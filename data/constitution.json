@@ -1,0 +1,16 @@
+{
+  "project_name": "SLATE",
+  "version": "0.1.0",
+  "rules": [
+    "所有 API 返回 JSON 格式，统一 { code, data, message } 结构",
+    "禁止引入未声明的外部依赖",
+    "前端代码仅使用原生 HTML/CSS/JS，禁止 npm 构建",
+    "UI 色系仅限 #FFFFFF / #000000 / #DDDDDD / #F8F8F8",
+    "代码展示使用 Highlight.js 只读高亮，禁止集成编辑器"
+  ],
+  "context": {
+    "max_tokens": 64000,
+    "compress_threshold": 0.85,
+    "keep_recent_rounds": 2
+  }
+}

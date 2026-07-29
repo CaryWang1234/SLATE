@@ -1,0 +1,82 @@
+/**
+ * SLATE 模型适配器：System Prompt 模板 + 参数映射
+ * 根据不同模型特点优化提示词
+ */
+
+// ── System Prompt 模板 ──────────────────────
+
+const SYSTEM_BASE = `你是 SLATE（砚），一个本地 AI 协作调度台助手。
+你的核心能力：
+1. 将用户的零碎灵感整理为结构化方案
+2. 生成高质量提示词，供外部 Coding Agent 执行
+3. 在白板上整理逻辑链和思维导图
+4. 调用技能（文件扫描、终端执行等）辅助开发
+
+回答风格：简洁务实，中文为主，技术术语保留英文。
+不使用冗余的客套话，直接给出方案。`;
+
+const SYSTEM_PROMPTS = {
+  default: SYSTEM_BASE,
+
+  // 针对推理模型的系统提示
+  reasoning: `${SYSTEM_BASE}\n\n当前处于深度推理模式，请在回答前仔细分析问题，给出思考过程。`,
+
+  // 针对轻量模型的精简提示
+  lightweight: `你是 SLATE 助手。简洁回答，不超过 3 句话。`,
+};
+
+// ── 模型分类 ────────────────────────────────
+
+const REASONING_MODELS = ["deepseek-reasoner", "o1", "o3-mini"];
+const LIGHTWEIGHT_MODELS = ["gemini-2.0-flash", "moonshot-v1-128k", "doubao-pro-32k"];
+
+/**
+ * 根据模型 ID 获取适配的系统提示
+ */
+function getSystemPrompt(modelId) {
+  if (REASONING_MODELS.includes(modelId)) return SYSTEM_PROMPTS.reasoning;
+  if (LIGHTWEIGHT_MODELS.includes(modelId)) return SYSTEM_PROMPTS.lightweight;
+  return SYSTEM_PROMPTS.default;
+}
+
+/**
+ * 构建完整的消息列表（注入系统提示 + 宪法上下文）
+ */
+function buildMessages(userMessages, constitution) {
+  const messages = [];
+
+  // 系统提示
+  const modelId = userMessages._modelId || "";
+  let systemContent = getSystemPrompt(modelId);
+
+  // 注入项目宪法
+  if (constitution) {
+    systemContent += "\n\n[项目宪法]\n";
+    if (constitution.rules) {
+      constitution.rules.forEach((rule, i) => {
+        systemContent += `${i + 1}. ${rule}\n`;
+      });
+    }
+  }
+
+  messages.push({ role: "system", content: systemContent });
+
+  // 用户消息
+  for (const msg of userMessages) {
+    messages.push({ role: msg.role, content: msg.content });
+  }
+
+  return messages;
+}
+
+/**
+ * 获取模型的默认参数
+ */
+function getDefaultParams(modelId) {
+  if (REASONING_MODELS.includes(modelId)) {
+    return { temperature: 0.6, max_tokens: 8192 };
+  }
+  return { temperature: 0.7, max_tokens: 4096 };
+}
+
+export { getSystemPrompt, buildMessages, getDefaultParams, SYSTEM_PROMPTS };

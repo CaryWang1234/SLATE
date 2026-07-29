@@ -1,0 +1,229 @@
+/**
+ * SLATE 技能面板：内置技能列表 + 自定义 Skill 上传
+ */
+
+import { state, subscribe, setSkills } from "../store.js";
+import { get, post, upload } from "../services/api.js";
+
+let skillList, btnUpload, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
+
+// ── 技能参数定义 ─────────────────────────────
+
+const SKILL_PARAM_DEFS = {
+  file_tree: [
+    { key: "directory", label: "目录路径", type: "text", placeholder: "C:\\path\\to\\project" },
+  ],
+  file_peek: [
+    { key: "file_path", label: "文件路径", type: "text", placeholder: "C:\\path\\to\\file.js" },
+    { key: "lines", label: "行数（≤50）", type: "number", placeholder: "30" },
+  ],
+  terminal: [
+    { key: "command", label: "命令", type: "text", placeholder: "ls -la" },
+    { key: "work_dir", label: "工作目录", type: "text", placeholder: "." },
+  ],
+  html_render: [
+    { key: "title", label: "页面标题", type: "text", placeholder: "SLATE 页面" },
+    { key: "body", label: "HTML 内容", type: "textarea", placeholder: "<p>Hello</p>" },
+  ],
+};
+
+// ── 技能列表渲染 ────────────────────────────
+
+function renderSkillList() {
+  skillList.innerHTML = "";
+
+  // 内置技能
+  const builtin = state.skills.builtin || {};
+  for (const [name, desc] of Object.entries(builtin)) {
+    skillList.appendChild(createSkillItem(name, desc, false));
+  }
+
+  // 自定义技能
+  const custom = state.skills.custom || {};
+  for (const [name, desc] of Object.entries(custom)) {
+    skillList.appendChild(createSkillItem(name, desc, true));
+  }
+}
+
+function createSkillItem(name, desc, isCustom) {
+  const item = document.createElement("div");
+  item.className = "skill-item";
+
+  const info = document.createElement("div");
+  const nameEl = document.createElement("div");
+  nameEl.className = "skill-item-name";
+  nameEl.textContent = name + (isCustom ? " ✦" : "");
+  const descEl = document.createElement("div");
+  descEl.className = "skill-item-desc";
+  descEl.textContent = desc;
+  info.appendChild(nameEl);
+  info.appendChild(descEl);
+  item.appendChild(info);
+
+  item.addEventListener("click", () => openSkillModal(name, isCustom));
+  return item;
+}
+
+// ── 技能执行弹窗 ─────────────────────────────
+
+let currentSkillName = "";
+
+function openSkillModal(name, isCustom) {
+  currentSkillName = name;
+  skillModalTitle.textContent = `执行: ${name}`;
+  skillParams.innerHTML = "";
+  skillResult.classList.add("hidden");
+  skillResult.textContent = "";
+
+  if (isCustom) {
+    // 自定义技能没有预定义参数
+    const label = document.createElement("label");
+    label.textContent = "参数（JSON 格式）";
+    const input = document.createElement("textarea");
+    input.id = "skill-param-custom";
+    input.rows = 4;
+    input.placeholder = '{"key": "value"}';
+    skillParams.appendChild(label);
+    skillParams.appendChild(input);
+  } else {
+    const defs = SKILL_PARAM_DEFS[name] || [];
+    for (const def of defs) {
+      const label = document.createElement("label");
+      label.textContent = def.label;
+
+      let input;
+      if (def.type === "textarea") {
+        input = document.createElement("textarea");
+        input.rows = 3;
+      } else {
+        input = document.createElement("input");
+        input.type = def.type;
+      }
+      input.id = `skill-param-${def.key}`;
+      input.placeholder = def.placeholder || "";
+      if (def.type === "number") input.value = "30";
+
+      skillParams.appendChild(label);
+      skillParams.appendChild(input);
+    }
+  }
+
+  skillModal.classList.remove("hidden");
+}
+
+async function executeSkill() {
+  const params = {};
+
+  if (SKILL_PARAM_DEFS[currentSkillName]) {
+    for (const def of SKILL_PARAM_DEFS[currentSkillName]) {
+      const el = document.getElementById(`skill-param-${def.key}`);
+      if (el) {
+        params[def.key] = def.type === "number" ? parseInt(el.value) || 0 : el.value;
+      }
+    }
+  } else {
+    // 自定义技能
+    const el = document.getElementById("skill-param-custom");
+    if (el && el.value.trim()) {
+      try {
+        Object.assign(params, JSON.parse(el.value));
+      } catch (e) {
+        alert("参数格式错误，请输入有效的 JSON");
+        return;
+      }
+    }
+  }
+
+  btnRunSkill.disabled = true;
+  btnRunSkill.textContent = "执行中…";
+
+  try {
+    const res = await post("/skills/execute", { skill: currentSkillName, params });
+    skillResult.classList.remove("hidden");
+    if (res.code === 0) {
+      skillResult.textContent = JSON.stringify(res.data, null, 2);
+    } else {
+      skillResult.textContent = `错误: ${res.message}`;
+    }
+  } catch (e) {
+    skillResult.classList.remove("hidden");
+    skillResult.textContent = `请求失败: ${e.message}`;
+  }
+
+  btnRunSkill.disabled = false;
+  btnRunSkill.textContent = "执行";
+}
+
+// ── 上传自定义技能 ───────────────────────────
+
+function handleUploadSkill() {
+  const name = prompt("技能名称（英文，如 my-skill）：");
+  if (!name) return;
+  const desc = prompt("技能描述：") || name;
+
+  // 创建文件选择器
+  const input = document.createElement("input");
+  input.type = "file";
+  input.multiple = true;
+  input.accept = ".md,.py,.js,.json,.yaml,.yml,.sh,.bat";
+
+  input.addEventListener("change", async () => {
+    if (!input.files.length) return;
+    const formData = new FormData();
+    for (const file of input.files) {
+      formData.append("files", file);
+    }
+    formData.append("skill_name", name);
+    formData.append("skill_desc", desc);
+
+    try {
+      const res = await upload(`/skills/upload?skill_name=${encodeURIComponent(name)}&skill_desc=${encodeURIComponent(desc)}`, formData);
+      if (res.code === 0) {
+        alert(`技能 ${name} 上传成功`);
+        refreshSkills();
+      } else {
+        alert(`上传失败: ${res.message}`);
+      }
+    } catch (e) {
+      alert(`上传失败: ${e.message}`);
+    }
+  });
+
+  input.click();
+}
+
+// ── 刷新技能列表 ─────────────────────────────
+
+async function refreshSkills() {
+  const res = await get("/skills");
+  if (res.code === 0) {
+    setSkills(res.data);
+  }
+}
+
+// ── 初始化 ───────────────────────────────────
+
+function initSkillPanel() {
+  skillList = document.getElementById("skill-list");
+  btnUpload = document.getElementById("btn-upload-skill");
+  skillModal = document.getElementById("skill-modal");
+  skillModalTitle = document.getElementById("skill-modal-title");
+  skillParams = document.getElementById("skill-params");
+  skillResult = document.getElementById("skill-result");
+  btnRunSkill = document.getElementById("btn-run-skill");
+
+  btnUpload.addEventListener("click", handleUploadSkill);
+  btnRunSkill.addEventListener("click", executeSkill);
+
+  // 关闭弹窗
+  skillModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
+    el.addEventListener("click", () => skillModal.classList.add("hidden"));
+  });
+
+  subscribe("skills", renderSkillList);
+
+  // 加载技能列表
+  refreshSkills();
+}
+
+export { initSkillPanel, refreshSkills };

@@ -1,0 +1,35 @@
+"""SLATE 后端入口：挂载静态目录，注册路由。"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from backend.routers import chat, constitution, proxy, skills
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+app = FastAPI(title="SLATE", version="0.1.0")
+
+# CORS：开发阶段允许全部来源
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 注册 API 路由
+app.include_router(proxy.router, prefix="/api")
+app.include_router(constitution.router, prefix="/api")
+app.include_router(skills.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
+
+# 挂载前端静态文件
+frontend_dir = PROJECT_ROOT / "frontend"
+if frontend_dir.is_dir():
+    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLATE — 砚</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <!-- Highlight.js：只读代码高亮 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <!-- Mermaid.js：白板逻辑链 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
+  <!-- 全局样式 -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- ═══ 顶栏 ═══ -->
+  <header id="topbar">
+    <div class="topbar-left">
+      <span class="logo">砚</span>
+      <span class="logo-sub">SLATE</span>
+    </div>
+    <div class="topbar-center">
+      <button class="tab-btn active" data-panel="chat">对话</button>
+      <button class="tab-btn" data-panel="whiteboard">黑板</button>
+      <button class="tab-btn" data-panel="factory">工厂</button>
+    </div>
+    <div class="topbar-right">
+      <!-- 模型快捷切换 -->
+      <select id="model-select" title="当前模型">
+        <option value="">选择模型…</option>
+      </select>
+      <button id="btn-settings" class="icon-btn" title="设置">⚙</button>
+    </div>
+  </header>
+
+  <!-- ═══ 主区域：三栏 ═══ -->
+  <main id="workspace">
+
+    <!-- 左栏：对话 -->
+    <section id="panel-chat" class="panel active">
+      <div class="panel-header">
+        <span class="panel-title">对话</span>
+        <div class="panel-actions">
+          <select id="conversation-select" title="对话列表">
+            <option value="">新对话</option>
+          </select>
+          <button id="btn-new-chat" class="icon-btn" title="新建对话">+</button>
+        </div>
+      </div>
+      <div id="chat-messages" class="chat-scroll"></div>
+      <div id="chat-input-area">
+        <textarea id="chat-input" placeholder="输入消息…" rows="1"></textarea>
+        <button id="btn-send" class="send-btn">发送</button>
+      </div>
+    </section>
+
+    <!-- 中栏：黑板 -->
+    <section id="panel-whiteboard" class="panel">
+      <div class="panel-header">
+        <span class="panel-title">黑板</span>
+        <div class="panel-actions">
+          <button id="btn-add-card" class="icon-btn" title="添加卡片">+</button>
+          <button id="btn-clear-board" class="icon-btn" title="清空黑板">×</button>
+        </div>
+      </div>
+      <div id="whiteboard-canvas" class="board-canvas">
+        <div id="board-cards" class="board-cards"></div>
+        <div id="board-empty" class="board-empty">
+          <p>黑板是空的</p>
+          <p class="hint">将灵感拖到这里，或让 AI 整理逻辑链</p>
+        </div>
+      </div>
+      <div id="mermaid-preview" class="mermaid-preview hidden">
+        <pre><code id="mermaid-code" class="language-mermaid"></code></pre>
+      </div>
+    </section>
+
+    <!-- 右栏：工厂 + 技能 -->
+    <section id="panel-factory" class="panel">
+      <div class="panel-header">
+        <span class="panel-title">提示词工厂</span>
+      </div>
+      <div id="factory-area" class="factory-area">
+        <div class="factory-section">
+          <label class="factory-label">项目宪法</label>
+          <div id="constitution-display" class="constitution-display"></div>
+        </div>
+        <div class="factory-section">
+          <label class="factory-label">任务描述</label>
+          <textarea id="factory-task" class="factory-input" placeholder="描述你要完成的任务…" rows="3"></textarea>
+        </div>
+        <div class="factory-section">
+          <label class="factory-label">相关文件上下文</label>
+          <textarea id="factory-context" class="factory-input" placeholder="文件路径或关键代码片段…" rows="3"></textarea>
+        </div>
+        <div class="factory-section">
+          <label class="factory-label">约束条件</label>
+          <textarea id="factory-constraints" class="factory-input" placeholder="禁止修改的文件、必须遵守的规则…" rows="2"></textarea>
+        </div>
+        <button id="btn-generate-prompt" class="generate-btn">生成提示词</button>
+        <div id="prompt-output" class="prompt-output hidden">
+          <div class="prompt-output-header">
+            <span>输出</span>
+            <button id="btn-copy-prompt" class="icon-btn" title="复制">⧉</button>
+          </div>
+          <pre id="prompt-result" class="prompt-result"></pre>
+        </div>
+      </div>
+
+      <!-- 技能面板 -->
+      <div class="panel-header" style="margin-top:1rem;">
+        <span class="panel-title">技能</span>
+      </div>
+      <div id="skill-panel" class="skill-panel">
+        <div id="skill-list" class="skill-list"></div>
+        <div class="skill-upload">
+          <button id="btn-upload-skill" class="icon-btn" title="上传自定义技能">+ 自定义技能</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══ 设置弹窗 ═══ -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>设置</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label class="setting-label">API Key</label>
+          <input id="setting-api-key" type="password" class="setting-input" placeholder="输入 API Key…">
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">自定义 Base URL（可选）</label>
+          <input id="setting-base-url" type="text" class="setting-input" placeholder="https://api.example.com/v1">
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">自定义模型名（可选）</label>
+          <input id="setting-model-name" type="text" class="setting-input" placeholder="model-name">
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">上下文 Token 上限</label>
+          <input id="setting-max-tokens" type="number" class="setting-input" value="64000">
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">项目宪法</label>
+          <textarea id="setting-constitution" class="setting-input setting-textarea" rows="5"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="send-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 技能执行弹窗 ═══ -->
+  <div id="skill-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="skill-modal-title">执行技能</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="skill-params" class="skill-params"></div>
+        <pre id="skill-result" class="skill-result hidden"></pre>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-run-skill" class="send-btn">执行</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ JS 模块 ═══ -->
+  <script type="module" src="/js/app.js"></script>
+
+</body>
+</html>
