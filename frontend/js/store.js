@@ -1,33 +1,34 @@
 /**
- * SLATE 全局状态管理
- * 管理当前模型、对话历史、上下文池、黑板卡片
+ * SLATE 全局状态管理 v2
+ * 管理主题、模型、对话历史、上下文池、黑板卡片
  */
 
 const API_BASE = "http://127.0.0.1:8000/api";
 
-// ── 状态 ────────────────────────────────────
-
 const state = {
+  // 主题
+  theme: "light",
+
   // 当前选中的模型
-  currentModel: null,       // { id, name, provider, base_url, context_window }
+  currentModel: null,
   apiKey: "",
   customBaseUrl: "",
   customModelName: "",
   maxTokens: 64000,
 
   // 模型列表
-  modelRegistry: {},        // { international: [...], domestic: [...], local: [...] }
+  modelRegistry: {},
 
   // 对话
   currentConversationId: null,
-  conversations: [],        // [{ id, title, created_at }]
-  messages: [],             // [{ id, role, content, model, created_at }]
+  conversations: [],
+  messages: [],
 
   // 黑板
-  boardCards: [],           // [{ id, title, body, arrows: [targetId] }]
+  boardCards: [],
 
   // 宪法
-  constitution: null,       // { project_name, rules, context, ... }
+  constitution: null,
 
   // 技能
   skills: { builtin: {}, custom: {} },
@@ -46,10 +47,11 @@ function notify(key, data) {
   (listeners[key] || []).forEach(fn => fn(data));
 }
 
-// ── 持久化（内存 + localStorage 备份） ───────
+// ── 持久化 ──────────────────────────────────
 
 function savePersistent() {
   const data = {
+    theme: state.theme,
     apiKey: state.apiKey,
     customBaseUrl: state.customBaseUrl,
     customModelName: state.customModelName,
@@ -57,9 +59,7 @@ function savePersistent() {
     currentModelId: state.currentModel?.id || null,
     boardCards: state.boardCards,
   };
-  try {
-    localStorage.setItem("slate_state", JSON.stringify(data));
-  } catch (e) { /* 忽略 */ }
+  try { localStorage.setItem("slate_state", JSON.stringify(data)); } catch (e) {}
 }
 
 function loadPersistent() {
@@ -67,17 +67,28 @@ function loadPersistent() {
     const raw = localStorage.getItem("slate_state");
     if (!raw) return;
     const data = JSON.parse(raw);
+    state.theme = data.theme || "light";
     state.apiKey = data.apiKey || "";
     state.customBaseUrl = data.customBaseUrl || "";
     state.customModelName = data.customModelName || "";
     state.maxTokens = data.maxTokens || 64000;
     state.boardCards = data.boardCards || [];
-    // currentModelId 需要在模型列表加载后恢复
     state._pendingModelId = data.currentModelId;
-  } catch (e) { /* 忽略 */ }
+  } catch (e) {}
 }
 
-// ── 状态修改函数 ────────────────────────────
+// ── 状态修改 ────────────────────────────────
+
+function setTheme(t) {
+  state.theme = t;
+  document.documentElement.setAttribute("data-theme", t);
+  savePersistent();
+  notify("theme", t);
+}
+
+function toggleTheme() {
+  setTheme(state.theme === "light" ? "dark" : "light");
+}
 
 function setCurrentModel(model) {
   state.currentModel = model;
@@ -139,14 +150,10 @@ function setSkills(data) {
 
 function setModelRegistry(registry) {
   state.modelRegistry = registry;
-  // 恢复之前选中的模型
   if (state._pendingModelId) {
     for (const category of Object.values(registry)) {
       const found = category.find(m => m.id === state._pendingModelId);
-      if (found) {
-        setCurrentModel(found);
-        break;
-      }
+      if (found) { setCurrentModel(found); break; }
     }
     delete state._pendingModelId;
   }
@@ -155,8 +162,9 @@ function setModelRegistry(registry) {
 
 export {
   API_BASE, state, subscribe, notify,
-  setCurrentModel, setApiKey, setMessages, addMessage,
-  updateLastAssistantMessage, setConversations, addMessage as pushMessage,
-  setBoardCards, addBoardCard, setConstitution, setSkills,
-  setModelRegistry, savePersistent, loadPersistent,
+  setTheme, toggleTheme, setCurrentModel, setApiKey,
+  setMessages, addMessage, updateLastAssistantMessage,
+  setConversations, setBoardCards, addBoardCard,
+  setConstitution, setSkills, setModelRegistry,
+  savePersistent, loadPersistent,
 };

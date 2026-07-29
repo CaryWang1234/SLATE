@@ -5,12 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE — 砚</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <!-- Highlight.js：只读代码高亮 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <!-- Mermaid.js：白板逻辑链 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <!-- 全局样式 -->
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -27,10 +24,10 @@
       <button class="tab-btn" data-panel="factory">工厂</button>
     </div>
     <div class="topbar-right">
-      <!-- 模型快捷切换 -->
       <select id="model-select" title="当前模型">
         <option value="">选择模型…</option>
       </select>
+      <button id="btn-theme" class="theme-btn" title="切换主题">◐</button>
       <button id="btn-settings" class="icon-btn" title="设置">⚙</button>
     </div>
   </header>
@@ -43,15 +40,19 @@
       <div class="panel-header">
         <span class="panel-title">对话</span>
         <div class="panel-actions">
-          <select id="conversation-select" title="对话列表">
-            <option value="">新对话</option>
-          </select>
-          <button id="btn-new-chat" class="icon-btn" title="新建对话">+</button>
+          <button id="btn-new-chat" class="icon-btn" title="新建对话 (Ctrl+N)">+</button>
         </div>
+      </div>
+      <!-- 对话历史侧栏 -->
+      <div id="conv-sidebar" class="conv-sidebar">
+        <div class="conv-sidebar-header">
+          <span class="conv-sidebar-title">历史</span>
+        </div>
+        <div id="conv-list"></div>
       </div>
       <div id="chat-messages" class="chat-scroll"></div>
       <div id="chat-input-area">
-        <textarea id="chat-input" placeholder="输入消息…" rows="1"></textarea>
+        <textarea id="chat-input" placeholder="输入消息… (Enter 发送, Shift+Enter 换行)" rows="1"></textarea>
         <button id="btn-send" class="send-btn">发送</button>
       </div>
     </section>
@@ -108,8 +109,6 @@
           <pre id="prompt-result" class="prompt-result"></pre>
         </div>
       </div>
-
-      <!-- 技能面板 -->
       <div class="panel-header" style="margin-top:1rem;">
         <span class="panel-title">技能</span>
       </div>
@@ -177,7 +176,9 @@
     </div>
   </div>
 
-  <!-- ═══ JS 模块 ═══ -->
+  <!-- ═══ Toast 容器 ═══ -->
+  <div id="toast-container"></div>
+
   <script type="module" src="/js/app.js"></script>
 
 </body>

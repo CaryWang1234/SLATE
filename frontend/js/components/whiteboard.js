@@ -205,14 +205,27 @@ function initWhiteboard() {
 
   setupDragDrop();
 
-  // 初始化 Mermaid
-  if (window.mermaid) {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: "neutral",
-      flowchart: { curve: "basis", padding: 12 },
-    });
+  // 初始化 Mermaid（根据当前主题）
+  function initMermaidTheme() {
+    if (window.mermaid) {
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: isDark ? "dark" : "neutral",
+        flowchart: { curve: "basis", padding: 12 },
+        themeVariables: isDark
+          ? { primaryColor: "#1E1E1E", primaryTextColor: "#E0E0E0", primaryBorderColor: "#2A2A2A", lineColor: "#555", secondaryColor: "#161616" }
+          : {},
+      });
+    }
   }
+  initMermaidTheme();
+
+  // 主题切换时重新初始化 Mermaid 并重渲染
+  subscribe("theme", () => {
+    initMermaidTheme();
+    if (state.boardCards.length > 0) renderMermaid();
+  });
 
   subscribe("boardCards", () => {
     renderAllCards();

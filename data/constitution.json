@@ -1,5 +1,5 @@
 {
-  "project_name": "SLATE",
+  "project_name": "test",
   "version": "0.1.0",
   "rules": [
     "所有 API 返回 JSON 格式，统一 { code, data, message } 结构",

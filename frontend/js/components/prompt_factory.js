@@ -25,10 +25,20 @@ function renderConstitution() {
 
 // ── 提示词生成 ───────────────────────────────
 
+function showToast(msg) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => { el.classList.add("out"); el.addEventListener("animationend", () => el.remove()); }, 2200);
+}
+
 function generatePrompt() {
   const task = factoryTask.value.trim();
   if (!task) {
-    alert("请输入任务描述");
+    showToast("请输入任务描述");
     return;
   }
 

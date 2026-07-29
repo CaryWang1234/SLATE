@@ -7,6 +7,16 @@ import { get, post, upload } from "../services/api.js";
 
 let skillList, btnUpload, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
+function showToast(msg) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => { el.classList.add("out"); el.addEventListener("animationend", () => el.remove()); }, 2200);
+}
+
 // ── 技能参数定义 ─────────────────────────────
 
 const SKILL_PARAM_DEFS = {
@@ -128,7 +138,7 @@ async function executeSkill() {
       try {
         Object.assign(params, JSON.parse(el.value));
       } catch (e) {
-        alert("参数格式错误，请输入有效的 JSON");
+        showToast("参数格式错误，请输入有效的 JSON");
         return;
       }
     }
@@ -179,13 +189,13 @@ function handleUploadSkill() {
     try {
       const res = await upload(`/skills/upload?skill_name=${encodeURIComponent(name)}&skill_desc=${encodeURIComponent(desc)}`, formData);
       if (res.code === 0) {
-        alert(`技能 ${name} 上传成功`);
+        showToast(`技能 ${name} 上传成功`);
         refreshSkills();
       } else {
-        alert(`上传失败: ${res.message}`);
+        showToast(`上传失败: ${res.message}`);
       }
     } catch (e) {
-      alert(`上传失败: ${e.message}`);
+      showToast(`上传失败: ${e.message}`);
     }
   });
 

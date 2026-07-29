@@ -113,49 +113,49 @@ def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-async def _stream_openai(client: httpx.AsyncClient, url: str, headers: dict[str, str],
-                         payload: dict[str, Any]):
-    """流式转发 OpenAI 兼容 API。"""
-    async with client.stream("POST", url, json=payload, headers=headers, timeout=120) as resp:
-        async for line in resp.aiter_lines():
-            if line:
-                yield f"{line}\n\n"
+async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, Any]):
+    """流式转发 OpenAI 兼容 API（自管理 client 生命周期）。"""
+    async with httpx.AsyncClient() as client:
+        async with client.stream("POST", url, json=payload, headers=headers, timeout=120) as resp:
+            async for line in resp.aiter_lines():
+                if line:
+                    yield f"{line}\n\n"
 
 
-async def _stream_anthropic(client: httpx.AsyncClient, url: str, headers: dict[str, str],
-                            payload: dict[str, Any]):
-    """流式转发 Anthropic API，转换为 OpenAI 兼容 SSE 格式。"""
-    async with client.stream("POST", url, json=payload, headers=headers, timeout=120) as resp:
-        buffer = ""
-        async for line in resp.aiter_lines():
-            buffer += line + "\n"
-            if line == "" and buffer.strip():
-                # 解析 Anthropic SSE 事件
-                event_type = ""
-                data_str = ""
-                for bline in buffer.strip().split("\n"):
-                    if bline.startswith("event:"):
-                        event_type = bline[6:].strip()
-                    elif bline.startswith("data:"):
-                        data_str = bline[5:].strip()
-                buffer = ""
-                if not data_str:
-                    continue
-                try:
-                    data = json.loads(data_str)
-                except json.JSONDecodeError:
-                    continue
-                # 转换为 OpenAI SSE 格式
-                if event_type == "content_block_delta":
-                    delta = data.get("delta", {})
-                    text = delta.get("text", "")
-                    if text:
-                        chunk = {
-                            "choices": [{"delta": {"content": text}, "index": 0}]
-                        }
-                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
-                elif event_type == "message_stop":
-                    yield "data: [DONE]\n\n"
+async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str, Any]):
+    """流式转发 Anthropic API，转换为 OpenAI 兼容 SSE 格式（自管理 client）。"""
+    async with httpx.AsyncClient() as client:
+        async with client.stream("POST", url, json=payload, headers=headers, timeout=120) as resp:
+            buffer = ""
+            async for line in resp.aiter_lines():
+                buffer += line + "\n"
+                if line == "" and buffer.strip():
+                    # 解析 Anthropic SSE 事件
+                    event_type = ""
+                    data_str = ""
+                    for bline in buffer.strip().split("\n"):
+                        if bline.startswith("event:"):
+                            event_type = bline[6:].strip()
+                        elif bline.startswith("data:"):
+                            data_str = bline[5:].strip()
+                    buffer = ""
+                    if not data_str:
+                        continue
+                    try:
+                        data = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+                    # 转换为 OpenAI SSE 格式
+                    if event_type == "content_block_delta":
+                        delta = data.get("delta", {})
+                        text = delta.get("text", "")
+                        if text:
+                            chunk = {
+                                "choices": [{"delta": {"content": text}, "index": 0}]
+                            }
+                            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                    elif event_type == "message_stop":
+                        yield "data: [DONE]\n\n"
 
 
 @router.post("/chat")
@@ -174,78 +174,81 @@ async def proxy_chat(request: Request) -> Any:
     provider = model_cfg["provider"]
     base_url = model_cfg["base_url"]
 
-    async with httpx.AsyncClient() as client:
-        if provider == "anthropic":
-            headers = {
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            }
-            url = f"{base_url}/v1/messages"
-            payload = _build_anthropic_request(body)
-
-            if is_stream:
-                return StreamingResponse(
-                    _stream_anthropic(client, url, headers, payload),
-                    media_type="text/event-stream",
-                )
-            resp = await client.post(url, json=payload, headers=headers, timeout=120)
-            data = resp.json()
-            # 转换为 OpenAI 格式
-            content = ""
-            if "content" in data and data["content"]:
-                content = data["content"][0].get("text", "")
-            return {
-                "code": 0,
-                "data": {
-                    "choices": [{"message": {"role": "assistant", "content": content}}],
-                    "usage": data.get("usage", {}),
-                },
-                "message": "ok",
-            }
-
-        # OpenAI 兼容（含国内模型、本地模型、Google via 兼容层）
-        if provider == "google":
-            headers = {"content-type": "application/json"}
-            url = f"{base_url}/models/{model_id}:generateContent?key={api_key}"
-            # Google 格式
-            messages = body.get("messages", [])
-            contents = []
-            for msg in messages:
-                role = "user" if msg["role"] == "user" else "model"
-                contents.append({"role": role, "parts": [{"text": msg["content"]}]})
-            payload = {"contents": contents}
-            if body.get("temperature"):
-                payload["generationConfig"] = {"temperature": body["temperature"]}
-
-            resp = await client.post(url, json=payload, headers=headers, timeout=120)
-            data = resp.json()
-            text = ""
-            if "candidates" in data and data["candidates"]:
-                parts = data["candidates"][0].get("content", {}).get("parts", [])
-                text = "".join(p.get("text", "") for p in parts)
-            return {
-                "code": 0,
-                "data": {
-                    "choices": [{"message": {"role": "assistant", "content": text}}],
-                    "usage": data.get("usageMetadata", {}),
-                },
-                "message": "ok",
-            }
-
-        # 默认 OpenAI 兼容
+    # ── Anthropic ──
+    if provider == "anthropic":
         headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
         }
-        url = f"{base_url}/chat/completions"
-        payload = _build_openai_request(body)
+        url = f"{base_url}/v1/messages"
+        payload = _build_anthropic_request(body)
 
         if is_stream:
             return StreamingResponse(
-                _stream_openai(client, url, headers, payload),
+                _stream_anthropic(url, headers, payload),
                 media_type="text/event-stream",
             )
-        resp = await client.post(url, json=payload, headers=headers, timeout=120)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, json=payload, headers=headers, timeout=120)
         data = resp.json()
-        return {"code": 0, "data": data, "message": "ok"}
+        content = ""
+        if "content" in data and data["content"]:
+            content = data["content"][0].get("text", "")
+        return {
+            "code": 0,
+            "data": {
+                "choices": [{"message": {"role": "assistant", "content": content}}],
+                "usage": data.get("usage", {}),
+            },
+            "message": "ok",
+        }
+
+    # ── Google ──
+    if provider == "google":
+        headers = {"content-type": "application/json"}
+        url = f"{base_url}/models/{model_id}:generateContent?key={api_key}"
+        messages = body.get("messages", [])
+        contents = []
+        for msg in messages:
+            role = "user" if msg["role"] == "user" else "model"
+            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+        payload: dict[str, Any] = {"contents": contents}
+        if body.get("temperature"):
+            payload["generationConfig"] = {"temperature": body["temperature"]}
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, json=payload, headers=headers, timeout=120)
+        data = resp.json()
+        text = ""
+        if "candidates" in data and data["candidates"]:
+            parts = data["candidates"][0].get("content", {}).get("parts", [])
+            text = "".join(p.get("text", "") for p in parts)
+        return {
+            "code": 0,
+            "data": {
+                "choices": [{"message": {"role": "assistant", "content": text}}],
+                "usage": data.get("usageMetadata", {}),
+            },
+            "message": "ok",
+        }
+
+    # ── OpenAI 兼容（含国内模型、本地模型） ──
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    url = f"{base_url}/chat/completions"
+    payload = _build_openai_request(body)
+
+    if is_stream:
+        return StreamingResponse(
+            _stream_openai(url, headers, payload),
+            media_type="text/event-stream",
+        )
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, json=payload, headers=headers, timeout=120)
+    data = resp.json()
+    return {"code": 0, "data": data, "message": "ok"}
