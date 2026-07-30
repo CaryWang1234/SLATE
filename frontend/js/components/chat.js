@@ -2,16 +2,34 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage } from "../store.js";
-import { get, post, del, streamChat, upload } from "../services/api.js";
-import { buildMessages, getDefaultParams } from "../services/adapter.js";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-2";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-2";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-2";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-2";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
 let pendingFiles = []; // { name, size, content, type }
 
-// ── 简易 Markdown → HTML ────────────────────
+// ── 用量同步到后端 ──────────────────────────
+
+async function syncUsageToBackend() {
+  if (!state.currentConversationId) return;
+  const ctxTokens = estimateContextTokens(state.messages);
+  try {
+    await patch(`/chat/conversations/${state.currentConversationId}/usage`, {
+      total_tokens: state.usage.totalTokens,
+      prompt_tokens: state.usage.promptTokens,
+      completion_tokens: state.usage.completionTokens,
+      message_count: state.usage.messageCount,
+      context_tokens: ctxTokens,
+    });
+  } catch (e) {
+    console.warn("用量同步失败:", e);
+  }
+}
+
+// ─ 简易 Markdown → HTML ────────────────────
 
 function renderMarkdown(text) {
   if (!text) return "";
@@ -314,6 +332,9 @@ async function sendMessage() {
   const estimatedCompletion = Math.ceil(fullContent.length / 3);
   addUsage({ prompt_tokens: estimatedPrompt, completion_tokens: estimatedCompletion });
 
+  // 同步用量到后端
+  syncUsageToBackend();
+
   const contentEl = msgEl.querySelector(".msg-content");
   if (contentEl) {
     contentEl.innerHTML = renderMarkdown(fullContent);
@@ -367,7 +388,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js");
+    const { toast } = await import("../app.js?v=20260730-2");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -391,10 +412,25 @@ function renderConvList(conversations) {
     const item = document.createElement("div");
     item.className = "conv-item" + (conv.id === state.currentConversationId ? " active" : "");
 
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "conv-item-title-wrap";
+
     const title = document.createElement("span");
     title.className = "conv-item-title";
     title.textContent = conv.title || conv.id;
-    item.appendChild(title);
+    titleWrap.appendChild(title);
+
+    // 用量摘要
+    const msgCount = conv.message_count || 0;
+    const totalTokens = conv.total_tokens || 0;
+    if (msgCount > 0 || totalTokens > 0) {
+      const usageInfo = document.createElement("span");
+      usageInfo.className = "conv-item-usage";
+      usageInfo.textContent = `${msgCount}条 · ~${totalTokens >= 1000 ? (totalTokens / 1000).toFixed(1) + "K" : totalTokens} tok`;
+      titleWrap.appendChild(usageInfo);
+    }
+
+    item.appendChild(titleWrap);
 
     const delBtn = document.createElement("button");
     delBtn.className = "conv-item-del";
@@ -417,9 +453,29 @@ function renderConvList(conversations) {
 }
 
 async function switchConversation(convId) {
+  // 保存当前对话用量
+  if (state.currentConversationId) {
+    setConversationUsage(state.currentConversationId, { ...state.usage });
+  }
   state.currentConversationId = convId;
   const res = await get(`/chat/conversations/${convId}/messages`);
   if (res.code === 0) setMessages(res.data);
+
+  // 从后端对话列表获取用量数据
+  const conv = state.conversations.find(c => c.id === convId);
+  if (conv && (conv.total_tokens || conv.message_count)) {
+    const backendUsage = {
+      totalTokens: conv.total_tokens || 0,
+      promptTokens: conv.prompt_tokens || 0,
+      completionTokens: conv.completion_tokens || 0,
+      messageCount: conv.message_count || 0,
+    };
+    setConversationUsage(convId, backendUsage);
+    restoreUsageForConversation(convId);
+  } else {
+    restoreUsageForConversation(convId);
+  }
+
   renderConvList(state.conversations);
 }
 
@@ -438,13 +494,19 @@ function renderUsageBar() {
     ctxPercent = Math.min(100, Math.round((ctxTokens / ctxLimit) * 100));
   }
 
+  const fmtTok = (n) => n >= 1000 ? (n / 1000).toFixed(1) + "K" : n.toLocaleString();
+
   usageBar.innerHTML = `
     <span class="usage-model" title="${state.currentModel?.base_url || ''}">${modelName}${hasKey ? "" : " ⚠"}</span>
     <span class="usage-sep">|</span>
     <span class="usage-stat">消息 ${u.messageCount}</span>
     <span class="usage-sep">|</span>
-    <span class="usage-stat">上下文 ~${ctxTokens.toLocaleString()} tok</span>
-    ${ctxLimit > 0 ? `<span class="usage-sep">|</span><span class="usage-stat ${ctxPercent > 80 ? "usage-warn" : ""}">${ctxPercent}% / ${Math.round(ctxLimit / 1000)}K</span>` : ""}
+    <span class="usage-stat">输入 ${fmtTok(u.promptTokens)}</span>
+    <span class="usage-sep">|</span>
+    <span class="usage-stat">输出 ${fmtTok(u.completionTokens)}</span>
+    <span class="usage-sep">|</span>
+    <span class="usage-stat">总计 ${fmtTok(u.totalTokens)}</span>
+    ${ctxLimit > 0 ? `<span class="usage-sep">|</span><span class="usage-stat ${ctxPercent > 80 ? "usage-warn" : ""}">上下文 ${ctxPercent}% / ${Math.round(ctxLimit / 1000)}K</span>` : ""}
   `;
 }
 
@@ -493,7 +555,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js");
+      const { toast } = await import("../app.js?v=20260730-2");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }
@@ -581,7 +643,7 @@ function initChat() {
 
   chatInput.addEventListener("input", () => {
     chatInput.style.height = "auto";
-    chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + "px";
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + "px";
   });
 
   btnNewChat.addEventListener("click", () => {

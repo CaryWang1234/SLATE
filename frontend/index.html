@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE — 砚</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="./css/style.css?v=20260730-2">
 </head>
 <body>
 
@@ -38,54 +38,66 @@
 
     <!-- 左栏：对话 + 团队 -->
     <section id="panel-chat" class="panel active">
-      <div class="panel-header">
-        <div class="panel-mode-toggle">
-          <button id="btn-chat-mode" class="mode-btn active">对话</button>
-          <button id="btn-team-mode" class="mode-btn">团队</button>
+      <div class="chat-layout">
+        <!-- 左侧：项目目录 (25%) -->
+        <div id="project-sidebar" class="project-sidebar">
+          <div id="project-bar" class="project-bar"></div>
+          <div id="project-file-tree" class="project-file-tree"></div>
+          <div id="file-preview" class="file-preview hidden"></div>
         </div>
-        <div class="panel-actions">
-          <button id="btn-toggle-history" class="icon-btn active" title="显示/隐藏历史">☰</button>
-          <button id="btn-new-chat" class="icon-btn" title="新建对话 (Ctrl+N)">+</button>
-        </div>
-      </div>
-      <!-- 用量信息栏 -->
-      <div id="usage-bar" class="usage-bar"></div>
 
-      <!-- 对话区域 -->
-      <div id="chat-area">
-        <!-- 对话历史侧栏 -->
-        <div id="conv-sidebar" class="conv-sidebar">
-          <div class="conv-sidebar-header">
-            <span class="conv-sidebar-title">历史</span>
+        <!-- 右侧：对话/团队 (75%) -->
+        <div class="chat-main">
+          <div class="panel-header">
+            <div class="panel-mode-toggle">
+              <button id="btn-chat-mode" class="mode-btn active">对话</button>
+              <button id="btn-team-mode" class="mode-btn">团队</button>
+            </div>
+            <div class="panel-actions">
+              <button id="btn-toggle-history" class="icon-btn active" title="显示/隐藏历史">☰</button>
+              <button id="btn-new-chat" class="icon-btn" title="新建对话 (Ctrl+N)">+</button>
+            </div>
           </div>
-          <div id="conv-list"></div>
-        </div>
-        <div id="chat-messages" class="chat-scroll"></div>
-        <!-- 文件附件预览区 -->
-        <div id="file-preview-area" class="file-preview-area hidden"></div>
-        <div id="chat-input-area">
-          <button id="btn-attach-file" class="icon-btn" title="附加文件">📎</button>
-          <input type="file" id="file-input" multiple hidden accept=".txt,.md,.csv,.json,.py,.js,.html,.css,.yaml,.yml,.xml,.sh,.bat,.jpg,.jpeg,.png,.gif,.webp,.svg,.pdf">
-          <textarea id="chat-input" placeholder="输入消息… (Enter 发送, Shift+Enter 换行)" rows="1"></textarea>
-          <button id="btn-send" class="send-btn">发送</button>
-        </div>
-      </div>
+          <!-- 用量信息栏 -->
+          <div id="usage-bar" class="usage-bar"></div>
 
-      <!-- 团队讨论区域 -->
-      <div id="team-panel" class="team-panel hidden">
-        <div class="team-config">
-          <div class="team-members-header">
-            <span class="team-label">团队成员</span>
-            <button id="btn-add-member" class="icon-btn" title="添加成员">+</button>
+          <!-- 对话区域 -->
+          <div id="chat-area">
+            <!-- 对话历史侧栏 -->
+            <div id="conv-sidebar" class="conv-sidebar">
+              <div class="conv-sidebar-header">
+                <span class="conv-sidebar-title">历史</span>
+              </div>
+              <div id="conv-list"></div>
+            </div>
+            <div id="chat-messages" class="chat-scroll"></div>
+            <!-- 文件附件预览区 -->
+            <div id="file-preview-area" class="file-preview-area hidden"></div>
+            <div id="chat-input-area">
+              <button id="btn-attach-file" class="icon-btn" title="附加文件">📎</button>
+              <input type="file" id="file-input" multiple hidden accept=".txt,.md,.csv,.json,.py,.js,.html,.css,.yaml,.yml,.xml,.sh,.bat,.jpg,.jpeg,.png,.gif,.webp,.svg,.pdf">
+              <textarea id="chat-input" placeholder="输入消息… (Enter 发送, Shift+Enter 换行)" rows="1"></textarea>
+              <button id="btn-send" class="send-btn">发送</button>
+            </div>
           </div>
-          <div id="team-members-area" class="team-members-area"></div>
-        </div>
-        <div class="team-discuss">
-          <div class="team-input-row">
-            <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题…">
-            <button id="btn-start-discuss" class="send-btn">开始讨论</button>
+
+          <!-- 团队讨论区域 -->
+          <div id="team-panel" class="team-panel hidden">
+            <div class="team-config">
+              <div class="team-members-header">
+                <span class="team-label">团队成员</span>
+                <button id="btn-add-member" class="icon-btn" title="添加成员">+</button>
+              </div>
+              <div id="team-members-area" class="team-members-area"></div>
+            </div>
+            <div class="team-discuss">
+              <div class="team-input-row">
+                <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题…">
+                <button id="btn-start-discuss" class="send-btn">开始讨论</button>
+              </div>
+              <div id="team-output" class="team-output"></div>
+            </div>
           </div>
-          <div id="team-output" class="team-output"></div>
         </div>
       </div>
     </section>
@@ -96,6 +108,8 @@
         <span class="panel-title">黑板</span>
         <div class="panel-actions">
           <button id="btn-add-card" class="icon-btn" title="添加卡片">+</button>
+          <button id="btn-ai-organize" class="icon-btn" title="AI 整理成流程图">◇</button>
+          <button id="btn-toggle-mermaid" class="icon-btn" title="显示/隐藏流程图">📊</button>
           <button id="btn-clear-board" class="icon-btn" title="清空黑板">×</button>
         </div>
       </div>
@@ -107,9 +121,48 @@
         </div>
       </div>
       <div id="mermaid-preview" class="mermaid-preview hidden">
-        <pre><code id="mermaid-code" class="language-mermaid"></code></pre>
+        <div class="mermaid-preview-header">
+          <span>流程图预览</span>
+          <button id="btn-close-mermaid" class="icon-btn" title="关闭">×</button>
+        </div>
+        <div id="mermaid-render-area" class="mermaid-render-area"></div>
+        <pre class="hidden"><code id="mermaid-code" class="language-mermaid"></code></pre>
       </div>
     </section>
+
+    <!-- ══ 卡片编辑弹窗 ═══ -->
+    <div id="card-modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <span id="card-modal-title">添加卡片</span>
+          <button class="modal-close icon-btn">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="setting-group">
+            <label class="setting-label">标题</label>
+            <input id="card-input-title" type="text" class="setting-input" placeholder="卡片标题">
+          </div>
+          <div class="setting-group">
+            <label class="setting-label">描述</label>
+            <textarea id="card-input-body" class="setting-input setting-textarea" rows="3" placeholder="卡片描述（可选）"></textarea>
+          </div>
+          <div class="setting-group">
+            <label class="setting-label">颜色标签</label>
+            <div id="card-color-options" class="card-color-options"></div>
+          </div>
+          <div class="setting-group">
+            <label class="setting-label">箭头指向（目标卡片 ID，多个用逗号分隔）</label>
+            <input id="card-input-arrows" type="text" class="setting-input" placeholder="c1, c2, ...">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-card-delete" class="send-btn" style="background:#999;margin-right:auto;">删除</button>
+          <button id="btn-card-cancel" class="send-btn" style="background:#666;">取消</button>
+          <button id="btn-card-save" class="send-btn">保存</button>
+        </div>
+      </div>
+    </div>
 
     <!-- 右栏：工厂 + 技能 -->
     <section id="panel-factory" class="panel">
@@ -253,10 +306,34 @@
     </div>
   </div>
 
+  <!-- ═══ 打开项目弹窗 ═══ -->
+  <div id="project-open-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>打开项目</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label class="setting-label">项目目录路径</label>
+          <input id="project-path-input" type="text" class="setting-input" placeholder="C:\Users\...\project 或 /home/user/project">
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">快速选择</label>
+          <div id="project-drives-list" class="project-drives-list"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-confirm-open-project" class="send-btn">打开</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ Toast 容器 ═══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="./js/app.js?v=20260730-2"></script>
 
 </body>
 </html>

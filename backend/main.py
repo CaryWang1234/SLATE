@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import chat, constitution, files, proxy, skills
+from backend.routers import chat, constitution, files, proxy, projects, skills
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -23,12 +23,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def add_dev_cache_headers(request, call_next):
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 # 注册 API 路由
 app.include_router(proxy.router, prefix="/api")
 app.include_router(constitution.router, prefix="/api")
 app.include_router(skills.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
+app.include_router(projects.router, prefix="/api")
 
 # 挂载前端静态文件
 frontend_dir = PROJECT_ROOT / "frontend"

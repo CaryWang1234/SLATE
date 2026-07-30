@@ -26,6 +26,9 @@ const state = {
     messageCount: 0,
   },
 
+  // 每个对话的用量统计（convId → usage）
+  conversationUsage: {},
+
   // 模型列表
   modelRegistry: {},
 
@@ -42,6 +45,10 @@ const state = {
 
   // 技能
   skills: { builtin: {}, custom: {} },
+
+  // 项目
+  project: null,        // { path, name, config, constitution }
+  projectFileTree: [],  // 当前浏览的目录内容
 };
 
 // ── 订阅者 ──────────────────────────────────
@@ -66,6 +73,8 @@ function savePersistent() {
     customModels: state.customModels,
     currentModelId: state.currentModel?.id || null,
     boardCards: state.boardCards,
+    lastProjectPath: state.project?.path || null,
+    conversationUsage: state.conversationUsage,
   };
   try { localStorage.setItem("slate_state", JSON.stringify(data)); } catch (e) {}
 }
@@ -80,6 +89,8 @@ function loadPersistent() {
     state.customModels = data.customModels || [];
     state.boardCards = data.boardCards || [];
     state._pendingModelId = data.currentModelId;
+    state._lastProjectPath = data.lastProjectPath || null;
+    state.conversationUsage = data.conversationUsage || {};
   } catch (e) {}
 }
 
@@ -128,8 +139,26 @@ function addCustomModel(model) {
 }
 
 function resetUsage() {
+  // 保存当前对话的用量
+  if (state.currentConversationId) {
+    state.conversationUsage[state.currentConversationId] = { ...state.usage };
+  }
   state.usage = { totalTokens: 0, promptTokens: 0, completionTokens: 0, messageCount: 0 };
   notify("usage", state.usage);
+}
+
+function restoreUsageForConversation(convId) {
+  const saved = state.conversationUsage[convId];
+  if (saved) {
+    state.usage = { ...saved };
+  } else {
+    state.usage = { totalTokens: 0, promptTokens: 0, completionTokens: 0, messageCount: 0 };
+  }
+  notify("usage", state.usage);
+}
+
+function setConversationUsage(convId, usage) {
+  state.conversationUsage[convId] = { ...usage };
 }
 
 function addUsage(usage) {
@@ -202,6 +231,23 @@ function setSkills(data) {
   notify("skills", data);
 }
 
+function setProject(data) {
+  state.project = data;
+  if (data) {
+    savePersistent();
+    // 如果项目有自己的宪法，覆盖全局宪法
+    if (data.constitution) {
+      setConstitution(data.constitution);
+    }
+  }
+  notify("project", data);
+}
+
+function setProjectFileTree(data) {
+  state.projectFileTree = data;
+  notify("projectFileTree", data);
+}
+
 function setModelRegistry(registry) {
   state.modelRegistry = registry;
   if (state._pendingModelId) {
@@ -217,9 +263,10 @@ function setModelRegistry(registry) {
 export {
   API_BASE, state, subscribe, notify,
   setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel,
-  resetUsage, addUsage, estimateContextTokens,
+  resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateContextTokens,
   setMessages, addMessage, updateLastAssistantMessage,
   setConversations, setBoardCards, addBoardCard,
   setConstitution, setSkills, setModelRegistry,
+  setProject, setProjectFileTree,
   savePersistent, loadPersistent,
 };

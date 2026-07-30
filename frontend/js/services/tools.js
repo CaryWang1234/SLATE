@@ -7,12 +7,60 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js";
-import { post } from "../services/api.js";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-2";
+import { post } from "../services/api.js?v=20260730-2";
 
 // ── 工具注册表 ────────────────────────────────
 
 const TOOLS = {
+
+  project_info: {
+    name: "查看项目",
+    description: "查看当前打开的项目信息（路径、配置、宪法）",
+    params: {},
+    async execute() {
+      const p = state.project;
+      if (!p) return "当前未打开任何项目";
+      const lines = [`项目: ${p.name}`, `路径: ${p.path}`];
+      if (p.constitution?.rules?.length) {
+        lines.push("项目宪法:");
+        p.constitution.rules.forEach((r, i) => lines.push(`  ${i + 1}. ${r}`));
+      }
+      return lines.join("\n");
+    },
+  },
+
+  project_files: {
+    name: "浏览项目文件",
+    description: "浏览当前项目的文件目录，或读取文件内容",
+    params: {
+      path: { type: "string", description: "相对路径（空=根目录）" },
+    },
+    async execute({ path }) {
+      if (!state.project) return "未打开项目";
+      const res = await post("/projects/browse", { path: path || "" });
+      if (res.code !== 0) return res.message || "浏览失败";
+      const d = res.data;
+      if (d.type === "file") return `[${d.name}] (${d.size} bytes)\n${d.content?.slice(0, 5000) || ""}`;
+      if (!d.entries?.length) return `[${d.path}] 空目录`;
+      return d.entries.map(e => `${e.type === "dir" ? "📁" : "📄"} ${e.name}${e.size ? ` (${e.size}B)` : ""}`).join("\n");
+    },
+  },
+
+  project_read_file: {
+    name: "读取项目文件",
+    description: "读取项目中的指定文件内容",
+    params: {
+      path: { type: "string", description: "文件相对路径", required: true },
+    },
+    async execute({ path }) {
+      if (!state.project) return "未打开项目";
+      const res = await post("/projects/browse", { path });
+      if (res.code !== 0) return res.message || "读取失败";
+      if (res.data.type !== "file") return "路径不是文件";
+      return res.data.content?.slice(0, 10000) || "(空文件)";
+    },
+  },
 
   board_add: {
     name: "添加黑板卡片",
@@ -66,7 +114,16 @@ const TOOLS = {
     },
     async execute({ skill, params }) {
       try {
-        const res = await post("/skills/execute", { skill, params: params || {} });
+        const p = params || {};
+        // 自动注入项目目录作为默认工作目录
+        if (state.project) {
+          if (!p.directory && (skill === "file_tree")) p.directory = state.project.path;
+          if (!p.work_dir && (skill === "terminal")) p.work_dir = state.project.path;
+          if (!p.file_path && skill === "file_peek" && p.relative_path) {
+            p.file_path = state.project.path + "/" + p.relative_path;
+          }
+        }
+        const res = await post("/skills/execute", { skill, params: p });
         if (res.code === 0) {
           const data = res.data;
           if (typeof data === "string") return data.length > 2000 ? data.slice(0, 2000) + "…" : data;
@@ -179,7 +236,30 @@ async function executeToolCalls(calls) {
 // ── 系统提示词工具段 ──────────────────────────
 
 function getToolsSystemPrompt() {
-  let s = "\n\n[可用工具]\n你可以直接调用以下工具来操作用户的工作环境。需要时就调用，不必征求许可。\n\n";
+  let s = "\n\n[可用工具 - 必须调用]\n";
+  s += "你拥有工具，可以直接操作用户的工作环境。\n\n";
+  s += '**当用户说"了解项目"、"看看文件"、"浏览目录"时，你必须立即调用 project_files 工具，格式如下：**\n';
+  s += "◈◈project_files\n{\"path\": \"\"}\n◆◆\n\n";
+  s += "不要回答'我无法查看'——你必须发出上面的调用！\n\n";
+  s += "**调用规则：必须使用下方指定格式调用工具。不要只描述你要做什么——必须实际发出调用。**\n";
+  s += "每次调用独占一行，格式严格如下（◈◈◈ 和 ◈◆◆ 是固定标记，不可省略）：\n";
+  s += "◈◈◈tool_name\n{JSON参数}\n◈◆◆\n\n";
+
+  // 具体示例
+  s += '**示例：当用户说"了解项目"时，你必须这样回复（不要文字描述，直接发出调用）：**\n';
+  s += "```\n◈project_files\n{\"path\": \"\"}\n◆◆\n```\n";
+  s += "（等待工具返回目录列表后，再根据结果回答用户）\n\n";
+
+  // 项目上下文
+  if (state.project) {
+    s += `[当前项目] ${state.project.name} (${state.project.path})\n`;
+    if (state.project.constitution?.rules?.length) {
+      s += "项目宪法:\n";
+      state.project.constitution.rules.forEach((r, i) => { s += `  ${i + 1}. ${r}\n`; });
+    }
+    s += "用户提到项目/文件时，你必须先调用 project_files 浏览目录。\n\n";
+  }
+
   for (const [key, tool] of Object.entries(TOOLS)) {
     s += `### ${key} — ${tool.description}\n`;
     const pEntries = Object.entries(tool.params || {});
@@ -189,9 +269,9 @@ function getToolsSystemPrompt() {
         s += `  - ${pk}: ${pv.type}${pv.required ? " (必填)" : ""} — ${pv.description}\n`;
       }
     }
-    s += `调用格式:\n◈◈◈${key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
+    s += `示例:\n◈◈◈${key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
   }
-  s += "你可以在一次回复中多次调用工具。调用后继续正常回答。";
+  s += "**再次提醒：不要只说'我来帮你查看'——必须发出 ◈◈ 调用。一次回复可多次调用。**";
   return s;
 }
 

@@ -26,9 +26,20 @@ def _get_db() -> sqlite3.Connection:
             id TEXT PRIMARY KEY,
             title TEXT DEFAULT '',
             created_at REAL,
-            updated_at REAL
+            updated_at REAL,
+            total_tokens INTEGER DEFAULT 0,
+            prompt_tokens INTEGER DEFAULT 0,
+            completion_tokens INTEGER DEFAULT 0,
+            message_count INTEGER DEFAULT 0,
+            context_tokens INTEGER DEFAULT 0
         )
     """)
+    # 迁移：为已有表添加用量字段
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(conversations)").fetchall()]
+    for col in ("total_tokens", "prompt_tokens", "completion_tokens", "message_count", "context_tokens"):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE conversations ADD COLUMN {col} INTEGER DEFAULT 0")
+    conn.commit()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id TEXT PRIMARY KEY,
@@ -49,7 +60,9 @@ async def list_conversations() -> dict[str, Any]:
     """列出所有对话。"""
     conn = _get_db()
     rows = conn.execute(
-        "SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC"
+        "SELECT id, title, created_at, updated_at, total_tokens, prompt_tokens, "
+        "completion_tokens, message_count, context_tokens "
+        "FROM conversations ORDER BY updated_at DESC"
     ).fetchall()
     conn.close()
     conversations = [dict(r) for r in rows]
@@ -131,6 +144,26 @@ async def delete_conversation(conv_id: str) -> dict[str, Any]:
     conn = _get_db()
     conn.execute("DELETE FROM messages WHERE conversation_id = ?", (conv_id,))
     conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": None, "message": "ok"}
+
+
+@router.patch("/conversations/{conv_id}/usage")
+async def update_usage(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """更新对话的用量统计。"""
+    total = body.get("total_tokens", 0)
+    prompt = body.get("prompt_tokens", 0)
+    completion = body.get("completion_tokens", 0)
+    msg_count = body.get("message_count", 0)
+    ctx = body.get("context_tokens", 0)
+
+    conn = _get_db()
+    conn.execute(
+        "UPDATE conversations SET total_tokens=?, prompt_tokens=?, completion_tokens=?, "
+        "message_count=?, context_tokens=? WHERE id=?",
+        (total, prompt, completion, msg_count, ctx, conv_id),
+    )
     conn.commit()
     conn.close()
     return {"code": 0, "data": None, "message": "ok"}

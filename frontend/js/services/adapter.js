@@ -3,7 +3,7 @@
  * 根据不同模型特点优化提示词
  */
 
-import { getToolsSystemPrompt } from "./tools.js";
+import { getToolsSystemPrompt } from "./tools.js?v=20260730-2";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -12,9 +12,9 @@ const SYSTEM_BASE = `你是 SLATE（砚），一个本地 AI 协作调度台助�
 1. 将用户的零碎灵感整理为结构化方案
 2. 生成高质量提示词，供外部 Coding Agent 执行
 3. 在白板上整理逻辑链和思维导图
-4. 调用技能（文件扫描、终端执行等）辅助开发
+4. 调用工具直接操作环境（文件浏览、技能执行、黑板管理等）
 
-你拥有直接操作环境的工具——需要时主动调用，不必征求许可。
+**重要：你拥有工具，必须主动调用。当用户提到项目、文件、目录、代码时，你必须调用 project_files 或 project_read_file 工具查看实际内容，而不是凭猜测回答。**
 回答风格：简洁务实，中文为主，技术术语保留英文。
 不使用冗余的客套话，直接给出方案。`;
 
@@ -25,7 +25,7 @@ const SYSTEM_PROMPTS = {
   reasoning: `${SYSTEM_BASE}\n\n当前处于深度推理模式，请在回答前仔细分析问题，给出思考过程。`,
 
   // 针对轻量模型的精简提示
-  lightweight: `你是 SLATE 助手。简洁回答，不超过 3 句话。`,
+  lightweight: `你是 SLATE 助手。简洁回答，不超过 3 句话。你拥有工具，当用户提到项目/文件时必须调用 tool 查看实际内容。`,
 };
 
 // ── 模型分类 ────────────────────────────────
@@ -62,10 +62,8 @@ function buildMessages(userMessages, constitution) {
     }
   }
 
-  // 注入工具描述（轻量模型跳过，token 有限）
-  if (!LIGHTWEIGHT_MODELS.includes(modelId)) {
-    systemContent += getToolsSystemPrompt();
-  }
+  // 注入工具描述（所有模型都需要，否则 AI 不知道如何调用工具）
+  systemContent += getToolsSystemPrompt();
 
   messages.push({ role: "system", content: systemContent });
 

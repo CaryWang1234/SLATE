@@ -2,7 +2,7 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js";
+import { API_BASE } from "../store.js?v=20260730-2";
 
 /**
  * 通用 JSON 请求
@@ -42,6 +42,11 @@ function put(path, body) {
 /** DELETE */
 function del(path) {
   return request(path, { method: "DELETE" });
+}
+
+/** PATCH */
+function patch(path, body) {
+  return request(path, { method: "PATCH", body });
 }
 
 /**
@@ -103,4 +108,4 @@ async function upload(path, formData) {
   return resp.json();
 }
 
-export { get, post, put, del, streamChat, upload };
+export { get, post, put, del, patch, streamChat, upload };

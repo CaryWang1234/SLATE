@@ -2,18 +2,22 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, setModelRegistry, loadPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js";
-import { get, put } from "./services/api.js";
-import { initChat } from "./components/chat.js";
-import { initWhiteboard } from "./components/whiteboard.js";
-import { initPromptFactory } from "./components/prompt_factory.js";
-import { initSkillPanel } from "./components/skill_panel.js";
-import { initTeamPanel } from "./components/team.js";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, setModelRegistry, loadPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260730-2";
+import { get, put } from "./services/api.js?v=20260730-2";
+import { initChat } from "./components/chat.js?v=20260730-2";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260730-2";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260730-2";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260730-2";
+import { initTeamPanel } from "./components/team.js?v=20260730-2";
+import { initProjectBar } from "./components/project_bar.js?v=20260730-2";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260730-2";
+import { setProject, setProjectFileTree } from "./store.js?v=20260730-2";
 
 // ── Toast 通知 ──────────────────────────────
 
 function toast(msg, duration = 2200) {
   const container = document.getElementById("toast-container");
+  if (!container) return;
   const el = document.createElement("div");
   el.className = "toast";
   el.textContent = msg;
@@ -22,6 +26,17 @@ function toast(msg, duration = 2200) {
     el.classList.add("out");
     el.addEventListener("animationend", () => el.remove());
   }, duration);
+}
+
+function safeInit(name, fn) {
+  try {
+    fn();
+    return true;
+  } catch (e) {
+    console.error(`[SLATE] ${name} 初始化失败:`, e);
+    toast(`${name} 初始化失败，请查看控制台`);
+    return false;
+  }
 }
 
 // ── 模型选择器 ──────────────────────────────
@@ -323,13 +338,14 @@ async function init() {
   // 应用保存的主题
   document.documentElement.setAttribute("data-theme", state.theme);
 
-  initTabs();
-  initChat();
-  initWhiteboard();
-  initPromptFactory();
-  initSkillPanel();
-  initTeamPanel();
-  initKeyboardShortcuts();
+  safeInit("标签页", initTabs);
+  safeInit("对话", initChat);
+  safeInit("黑板", initWhiteboard);
+  safeInit("提示词工厂", initPromptFactory);
+  safeInit("技能面板", initSkillPanel);
+  safeInit("AI 团队", initTeamPanel);
+  safeInit("项目栏", initProjectBar);
+  safeInit("快捷键", initKeyboardShortcuts);
 
   // 模型选择
   document.getElementById("model-select").addEventListener("change", handleModelSelect);
@@ -366,6 +382,22 @@ async function init() {
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
 
   await loadModels();
+
+  // 自动恢复上次打开的项目
+  if (state._lastProjectPath) {
+    const res = await getCurrentProject();
+    if (res.code === 0 && res.data) {
+      setProject(res.data);
+    } else {
+      const { openProject } = await import("./services/project.js?v=20260730-2");
+      const openRes = await openProject(state._lastProjectPath);
+      if (openRes.code === 0) setProject(openRes.data);
+    }
+    // 确保文件树加载
+    const browseRes = await browseFiles("");
+    if (browseRes.code === 0) setProjectFileTree(browseRes.data);
+  }
+
   console.log("[SLATE] v3 初始化完成");
 }
 
