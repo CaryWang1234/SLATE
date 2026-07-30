@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-2";
-import { post } from "../services/api.js?v=20260730-2";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-7";
+import { post } from "../services/api.js?v=20260730-7";
 
 // ── 工具注册表 ────────────────────────────────
 
@@ -107,7 +107,7 @@ const TOOLS = {
 
   skill_run: {
     name: "执行技能",
-    description: "调用内置技能。可用：file_tree(目录树), file_peek(读文件), terminal(执行命令), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架)",
+    description: "调用内置技能。可用：file_tree(目录树), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架)",
     params: {
       skill: { type: "string", description: "技能名称", required: true },
       params: { type: "object", description: "技能参数" },
@@ -171,6 +171,73 @@ const TOOLS = {
     },
   },
 
+  file_edit: {
+    name: "编辑文件",
+    description: "基于 diff 精确编辑项目文件。只改指定内容，未提及的部分绝不触碰。用户可「接受」「拒绝」或「复制」diff。",
+    params: {
+      file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录）", required: true },
+      edits: { type: "array", description: '编辑列表，每项含 old_text 和 new_text，如 [{"old_text":"原内容","new_text":"新内容"}]', required: true },
+    },
+    async execute({ file_path, edits }) {
+      if (!state.project) return "未打开项目";
+      if (!file_path) return "缺少 file_path";
+      if (!edits || !edits.length) return "缺少 edits";
+
+      const absPath = state.project.path + "/" + file_path.replace(/^\/+/, "");
+      const res = await post("/skills/execute", {
+        skill: "file_edit",
+        params: { file_path: absPath, edits: JSON.stringify(edits) },
+      });
+      if (res.code !== 0) return `编辑失败: ${res.message}`;
+      const data = res.data;
+      if (data.error) return `编辑失败: ${data.error}`;
+
+      // 返回结构化数据，chat.js 会检测 _type 渲染 diff UI
+      return {
+        _type: "file_edit",
+        file: data.file,
+        file_name: data.file_name,
+        diff: data.diff,
+        new_content: data.new_content,
+        stats: data.stats,
+        errors: data.errors || [],
+        applied: data.applied || [],
+      };
+    },
+  },
+
+  file_create: {
+    name: "创建文件",
+    description: "在项目中创建新文件。文件内容先以 diff 预览，用户确认后才写入。",
+    params: {
+      file_path: { type: "string", description: "新文件相对路径（相对于项目根目录），如 src/utils/helper.js", required: true },
+      content: { type: "string", description: "文件完整内容", required: true },
+    },
+    async execute({ file_path, content }) {
+      if (!state.project) return "未打开项目";
+      if (!file_path) return "缺少 file_path";
+      if (content === undefined || content === null) return "缺少 content";
+
+      const absPath = state.project.path + "/" + file_path.replace(/^\/+/, "");
+      const res = await post("/skills/execute", {
+        skill: "file_create",
+        params: { file_path: absPath, content },
+      });
+      if (res.code !== 0) return `创建失败: ${res.message}`;
+      const data = res.data;
+      if (data.error) return `创建失败: ${data.error}`;
+
+      return {
+        _type: "file_create",
+        file: data.file,
+        file_name: data.file_name,
+        diff: data.diff,
+        content: data.content,
+        stats: data.stats,
+      };
+    },
+  },
+
   chat_context: {
     name: "查看对话上下文",
     description: "查看当前对话的统计信息",
@@ -218,6 +285,21 @@ async function executeTool(name, params) {
   if (!tool) return { success: false, output: `未知工具: ${name}` };
   try {
     const output = await tool.execute(params || {});
+    // 结构化结果（如 file_edit / file_create）直接传递，同时生成文本摘要给 AI
+    if (output && typeof output === "object" && output._type) {
+      let summary = `[工具 ${name}] `;
+      if (output._type === "file_edit") {
+        const s = output.stats;
+        summary = `[工具 file_edit] 文件: ${output.file_name}，共 ${s.edits_total} 处编辑，${s.edits_applied} 处成功，+${s.lines_added} -${s.lines_removed} 行。`;
+        if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
+        summary += " diff 已展示给用户，等待用户确认。";
+      } else if (output._type === "file_create") {
+        const s = output.stats;
+        summary = `[工具 file_create] 新文件: ${output.file_name}，${s.lines} 行，${s.chars} 字符。`;
+        summary += " 预览已展示给用户，等待用户确认。";
+      }
+      return { success: true, output: summary, _structured: output };
+    }
     return { success: true, output };
   } catch (e) {
     return { success: false, output: `执行出错: ${e.message}` };
@@ -272,6 +354,28 @@ function getToolsSystemPrompt() {
     s += `示例:\n◈◈◈${key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
   }
   s += "**再次提醒：不要只说'我来帮你查看'——必须发出 ◈◈ 调用。一次回复可多次调用。**";
+
+  // file_edit 专项指导
+  s += "\n\n[文件编辑规则 — file_edit 工具]\n";
+  s += "当用户要求修改、编辑、修复项目中的已有文件时，你必须使用 file_edit 工具。\n";
+  s += "核心原则：你说改它就真改，你不说它绝不碰。\n";
+  s += "- file_path: 相对于项目根目录的路径\n";
+  s += "- edits: JSON 数组，每项包含 old_text（要替换的原文）和 new_text（替换后的内容）\n";
+  s += "- old_text 必须在文件中唯一出现，否则会报错\n";
+  s += "- 只包含你要修改的部分，不要包含整个文件内容\n";
+  s += "- 可以包含多组编辑，一次性完成所有修改\n";
+  s += "- 用户会看到 diff 预览，并可以选择「接受」「拒绝」或「复制」\n";
+  s += "- 编辑完成后，等待用户确认，不要自动继续修改\n";
+
+  // file_create 专项指导
+  s += "\n\n[文件创建规则 — file_create 工具]\n";
+  s += "当用户要求创建新文件时，你必须使用 file_create 工具。\n";
+  s += "- file_path: 相对于项目根目录的路径（文件不能已存在）\n";
+  s += "- content: 文件的完整内容\n";
+  s += "- 如果文件已存在，应使用 file_edit 工具而非 file_create\n";
+  s += "- 用户会看到内容预览，并可以选择「接受」「拒绝」或「复制」\n";
+  s += "- 创建完成后，等待用户确认\n";
+
   return s;
 }
 

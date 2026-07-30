@@ -210,3 +210,69 @@ async def list_drives():
             drives.append({"path": str(home), "name": "~ (Home)"})
 
     return {"code": 0, "data": drives}
+
+
+# ── 文件编辑（接受 diff） ───────────────────────
+
+class ApplyEditRequest(BaseModel):
+    file_path: str
+    content: str
+
+
+@router.post("/apply-edit")
+async def apply_file_edit(req: ApplyEditRequest):
+    """将编辑后的内容写入文件（用户点击「接受」时调用）"""
+    if not _current_project:
+        return {"code": 1, "message": "未打开项目"}
+
+    project_dir = Path(_current_project["path"])
+    target = Path(req.file_path)
+
+    # 安全检查：确保文件在项目范围内
+    try:
+        target.resolve().relative_to(project_dir.resolve())
+    except ValueError:
+        return {"code": 1, "message": "文件路径超出项目范围"}
+
+    if not target.is_file():
+        return {"code": 1, "message": "文件不存在"}
+
+    try:
+        target.write_text(req.content, encoding="utf-8")
+        return {"code": 0, "data": {"file": str(target.relative_to(project_dir))}, "message": "ok"}
+    except Exception as e:
+        return {"code": 1, "message": f"写入失败: {e}"}
+
+
+# ── 创建新文件 ─────────────────────────────
+
+class CreateFileRequest(BaseModel):
+    file_path: str
+    content: str
+
+
+@router.post("/create-file")
+async def create_file(req: CreateFileRequest):
+    """创建新文件（用户点击「接受」时调用）"""
+    if not _current_project:
+        return {"code": 1, "message": "未打开项目"}
+
+    project_dir = Path(_current_project["path"])
+    target = Path(req.file_path)
+
+    # 安全检查：确保文件在项目范围内
+    try:
+        target.resolve().relative_to(project_dir.resolve())
+    except ValueError:
+        return {"code": 1, "message": "文件路径超出项目范围"}
+
+    if target.exists():
+        return {"code": 1, "message": "文件已存在"}
+
+    try:
+        # 自动创建父目录
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(req.content, encoding="utf-8")
+        return {"code": 0, "data": {"file": str(target.relative_to(project_dir))}, "message": "ok"}
+    except Exception as e:
+        return {"code": 1, "message": f"创建失败: {e}"}

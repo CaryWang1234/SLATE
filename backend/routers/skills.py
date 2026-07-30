@@ -22,6 +22,8 @@ BUILTIN_SKILLS: dict[str, str] = {
     "html_render": "生成纯黑白 HTML 骨架",
     "css_color": "基于描述生成 CSS 配色方案（支持暖色/冷色/自然/深色等多种风格）",
     "doc_write": "生成 Markdown 格式技术文档或需求说明",
+    "file_edit": "基于 diff 精确编辑文件（只改指定内容）",
+    "file_create": "创建新文件（预览后确认写入）",
 }
 
 

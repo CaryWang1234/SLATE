@@ -2,8 +2,8 @@
  * SLATE 技能面板：内置技能列表 + 自定义 Skill 上传
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260730-2";
-import { get, post, upload } from "../services/api.js?v=20260730-2";
+import { state, subscribe, setSkills } from "../store.js?v=20260730-7";
+import { get, post, upload } from "../services/api.js?v=20260730-7";
 
 let skillList, btnUpload, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -44,6 +44,14 @@ const SKILL_PARAM_DEFS = {
     { key: "doc_type", label: "文档类型", type: "text", placeholder: "technical / requirement / api / readme / changelog" },
     { key: "sections", label: "章节（逗号分隔）", type: "text", placeholder: "概述,安装,配置,API" },
     { key: "content_hint", label: "内容提示", type: "textarea", placeholder: "关键信息或要点" },
+  ],
+  file_edit: [
+    { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/app.js" },
+    { key: "edits", label: "编辑操作（JSON 数组）", type: "textarea", placeholder: '[{"old_text": "原内容", "new_text": "新内容"}]' },
+  ],
+  file_create: [
+    { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/new_file.js" },
+    { key: "content", label: "文件内容", type: "textarea", placeholder: "文件内容..." },
   ],
 };
 

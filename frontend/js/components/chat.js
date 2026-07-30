@@ -2,10 +2,10 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-2";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-2";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-2";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-2";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-7";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-7";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-7";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-7";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -158,16 +158,202 @@ function renderToolCallCard(call, result) {
   if (call.params && Object.keys(call.params).length > 0) {
     const input = document.createElement("div");
     input.className = "tool-call-input";
-    input.textContent = JSON.stringify(call.params, null, 2);
+    // file_edit / file_create 的参数可能很长，截断显示
+    if (call.name === "file_edit" && call.params.edits) {
+      const brief = { file_path: call.params.file_path, edits_count: Array.isArray(call.params.edits) ? call.params.edits.length : 0 };
+      input.textContent = JSON.stringify(brief, null, 2);
+    } else if (call.name === "file_create" && call.params.content) {
+      const brief = { file_path: call.params.file_path, lines: (call.params.content || "").split("\n").length };
+      input.textContent = JSON.stringify(brief, null, 2);
+    } else {
+      input.textContent = JSON.stringify(call.params, null, 2);
+    }
     el.appendChild(input);
   }
 
-  const output = document.createElement("div");
-  output.className = "tool-call-output";
-  output.textContent = result.output || "";
-  el.appendChild(output);
+  // 检测结构化结果
+  if (result._structured && result._structured._type === "file_edit") {
+    el.appendChild(renderFileEditDiff(result._structured));
+  } else if (result._structured && result._structured._type === "file_create") {
+    el.appendChild(renderFileCreateDiff(result._structured));
+  } else {
+    const output = document.createElement("div");
+    output.className = "tool-call-output";
+    output.textContent = result.output || "";
+    el.appendChild(output);
+  }
 
   return el;
+}
+
+// ── 文件编辑 diff 查看器 ───────────────────
+
+function renderFileEditDiff(data) {
+  const wrap = document.createElement("div");
+  wrap.className = "file-edit-diff";
+
+  const head = document.createElement("div");
+  head.className = "file-edit-diff-head";
+  const s = data.stats;
+  head.innerHTML = `<span class="file-edit-file-name">${data.file_name}</span>` +
+    `<span class="file-edit-stats">+${s.lines_added} −${s.lines_removed}</span>`;
+  wrap.appendChild(head);
+
+  const pre = document.createElement("pre");
+  pre.className = "file-edit-diff-pre";
+  const diffLines = (data.diff || "").split("\n");
+  for (const line of diffLines) {
+    const span = document.createElement("span");
+    span.className = "diff-line" +
+      (line.startsWith("+") ? " diff-add" : "") +
+      (line.startsWith("-") ? " diff-del" : "") +
+      (line.startsWith("@@") ? " diff-hunk" : "");
+    span.textContent = line;
+    pre.appendChild(span);
+    pre.appendChild(document.createTextNode("\n"));
+  }
+  wrap.appendChild(pre);
+
+  if (data.errors && data.errors.length > 0) {
+    const errDiv = document.createElement("div");
+    errDiv.className = "file-edit-errors";
+    errDiv.textContent = "⚠ " + data.errors.join("\n");
+    wrap.appendChild(errDiv);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "file-edit-actions";
+
+  const btnAccept = document.createElement("button");
+  btnAccept.className = "file-edit-btn file-edit-btn-accept";
+  btnAccept.textContent = "✓ 接受";
+  btnAccept.addEventListener("click", async () => {
+    btnAccept.disabled = true;
+    btnReject.disabled = true;
+    btnCopy.disabled = true;
+    try {
+      const res = await post("/projects/apply-edit", { file_path: data.file, content: data.new_content });
+      if (res.code === 0) {
+        btnAccept.textContent = "✓ 已应用";
+        btnAccept.classList.add("done");
+        wrap.classList.add("file-edit-resolved");
+      } else {
+        btnAccept.textContent = "✗ 失败";
+        btnAccept.classList.add("failed");
+        btnAccept.disabled = false; btnReject.disabled = false; btnCopy.disabled = false;
+      }
+    } catch (e) {
+      btnAccept.textContent = "✗ 失败";
+      btnAccept.disabled = false; btnReject.disabled = false; btnCopy.disabled = false;
+    }
+  });
+
+  const btnReject = document.createElement("button");
+  btnReject.className = "file-edit-btn file-edit-btn-reject";
+  btnReject.textContent = "✗ 拒绝";
+  btnReject.addEventListener("click", () => {
+    btnAccept.disabled = true; btnReject.disabled = true; btnCopy.disabled = true;
+    btnReject.textContent = "✓ 已拒绝";
+    wrap.classList.add("file-edit-rejected");
+  });
+
+  const btnCopy = document.createElement("button");
+  btnCopy.className = "file-edit-btn file-edit-btn-copy";
+  btnCopy.textContent = "⧉ 复制 diff";
+  btnCopy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(data.diff);
+      btnCopy.textContent = "✓ 已复制";
+      setTimeout(() => { btnCopy.textContent = "⧉ 复制 diff"; }, 1500);
+    } catch (e) {}
+  });
+
+  actions.appendChild(btnAccept);
+  actions.appendChild(btnReject);
+  actions.appendChild(btnCopy);
+  wrap.appendChild(actions);
+
+  return wrap;
+}
+
+// ── 文件创建 diff 查看器 ───────────────────
+
+function renderFileCreateDiff(data) {
+  const wrap = document.createElement("div");
+  wrap.className = "file-edit-diff file-create-diff";
+
+  const head = document.createElement("div");
+  head.className = "file-edit-diff-head";
+  const s = data.stats;
+  head.innerHTML = `<span class="file-edit-file-name">✨ ${data.file_name}</span>` +
+    `<span class="file-edit-stats file-create-badge">新文件 · ${s.lines} 行 · ${s.chars} 字符</span>`;
+  wrap.appendChild(head);
+
+  const pre = document.createElement("pre");
+  pre.className = "file-edit-diff-pre";
+  const diffLines = (data.diff || "").split("\n");
+  for (const line of diffLines) {
+    const span = document.createElement("span");
+    span.className = "diff-line" +
+      (line.startsWith("+") ? " diff-add" : "") +
+      (line.startsWith("@@") ? " diff-hunk" : "");
+    span.textContent = line;
+    pre.appendChild(span);
+    pre.appendChild(document.createTextNode("\n"));
+  }
+  wrap.appendChild(pre);
+
+  const actions = document.createElement("div");
+  actions.className = "file-edit-actions";
+
+  const btnAccept = document.createElement("button");
+  btnAccept.className = "file-edit-btn file-edit-btn-accept";
+  btnAccept.textContent = "✓ 创建";
+  btnAccept.addEventListener("click", async () => {
+    btnAccept.disabled = true; btnReject.disabled = true; btnCopy.disabled = true;
+    try {
+      const res = await post("/projects/create-file", { file_path: data.file, content: data.content });
+      if (res.code === 0) {
+        btnAccept.textContent = "✓ 已创建";
+        btnAccept.classList.add("done");
+        wrap.classList.add("file-edit-resolved");
+      } else {
+        btnAccept.textContent = "✗ 失败";
+        btnAccept.classList.add("failed");
+        btnAccept.disabled = false; btnReject.disabled = false; btnCopy.disabled = false;
+      }
+    } catch (e) {
+      btnAccept.textContent = "✗ 失败";
+      btnAccept.disabled = false; btnReject.disabled = false; btnCopy.disabled = false;
+    }
+  });
+
+  const btnReject = document.createElement("button");
+  btnReject.className = "file-edit-btn file-edit-btn-reject";
+  btnReject.textContent = "✗ 放弃";
+  btnReject.addEventListener("click", () => {
+    btnAccept.disabled = true; btnReject.disabled = true; btnCopy.disabled = true;
+    btnReject.textContent = "✓ 已放弃";
+    wrap.classList.add("file-edit-rejected");
+  });
+
+  const btnCopy = document.createElement("button");
+  btnCopy.className = "file-edit-btn file-edit-btn-copy";
+  btnCopy.textContent = "⧉ 复制内容";
+  btnCopy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(data.content);
+      btnCopy.textContent = "✓ 已复制";
+      setTimeout(() => { btnCopy.textContent = "⧉ 复制内容"; }, 1500);
+    } catch (e) {}
+  });
+
+  actions.appendChild(btnAccept);
+  actions.appendChild(btnReject);
+  actions.appendChild(btnCopy);
+  wrap.appendChild(actions);
+
+  return wrap;
 }
 
 async function runToolLoop(msgEl, modelId, apiKey, baseUrl) {
@@ -388,7 +574,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260730-2");
+    const { toast } = await import("../app.js?v=20260730-7");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -555,7 +741,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260730-2");
+      const { toast } = await import("../app.js?v=20260730-7");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }

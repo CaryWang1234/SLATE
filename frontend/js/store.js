@@ -49,6 +49,15 @@ const state = {
   // 项目
   project: null,        // { path, name, config, constitution }
   projectFileTree: [],  // 当前浏览的目录内容
+
+  // 记忆
+  memories: [],
+
+  // 用户资料
+  userProfile: {},
+
+  // 提示词素材
+  promptSnippets: [],
 };
 
 // ── 订阅者 ──────────────────────────────────
@@ -248,6 +257,62 @@ function setProjectFileTree(data) {
   notify("projectFileTree", data);
 }
 
+// ── 记忆管理 ────────────────────────────────
+
+function setMemories(list) {
+  state.memories = list;
+  notify("memories", list);
+}
+
+function addMemory(mem) {
+  const newMem = { ...mem, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), createdAt: Date.now() };
+  state.memories.push(newMem);
+  notify("memories", state.memories);
+}
+
+function updateMemory(id, updates) {
+  const idx = state.memories.findIndex(m => m.id === id);
+  if (idx >= 0) {
+    Object.assign(state.memories[idx], updates);
+    notify("memories", state.memories);
+  }
+}
+
+function removeMemory(id) {
+  state.memories = state.memories.filter(m => m.id !== id);
+  notify("memories", state.memories);
+}
+
+// ── 用户资料 ────────────────────────────────
+
+function setUserProfile(profile) {
+  state.userProfile = { ...state.userProfile, ...profile };
+  notify("userProfile", state.userProfile);
+}
+
+function resetUserProfile() {
+  state.userProfile = {};
+  notify("userProfile", state.userProfile);
+}
+
+// ── 提示词素材 ──────────────────────────────
+
+function setPromptSnippets(list) {
+  state.promptSnippets = list;
+  notify("promptSnippets", list);
+}
+
+function addPromptSnippet(snip) {
+  const newSnip = { ...snip, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), createdAt: Date.now() };
+  state.promptSnippets.push(newSnip);
+  notify("promptSnippets", state.promptSnippets);
+}
+
+function removePromptSnippet(id) {
+  state.promptSnippets = state.promptSnippets.filter(s => s.id !== id);
+  notify("promptSnippets", state.promptSnippets);
+}
+
 function setModelRegistry(registry) {
   state.modelRegistry = registry;
   if (state._pendingModelId) {
@@ -268,5 +333,8 @@ export {
   setConversations, setBoardCards, addBoardCard,
   setConstitution, setSkills, setModelRegistry,
   setProject, setProjectFileTree,
+  setMemories, addMemory, updateMemory, removeMemory,
+  setUserProfile, resetUserProfile,
+  setPromptSnippets, addPromptSnippet, removePromptSnippet,
   savePersistent, loadPersistent,
 };

@@ -4,17 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE — 砚</title>
-  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260730-2">
+  <link rel="stylesheet" href="./css/style.css?v=20260730-7">
 </head>
 <body>
 
   <!-- ═══ 顶栏 ═══ -->
   <header id="topbar">
     <div class="topbar-left">
+      <span class="logo-icon"><img src="./icon.png" alt=""></span>
       <span class="logo">砚</span>
       <span class="logo-sub">SLATE</span>
     </div>
@@ -39,12 +40,14 @@
     <!-- 左栏：对话 + 团队 -->
     <section id="panel-chat" class="panel active">
       <div class="chat-layout">
-        <!-- 左侧：项目目录 (25%) -->
+        <!-- 左侧：项目目录 -->
         <div id="project-sidebar" class="project-sidebar">
           <div id="project-bar" class="project-bar"></div>
           <div id="project-file-tree" class="project-file-tree"></div>
           <div id="file-preview" class="file-preview hidden"></div>
         </div>
+        <!-- 拖拽调整手柄 -->
+        <div class="resize-handle" id="sidebar-resize-handle"></div>
 
         <!-- 右侧：对话/团队 (75%) -->
         <div class="chat-main">
@@ -54,6 +57,10 @@
               <button id="btn-team-mode" class="mode-btn">团队</button>
             </div>
             <div class="panel-actions">
+              <button id="btn-brainstorm" class="icon-btn" title="头脑风暴模式">💡</button>
+              <button id="btn-compress" class="icon-btn" title="手动压缩上下文">⟲</button>
+              <button id="btn-memory" class="icon-btn" title="记忆与画像">🧠</button>
+              <button id="btn-snippets" class="icon-btn" title="提示词素材">✂</button>
               <button id="btn-toggle-history" class="icon-btn active" title="显示/隐藏历史">☰</button>
               <button id="btn-new-chat" class="icon-btn" title="新建对话 (Ctrl+N)">+</button>
             </div>
@@ -81,7 +88,7 @@
             </div>
           </div>
 
-          <!-- 团队讨论区域 -->
+          <!-- 团队辩论区域 -->
           <div id="team-panel" class="team-panel hidden">
             <div class="team-config">
               <div class="team-members-header">
@@ -93,6 +100,12 @@
             <div class="team-discuss">
               <div class="team-input-row">
                 <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题…">
+                <select id="team-max-rounds" class="team-rounds-select" title="最大辩论轮数">
+                  <option value="3">3轮</option>
+                  <option value="5" selected>5轮</option>
+                  <option value="8">8轮</option>
+                  <option value="10">10轮</option>
+                </select>
                 <button id="btn-start-discuss" class="send-btn">开始讨论</button>
               </div>
               <div id="team-output" class="team-output"></div>
@@ -113,11 +126,31 @@
           <button id="btn-clear-board" class="icon-btn" title="清空黑板">×</button>
         </div>
       </div>
+      <!-- 工具栏 -->
+      <div id="board-toolbar" class="board-toolbar">
+        <button class="board-tool-btn active" data-mode="select" title="选择/移动">↖</button>
+        <button class="board-tool-btn" data-mode="connect" title="连线">↗</button>
+        <button class="board-tool-btn" data-mode="draw" title="画笔">✎</button>
+        <button class="board-tool-btn" data-mode="text" title="文字">T</button>
+        <span class="board-toolbar-sep"></span>
+        <button id="btn-undo-stroke" class="icon-btn" title="撤销笔画">↩</button>
+        <button id="btn-clear-strokes" class="icon-btn" title="清除所有画笔">🗑</button>
+      </div>
+      <!-- 画布区域 -->
       <div id="whiteboard-canvas" class="board-canvas">
+        <!-- SVG 连线层 -->
+        <svg id="board-svg" class="board-svg-layer"></svg>
+        <!-- Canvas 画笔层 -->
+        <canvas id="board-draw-canvas" class="board-draw-layer"></canvas>
+        <!-- 卡片层 -->
         <div id="board-cards" class="board-cards"></div>
+        <!-- 文字笔记层 -->
+        <div id="board-notes" class="board-notes-layer"></div>
+        <!-- 连线中临时指示线 -->
+        <svg id="board-temp-svg" class="board-svg-layer" style="pointer-events:none;"></svg>
         <div id="board-empty" class="board-empty">
           <p>黑板是空的</p>
-          <p class="hint">将灵感拖到这里，或让 AI 整理逻辑链</p>
+          <p class="hint">点击 + 添加卡片，或选择工具开始创作</p>
         </div>
       </div>
       <div id="mermaid-preview" class="mermaid-preview hidden">
@@ -157,8 +190,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button id="btn-card-delete" class="send-btn" style="background:#999;margin-right:auto;">删除</button>
-          <button id="btn-card-cancel" class="send-btn" style="background:#666;">取消</button>
+          <button id="btn-card-delete" class="send-btn" style="background:#888;margin-right:auto;">删除</button>
+          <button id="btn-card-cancel" class="send-btn" style="background:#555;">取消</button>
           <button id="btn-card-save" class="send-btn">保存</button>
         </div>
       </div>
@@ -330,10 +363,115 @@
     </div>
   </div>
 
+  <!-- ═══ 记忆与画像弹窗 ═══ -->
+  <div id="memory-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <span>记忆与画像</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <!-- 标签页 -->
+        <div class="memory-tabs">
+          <button class="memory-tab active" data-tab="memories">长期记忆</button>
+          <button class="memory-tab" data-tab="profile">用户画像</button>
+        </div>
+        <!-- 记忆列表 -->
+        <div id="memory-tab-memories" class="memory-tab-content active">
+          <div class="memory-toolbar">
+            <button id="btn-add-memory" class="send-btn send-btn-sm">+ 添加记忆</button>
+            <button id="btn-extract-memory" class="send-btn send-btn-sm">🔍 从对话提取</button>
+          </div>
+          <div id="memory-list" class="memory-list"></div>
+        </div>
+        <!-- 用户画像 -->
+        <div id="memory-tab-profile" class="memory-tab-content">
+          <div class="setting-group">
+            <label class="setting-label">角色/职业</label>
+            <input id="profile-role" type="text" class="setting-input" placeholder="如：全栈开发者、产品经理…">
+          </div>
+          <div class="setting-group">
+            <label class="setting-label">工作风格</label>
+            <input id="profile-style" type="text" class="setting-input" placeholder="如：注重细节、快速原型…">
+          </div>
+          <div class="setting-group">
+            <label class="setting-label">技术栈偏好</label>
+            <input id="profile-tech" type="text" class="setting-input" placeholder="如：Python, React, TypeScript…">
+          </div>
+          <div class="setting-group">
+            <label class="setting-label">沟通习惯</label>
+            <input id="profile-habits" type="text" class="setting-input" placeholder="如：简洁直接、多用示例…">
+          </div>
+          <div class="setting-group">
+            <label class="setting-label">其他</label>
+            <textarea id="profile-custom" class="setting-input setting-textarea" rows="2" placeholder="其他希望 AI 了解的信息…"></textarea>
+          </div>
+          <div class="memory-profile-actions">
+            <button id="btn-reset-profile" class="send-btn send-btn-sm" style="background:#555;">重置画像</button>
+            <button id="btn-save-profile" class="send-btn send-btn-sm">保存画像</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 压缩选项弹窗 ═══ -->
+  <div id="compress-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>手动压缩上下文</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label class="setting-label">压缩级别</label>
+          <div class="compress-options">
+            <label class="compress-option">
+              <input type="radio" name="compress-level" value="light" checked>
+              <span class="compress-label">
+                <strong>轻度压缩</strong>
+                <span>保留关键细节，约 50% 压缩</span>
+              </span>
+            </label>
+            <label class="compress-option">
+              <input type="radio" name="compress-level" value="heavy">
+              <span class="compress-label">
+                <strong>重度压缩</strong>
+                <span>仅保留摘要，约 80% 压缩</span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-do-compress" class="send-btn">开始压缩</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 提示词素材弹窗 ═══ -->
+  <div id="snippet-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <span>提示词素材</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="snippet-toolbar">
+          <button id="btn-add-snippet" class="send-btn send-btn-sm">+ 添加素材</button>
+        </div>
+        <div id="snippet-list" class="snippet-list"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ Toast 容器 ═══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260730-2"></script>
+  <script type="module" src="./js/app.js?v=20260730-7"></script>
 
 </body>
 </html>

@@ -3,7 +3,7 @@
  * 根据不同模型特点优化提示词
  */
 
-import { getToolsSystemPrompt } from "./tools.js?v=20260730-2";
+import { getToolsSystemPrompt } from "./tools.js?v=20260730-7";
 
 // ── System Prompt 模板 ──────────────────────
 

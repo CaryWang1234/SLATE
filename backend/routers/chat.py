@@ -1,4 +1,4 @@
-"""聊天路由：对话历史管理，上下文压缩。"""
+"""聊天路由：对话历史管理，上下文压缩，记忆/画像/素材。"""
 
 from __future__ import annotations
 
@@ -19,7 +19,9 @@ DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "chat_history
 def _get_db() -> sqlite3.Connection:
     """获取 SQLite 连接，自动建表。"""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), timeout=10.0)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.row_factory = sqlite3.Row
     conn.execute("""
         CREATE TABLE IF NOT EXISTS conversations (
@@ -49,6 +51,22 @@ def _get_db() -> sqlite3.Connection:
             model TEXT DEFAULT '',
             created_at REAL,
             FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS memories (
+            id TEXT PRIMARY KEY,
+            category TEXT DEFAULT 'general',
+            content TEXT DEFAULT '',
+            created_at REAL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS prompt_snippets (
+            id TEXT PRIMARY KEY,
+            text TEXT DEFAULT '',
+            source TEXT DEFAULT '',
+            created_at REAL
         )
     """)
     conn.commit()
@@ -220,6 +238,152 @@ async def compress_context(body: dict[str, Any]) -> dict[str, Any]:
             "compress_prompt": compress_prompt,
             "keep_messages": to_keep,
             "compress_count": len(to_compress),
+        },
+        "message": "ok",
+    }
+
+
+# ── 记忆 CRUD ─────────────────────────────────
+
+@router.get("/memories")
+async def list_memories() -> dict[str, Any]:
+    conn = _get_db()
+    rows = conn.execute("SELECT id, category, content, created_at FROM memories ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return {"code": 0, "data": [dict(r) for r in rows], "message": "ok"}
+
+
+@router.post("/memories")
+async def create_memory(body: dict[str, Any]) -> dict[str, Any]:
+    mem_id = body.get("id", str(uuid.uuid4())[:8])
+    category = body.get("category", "general")
+    content = body.get("content", "")
+    now = time.time()
+    conn = _get_db()
+    conn.execute("INSERT INTO memories (id, category, content, created_at) VALUES (?, ?, ?, ?)",
+                 (mem_id, category, content, now))
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": {"id": mem_id}, "message": "ok"}
+
+
+@router.patch("/memories/{mem_id}")
+async def update_memory(mem_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    category = body.get("category")
+    content = body.get("content")
+    conn = _get_db()
+    if category is not None:
+        conn.execute("UPDATE memories SET category=? WHERE id=?", (category, mem_id))
+    if content is not None:
+        conn.execute("UPDATE memories SET content=? WHERE id=?", (content, mem_id))
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": None, "message": "ok"}
+
+
+@router.delete("/memories/{mem_id}")
+async def delete_memory(mem_id: str) -> dict[str, Any]:
+    conn = _get_db()
+    conn.execute("DELETE FROM memories WHERE id=?", (mem_id,))
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": None, "message": "ok"}
+
+
+# ── 提示词素材 CRUD ───────────────────────────
+
+@router.get("/snippets")
+async def list_snippets() -> dict[str, Any]:
+    conn = _get_db()
+    rows = conn.execute("SELECT id, text, source, created_at FROM prompt_snippets ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return {"code": 0, "data": [dict(r) for r in rows], "message": "ok"}
+
+
+@router.post("/snippets")
+async def create_snippet(body: dict[str, Any]) -> dict[str, Any]:
+    snip_id = body.get("id", str(uuid.uuid4())[:8])
+    text = body.get("text", "")
+    source = body.get("source", "")
+    now = time.time()
+    conn = _get_db()
+    conn.execute("INSERT INTO prompt_snippets (id, text, source, created_at) VALUES (?, ?, ?, ?)",
+                 (snip_id, text, source, now))
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": {"id": snip_id}, "message": "ok"}
+
+
+@router.delete("/snippets/{snip_id}")
+async def delete_snippet(snip_id: str) -> dict[str, Any]:
+    conn = _get_db()
+    conn.execute("DELETE FROM prompt_snippets WHERE id=?", (snip_id,))
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": None, "message": "ok"}
+
+
+# ── 记忆提取（AI 自动识别） ───────────────
+
+@router.post("/extract-memories")
+async def extract_memories(body: dict[str, Any]) -> dict[str, Any]:
+    """
+    提供一段对话文本，返回建议提取的记忆条目。
+    实际提取由前端调用 LLM 完成，此端点构建提示词。
+    """
+    text = body.get("text", "")
+    existing = body.get("existing_memories", [])
+    prompt = (
+        "分析以下对话，提取值得长期记忆的关键信息（用户偏好、重要决策、项目背景、常用术语等）。\n"
+        "以 JSON 数组格式输出，每项包含 category 和 content 字段。\n"
+        "category 可选: preference, decision, project, term, fact, other。\n"
+        "只输出 JSON，不要其他文字。如果没有值得记忆的内容，输出空数组 []。\n\n"
+    )
+    if existing:
+        prompt += f"已有记忆（避免重复）:\n" + "\n".join(f"- [{m.get('category','')}] {m.get('content','')}" for m in existing[:20]) + "\n\n"
+    prompt += f"对话内容:\n{text[:6000]}"
+    return {"code": 0, "data": {"prompt": prompt}, "message": "ok"}
+
+
+# ── 手动压缩（支持级别） ───────────────────
+
+@router.post("/compress-manual")
+async def compress_manual(body: dict[str, Any]) -> dict[str, Any]:
+    """
+    手动上下文压缩，支持 level: light / heavy。
+    light: 保留关键细节，约 50% 压缩。
+    heavy: 仅保留摘要，约 80% 压缩。
+    """
+    messages = body.get("messages", [])
+    level = body.get("level", "light")
+    keep_rounds = body.get("keep_recent_rounds", 2)
+
+    user_msg_indices = [i for i, m in enumerate(messages) if m.get("role") == "user"]
+    if len(user_msg_indices) <= keep_rounds:
+        return {"code": 0, "data": {"need_compress": False}, "message": "ok"}
+
+    split_point = user_msg_indices[-keep_rounds]
+    to_compress = messages[:split_point]
+    to_keep = messages[split_point:]
+
+    if level == "heavy":
+        instruction = "将以下对话压缩为极简摘要，仅保留核心结论和关键决策，不超过 200 字。"
+    else:
+        instruction = "将以下对话压缩为摘要，保留关键细节、重要结论和核心上下文，不超过 500 字。"
+
+    compress_prompt = instruction + "\n\n"
+    for m in to_compress:
+        role_label = "用户" if m["role"] == "user" else "助手"
+        compress_prompt += f"[{role_label}]: {m['content']}\n"
+
+    return {
+        "code": 0,
+        "data": {
+            "need_compress": True,
+            "compress_prompt": compress_prompt,
+            "keep_messages": to_keep,
+            "compress_count": len(to_compress),
+            "level": level,
         },
         "message": "ok",
     }
