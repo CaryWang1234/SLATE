@@ -303,7 +303,11 @@ function setPromptSnippets(list) {
 }
 
 function addPromptSnippet(snip) {
-  const newSnip = { ...snip, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), createdAt: Date.now() };
+  const newSnip = {
+    id: snip.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    createdAt: snip.createdAt || Date.now(),
+    ...snip,
+  };
   state.promptSnippets.push(newSnip);
   notify("promptSnippets", state.promptSnippets);
 }

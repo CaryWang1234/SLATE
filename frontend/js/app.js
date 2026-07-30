@@ -2,17 +2,17 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, setModelRegistry, loadPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260730-13";
-import { get, put } from "./services/api.js?v=20260730-13";
-import { initChat } from "./components/chat.js?v=20260730-13";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260730-13";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260730-13";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260730-13";
-import { initTeamPanel } from "./components/team.js?v=20260730-13";
-import { initProjectBar } from "./components/project_bar.js?v=20260730-13";
-import { initMemoryPanel } from "./components/memory.js?v=20260730-13";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260730-13";
-import { setProject, setProjectFileTree } from "./store.js?v=20260730-13";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, setModelRegistry, loadPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260730-18";
+import { get, put } from "./services/api.js?v=20260730-18";
+import { initChat } from "./components/chat.js?v=20260730-18";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260730-18";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260730-18";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260730-18";
+import { initTeamPanel } from "./components/team.js?v=20260730-18";
+import { initProjectBar } from "./components/project_bar.js?v=20260730-18";
+import { initMemoryPanel } from "./components/memory.js?v=20260730-18";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260730-18";
+import { setProject, setProjectFileTree } from "./store.js?v=20260730-18";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -391,7 +391,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260730-13");
+      const { openProject } = await import("./services/project.js?v=20260730-18");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

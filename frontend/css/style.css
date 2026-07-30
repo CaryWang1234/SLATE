@@ -1068,16 +1068,17 @@ textarea::-webkit-scrollbar-thumb {
 /* ── 工厂面板 ─────────────────────────── */
 
 #panel-factory {
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .factory-area {
-  padding: 12px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .factory-section {
@@ -1169,24 +1170,47 @@ textarea::-webkit-scrollbar-thumb {
 /* ── 技能面板 ─────────────────────────── */
 
 .skill-panel {
-  padding: 8px 12px;
+  padding: 6px 12px 8px;
+  flex: 0 0 auto;
+  max-height: 118px;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
 }
 
 .skill-list {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.skill-list::-webkit-scrollbar {
+  display: none;
 }
 
 .skill-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
+  align-items: flex-start;
+  padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
   transition: border-color var(--transition), background-color var(--transition);
+  width: 190px;
+  min-width: 190px;
+  min-height: 54px;
+  max-height: 54px;
+  overflow: hidden;
+}
+
+.skill-item > div {
+  min-width: 0;
+  width: 100%;
 }
 
 .skill-item:hover {
@@ -1198,15 +1222,37 @@ textarea::-webkit-scrollbar-thumb {
   font-size: 12px;
   font-weight: 600;
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .skill-item-desc {
   font-size: 11px;
+  line-height: 1.35;
   color: var(--text-muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .skill-upload {
-  margin-top: 8px;
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.factory-skill-header {
+  padding-top: 5px;
+  padding-bottom: 5px;
+  background: var(--bg-alt);
+}
+
+#btn-upload-skill {
+  width: auto;
+  min-width: 92px;
+  padding: 4px 8px;
 }
 
 .skill-upload .icon-btn {
@@ -2965,4 +3011,288 @@ body.resizing {
 .send-btn-sm {
   padding: 4px 10px;
   font-size: 12px;
+}
+
+/* ── 提示词工厂 v2 ─────────────────────────── */
+
+.factory-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 12px;
+  min-height: 0;
+}
+
+.factory-compose,
+.factory-sidebar,
+.factory-output {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  transition: border-color var(--transition), background-color var(--transition);
+}
+
+.factory-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  min-width: 0;
+}
+
+.factory-strip {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.factory-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.factory-heading {
+  margin-top: 3px;
+  font-size: 18px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--text);
+}
+
+.factory-strip-actions,
+.factory-context-bar,
+.factory-output-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.factory-control-row,
+.factory-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.factory-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.factory-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.factory-field-main {
+  min-height: 160px;
+}
+
+.factory-select,
+.factory-ghost-btn {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--bg-input);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 12px;
+  min-height: 30px;
+  transition: border-color var(--transition), background-color var(--transition), color var(--transition);
+}
+
+.factory-select {
+  width: 100%;
+}
+
+.factory-ghost-btn {
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.factory-ghost-btn:hover {
+  border-color: var(--border-hover);
+  background-color: var(--bg-alt);
+}
+
+.factory-primary-btn {
+  margin-left: auto;
+  min-height: 30px;
+}
+
+.factory-task-input {
+  min-height: 150px;
+}
+
+.factory-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.factory-side-section {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  min-height: 0;
+}
+
+.factory-side-section:last-child {
+  border-bottom: none;
+}
+
+.factory-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.factory-count {
+  min-width: 22px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: center;
+}
+
+.factory-constitution {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.factory-rule {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.factory-rule:last-child {
+  border-bottom: none;
+}
+
+.factory-rule span {
+  color: var(--gold);
+  font-family: var(--font-mono);
+}
+
+.factory-file-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.factory-file-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.factory-file-row:hover {
+  border-color: var(--border);
+  background: var(--bg-alt);
+}
+
+.factory-file-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.factory-file-row small {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.factory-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.factory-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.factory-check span {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.factory-check.ok {
+  color: var(--text);
+}
+
+.factory-check.ok span {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.factory-empty {
+  padding: 14px 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.factory-output {
+  margin-top: 12px;
+}
+
+.factory-output .prompt-result {
+  max-height: none;
+  min-height: 260px;
+  background: var(--bg-input);
+}
+
+@media (max-width: 900px) {
+  .factory-workbench,
+  .factory-control-row,
+  .factory-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .factory-strip {
+    flex-direction: column;
+  }
+
+  .factory-primary-btn {
+    width: 100%;
+    margin-left: 0;
+  }
 }

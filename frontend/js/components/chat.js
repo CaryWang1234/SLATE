@@ -2,14 +2,17 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-13";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-13";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-13";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-13";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-18";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-18";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-18";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-18";
+import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-18";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
+let btnBrainstorm, btnCompress, btnMemory, btnSnippets, btnDoCompress, compressModal;
 let pendingFiles = []; // { name, size, content, type }
+let brainstormMode = false;
 
 // ── 用量同步到后端 ──────────────────────────
 
@@ -560,6 +563,12 @@ async function sendMessage() {
   const apiKey = getModelKey(modelId);
   const params = getDefaultParams(modelId);
   const historyForAdapter = state.messages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+  if (brainstormMode) {
+    const lastUser = historyForAdapter[historyForAdapter.length - 1];
+    if (lastUser?.role === "user") {
+      lastUser.content = `[头脑风暴模式]\n请先给出多个可能方向，再收束为最值得推进的 1-3 个建议。保持可执行、具体。\n\n${lastUser.content}`;
+    }
+  }
   historyForAdapter._modelId = modelId;
   const messages = buildMessages(historyForAdapter, state.constitution);
 
@@ -644,10 +653,87 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260730-13");
+    const { toast } = await import("../app.js?v=20260730-18");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
+  }
+}
+
+function toggleBrainstormMode() {
+  brainstormMode = !brainstormMode;
+  state.brainstormMode = brainstormMode;
+  btnBrainstorm?.classList.toggle("active", brainstormMode);
+  chatInput.placeholder = brainstormMode
+    ? "头脑风暴模式：先发散想法，再收束结论…"
+    : "输入消息… (Enter 发送, Shift+Enter 换行)";
+}
+
+function openCompressModal() {
+  if (!compressModal) return;
+  if (state.messages.length < 4) {
+    import("../app.js?v=20260730-18").then(({ toast }) => toast("当前对话还不需要压缩"));
+    return;
+  }
+  compressModal.classList.remove("hidden");
+}
+
+function closeCompressModal() {
+  compressModal?.classList.add("hidden");
+}
+
+async function doManualCompress() {
+  if (!compressModal || !btnDoCompress) return;
+  const level = document.querySelector('input[name="compress-level"]:checked')?.value || "light";
+  btnDoCompress.disabled = true;
+  const oldText = btnDoCompress.textContent;
+  btnDoCompress.textContent = "压缩中…";
+
+  try {
+    const res = await post("/chat/compress-manual", {
+      messages: state.messages.map(m => ({ role: m.role, content: m.content || "" })),
+      level,
+      keep_recent_rounds: 2,
+    });
+
+    const { toast } = await import("../app.js?v=20260730-18");
+    if (res.code !== 0) {
+      toast("压缩失败: " + (res.message || "未知错误"));
+      return;
+    }
+    if (!res.data?.need_compress) {
+      toast("当前对话还不需要压缩");
+      closeCompressModal();
+      return;
+    }
+
+    const modelId = state.currentModel?.id || "gpt-4o";
+    const apiKey = getModelKey(modelId);
+    const baseUrl = state.currentModel?.base_url || undefined;
+    let summary = "";
+    for await (const chunk of streamChat({
+      model: modelId,
+      messages: [{ role: "user", content: res.data.compress_prompt }],
+      api_key: apiKey,
+      base_url: baseUrl,
+      temperature: 0.3,
+      max_tokens: level === "heavy" ? 512 : 1024,
+      stream: true,
+    })) {
+      summary += chunk;
+    }
+
+    const summaryMsg = { role: "system", content: `[历史摘要]: ${summary}` };
+    const keepMessages = (res.data.keep_messages || []).map(normalizeMessageForRender);
+    setMessages([summaryMsg, ...keepMessages]);
+    closeCompressModal();
+    toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
+  } catch (e) {
+    const { toast } = await import("../app.js?v=20260730-18");
+    toast("压缩失败: " + e.message);
+  } finally {
+    btnDoCompress.disabled = false;
+    btnDoCompress.textContent = oldText;
   }
 }
 
@@ -811,7 +897,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260730-13");
+      const { toast } = await import("../app.js?v=20260730-18");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }
@@ -853,8 +939,22 @@ function initChat() {
   filePreviewArea = document.getElementById("file-preview-area");
   btnAttachFile = document.getElementById("btn-attach-file");
   fileInput = document.getElementById("file-input");
+  btnBrainstorm = document.getElementById("btn-brainstorm");
+  btnCompress = document.getElementById("btn-compress");
+  btnMemory = document.getElementById("btn-memory");
+  btnSnippets = document.getElementById("btn-snippets");
+  btnDoCompress = document.getElementById("btn-do-compress");
+  compressModal = document.getElementById("compress-modal");
 
   btnSend.addEventListener("click", sendMessage);
+  btnBrainstorm?.addEventListener("click", toggleBrainstormMode);
+  btnCompress?.addEventListener("click", openCompressModal);
+  btnMemory?.addEventListener("click", openMemoryModal);
+  btnSnippets?.addEventListener("click", openSnippetModal);
+  btnDoCompress?.addEventListener("click", doManualCompress);
+  compressModal?.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
+    el.addEventListener("click", closeCompressModal);
+  });
 
   // 历史侧栏切换
   const btnToggleHistory = document.getElementById("btn-toggle-history");

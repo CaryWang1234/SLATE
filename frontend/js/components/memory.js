@@ -9,8 +9,8 @@ import {
   setUserProfile, resetUserProfile,
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
-} from "../store.js?v=20260730-13";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260730-13";
+} from "../store.js?v=20260730-18";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260730-18";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList;
@@ -91,12 +91,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260730-13");
+    const { toast } = await import("../app.js?v=20260730-18");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260730-13");
+  const { toast } = await import("../app.js?v=20260730-18");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -287,6 +287,12 @@ function initMemoryPanel() {
   if (!memoryModal || !snippetModal) return;
 
   initMemoryTabs();
+  memoryModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
+    el.addEventListener("click", () => memoryModal.classList.add("hidden"));
+  });
+  snippetModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
+    el.addEventListener("click", () => snippetModal.classList.add("hidden"));
+  });
 
   // 绑定按钮事件
   const btnAddMemory = document.getElementById("btn-add-memory");
@@ -298,7 +304,7 @@ function initMemoryPanel() {
   if (btnExtractMemory) btnExtractMemory.addEventListener("click", extractMemoriesFromConversation);
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260730-13").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260730-18").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", () => {
     if (confirm("确定要重置用户资料吗？")) {
