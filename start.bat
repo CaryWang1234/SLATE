@@ -1,8 +1,8 @@
 @echo off
 title SLATE
 
-:: 自动清理占用 8000 端口的残留进程
-powershell -Command "Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+:: Kill process on port 8000 (pure ASCII, no encoding issues)
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R "127.0.0.1:8000.*LISTENING"') do taskkill /F /PID %%P >nul 2>&1
 
 chcp 65001 >nul
 echo [SLATE] Starting backend...

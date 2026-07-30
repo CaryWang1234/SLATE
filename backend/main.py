@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import chat, constitution, proxy, skills
+from backend.routers import chat, constitution, files, proxy, skills
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -28,6 +28,7 @@ app.include_router(proxy.router, prefix="/api")
 app.include_router(constitution.router, prefix="/api")
 app.include_router(skills.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(files.router, prefix="/api")
 
 # 挂载前端静态文件
 frontend_dir = PROJECT_ROOT / "frontend"

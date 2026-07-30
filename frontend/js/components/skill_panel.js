@@ -35,6 +35,16 @@ const SKILL_PARAM_DEFS = {
     { key: "title", label: "页面标题", type: "text", placeholder: "SLATE 页面" },
     { key: "body", label: "HTML 内容", type: "textarea", placeholder: "<p>Hello</p>" },
   ],
+  css_color: [
+    { key: "description", label: "样式描述", type: "text", placeholder: "高对比度代码编辑器风格" },
+    { key: "component", label: "组件类型", type: "text", placeholder: "page / card / button / nav / form / code" },
+  ],
+  doc_write: [
+    { key: "title", label: "文档标题", type: "text", placeholder: "项目技术文档" },
+    { key: "doc_type", label: "文档类型", type: "text", placeholder: "technical / requirement / api / readme / changelog" },
+    { key: "sections", label: "章节（逗号分隔）", type: "text", placeholder: "概述,安装,配置,API" },
+    { key: "content_hint", label: "内容提示", type: "textarea", placeholder: "关键信息或要点" },
+  ],
 };
 
 // ── 技能列表渲染 ────────────────────────────

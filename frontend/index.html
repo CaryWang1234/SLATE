@@ -27,6 +27,7 @@
       <select id="model-select" title="当前模型">
         <option value="">选择模型…</option>
       </select>
+      <button id="btn-manage-keys" class="icon-btn" title="管理模型密钥">🔑</button>
       <button id="btn-theme" class="theme-btn" title="切换主题">◐</button>
       <button id="btn-settings" class="icon-btn" title="设置">⚙</button>
     </div>
@@ -35,25 +36,57 @@
   <!-- ═══ 主区域：三栏 ═══ -->
   <main id="workspace">
 
-    <!-- 左栏：对话 -->
+    <!-- 左栏：对话 + 团队 -->
     <section id="panel-chat" class="panel active">
       <div class="panel-header">
-        <span class="panel-title">对话</span>
+        <div class="panel-mode-toggle">
+          <button id="btn-chat-mode" class="mode-btn active">对话</button>
+          <button id="btn-team-mode" class="mode-btn">团队</button>
+        </div>
         <div class="panel-actions">
+          <button id="btn-toggle-history" class="icon-btn active" title="显示/隐藏历史">☰</button>
           <button id="btn-new-chat" class="icon-btn" title="新建对话 (Ctrl+N)">+</button>
         </div>
       </div>
-      <!-- 对话历史侧栏 -->
-      <div id="conv-sidebar" class="conv-sidebar">
-        <div class="conv-sidebar-header">
-          <span class="conv-sidebar-title">历史</span>
+      <!-- 用量信息栏 -->
+      <div id="usage-bar" class="usage-bar"></div>
+
+      <!-- 对话区域 -->
+      <div id="chat-area">
+        <!-- 对话历史侧栏 -->
+        <div id="conv-sidebar" class="conv-sidebar">
+          <div class="conv-sidebar-header">
+            <span class="conv-sidebar-title">历史</span>
+          </div>
+          <div id="conv-list"></div>
         </div>
-        <div id="conv-list"></div>
+        <div id="chat-messages" class="chat-scroll"></div>
+        <!-- 文件附件预览区 -->
+        <div id="file-preview-area" class="file-preview-area hidden"></div>
+        <div id="chat-input-area">
+          <button id="btn-attach-file" class="icon-btn" title="附加文件">📎</button>
+          <input type="file" id="file-input" multiple hidden accept=".txt,.md,.csv,.json,.py,.js,.html,.css,.yaml,.yml,.xml,.sh,.bat,.jpg,.jpeg,.png,.gif,.webp,.svg,.pdf">
+          <textarea id="chat-input" placeholder="输入消息… (Enter 发送, Shift+Enter 换行)" rows="1"></textarea>
+          <button id="btn-send" class="send-btn">发送</button>
+        </div>
       </div>
-      <div id="chat-messages" class="chat-scroll"></div>
-      <div id="chat-input-area">
-        <textarea id="chat-input" placeholder="输入消息… (Enter 发送, Shift+Enter 换行)" rows="1"></textarea>
-        <button id="btn-send" class="send-btn">发送</button>
+
+      <!-- 团队讨论区域 -->
+      <div id="team-panel" class="team-panel hidden">
+        <div class="team-config">
+          <div class="team-members-header">
+            <span class="team-label">团队成员</span>
+            <button id="btn-add-member" class="icon-btn" title="添加成员">+</button>
+          </div>
+          <div id="team-members-area" class="team-members-area"></div>
+        </div>
+        <div class="team-discuss">
+          <div class="team-input-row">
+            <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题…">
+            <button id="btn-start-discuss" class="send-btn">开始讨论</button>
+          </div>
+          <div id="team-output" class="team-output"></div>
+        </div>
       </div>
     </section>
 
@@ -125,23 +158,15 @@
   <!-- ═══ 设置弹窗 ═══ -->
   <div id="settings-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
-    <div class="modal-content">
+    <div class="modal-content modal-wide">
       <div class="modal-header">
-        <span>设置</span>
+        <span>设置 — 密钥管理</span>
         <button class="modal-close icon-btn">×</button>
       </div>
       <div class="modal-body">
         <div class="setting-group">
-          <label class="setting-label">API Key</label>
-          <input id="setting-api-key" type="password" class="setting-input" placeholder="输入 API Key…">
-        </div>
-        <div class="setting-group">
-          <label class="setting-label">自定义 Base URL（可选）</label>
-          <input id="setting-base-url" type="text" class="setting-input" placeholder="https://api.example.com/v1">
-        </div>
-        <div class="setting-group">
-          <label class="setting-label">自定义模型名（可选）</label>
-          <input id="setting-model-name" type="text" class="setting-input" placeholder="model-name">
+          <label class="setting-label">模型密钥</label>
+          <div id="key-management-list" class="key-mgmt-list"></div>
         </div>
         <div class="setting-group">
           <label class="setting-label">上下文 Token 上限</label>
@@ -154,6 +179,58 @@
       </div>
       <div class="modal-footer">
         <button id="btn-save-settings" class="send-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 密钥输入弹窗 ═══ -->
+  <div id="key-input-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="key-modal-model-name">输入 API Key</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label class="setting-label">API Key</label>
+          <input id="key-modal-input" type="password" class="setting-input" placeholder="sk-..." autocomplete="off">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-key" class="send-btn">保存并切换</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 自定义模型弹窗 ═══ -->
+  <div id="custom-model-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>添加自定义模型</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label class="setting-label">模型名称 / ID</label>
+          <input id="custom-model-name" type="text" class="setting-input" placeholder="my-model">
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">Base URL</label>
+          <input id="custom-model-url" type="text" class="setting-input" placeholder="https://api.example.com/v1">
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">API Key（可选）</label>
+          <input id="custom-model-key" type="password" class="setting-input" placeholder="sk-...">
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">Context Window</label>
+          <input id="custom-model-ctx" type="number" class="setting-input" value="32768">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-custom-model" class="send-btn">添加</button>
       </div>
     </div>
   </div>

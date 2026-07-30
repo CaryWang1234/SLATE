@@ -1,6 +1,6 @@
 /**
- * SLATE 全局状态管理 v2
- * 管理主题、模型、对话历史、上下文池、黑板卡片
+ * SLATE 全局状态管理 v3
+ * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
 const API_BASE = "http://127.0.0.1:8000/api";
@@ -11,10 +11,20 @@ const state = {
 
   // 当前选中的模型
   currentModel: null,
-  apiKey: "",
-  customBaseUrl: "",
-  customModelName: "",
-  maxTokens: 64000,
+
+  // 每个模型的 API Key（modelId → key）
+  modelKeys: {},
+
+  // 自定义模型（用户手动添加的）
+  customModels: [],
+
+  // 用量统计（当前对话）
+  usage: {
+    totalTokens: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    messageCount: 0,
+  },
 
   // 模型列表
   modelRegistry: {},
@@ -52,10 +62,8 @@ function notify(key, data) {
 function savePersistent() {
   const data = {
     theme: state.theme,
-    apiKey: state.apiKey,
-    customBaseUrl: state.customBaseUrl,
-    customModelName: state.customModelName,
-    maxTokens: state.maxTokens,
+    modelKeys: state.modelKeys,
+    customModels: state.customModels,
     currentModelId: state.currentModel?.id || null,
     boardCards: state.boardCards,
   };
@@ -68,10 +76,8 @@ function loadPersistent() {
     if (!raw) return;
     const data = JSON.parse(raw);
     state.theme = data.theme || "light";
-    state.apiKey = data.apiKey || "";
-    state.customBaseUrl = data.customBaseUrl || "";
-    state.customModelName = data.customModelName || "";
-    state.maxTokens = data.maxTokens || 64000;
+    state.modelKeys = data.modelKeys || {};
+    state.customModels = data.customModels || [];
     state.boardCards = data.boardCards || [];
     state._pendingModelId = data.currentModelId;
   } catch (e) {}
@@ -96,9 +102,57 @@ function setCurrentModel(model) {
   notify("model", model);
 }
 
-function setApiKey(key) {
-  state.apiKey = key;
+function setModelKey(modelId, key) {
+  if (key) {
+    state.modelKeys[modelId] = key;
+  } else {
+    delete state.modelKeys[modelId];
+  }
   savePersistent();
+  notify("modelKeys", state.modelKeys);
+}
+
+function getModelKey(modelId) {
+  return state.modelKeys[modelId] || "";
+}
+
+function hasModelKey(modelId) {
+  return !!state.modelKeys[modelId];
+}
+
+function addCustomModel(model) {
+  if (!state.customModels.find(m => m.id === model.id)) {
+    state.customModels.push(model);
+    savePersistent();
+  }
+}
+
+function resetUsage() {
+  state.usage = { totalTokens: 0, promptTokens: 0, completionTokens: 0, messageCount: 0 };
+  notify("usage", state.usage);
+}
+
+function addUsage(usage) {
+  if (!usage) return;
+  state.usage.promptTokens += usage.prompt_tokens || 0;
+  state.usage.completionTokens += usage.completion_tokens || 0;
+  state.usage.totalTokens = state.usage.promptTokens + state.usage.completionTokens;
+  state.usage.messageCount += 1;
+  notify("usage", state.usage);
+}
+
+function estimateTokens(text) {
+  if (!text) return 0;
+  // 粗略估算：中英文混合约 3 字符/token
+  return Math.ceil(text.length / 3);
+}
+
+function estimateContextTokens(messages) {
+  let total = 0;
+  for (const msg of messages) {
+    total += estimateTokens(msg.content || "") + 4; // role overhead
+  }
+  return total;
 }
 
 function setMessages(msgs) {
@@ -162,7 +216,8 @@ function setModelRegistry(registry) {
 
 export {
   API_BASE, state, subscribe, notify,
-  setTheme, toggleTheme, setCurrentModel, setApiKey,
+  setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel,
+  resetUsage, addUsage, estimateContextTokens,
   setMessages, addMessage, updateLastAssistantMessage,
   setConversations, setBoardCards, addBoardCard,
   setConstitution, setSkills, setModelRegistry,

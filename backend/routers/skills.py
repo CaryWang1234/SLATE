@@ -20,6 +20,8 @@ BUILTIN_SKILLS: dict[str, str] = {
     "file_peek": "读取文件前 N 行（≤50行）",
     "terminal": "受限终端执行（指定目录沙箱）",
     "html_render": "生成纯黑白 HTML 骨架",
+    "css_color": "基于描述生成 CSS 配色方案（支持暖色/冷色/自然/深色等多种风格）",
+    "doc_write": "生成 Markdown 格式技术文档或需求说明",
 }
 
 

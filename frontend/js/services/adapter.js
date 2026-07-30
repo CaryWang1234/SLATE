@@ -3,6 +3,8 @@
  * 根据不同模型特点优化提示词
  */
 
+import { getToolsSystemPrompt } from "./tools.js";
+
 // ── System Prompt 模板 ──────────────────────
 
 const SYSTEM_BASE = `你是 SLATE（砚），一个本地 AI 协作调度台助手。
@@ -12,6 +14,7 @@ const SYSTEM_BASE = `你是 SLATE（砚），一个本地 AI 协作调度台助�
 3. 在白板上整理逻辑链和思维导图
 4. 调用技能（文件扫描、终端执行等）辅助开发
 
+你拥有直接操作环境的工具——需要时主动调用，不必征求许可。
 回答风格：简洁务实，中文为主，技术术语保留英文。
 不使用冗余的客套话，直接给出方案。`;
 
@@ -27,8 +30,8 @@ const SYSTEM_PROMPTS = {
 
 // ── 模型分类 ────────────────────────────────
 
-const REASONING_MODELS = ["deepseek-reasoner", "o1", "o3-mini"];
-const LIGHTWEIGHT_MODELS = ["gemini-2.0-flash", "moonshot-v1-128k", "doubao-pro-32k"];
+const REASONING_MODELS = ["deepseek-reasoner", "o3-mini"];
+const LIGHTWEIGHT_MODELS = ["gemini-2.5-flash", "deepseek-v4-flash", "kimi-k2.7-code", "doubao-pro-256k"];
 
 /**
  * 根据模型 ID 获取适配的系统提示
@@ -40,7 +43,7 @@ function getSystemPrompt(modelId) {
 }
 
 /**
- * 构建完整的消息列表（注入系统提示 + 宪法上下文）
+ * 构建完整的消息列表（注入系统提示 + 宪法 + 工具 + 黑板上下文）
  */
 function buildMessages(userMessages, constitution) {
   const messages = [];
@@ -57,6 +60,11 @@ function buildMessages(userMessages, constitution) {
         systemContent += `${i + 1}. ${rule}\n`;
       });
     }
+  }
+
+  // 注入工具描述（轻量模型跳过，token 有限）
+  if (!LIGHTWEIGHT_MODELS.includes(modelId)) {
+    systemContent += getToolsSystemPrompt();
   }
 
   messages.push({ role: "system", content: systemContent });

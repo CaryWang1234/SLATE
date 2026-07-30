@@ -1,13 +1,14 @@
 /**
- * SLATE 主控 v2：主题切换、面板拖拽、键盘快捷键、Toast 系统
+ * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setApiKey, setModelRegistry, loadPersistent, savePersistent, toggleTheme } from "./store.js";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, setModelRegistry, loadPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js";
 import { get, put } from "./services/api.js";
 import { initChat } from "./components/chat.js";
 import { initWhiteboard } from "./components/whiteboard.js";
 import { initPromptFactory } from "./components/prompt_factory.js";
 import { initSkillPanel } from "./components/skill_panel.js";
+import { initTeamPanel } from "./components/team.js";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -25,21 +26,37 @@ function toast(msg, duration = 2200) {
 
 // ── 模型选择器 ──────────────────────────────
 
-function populateModelSelect(registry) {
+function populateModelSelect() {
   const select = document.getElementById("model-select");
   select.innerHTML = '<option value="">选择模型…</option>';
 
   const groups = { international: "国外", domestic: "国内", local: "本地" };
 
   for (const [cat, label] of Object.entries(groups)) {
-    const models = registry[cat];
+    const models = state.modelRegistry[cat];
     if (!models || models.length === 0) continue;
     const optgroup = document.createElement("optgroup");
     optgroup.label = label;
     for (const m of models) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      opt.textContent = m.name;
+      const hasKey = hasModelKey(m.id);
+      opt.textContent = (hasKey ? "● " : "○ ") + m.name;
+      opt.title = m.base_url;
+      optgroup.appendChild(opt);
+    }
+    select.appendChild(optgroup);
+  }
+
+  // 自定义模型
+  if (state.customModels.length > 0) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = "自定义";
+    for (const m of state.customModels) {
+      const opt = document.createElement("option");
+      opt.value = m.id;
+      const hasKey = hasModelKey(m.id);
+      opt.textContent = (hasKey ? "● " : "○ ") + m.name;
       optgroup.appendChild(opt);
     }
     select.appendChild(optgroup);
@@ -47,7 +64,7 @@ function populateModelSelect(registry) {
 
   const customOpt = document.createElement("option");
   customOpt.value = "__custom__";
-  customOpt.textContent = "自定义模型…";
+  customOpt.textContent = "+ 自定义模型…";
   select.appendChild(customOpt);
 
   if (state.currentModel) select.value = state.currentModel.id;
@@ -56,11 +73,160 @@ function populateModelSelect(registry) {
 function handleModelSelect(e) {
   const value = e.target.value;
   if (!value) return;
-  if (value === "__custom__") { openSettings(); return; }
+  if (value === "__custom__") {
+    openCustomModelModal();
+    e.target.value = state.currentModel?.id || "";
+    return;
+  }
 
+  // 在所有分类中查找
   for (const models of Object.values(state.modelRegistry)) {
     const found = models.find(m => m.id === value);
-    if (found) { setCurrentModel(found); toast(`已切换: ${found.name}`); return; }
+    if (found) {
+      if (!hasModelKey(found.id) && found.id !== "local") {
+        // 没有 API key，弹出输入
+        openKeyInputModal(found);
+      } else {
+        setCurrentModel(found);
+        resetUsage();
+        toast(`已切换: ${found.name}`);
+      }
+      return;
+    }
+  }
+
+  // 查找自定义模型
+  const custom = state.customModels.find(m => m.id === value);
+  if (custom) {
+    if (!hasModelKey(custom.id)) {
+      openKeyInputModal(custom);
+    } else {
+      setCurrentModel(custom);
+      resetUsage();
+      toast(`已切换: ${custom.name}`);
+    }
+  }
+}
+
+// ── 密钥输入弹窗 ────────────────────────────
+
+let keyModal, keyModalModelName, keyModalInput;
+let pendingKeyModel = null;
+
+function openKeyInputModal(model) {
+  pendingKeyModel = model;
+  keyModalModelName.textContent = `${model.name} — 输入 API Key`;
+  keyModalInput.value = getModelKey(model.id) || "";
+  keyModalInput.placeholder = `${model.base_url}`;
+  keyModal.classList.remove("hidden");
+  keyModalInput.focus();
+}
+
+function saveKeyFromModal() {
+  if (!pendingKeyModel) return;
+  const key = keyModalInput.value.trim();
+  if (key) {
+    setModelKey(pendingKeyModel.id, key);
+    setCurrentModel(pendingKeyModel);
+    resetUsage();
+    toast(`已保存密钥并切换: ${pendingKeyModel.name}`);
+    populateModelSelect();
+  } else {
+    toast("请输入有效的 API Key");
+    return;
+  }
+  keyModal.classList.add("hidden");
+  pendingKeyModel = null;
+}
+
+// ── 自定义模型弹窗 ──────────────────────────
+
+let customModelModal;
+
+function openCustomModelModal() {
+  customModelModal = document.getElementById("custom-model-modal");
+  customModelModal.classList.remove("hidden");
+}
+
+function saveCustomModel() {
+  const name = document.getElementById("custom-model-name").value.trim();
+  const baseUrl = document.getElementById("custom-model-url").value.trim();
+  const key = document.getElementById("custom-model-key").value.trim();
+  const ctx = parseInt(document.getElementById("custom-model-ctx").value) || 32768;
+
+  if (!name || !baseUrl) {
+    toast("请填写模型名称和 Base URL");
+    return;
+  }
+
+  const model = { id: name, name, provider: "openai", base_url: baseUrl, context_window: ctx };
+  addCustomModel(model);
+  if (key) setModelKey(name, key);
+  setCurrentModel(model);
+  resetUsage();
+  populateModelSelect();
+  customModelModal.classList.add("hidden");
+  toast(`已添加自定义模型: ${name}`);
+
+  // 清空输入
+  document.getElementById("custom-model-name").value = "";
+  document.getElementById("custom-model-url").value = "";
+  document.getElementById("custom-model-key").value = "";
+}
+
+// ── 密钥管理面板（设置弹窗内） ──────────────
+
+function renderKeyManagement() {
+  const container = document.getElementById("key-management-list");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const allModels = [];
+  for (const models of Object.values(state.modelRegistry)) {
+    allModels.push(...models);
+  }
+  allModels.push(...state.customModels);
+
+  for (const m of allModels) {
+    const row = document.createElement("div");
+    row.className = "key-mgmt-row";
+
+    const info = document.createElement("div");
+    info.className = "key-mgmt-info";
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "key-mgmt-name";
+    nameSpan.textContent = m.name;
+    const urlSpan = document.createElement("span");
+    urlSpan.className = "key-mgmt-url";
+    urlSpan.textContent = m.base_url;
+    info.appendChild(nameSpan);
+    info.appendChild(urlSpan);
+
+    const inputWrap = document.createElement("div");
+    inputWrap.className = "key-mgmt-input-wrap";
+    const input = document.createElement("input");
+    input.type = "password";
+    input.className = "setting-input key-mgmt-input";
+    input.value = getModelKey(m.id) || "";
+    input.placeholder = hasModelKey(m.id) ? "已配置 (留空删除)" : "未配置";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "icon-btn key-mgmt-save";
+    saveBtn.textContent = "✓";
+    saveBtn.title = "保存";
+    saveBtn.addEventListener("click", () => {
+      const val = input.value.trim();
+      setModelKey(m.id, val);
+      populateModelSelect();
+      toast(val ? `已保存: ${m.name}` : `已删除: ${m.name}`);
+    });
+
+    inputWrap.appendChild(input);
+    inputWrap.appendChild(saveBtn);
+
+    row.appendChild(info);
+    row.appendChild(inputWrap);
+    container.appendChild(row);
   }
 }
 
@@ -70,32 +236,19 @@ let settingsModal;
 
 function openSettings() {
   settingsModal = document.getElementById("settings-modal");
-  document.getElementById("setting-api-key").value = state.apiKey;
-  document.getElementById("setting-base-url").value = state.customBaseUrl;
-  document.getElementById("setting-model-name").value = state.customModelName;
-  document.getElementById("setting-max-tokens").value = state.maxTokens;
+  document.getElementById("setting-max-tokens").value = 64000;
   if (state.constitution) {
     document.getElementById("setting-constitution").value = JSON.stringify(state.constitution, null, 2);
   }
+  renderKeyManagement();
   settingsModal.classList.remove("hidden");
 }
 
 function closeSettings() { settingsModal.classList.add("hidden"); }
 
 async function saveSettings() {
-  const apiKey = document.getElementById("setting-api-key").value.trim();
-  const baseUrl = document.getElementById("setting-base-url").value.trim();
-  const modelName = document.getElementById("setting-model-name").value.trim();
   const maxTokens = parseInt(document.getElementById("setting-max-tokens").value) || 64000;
-
-  setApiKey(apiKey);
-  state.customBaseUrl = baseUrl;
-  state.customModelName = modelName;
   state.maxTokens = maxTokens;
-
-  if (modelName && baseUrl) {
-    setCurrentModel({ id: modelName, name: modelName, provider: "openai", base_url: baseUrl, context_window: maxTokens });
-  }
 
   const constText = document.getElementById("setting-constitution").value.trim();
   if (constText) {
@@ -155,7 +308,7 @@ async function loadModels() {
     const res = await get("/proxy/models");
     if (res.code === 0) {
       setModelRegistry(res.data);
-      populateModelSelect(res.data);
+      populateModelSelect();
     }
   } catch (e) {
     console.warn("加载模型列表失败:", e);
@@ -175,10 +328,30 @@ async function init() {
   initWhiteboard();
   initPromptFactory();
   initSkillPanel();
+  initTeamPanel();
   initKeyboardShortcuts();
 
   // 模型选择
   document.getElementById("model-select").addEventListener("change", handleModelSelect);
+
+  // 密钥管理按钮
+  document.getElementById("btn-manage-keys").addEventListener("click", openSettings);
+
+  // 密钥输入弹窗
+  keyModal = document.getElementById("key-input-modal");
+  keyModalModelName = document.getElementById("key-modal-model-name");
+  keyModalInput = document.getElementById("key-modal-input");
+  document.getElementById("btn-save-key").addEventListener("click", saveKeyFromModal);
+  keyModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
+    el.addEventListener("click", () => keyModal.classList.add("hidden"));
+  });
+
+  // 自定义模型弹窗
+  customModelModal = document.getElementById("custom-model-modal");
+  document.getElementById("btn-save-custom-model").addEventListener("click", saveCustomModel);
+  customModelModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
+    el.addEventListener("click", () => customModelModal.classList.add("hidden"));
+  });
 
   // 主题切换
   document.getElementById("btn-theme").addEventListener("click", () => {
@@ -193,7 +366,7 @@ async function init() {
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
 
   await loadModels();
-  console.log("[SLATE] v2 初始化完成");
+  console.log("[SLATE] v3 初始化完成");
 }
 
 document.addEventListener("DOMContentLoaded", init);
