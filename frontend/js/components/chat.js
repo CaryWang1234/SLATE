@@ -2,10 +2,10 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-7";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-7";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-7";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-7";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-13";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-13";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-13";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-13";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -55,9 +55,38 @@ function renderMarkdown(text) {
   return html;
 }
 
+function normalizeMessageForRender(msg) {
+  const normalized = {
+    ...msg,
+    role: ["system", "user", "assistant"].includes(msg?.role) ? msg.role : "assistant",
+    content: typeof msg?.content === "string" ? msg.content : JSON.stringify(msg?.content ?? ""),
+  };
+
+  if (normalized.role === "assistant") {
+    const calls = detectToolCalls(normalized.content);
+    if (calls.length > 0) {
+      normalized.content = stripToolCalls(normalized.content);
+      normalized.toolResults = [
+        ...(Array.isArray(normalized.toolResults) ? normalized.toolResults : []),
+        ...calls.map(call => ({
+          call,
+          result: {
+            success: true,
+            output: "这是从历史记录中恢复的工具调用。diff 预览结果未保存在旧历史中，请重新发起编辑以生成可接受的 diff。",
+            historical: true,
+          },
+        })),
+      ];
+    }
+  }
+
+  return normalized;
+}
+
 // ── 消息渲染 ────────────────────────────────
 
 function renderMessage(msg, index) {
+  msg = normalizeMessageForRender(msg);
   const div = document.createElement("div");
   div.className = `msg msg-${msg.role}`;
   div.dataset.index = index;
@@ -93,6 +122,12 @@ function renderMessage(msg, index) {
   content.className = "msg-content";
   content.innerHTML = renderMarkdown(msg.content);
   div.appendChild(content);
+
+  if (Array.isArray(msg.toolResults)) {
+    for (const item of msg.toolResults) {
+      div.appendChild(renderToolCallCard(item.call || item, item.result || item));
+    }
+  }
 
   // 消息操作按钮
   if (msg.role !== "system") {
@@ -194,31 +229,35 @@ function renderFileEditDiff(data) {
 
   const head = document.createElement("div");
   head.className = "file-edit-diff-head";
-  const s = data.stats;
-  head.innerHTML = `<span class="file-edit-file-name">${data.file_name}</span>` +
+  const s = data.stats || { lines_added: 0, lines_removed: 0 };
+  head.innerHTML = `<span class="file-edit-file-name">${data.file_name || "未知文件"}</span>` +
     `<span class="file-edit-stats">+${s.lines_added} −${s.lines_removed}</span>`;
   wrap.appendChild(head);
 
-  const pre = document.createElement("pre");
-  pre.className = "file-edit-diff-pre";
-  const diffLines = (data.diff || "").split("\n");
-  for (const line of diffLines) {
-    const span = document.createElement("span");
-    span.className = "diff-line" +
-      (line.startsWith("+") ? " diff-add" : "") +
-      (line.startsWith("-") ? " diff-del" : "") +
-      (line.startsWith("@@") ? " diff-hunk" : "");
-    span.textContent = line;
-    pre.appendChild(span);
-    pre.appendChild(document.createTextNode("\n"));
-  }
-  wrap.appendChild(pre);
-
+  // 显示错误信息
   if (data.errors && data.errors.length > 0) {
     const errDiv = document.createElement("div");
     errDiv.className = "file-edit-errors";
     errDiv.textContent = "⚠ " + data.errors.join("\n");
     wrap.appendChild(errDiv);
+  }
+
+  // 只有有 diff 内容时才渲染 pre
+  if (data.diff) {
+    const pre = document.createElement("pre");
+    pre.className = "file-edit-diff-pre";
+    const diffLines = data.diff.split("\n");
+    for (const line of diffLines) {
+      const span = document.createElement("span");
+      span.className = "diff-line" +
+        (line.startsWith("+") ? " diff-add" : "") +
+        (line.startsWith("-") ? " diff-del" : "") +
+        (line.startsWith("@@") ? " diff-hunk" : "");
+      span.textContent = line;
+      pre.appendChild(span);
+      pre.appendChild(document.createTextNode("\n"));
+    }
+    wrap.appendChild(pre);
   }
 
   const actions = document.createElement("div");
@@ -284,24 +323,35 @@ function renderFileCreateDiff(data) {
 
   const head = document.createElement("div");
   head.className = "file-edit-diff-head";
-  const s = data.stats;
-  head.innerHTML = `<span class="file-edit-file-name">✨ ${data.file_name}</span>` +
+  const s = data.stats || { lines: 0, chars: 0 };
+  head.innerHTML = `<span class="file-edit-file-name">✨ ${data.file_name || "未知文件"}</span>` +
     `<span class="file-edit-stats file-create-badge">新文件 · ${s.lines} 行 · ${s.chars} 字符</span>`;
   wrap.appendChild(head);
 
-  const pre = document.createElement("pre");
-  pre.className = "file-edit-diff-pre";
-  const diffLines = (data.diff || "").split("\n");
-  for (const line of diffLines) {
-    const span = document.createElement("span");
-    span.className = "diff-line" +
-      (line.startsWith("+") ? " diff-add" : "") +
-      (line.startsWith("@@") ? " diff-hunk" : "");
-    span.textContent = line;
-    pre.appendChild(span);
-    pre.appendChild(document.createTextNode("\n"));
+  // 显示错误信息
+  if (data.errors && data.errors.length > 0) {
+    const errDiv = document.createElement("div");
+    errDiv.className = "file-edit-errors";
+    errDiv.textContent = "⚠ " + data.errors.join("\n");
+    wrap.appendChild(errDiv);
   }
-  wrap.appendChild(pre);
+
+  // 只有有 diff 内容时才渲染 pre
+  if (data.diff) {
+    const pre = document.createElement("pre");
+    pre.className = "file-edit-diff-pre";
+    const diffLines = data.diff.split("\n");
+    for (const line of diffLines) {
+      const span = document.createElement("span");
+      span.className = "diff-line" +
+        (line.startsWith("+") ? " diff-add" : "") +
+        (line.startsWith("@@") ? " diff-hunk" : "");
+      span.textContent = line;
+      pre.appendChild(span);
+      pre.appendChild(document.createTextNode("\n"));
+    }
+    wrap.appendChild(pre);
+  }
 
   const actions = document.createElement("div");
   actions.className = "file-edit-actions";
@@ -380,8 +430,20 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl) {
     const results = await executeToolCalls(calls);
 
     // 渲染工具卡片
-    for (let i = 0; i < calls.length; i++) {
-      chatScroll.appendChild(renderToolCallCard(calls[i], results[i]));
+    lastMsg.toolResults = [
+      ...(lastMsg.toolResults || []),
+      ...results.map((result, i) => ({ call: calls[i], result })),
+    ];
+    setMessages([...state.messages]);
+    if (lastMsg.id) {
+      try {
+        await patch(`/chat/messages/${lastMsg.id}`, {
+          content: lastMsg.content,
+          metadata: { toolResults: lastMsg.toolResults },
+        });
+      } catch (e) {
+        console.warn("工具结果保存失败:", e);
+      }
     }
     chatScroll.scrollTop = chatScroll.scrollHeight;
 
@@ -429,7 +491,8 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl) {
 
     // 持久化
     if (state.currentConversationId) {
-      await post(`/chat/conversations/${state.currentConversationId}/messages`, { role: "assistant", content: followContent2, model: modelId });
+      const saved = await post(`/chat/conversations/${state.currentConversationId}/messages`, { role: "assistant", content: followContent2, model: modelId });
+      if (saved.code === 0 && saved.data?.id) followUp.id = saved.data.id;
     }
 
     msgEl = followEl; // 下一轮用新的元素
@@ -475,7 +538,13 @@ async function sendMessage() {
   addMessage(userMsg);
 
   if (state.currentConversationId) {
-    await post(`/chat/conversations/${state.currentConversationId}/messages`, { role: "user", content: text, model: "" });
+    const saved = await post(`/chat/conversations/${state.currentConversationId}/messages`, {
+      role: "user",
+      content: text,
+      model: "",
+      metadata: fileMeta.length > 0 ? { files: fileMeta } : {},
+    });
+    if (saved.code === 0 && saved.data?.id) userMsg.id = saved.data.id;
   }
 
   const assistantMsg = { role: "assistant", content: "", model: state.currentModel?.name || "" };
@@ -528,7 +597,8 @@ async function sendMessage() {
   }
 
   if (state.currentConversationId) {
-    await post(`/chat/conversations/${state.currentConversationId}/messages`, { role: "assistant", content: fullContent, model: modelId });
+    const saved = await post(`/chat/conversations/${state.currentConversationId}/messages`, { role: "assistant", content: fullContent, model: modelId });
+    if (saved.code === 0 && saved.data?.id) assistantMsg.id = saved.data.id;
   }
 
   // 工具调用循环（最多 5 轮）
@@ -574,7 +644,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260730-7");
+    const { toast } = await import("../app.js?v=20260730-13");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -645,7 +715,7 @@ async function switchConversation(convId) {
   }
   state.currentConversationId = convId;
   const res = await get(`/chat/conversations/${convId}/messages`);
-  if (res.code === 0) setMessages(res.data);
+  if (res.code === 0) setMessages((res.data || []).map(normalizeMessageForRender));
 
   // 从后端对话列表获取用量数据
   const conv = state.conversations.find(c => c.id === convId);
@@ -741,7 +811,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260730-7");
+      const { toast } = await import("../app.js?v=20260730-13");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }

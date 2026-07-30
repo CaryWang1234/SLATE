@@ -49,10 +49,14 @@ def _get_db() -> sqlite3.Connection:
             role TEXT,
             content TEXT,
             model TEXT DEFAULT '',
+            metadata TEXT DEFAULT '',
             created_at REAL,
             FOREIGN KEY (conversation_id) REFERENCES conversations(id)
         )
     """)
+    msg_cols = [r[1] for r in conn.execute("PRAGMA table_info(messages)").fetchall()]
+    if "metadata" not in msg_cols:
+        conn.execute("ALTER TABLE messages ADD COLUMN metadata TEXT DEFAULT ''")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS memories (
             id TEXT PRIMARY KEY,
@@ -110,12 +114,23 @@ async def get_messages(conv_id: str) -> dict[str, Any]:
     """获取对话的所有消息。"""
     conn = _get_db()
     rows = conn.execute(
-        "SELECT id, role, content, model, created_at FROM messages "
+        "SELECT id, role, content, model, metadata, created_at FROM messages "
         "WHERE conversation_id = ? ORDER BY created_at ASC",
         (conv_id,),
     ).fetchall()
     conn.close()
-    messages = [dict(r) for r in rows]
+    messages = []
+    for row in rows:
+        msg = dict(row)
+        raw_metadata = msg.pop("metadata", "") or ""
+        if raw_metadata:
+            try:
+                metadata = json.loads(raw_metadata)
+                if isinstance(metadata, dict):
+                    msg.update(metadata)
+            except json.JSONDecodeError:
+                pass
+        messages.append(msg)
     return {"code": 0, "data": messages, "message": "ok"}
 
 
@@ -126,14 +141,16 @@ async def add_message(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
     role = body.get("role", "user")
     content = body.get("content", "")
     model = body.get("model", "")
+    metadata = body.get("metadata", {})
+    metadata_text = json.dumps(metadata, ensure_ascii=False) if isinstance(metadata, dict) and metadata else ""
     now = time.time()
 
     conn = _get_db()
     # 插入消息
     conn.execute(
-        "INSERT INTO messages (id, conversation_id, role, content, model, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (msg_id, conv_id, role, content, model, now),
+        "INSERT INTO messages (id, conversation_id, role, content, model, metadata, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (msg_id, conv_id, role, content, model, metadata_text, now),
     )
     # 更新对话时间戳
     conn.execute(
@@ -154,6 +171,32 @@ async def add_message(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
     conn.commit()
     conn.close()
     return {"code": 0, "data": {"id": msg_id}, "message": "ok"}
+
+
+@router.patch("/messages/{msg_id}")
+async def update_message(msg_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """更新单条消息内容或渲染元数据。"""
+    fields: list[str] = []
+    values: list[Any] = []
+
+    if "content" in body:
+        fields.append("content = ?")
+        values.append(body.get("content", ""))
+    if "metadata" in body:
+        metadata = body.get("metadata", {})
+        metadata_text = json.dumps(metadata, ensure_ascii=False) if isinstance(metadata, dict) and metadata else ""
+        fields.append("metadata = ?")
+        values.append(metadata_text)
+
+    if not fields:
+        return {"code": 0, "data": None, "message": "ok"}
+
+    values.append(msg_id)
+    conn = _get_db()
+    conn.execute(f"UPDATE messages SET {', '.join(fields)} WHERE id = ?", values)
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": None, "message": "ok"}
 
 
 @router.delete("/conversations/{conv_id}")

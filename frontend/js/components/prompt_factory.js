@@ -2,8 +2,8 @@
  * SLATE 提示词工厂：生成、预览、编辑、导出
  */
 
-import { state, subscribe } from "../store.js?v=20260730-7";
-import { get } from "../services/api.js?v=20260730-7";
+import { state, subscribe } from "../store.js?v=20260730-13";
+import { get } from "../services/api.js?v=20260730-13";
 
 let factoryTask, factoryContext, factoryConstraints;
 let btnGenerate, promptOutput, promptResult, btnCopy;

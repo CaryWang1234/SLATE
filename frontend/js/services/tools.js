@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-7";
-import { post } from "../services/api.js?v=20260730-7";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-13";
+import { post } from "../services/api.js?v=20260730-13";
 
 // ── 工具注册表 ────────────────────────────────
 
@@ -184,13 +184,49 @@ const TOOLS = {
       if (!edits || !edits.length) return "缺少 edits";
 
       const absPath = state.project.path + "/" + file_path.replace(/^\/+/, "");
-      const res = await post("/skills/execute", {
-        skill: "file_edit",
-        params: { file_path: absPath, edits: JSON.stringify(edits) },
-      });
-      if (res.code !== 0) return `编辑失败: ${res.message}`;
+      let res;
+      try {
+        res = await post("/skills/execute", {
+          skill: "file_edit",
+          params: { file_path: absPath, edits: JSON.stringify(edits) },
+        });
+      } catch (e) {
+        return {
+          _type: "file_edit",
+          file: absPath,
+          file_name: file_path.split("/").pop(),
+          diff: "",
+          new_content: "",
+          stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+          errors: ["网络请求失败: " + e.message],
+          applied: [],
+        };
+      }
+      if (res.code !== 0) {
+        return {
+          _type: "file_edit",
+          file: absPath,
+          file_name: file_path.split("/").pop(),
+          diff: "",
+          new_content: "",
+          stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+          errors: [res.message || "未知错误"],
+          applied: [],
+        };
+      }
       const data = res.data;
-      if (data.error) return `编辑失败: ${data.error}`;
+      if (data?.error) {
+        return {
+          _type: "file_edit",
+          file: absPath,
+          file_name: file_path.split("/").pop(),
+          diff: "",
+          new_content: "",
+          stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+          errors: [data.error],
+          applied: [],
+        };
+      }
 
       // 返回结构化数据，chat.js 会检测 _type 渲染 diff UI
       return {
@@ -199,7 +235,7 @@ const TOOLS = {
         file_name: data.file_name,
         diff: data.diff,
         new_content: data.new_content,
-        stats: data.stats,
+        stats: data.stats || { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
         errors: data.errors || [],
         applied: data.applied || [],
       };
@@ -219,13 +255,46 @@ const TOOLS = {
       if (content === undefined || content === null) return "缺少 content";
 
       const absPath = state.project.path + "/" + file_path.replace(/^\/+/, "");
-      const res = await post("/skills/execute", {
-        skill: "file_create",
-        params: { file_path: absPath, content },
-      });
-      if (res.code !== 0) return `创建失败: ${res.message}`;
+      let res;
+      try {
+        res = await post("/skills/execute", {
+          skill: "file_create",
+          params: { file_path: absPath, content },
+        });
+      } catch (e) {
+        return {
+          _type: "file_create",
+          file: absPath,
+          file_name: file_path.split("/").pop(),
+          diff: "",
+          content,
+          stats: { lines: content.split("\n").length, chars: content.length },
+          errors: ["网络请求失败: " + e.message],
+        };
+      }
+      if (res.code !== 0) {
+        return {
+          _type: "file_create",
+          file: absPath,
+          file_name: file_path.split("/").pop(),
+          diff: "",
+          content,
+          stats: { lines: content.split("\n").length, chars: content.length },
+          errors: [res.message || "未知错误"],
+        };
+      }
       const data = res.data;
-      if (data.error) return `创建失败: ${data.error}`;
+      if (data?.error) {
+        return {
+          _type: "file_create",
+          file: absPath,
+          file_name: file_path.split("/").pop(),
+          diff: "",
+          content,
+          stats: { lines: content.split("\n").length, chars: content.length },
+          errors: [data.error],
+        };
+      }
 
       return {
         _type: "file_create",
@@ -233,7 +302,8 @@ const TOOLS = {
         file_name: data.file_name,
         diff: data.diff,
         content: data.content,
-        stats: data.stats,
+        stats: data.stats || { lines: content.split("\n").length, chars: content.length },
+        errors: data.errors || [],
       };
     },
   },
@@ -321,7 +391,7 @@ function getToolsSystemPrompt() {
   let s = "\n\n[可用工具 - 必须调用]\n";
   s += "你拥有工具，可以直接操作用户的工作环境。\n\n";
   s += '**当用户说"了解项目"、"看看文件"、"浏览目录"时，你必须立即调用 project_files 工具，格式如下：**\n';
-  s += "◈◈project_files\n{\"path\": \"\"}\n◆◆\n\n";
+  s += "◈◈◈project_files\n{\"path\": \"\"}\n◈◆◆\n\n";
   s += "不要回答'我无法查看'——你必须发出上面的调用！\n\n";
   s += "**调用规则：必须使用下方指定格式调用工具。不要只描述你要做什么——必须实际发出调用。**\n";
   s += "每次调用独占一行，格式严格如下（◈◈◈ 和 ◈◆◆ 是固定标记，不可省略）：\n";
@@ -329,7 +399,7 @@ function getToolsSystemPrompt() {
 
   // 具体示例
   s += '**示例：当用户说"了解项目"时，你必须这样回复（不要文字描述，直接发出调用）：**\n';
-  s += "```\n◈project_files\n{\"path\": \"\"}\n◆◆\n```\n";
+  s += "```\n◈◈◈project_files\n{\"path\": \"\"}\n◈◆◆\n```\n";
   s += "（等待工具返回目录列表后，再根据结果回答用户）\n\n";
 
   // 项目上下文
@@ -353,7 +423,7 @@ function getToolsSystemPrompt() {
     }
     s += `示例:\n◈◈◈${key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
   }
-  s += "**再次提醒：不要只说'我来帮你查看'——必须发出 ◈◈ 调用。一次回复可多次调用。**";
+  s += "**再次提醒：不要只说'我来帮你查看'——必须发出 ◈◈◈ 调用。一次回复可多次调用。**";
 
   // file_edit 专项指导
   s += "\n\n[文件编辑规则 — file_edit 工具]\n";

@@ -2,8 +2,8 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260730-7";
-import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260730-7";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260730-13";
+import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260730-13";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let fileTreeContainer, projectInfoEl, projectCloseBtn;
@@ -307,7 +307,7 @@ function openProjectSettings() {
     try {
       const constData = JSON.parse(constitutionInput.value.trim());
       const config = { ...(state.project?.config || {}), constitution: constData };
-      const res = await (await import("../services/project.js?v=20260730-7")).updateProjectConfig(config);
+      const res = await (await import("../services/project.js?v=20260730-13")).updateProjectConfig(config);
       if (res.code === 0) {
         setProject(res.data);
         settingsModal.classList.add("hidden");

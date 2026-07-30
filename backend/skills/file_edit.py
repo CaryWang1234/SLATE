@@ -92,7 +92,22 @@ def execute(
         })
 
     if errors and not applied:
-        return {"error": "所有编辑均失败:\n" + "\n".join(errors)}
+        # 即使全部失败，也返回结构化数据（前端可渲染 diff 查看器展示错误）
+        return {
+            "file": str(target),
+            "file_name": target.name,
+            "diff": "",
+            "applied": [],
+            "errors": errors,
+            "stats": {
+                "edits_total": len(edit_list),
+                "edits_applied": 0,
+                "lines_added": 0,
+                "lines_removed": 0,
+            },
+            "new_content": original,
+            "note": "所有编辑均未匹配。请检查 old_text 是否与文件内容完全一致。",
+        }
 
     # 生成 unified diff
     import difflib
