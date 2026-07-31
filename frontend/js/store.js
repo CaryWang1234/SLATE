@@ -3,7 +3,10 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-const API_BASE = "http://127.0.0.1:8000/api";
+const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
+  ? window.location.origin
+  : "http://127.0.0.1:8000";
+const API_BASE = `${API_ORIGIN}/api`;
 
 const state = {
   // 主题
@@ -86,6 +89,17 @@ function savePersistent() {
     conversationUsage: state.conversationUsage,
   };
   try { localStorage.setItem("slate_state", JSON.stringify(data)); } catch (e) {}
+  saveSharedPersistent(data);
+}
+
+function saveSharedPersistent(data) {
+  try {
+    fetch(`${API_BASE}/settings/state`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data }),
+    }).catch(() => {});
+  } catch (e) {}
 }
 
 function loadPersistent() {
@@ -100,6 +114,23 @@ function loadPersistent() {
     state._pendingModelId = data.currentModelId;
     state._lastProjectPath = data.lastProjectPath || null;
     state.conversationUsage = data.conversationUsage || {};
+  } catch (e) {}
+}
+
+async function loadSharedPersistent() {
+  try {
+    const resp = await fetch(`${API_BASE}/settings/state`, { cache: "no-store" });
+    if (!resp.ok) return;
+    const res = await resp.json();
+    const data = res?.data || {};
+    state.modelKeys = { ...(data.modelKeys || {}), ...state.modelKeys };
+    if (Array.isArray(data.customModels) && data.customModels.length > 0 && state.customModels.length === 0) {
+      state.customModels = data.customModels;
+    }
+    if (!state._pendingModelId && data.currentModelId) {
+      state._pendingModelId = data.currentModelId;
+    }
+    savePersistent();
   } catch (e) {}
 }
 
@@ -333,6 +364,7 @@ export {
   API_BASE, state, subscribe, notify,
   setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel,
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens, estimateContextTokens,
+  loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage,
   setConversations, setBoardCards, addBoardCard,
   setConstitution, setSkills, setModelRegistry,

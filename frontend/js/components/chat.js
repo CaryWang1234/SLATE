@@ -2,11 +2,11 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-26";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-26";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-26";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-26";
-import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-26";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-29";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-29";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-29";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-29";
+import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-29";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -218,6 +218,8 @@ function shouldHideToolOutput(call) {
 function looksLikeInspectionStall(content) {
   if (!content || detectToolCalls(content).length > 0) return false;
   const text = content.replace(/```[\s\S]*?```/g, " ");
+  const offerOrQuestion = /(需要我|要我|是否需要|要不要|你需要|如果你需要|我可以(?:直接)?(?:动手|继续|帮你|给出)|是否要|吗[？?]?|呢[？?]?)/;
+  if (offerOrQuestion.test(text)) return false;
   const intent = /(我(?:先|再|来|会|需要|可以)?(?:查看|看看|看一下|看一眼|浏览|读取|检查|了解|确认|分析)|让我(?:查看|看看|看一下|浏览|读取|检查|了解)|需要(?:查看|看看|看一下|浏览|读取|检查|了解|确认)|(?:先|再)(?:查看|看看|看一下|浏览|读取|检查|了解)|I'll\s+(?:check|inspect|look|read)|I\s+need\s+to\s+(?:check|inspect|look|read))/i;
   const target = /(项目|文件|目录|代码|路径|仓库|工程|结构|数据模型|管理器|核心|黑板|技能|上下文|project|file|directory|repo|code|path|folder|context|model|manager|schema)/i;
   const waiting = /(稍等|等一下|接下来|下一步|然后|之后|before|first|next)/i;
@@ -748,7 +750,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260730-26");
+    const { toast } = await import("../app.js?v=20260730-29");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -767,7 +769,7 @@ function toggleBrainstormMode() {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260730-26").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260730-29").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -791,7 +793,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260730-26");
+    const { toast } = await import("../app.js?v=20260730-29");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -824,7 +826,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260730-26");
+    const { toast } = await import("../app.js?v=20260730-29");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -992,7 +994,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260730-26");
+      const { toast } = await import("../app.js?v=20260730-29");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }

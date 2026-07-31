@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 import uuid
@@ -13,7 +14,8 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "chat_history.db"
+DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
+DB_PATH = DATA_DIR / "chat_history.db"
 
 
 def _get_db() -> sqlite3.Connection:

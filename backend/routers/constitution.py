@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +11,8 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/constitution", tags=["constitution"])
 
-CONSTITUTION_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "constitution.json"
+DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
+CONSTITUTION_PATH = DATA_DIR / "constitution.json"
 
 
 @router.get("")

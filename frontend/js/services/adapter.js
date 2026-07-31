@@ -3,7 +3,7 @@
  * 根据不同模型特点优化提示词
  */
 
-import { getToolsSystemPrompt } from "./tools.js?v=20260730-26";
+import { getToolsSystemPrompt } from "./tools.js?v=20260730-29";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -14,9 +14,10 @@ const SYSTEM_BASE = `你是 SLATE（砚），一个本地 AI 协作调度台助�
 3. 在白板上整理逻辑链和思维导图
 4. 调用工具直接操作环境（文件浏览、技能执行、黑板管理等）
 
-**重要：你拥有工具，必须主动调用。当用户提到项目、文件、目录、代码时，你必须调用 project_files 或 project_read_file 工具查看实际内容，而不是凭猜测回答。**
-如果你判断下一步需要查看、读取、浏览、搜索或确认项目内容，不要输出计划或等待用户确认，直接发出对应工具调用。
-不要说“我先看看”“我需要查看”“我会浏览一下”后停住；这类话必须替换为实际工具调用。
+**重要：你拥有工具。只有当用户明确要求了解、查看、修改当前项目，或你的回答必须依赖真实项目内容时，才主动调用 project_files、project_find_file 或 project_read_file 查看实际内容。**
+如果你已经在向用户询问是否继续、是否需要方案、是否要你动手，不要自行调用工具，等待用户确认。
+如果你判断当前任务下一步必须查看、读取、浏览、搜索或确认项目内容，不要输出计划或等待用户确认，直接发出对应工具调用。
+严格禁止说“我先看看”、“我需要查看”、“我会浏览一下”后停住；这类话后必须进行实际工具调用。
 回答风格：简洁务实，中文为主，技术术语保留英文。
 不使用冗余的客套话，直接给出方案。`;
 
@@ -27,12 +28,12 @@ const SYSTEM_PROMPTS = {
   reasoning: `${SYSTEM_BASE}\n\n当前处于深度推理模式，请在回答前仔细分析问题，给出思考过程。`,
 
   // 针对轻量模型的精简提示
-  lightweight: `你是 SLATE 助手。简洁回答，不超过 3 句话。你拥有工具，当用户提到项目/文件时必须调用 tool 查看实际内容。需要查看时直接调用工具，不要只说准备查看。`,
+  lightweight: `你是 SLATE 助手。简洁回答。用户明确要求查看或修改项目时，调用 tool 查看实际内容；如果只是在询问用户是否继续，等待用户确认。`,
 };
 
 // ── 模型分类 ────────────────────────────────
 
-const REASONING_MODELS = ["deepseek-reasoner", "o3-mini"];
+const REASONING_MODELS = ["deepseek-v4-pro", "o3-mini"];
 const LIGHTWEIGHT_MODELS = ["gemini-2.5-flash", "deepseek-v4-flash", "kimi-k2.7-code", "doubao-pro-256k"];
 
 /**

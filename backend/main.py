@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import chat, constitution, files, proxy, projects, skills
+from backend.routers import chat, constitution, files, proxy, projects, settings, skills
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 
 app = FastAPI(title="SLATE", version="0.1.0")
 
@@ -41,6 +42,7 @@ app.include_router(skills.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
 
 # 挂载前端静态文件
 frontend_dir = PROJECT_ROOT / "frontend"

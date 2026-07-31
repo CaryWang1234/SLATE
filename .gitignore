@@ -1,4 +1,12 @@
 /.tmp-chrome-codex
 /.tmp-chrome-codex-*
-
+/dist
+/build
 /data
+/installer
+build_installer.bat
+build_desktop.bat
+desktop_backend.log
+SLATE_InnoSetup.iss
+SLATE.spec
+*/__pycache__

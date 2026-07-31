@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,8 @@ from fastapi import APIRouter, UploadFile, File
 router = APIRouter(prefix="/skills", tags=["skills"])
 
 SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"
-USER_SKILLS_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "skills"
+DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
+USER_SKILLS_DIR = DATA_DIR / "skills"
 
 # 内置技能注册表
 BUILTIN_SKILLS: dict[str, str] = {

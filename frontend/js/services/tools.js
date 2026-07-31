@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-26";
-import { post } from "../services/api.js?v=20260730-26";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-29";
+import { post } from "../services/api.js?v=20260730-29";
 
 // ── 工具注册表 ────────────────────────────────
 
@@ -405,7 +405,7 @@ async function executeToolCalls(calls) {
 // ── 系统提示词工具段 ──────────────────────────
 
 function getToolsSystemPrompt() {
-  let s = "\n\n[可用工具 - 必须调用]\n";
+  let s = "\n\n[可用工具]\n";
   s += "你拥有工具，可以直接操作用户的工作环境。\n\n";
   s += '**当用户说"了解项目"、"看看文件"、"浏览目录"时，你必须立即调用 project_files 工具，格式如下：**\n';
   s += "◈◈◈project_files\n{\"path\": \"\"}\n◈◆◆\n\n";
@@ -413,7 +413,8 @@ function getToolsSystemPrompt() {
   s += "**调用规则：必须使用下方指定格式调用工具。不要只描述你要做什么——必须实际发出调用。**\n";
   s += "每次调用独占一行，格式严格如下（◈◈◈ 和 ◈◆◆ 是固定标记，不可省略）：\n";
   s += "◈◈◈tool_name\n{JSON参数}\n◈◆◆\n\n";
-  s += "如果你准备查看任何文件、目录、项目结构、黑板内容或技能结果，当前回复必须包含工具调用块。\n";
+  s += "如果当前任务已经需要你查看文件、目录、项目结构、黑板内容或技能结果，当前回复必须包含工具调用块。\n";
+  s += "如果你只是在问用户是否需要继续、是否要你动手、是否要给出方案，不要调用工具。\n";
   s += "禁止只输出“我先查看”“我需要读取”“让我看看”等意图描述后停止。\n\n";
   s += "只知道文件名但不知道相对路径时，先调用 project_find_file；拿到匹配路径后再调用 project_read_file 读取目标文件。\n\n";
 
@@ -429,7 +430,7 @@ function getToolsSystemPrompt() {
       s += "项目宪法:\n";
       state.project.constitution.rules.forEach((r, i) => { s += `  ${i + 1}. ${r}\n`; });
     }
-    s += "用户提到项目/文件时，你必须先调用 project_files 浏览目录。\n\n";
+    s += "用户明确要求查看或修改项目/文件时，你必须先调用 project_files 浏览目录。\n\n";
   }
 
   for (const [key, tool] of Object.entries(TOOLS)) {
