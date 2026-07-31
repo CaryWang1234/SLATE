@@ -2,11 +2,11 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-22";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-22";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-22";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-22";
-import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-22";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-23";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-23";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-23";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-23";
+import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-23";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -185,6 +185,14 @@ function addStreamingCursor(msgEl) {
 
 function removeStreamingCursor(cursor) {
   cursor?.parentNode?.removeChild(cursor);
+}
+
+function renderAssistantContent(contentEl, content, cursor = null) {
+  if (!contentEl) return;
+  const displayContent = detectToolCalls(content).length > 0 ? stripToolCalls(content) : content;
+  contentEl.innerHTML = renderMarkdown(displayContent);
+  if (cursor) contentEl.appendChild(cursor);
+  contentEl.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
 }
 
 function summarizeParams(params) {
@@ -510,9 +518,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl) {
     try {
       for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: 0.7, max_tokens: 4096, stream: true })) {
         followContent2 += chunk;
-        followContent.innerHTML = renderMarkdown(followContent2);
-        followContent.appendChild(cursor);
-        followContent.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
+        renderAssistantContent(followContent, followContent2, cursor);
         chatScroll.scrollTop = chatScroll.scrollHeight;
       }
     } catch (err) {
@@ -521,8 +527,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl) {
 
     removeStreamingCursor(cursor);
     updateLastAssistantMessage(followContent2);
-    followContent.innerHTML = renderMarkdown(followContent2);
-    followContent.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
+    renderAssistantContent(followContent, followContent2);
 
     // 持久化
     if (state.currentConversationId) {
@@ -609,11 +614,7 @@ async function sendMessage() {
     for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, stream: true })) {
       fullContent += chunk;
       const contentEl = msgEl.querySelector(".msg-content");
-      if (contentEl) {
-        contentEl.innerHTML = renderMarkdown(fullContent);
-        contentEl.appendChild(cursor);
-        contentEl.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
-      }
+      renderAssistantContent(contentEl, fullContent, cursor);
       chatScroll.scrollTop = chatScroll.scrollHeight;
     }
   } catch (err) {
@@ -632,10 +633,7 @@ async function sendMessage() {
   syncUsageToBackend();
 
   const contentEl = msgEl.querySelector(".msg-content");
-  if (contentEl) {
-    contentEl.innerHTML = renderMarkdown(fullContent);
-    contentEl.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
-  }
+  renderAssistantContent(contentEl, fullContent);
 
   if (state.currentConversationId) {
     const saved = await post(`/chat/conversations/${state.currentConversationId}/messages`, { role: "assistant", content: fullContent, model: modelId });
@@ -685,7 +683,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260730-22");
+    const { toast } = await import("../app.js?v=20260730-23");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -704,7 +702,7 @@ function toggleBrainstormMode() {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260730-22").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260730-23").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -728,7 +726,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260730-22");
+    const { toast } = await import("../app.js?v=20260730-23");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -761,7 +759,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260730-22");
+    const { toast } = await import("../app.js?v=20260730-23");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -929,7 +927,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260730-22");
+      const { toast } = await import("../app.js?v=20260730-23");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }

@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-22";
-import { post } from "../services/api.js?v=20260730-22";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-23";
+import { post } from "../services/api.js?v=20260730-23";
 
 // ── 工具注册表 ────────────────────────────────
 
