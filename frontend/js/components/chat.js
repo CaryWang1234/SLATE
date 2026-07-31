@@ -2,11 +2,11 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-23";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-23";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-23";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-23";
-import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-23";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-26";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-26";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-26";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-26";
+import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-26";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -212,7 +212,70 @@ function summarizeParams(params) {
 }
 
 function shouldHideToolOutput(call) {
-  return ["skill_run", "project_files", "project_read_file", "board_read", "chat_context"].includes(call?.name);
+  return ["skill_run", "project_files", "project_read_file", "project_find_file", "board_read", "chat_context"].includes(call?.name);
+}
+
+function looksLikeInspectionStall(content) {
+  if (!content || detectToolCalls(content).length > 0) return false;
+  const text = content.replace(/```[\s\S]*?```/g, " ");
+  const intent = /(我(?:先|再|来|会|需要|可以)?(?:查看|看看|看一下|看一眼|浏览|读取|检查|了解|确认|分析)|让我(?:查看|看看|看一下|浏览|读取|检查|了解)|需要(?:查看|看看|看一下|浏览|读取|检查|了解|确认)|(?:先|再)(?:查看|看看|看一下|浏览|读取|检查|了解)|I'll\s+(?:check|inspect|look|read)|I\s+need\s+to\s+(?:check|inspect|look|read))/i;
+  const target = /(项目|文件|目录|代码|路径|仓库|工程|结构|数据模型|管理器|核心|黑板|技能|上下文|project|file|directory|repo|code|path|folder|context|model|manager|schema)/i;
+  const waiting = /(稍等|等一下|接下来|下一步|然后|之后|before|first|next)/i;
+  return intent.test(text) && (target.test(text) || waiting.test(text));
+}
+
+function extractInspectionPath(content) {
+  const text = String(content || "").replace(/```[\s\S]*?```/g, " ");
+  const quoted = text.match(/[“"']([^“"']+\.[A-Za-z0-9]{1,12})[”"']/);
+  const pathLike = quoted?.[1] || text.match(/([A-Za-z0-9_.@-]+(?:[\\/][A-Za-z0-9_.@ -]+)*\.[A-Za-z0-9]{1,12})/)?.[1];
+  if (!pathLike) return null;
+  return pathLike.replace(/\\/g, "/").replace(/[，。；：、,.!?;:]+$/g, "");
+}
+
+function getInspectionQueries(content) {
+  const text = String(content || "").toLowerCase();
+  const queries = [];
+  if (/数据模型|模型|schema|model/.test(text)) queries.push("model");
+  if (/核心管理器|管理器|manager/.test(text)) queries.push("manager");
+  if (/路由|接口|router|api/.test(text)) queries.push("router");
+  if (/配置|config/.test(text)) queries.push("config");
+  if (/服务|service/.test(text)) queries.push("service");
+  return [...new Set(queries)].slice(0, 3);
+}
+
+function appendSyntheticToolCalls(msgEl, calls) {
+  const lastMsg = state.messages[state.messages.length - 1];
+  if (!lastMsg || lastMsg.role !== "assistant") return false;
+  const blocks = calls.map(call => `◈◈◈${call.name}\n${JSON.stringify(call.params)}\n◈◆◆`).join("\n\n");
+  lastMsg.content = `${lastMsg.content.trim()}\n\n${blocks}`;
+  const contentEl = msgEl?.querySelector(".msg-content");
+  renderAssistantContent(contentEl, lastMsg.content);
+  return true;
+}
+
+async function autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params) {
+  const lastMsg = state.messages[state.messages.length - 1];
+  if (!lastMsg || lastMsg.role !== "assistant") return msgEl;
+  if (lastMsg.autoAdvanced || !looksLikeInspectionStall(lastMsg.content)) return msgEl;
+
+  lastMsg.autoAdvanced = true;
+
+  const wantedPath = extractInspectionPath(lastMsg.content);
+  if (wantedPath) {
+    const hasDirectory = /[\\/]/.test(wantedPath);
+    appendSyntheticToolCalls(msgEl, [{
+      name: hasDirectory ? "project_read_file" : "project_find_file",
+      params: hasDirectory ? { path: wantedPath } : { query: wantedPath },
+    }]);
+    return msgEl;
+  }
+
+  const queries = getInspectionQueries(lastMsg.content);
+  appendSyntheticToolCalls(msgEl, [
+    { name: "project_files", params: { path: "" } },
+    ...queries.map(query => ({ name: "project_find_file", params: { query } })),
+  ]);
+  return msgEl;
 }
 
 // ── 工具调用渲染 ─────────────────────────────
@@ -449,7 +512,7 @@ function renderFileCreateDiff(data) {
   return wrap;
 }
 
-async function runToolLoop(msgEl, modelId, apiKey, baseUrl) {
+async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperature: 0.7, max_tokens: 4096 }) {
   const MAX_ROUNDS = 5;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const lastMsg = state.messages[state.messages.length - 1];
@@ -535,7 +598,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl) {
       if (saved.code === 0 && saved.data?.id) followUp.id = saved.data.id;
     }
 
-    msgEl = followEl; // 下一轮用新的元素
+    msgEl = await autoAdvanceIfStalled(followEl, modelId, apiKey, baseUrl, params);
   }
 }
 
@@ -590,7 +653,7 @@ async function sendMessage() {
   const assistantMsg = { role: "assistant", content: "", model: state.currentModel?.name || "" };
   addMessage(assistantMsg);
 
-  const msgEl = renderMessage(assistantMsg, state.messages.length - 1);
+  let msgEl = renderMessage(assistantMsg, state.messages.length - 1);
   chatScroll.appendChild(msgEl);
   const cursor = addStreamingCursor(msgEl);
   chatScroll.scrollTop = chatScroll.scrollHeight;
@@ -640,8 +703,10 @@ async function sendMessage() {
     if (saved.code === 0 && saved.data?.id) assistantMsg.id = saved.data.id;
   }
 
+  msgEl = await autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params);
+
   // 工具调用循环（最多 5 轮）
-  await runToolLoop(msgEl, modelId, apiKey, baseUrl);
+  await runToolLoop(msgEl, modelId, apiKey, baseUrl, params);
 
   // 后台检查上下文压缩
   checkAndCompress(modelId, apiKey, baseUrl);
@@ -683,7 +748,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260730-23");
+    const { toast } = await import("../app.js?v=20260730-26");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -702,7 +767,7 @@ function toggleBrainstormMode() {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260730-23").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260730-26").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -726,7 +791,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260730-23");
+    const { toast } = await import("../app.js?v=20260730-26");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -759,7 +824,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260730-23");
+    const { toast } = await import("../app.js?v=20260730-26");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -927,7 +992,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260730-23");
+      const { toast } = await import("../app.js?v=20260730-26");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }

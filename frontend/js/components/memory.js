@@ -9,8 +9,8 @@ import {
   setUserProfile, resetUserProfile,
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
-} from "../store.js?v=20260730-23";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260730-23";
+} from "../store.js?v=20260730-26";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260730-26";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList;
@@ -91,12 +91,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260730-23");
+    const { toast } = await import("../app.js?v=20260730-26");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260730-23");
+  const { toast } = await import("../app.js?v=20260730-26");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -304,7 +304,7 @@ function initMemoryPanel() {
   if (btnExtractMemory) btnExtractMemory.addEventListener("click", extractMemoriesFromConversation);
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260730-23").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260730-26").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", () => {
     if (confirm("确定要重置用户资料吗？")) {

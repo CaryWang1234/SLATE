@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-23";
-import { post } from "../services/api.js?v=20260730-23";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-26";
+import { post } from "../services/api.js?v=20260730-26";
 
 // ── 工具注册表 ────────────────────────────────
 
@@ -59,6 +59,23 @@ const TOOLS = {
       if (res.code !== 0) return res.message || "读取失败";
       if (res.data.type !== "file") return "路径不是文件";
       return res.data.content?.slice(0, 10000) || "(空文件)";
+    },
+  },
+
+  project_find_file: {
+    name: "查找项目文件",
+    description: "按文件名或相对路径在当前项目中查找文件",
+    params: {
+      query: { type: "string", description: "文件名或路径片段", required: true },
+    },
+    async execute({ query }) {
+      if (!state.project) return "未打开项目";
+      if (!query) return "缺少 query";
+      const res = await post("/projects/find", { query, limit: 30 });
+      if (res.code !== 0) return res.message || "查找失败";
+      const matches = res.data?.matches || [];
+      if (!matches.length) return `未找到: ${query}`;
+      return matches.map(item => `${item.type === "dir" ? "📁" : "📄"} ${item.path}${item.size ? ` (${item.size}B)` : ""}`).join("\n");
     },
   },
 
@@ -396,6 +413,9 @@ function getToolsSystemPrompt() {
   s += "**调用规则：必须使用下方指定格式调用工具。不要只描述你要做什么——必须实际发出调用。**\n";
   s += "每次调用独占一行，格式严格如下（◈◈◈ 和 ◈◆◆ 是固定标记，不可省略）：\n";
   s += "◈◈◈tool_name\n{JSON参数}\n◈◆◆\n\n";
+  s += "如果你准备查看任何文件、目录、项目结构、黑板内容或技能结果，当前回复必须包含工具调用块。\n";
+  s += "禁止只输出“我先查看”“我需要读取”“让我看看”等意图描述后停止。\n\n";
+  s += "只知道文件名但不知道相对路径时，先调用 project_find_file；拿到匹配路径后再调用 project_read_file 读取目标文件。\n\n";
 
   // 具体示例
   s += '**示例：当用户说"了解项目"时，你必须这样回复（不要文字描述，直接发出调用）：**\n';

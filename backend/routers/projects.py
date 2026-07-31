@@ -62,6 +62,11 @@ class BrowseRequest(BaseModel):
     path: str = ""
 
 
+class FindRequest(BaseModel):
+    query: str
+    limit: int = 30
+
+
 # ── 路由 ──────────────────────────────────────
 
 @router.post("/open")
@@ -189,6 +194,50 @@ async def browse_files(req: BrowseRequest):
             "entries": entries,
         },
     }
+
+
+@router.post("/find")
+async def find_files(req: FindRequest):
+    """按文件名或相对路径查找项目文件"""
+    if not _current_project:
+        return {"code": 1, "message": "未打开项目"}
+
+    query = (req.query or "").strip().lower()
+    if not query:
+        return {"code": 1, "message": "缺少查询条件"}
+
+    project_dir = Path(_current_project["path"])
+    limit = max(1, min(req.limit or 30, 100))
+    matches = []
+
+    stack = [project_dir]
+    while stack and len(matches) < limit:
+        current = stack.pop()
+        try:
+            children = sorted(current.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+        except PermissionError:
+            continue
+        for path in children:
+            if len(matches) >= limit:
+                break
+            if path.name.startswith(".") and path.name != ".env":
+                continue
+            if path.is_dir() and path.name in IGNORE_DIRS:
+                continue
+            rel = path.relative_to(project_dir).as_posix()
+            name = path.name.lower()
+            rel_lower = rel.lower()
+            if query == name or query in name or query in rel_lower:
+                matches.append({
+                    "name": path.name,
+                    "type": "dir" if path.is_dir() else "file",
+                    "path": rel,
+                    "size": path.stat().st_size if path.is_file() else None,
+                })
+            if path.is_dir():
+                stack.append(path)
+
+    return {"code": 0, "data": {"query": req.query, "matches": matches}}
 
 
 @router.get("/drives")
