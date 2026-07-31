@@ -2,8 +2,8 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260730-18";
-import { streamChat } from "../services/api.js?v=20260730-18";
+import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260730-22";
+import { streamChat } from "../services/api.js?v=20260730-22";
 
 let boardCards, boardEmpty, mermaidPreview, mermaidCode, mermaidRenderArea;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -295,6 +295,49 @@ function cardsToMermaid(cards) {
   return lines.join("\n");
 }
 
+function exportBoard() {
+  const cards = state.boardCards || [];
+  const date = new Date().toISOString().slice(0, 10);
+  const lines = [
+    "# SLATE 黑板导出",
+    "",
+    `导出时间: ${new Date().toLocaleString()}`,
+    `卡片数量: ${cards.length}`,
+    "",
+    "## 卡片",
+    "",
+  ];
+
+  if (cards.length === 0) {
+    lines.push("暂无卡片。", "");
+  } else {
+    for (const card of cards) {
+      lines.push(`### ${card.id} · ${card.title || "未命名"}`);
+      if (card.body) lines.push("", card.body);
+      if (card.arrows?.length) lines.push("", `关联: ${card.arrows.join(", ")}`);
+      if (card.color && card.color !== "default") lines.push("", `颜色: ${card.color}`);
+      lines.push("");
+    }
+  }
+
+  const mermaid = cardsToMermaid(cards);
+  if (mermaid) {
+    lines.push("## Mermaid", "", "```mermaid", mermaid, "```", "");
+  }
+
+  lines.push("## JSON", "", "```json", JSON.stringify(cards, null, 2), "```", "");
+
+  const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `slate-board-${date}.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function renderMermaid() {
   const code = cardsToMermaid(state.boardCards);
   if (!code) {
@@ -461,6 +504,7 @@ function initWhiteboard() {
 
   // Mermaid 切换按钮
   document.getElementById("btn-toggle-mermaid").addEventListener("click", toggleMermaid);
+  document.getElementById("btn-export-board")?.addEventListener("click", exportBoard);
   document.getElementById("btn-close-mermaid").addEventListener("click", () => {
     mermaidVisible = false;
     mermaidPreview.classList.add("hidden");

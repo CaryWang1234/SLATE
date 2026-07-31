@@ -3,16 +3,20 @@
  * 轻量模型初步讨论 → 重型模型最终决策
  */
 
-import { state, subscribe, getModelKey, hasModelKey } from "../store.js?v=20260730-18";
-import { streamChat } from "../services/api.js?v=20260730-18";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260730-18";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260730-22";
+import { streamChat } from "../services/api.js?v=20260730-22";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260730-22";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
 
 let teamPanel, teamMembersArea, teamTopicInput, btnStartDiscuss, teamOutput, btnAddMember;
+let teamHistoryList, teamUsageBar, btnNewTeamDiscussion;
 let teamMembers = [];
+let teamHistory = [];
+let currentTeamUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0, messageCount: 0 };
 let isDiscussing = false;
+const TEAM_HISTORY_KEY = "slate_team_history";
 
 // ── 默认团队成员 ────────────────────────────
 
@@ -21,6 +25,94 @@ const DEFAULT_MEMBERS = [
   { id: "member-2", name: "创意官", modelId: "gemini-2.5-flash", persona: "你是创意导向的思考者。关注创新可能性和用户体验，回答简洁（1-3句）。", role: "creative" },
   { id: "member-3", name: "决策者", modelId: "gpt-4o", persona: "你是最终决策者。综合各方观点给出明确建议和理由，回答简洁（1-3句）。", role: "decider" },
 ];
+
+function fmtTok(n) {
+  return n >= 1000 ? (n / 1000).toFixed(1) + "K" : String(n || 0);
+}
+
+function makeSessionId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function resetTeamUsage() {
+  currentTeamUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0, messageCount: 0 };
+  renderTeamUsage();
+}
+
+function addTeamUsage(promptText, completionText = "") {
+  const promptTokens = estimateTokens(promptText || "");
+  const completionTokens = estimateTokens(completionText || "");
+  currentTeamUsage.promptTokens += promptTokens;
+  currentTeamUsage.completionTokens += completionTokens;
+  currentTeamUsage.totalTokens = currentTeamUsage.promptTokens + currentTeamUsage.completionTokens;
+  currentTeamUsage.messageCount += 1;
+  renderTeamUsage();
+}
+
+function renderTeamUsage(usage = currentTeamUsage) {
+  if (!teamUsageBar) return;
+  teamUsageBar.innerHTML = `
+    <span class="usage-model">团队讨论</span>
+    <span class="usage-sep">|</span>
+    <span class="usage-stat">轮次 ${usage.messageCount || 0}</span>
+    <span class="usage-sep">|</span>
+    <span class="usage-stat">输入 ${fmtTok(usage.promptTokens || 0)}</span>
+    <span class="usage-sep">|</span>
+    <span class="usage-stat">输出 ${fmtTok(usage.completionTokens || 0)}</span>
+    <span class="usage-sep">|</span>
+    <span class="usage-stat">总计 ${fmtTok(usage.totalTokens || 0)}</span>
+  `;
+}
+
+function loadTeamHistory() {
+  try {
+    const raw = localStorage.getItem(TEAM_HISTORY_KEY);
+    teamHistory = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(teamHistory)) teamHistory = [];
+  } catch {
+    teamHistory = [];
+  }
+}
+
+function saveTeamHistory() {
+  try {
+    localStorage.setItem(TEAM_HISTORY_KEY, JSON.stringify(teamHistory.slice(0, 50)));
+  } catch {}
+}
+
+function renderTeamHistory() {
+  if (!teamHistoryList) return;
+  teamHistoryList.innerHTML = "";
+  if (teamHistory.length === 0) {
+    teamHistoryList.innerHTML = '<div class="team-history-empty">暂无团队历史</div>';
+    return;
+  }
+  for (const session of teamHistory) {
+    const item = document.createElement("div");
+    item.className = "team-history-item";
+    item.dataset.sessionId = session.id;
+
+    const title = document.createElement("div");
+    title.className = "team-history-title";
+    title.textContent = session.topic || "未命名讨论";
+    item.appendChild(title);
+
+    const meta = document.createElement("div");
+    meta.className = "team-history-meta";
+    const time = session.createdAt ? new Date(session.createdAt).toLocaleString() : "";
+    meta.textContent = `${time} · ${session.responses?.length || 0}人 · ~${fmtTok(session.usage?.totalTokens || 0)} tok`;
+    item.appendChild(meta);
+
+    item.addEventListener("click", () => loadTeamSession(session.id));
+    teamHistoryList.appendChild(item);
+  }
+}
+
+function persistTeamSession(session) {
+  teamHistory = [session, ...teamHistory.filter(item => item.id !== session.id)].slice(0, 50);
+  saveTeamHistory();
+  renderTeamHistory();
+}
 
 // ── 渲染 ────────────────────────────────────
 
@@ -132,6 +224,7 @@ async function startDiscussion() {
   btnStartDiscuss.disabled = true;
   btnStartDiscuss.textContent = "讨论中…";
   teamOutput.innerHTML = "";
+  resetTeamUsage();
 
   // 添加话题标题
   const topicEl = document.createElement("div");
@@ -169,12 +262,13 @@ async function startDiscussion() {
     }
     userPrompt += "\n\n请发表你的看法（1-3句话）。如需操作黑板或调用技能，可使用工具。";
 
+    const systemPrompt = `你是 SLATE 团队协作成员。${getToolsSystemPrompt()}`;
     let fullText = "";
     try {
       for await (const chunk of streamChat({
         model: member.modelId,
         messages: [
-          { role: "system", content: `你是 SLATE 团队协作成员。${getToolsSystemPrompt()}` },
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         api_key: apiKey,
@@ -207,11 +301,21 @@ async function startDiscussion() {
       fullText = cleanText + "\n[已执行工具: " + toolCalls.map(c => c.name).join(", ") + "]";
     }
 
+    addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText);
     responses.push({ member, text: fullText });
   }
 
   // 生成讨论摘要
-  await generateSummary(topic, responses);
+  const summaryMarkdown = await generateSummary(topic, responses);
+  persistTeamSession({
+    id: makeSessionId(),
+    topic,
+    createdAt: Date.now(),
+    members: teamMembers.map(m => ({ ...m })),
+    responses: responses.map(r => ({ member: { ...r.member }, text: r.text })),
+    summaryMarkdown,
+    usage: { ...currentTeamUsage },
+  });
 
   isDiscussing = false;
   btnStartDiscuss.disabled = false;
@@ -221,7 +325,7 @@ async function startDiscussion() {
 async function generateSummary(topic, responses) {
   // 找到决策者角色的响应
   const decider = responses.find(r => r.member.role === "decider");
-  if (!decider) return;
+  if (!decider) return "";
 
   const summaryEl = document.createElement("div");
   summaryEl.className = "team-summary";
@@ -257,6 +361,48 @@ async function generateSummary(topic, responses) {
   summary += `\n**决策建议**: ${decider.text}`;
 
   contentEl.innerHTML = renderSimpleMarkdown(summary);
+  return summary;
+}
+
+function renderLoadedSession(session) {
+  if (!session || !teamOutput) return;
+  teamOutput.innerHTML = "";
+  teamTopicInput.value = session.topic || "";
+
+  const topicEl = document.createElement("div");
+  topicEl.className = "team-topic";
+  topicEl.textContent = `议题: ${session.topic || "未命名讨论"}`;
+  teamOutput.appendChild(topicEl);
+
+  for (const response of session.responses || []) {
+    addTeamResponse(response.member, response.text || "");
+  }
+
+  if (session.summaryMarkdown) {
+    const summaryEl = document.createElement("div");
+    summaryEl.className = "team-summary";
+    summaryEl.innerHTML = '<div class="team-summary-title">讨论摘要</div><div class="team-summary-content"></div>';
+    summaryEl.querySelector(".team-summary-content").innerHTML = renderSimpleMarkdown(session.summaryMarkdown);
+    teamOutput.appendChild(summaryEl);
+  }
+
+  currentTeamUsage = {
+    promptTokens: session.usage?.promptTokens || 0,
+    completionTokens: session.usage?.completionTokens || 0,
+    totalTokens: session.usage?.totalTokens || 0,
+    messageCount: session.usage?.messageCount || 0,
+  };
+  renderTeamUsage();
+}
+
+function loadTeamSession(sessionId) {
+  if (isDiscussing) return;
+  const session = teamHistory.find(item => item.id === sessionId);
+  if (!session) return;
+  renderLoadedSession(session);
+  teamHistoryList?.querySelectorAll(".team-history-item").forEach(item => {
+    item.classList.toggle("active", item.dataset.sessionId === sessionId);
+  });
 }
 
 function addTeamResponse(member, text) {
@@ -319,9 +465,15 @@ function initTeamPanel() {
   btnStartDiscuss = document.getElementById("btn-start-discuss");
   teamOutput = document.getElementById("team-output");
   btnAddMember = document.getElementById("btn-add-member");
+  teamHistoryList = document.getElementById("team-history-list");
+  teamUsageBar = document.getElementById("team-usage-bar");
+  btnNewTeamDiscussion = document.getElementById("btn-new-team-discussion");
 
   // 默认成员
   teamMembers = [...DEFAULT_MEMBERS.map(m => ({ ...m }))];
+  loadTeamHistory();
+  renderTeamHistory();
+  renderTeamUsage();
   renderTeamMembers();
 
   btnAddMember.addEventListener("click", () => {
@@ -336,6 +488,14 @@ function initTeamPanel() {
   });
 
   btnStartDiscuss.addEventListener("click", startDiscussion);
+  btnNewTeamDiscussion?.addEventListener("click", () => {
+    if (isDiscussing) return;
+    teamOutput.innerHTML = "";
+    teamTopicInput.value = "";
+    resetTeamUsage();
+    teamHistoryList?.querySelectorAll(".team-history-item.active").forEach(item => item.classList.remove("active"));
+    teamTopicInput.focus();
+  });
 
   // 团队/对话切换
   const btnTeamMode = document.getElementById("btn-team-mode");

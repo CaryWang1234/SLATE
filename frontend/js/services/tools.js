@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-18";
-import { post } from "../services/api.js?v=20260730-18";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-22";
+import { post } from "../services/api.js?v=20260730-22";
 
 // ── 工具注册表 ────────────────────────────────
 
@@ -328,7 +328,7 @@ const TOOLS = {
 
 // ── 工具调用检测 ────────────────────────────────
 
-const TOOL_RE = /◈◈◈(\w+)\n([\s\S]*?)◈◆◆/g;
+const TOOL_RE = /◈◈◈\s*(\w+)\s*\r?\n([\s\S]*?)(?:◈◆◆|◆◆)/g;
 
 function detectToolCalls(text) {
   const calls = [];

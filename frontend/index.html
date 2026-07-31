@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260730-18">
+  <link rel="stylesheet" href="./css/style.css?v=20260730-22">
 </head>
 <body>
 
@@ -90,25 +90,35 @@
 
           <!-- 团队辩论区域 -->
           <div id="team-panel" class="team-panel hidden">
-            <div class="team-config">
-              <div class="team-members-header">
-                <span class="team-label">团队成员</span>
-                <button id="btn-add-member" class="icon-btn" title="添加成员">+</button>
+            <aside class="team-history-sidebar">
+              <div class="team-history-header">
+                <span class="team-label">团队历史</span>
+                <button id="btn-new-team-discussion" class="icon-btn" title="新团队讨论">+</button>
               </div>
-              <div id="team-members-area" class="team-members-area"></div>
-            </div>
-            <div class="team-discuss">
-              <div class="team-input-row">
-                <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题…">
-                <select id="team-max-rounds" class="team-rounds-select" title="最大辩论轮数">
-                  <option value="3">3轮</option>
-                  <option value="5" selected>5轮</option>
-                  <option value="8">8轮</option>
-                  <option value="10">10轮</option>
-                </select>
-                <button id="btn-start-discuss" class="send-btn">开始讨论</button>
+              <div id="team-history-list" class="team-history-list"></div>
+            </aside>
+            <div class="team-main">
+              <div class="team-config">
+                <div class="team-members-header">
+                  <span class="team-label">团队成员</span>
+                  <button id="btn-add-member" class="icon-btn" title="添加成员">+</button>
+                </div>
+                <div id="team-members-area" class="team-members-area"></div>
               </div>
-              <div id="team-output" class="team-output"></div>
+              <div class="team-discuss">
+                <div id="team-usage-bar" class="team-usage-bar"></div>
+                <div class="team-input-row">
+                  <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题…">
+                  <select id="team-max-rounds" class="team-rounds-select" title="最大辩论轮数">
+                    <option value="3">3轮</option>
+                    <option value="5" selected>5轮</option>
+                    <option value="8">8轮</option>
+                    <option value="10">10轮</option>
+                  </select>
+                  <button id="btn-start-discuss" class="send-btn">开始讨论</button>
+                </div>
+                <div id="team-output" class="team-output"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -123,6 +133,7 @@
           <button id="btn-add-card" class="icon-btn" title="添加卡片">+</button>
           <button id="btn-ai-organize" class="icon-btn" title="AI 整理成流程图">◇</button>
           <button id="btn-toggle-mermaid" class="icon-btn" title="显示/隐藏流程图">📊</button>
+          <button id="btn-export-board" class="icon-btn" title="导出黑板">⇩</button>
           <button id="btn-clear-board" class="icon-btn" title="清空黑板">×</button>
         </div>
       </div>
@@ -471,7 +482,7 @@
   <!-- ═══ Toast 容器 ═══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260730-18"></script>
+  <script type="module" src="./js/app.js?v=20260730-22"></script>
 
 </body>
 </html>

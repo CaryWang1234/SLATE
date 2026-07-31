@@ -1652,13 +1652,82 @@ textarea::-webkit-scrollbar-thumb {
 
 .team-panel {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex: 1;
   overflow: hidden;
 }
 
 .team-panel.hidden {
   display: none;
+}
+
+.team-history-sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-alt);
+  min-width: 0;
+}
+
+.team-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.team-history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.team-history-item {
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--transition), background-color var(--transition);
+}
+
+.team-history-item:hover,
+.team-history-item.active {
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.team-history-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-history-meta,
+.team-history-empty {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.team-history-empty {
+  padding: 16px 8px;
+  text-align: center;
+}
+
+.team-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .team-config {
@@ -1804,6 +1873,44 @@ textarea::-webkit-scrollbar-thumb {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.team-usage-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-alt);
+  flex-shrink: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .team-panel {
+    flex-direction: column;
+  }
+
+  .team-history-sidebar {
+    width: 100%;
+    height: 112px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .team-history-list {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .team-history-item {
+    min-width: 180px;
+  }
 }
 
 .team-input-row {
@@ -2233,6 +2340,12 @@ textarea::-webkit-scrollbar-thumb {
   max-height: 200px;
   overflow-y: auto;
   line-height: 1.5;
+}
+
+.tool-call-status {
+  background: var(--bg-alt);
+  color: var(--text-secondary);
+  max-height: none;
 }
 
 /* ── 文件编辑 diff 查看器 ─────────────────── */

@@ -2,11 +2,11 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-18";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-18";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-18";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-18";
-import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-18";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-22";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-22";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-22";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-22";
+import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-22";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -84,6 +84,10 @@ function normalizeMessageForRender(msg) {
   }
 
   return normalized;
+}
+
+function isHiddenContextMessage(msg) {
+  return msg?.hidden === true || msg?.metadata?.hidden === true || msg?.model === "[tool_results]";
 }
 
 // ── 消息渲染 ────────────────────────────────
@@ -164,6 +168,7 @@ function renderMessage(msg, index) {
 function renderAllMessages() {
   chatScroll.innerHTML = "";
   state.messages.forEach((msg, i) => {
+    if (isHiddenContextMessage(msg)) return;
     chatScroll.appendChild(renderMessage(msg, i));
   });
   chatScroll.scrollTop = chatScroll.scrollHeight;
@@ -182,6 +187,26 @@ function removeStreamingCursor(cursor) {
   cursor?.parentNode?.removeChild(cursor);
 }
 
+function summarizeParams(params) {
+  const summary = {};
+  for (const [key, value] of Object.entries(params || {})) {
+    if (typeof value === "string") {
+      summary[key] = value.length > 120 ? `${value.slice(0, 120)}...` : value;
+    } else if (Array.isArray(value)) {
+      summary[key] = `Array(${value.length})`;
+    } else if (value && typeof value === "object") {
+      summary[key] = "Object";
+    } else {
+      summary[key] = value;
+    }
+  }
+  return summary;
+}
+
+function shouldHideToolOutput(call) {
+  return ["skill_run", "project_files", "project_read_file", "board_read", "chat_context"].includes(call?.name);
+}
+
 // ── 工具调用渲染 ─────────────────────────────
 
 function renderToolCallCard(call, result) {
@@ -190,19 +215,24 @@ function renderToolCallCard(call, result) {
 
   const header = document.createElement("div");
   header.className = "tool-call-header";
-  header.textContent = `⚙ ${call.name}`;
+  const skillName = call.name === "skill_run" ? call.params?.skill : "";
+  header.textContent = skillName ? `Skill · ${skillName}` : `Tool · ${call.name}`;
   el.appendChild(header);
 
   if (call.params && Object.keys(call.params).length > 0) {
     const input = document.createElement("div");
     input.className = "tool-call-input";
-    // file_edit / file_create 的参数可能很长，截断显示
     if (call.name === "file_edit" && call.params.edits) {
       const brief = { file_path: call.params.file_path, edits_count: Array.isArray(call.params.edits) ? call.params.edits.length : 0 };
       input.textContent = JSON.stringify(brief, null, 2);
     } else if (call.name === "file_create" && call.params.content) {
       const brief = { file_path: call.params.file_path, lines: (call.params.content || "").split("\n").length };
       input.textContent = JSON.stringify(brief, null, 2);
+    } else if (call.name === "skill_run") {
+      input.textContent = JSON.stringify({
+        skill: call.params.skill,
+        params: summarizeParams(call.params.params || {}),
+      }, null, 2);
     } else {
       input.textContent = JSON.stringify(call.params, null, 2);
     }
@@ -216,8 +246,10 @@ function renderToolCallCard(call, result) {
     el.appendChild(renderFileCreateDiff(result._structured));
   } else {
     const output = document.createElement("div");
-    output.className = "tool-call-output";
-    output.textContent = result.output || "";
+    output.className = "tool-call-output tool-call-status";
+    output.textContent = shouldHideToolOutput(call)
+      ? (result.success === false ? `执行失败: ${result.output || "未知错误"}` : "已执行，结果仅作为上下文提供给模型。")
+      : (result.output || "");
     el.appendChild(output);
   }
 
@@ -450,11 +482,11 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl) {
     }
     chatScroll.scrollTop = chatScroll.scrollHeight;
 
-    // 构建工具结果消息
+    // Keep tool results in model context without rendering them as chat bubbles.
     const toolResultText = results.map((r, i) =>
       `[工具 ${calls[i].name} 结果]: ${r.output}`
     ).join("\n\n");
-    addMessage({ role: "user", content: toolResultText, model: "[tool_results]" });
+    addMessage({ role: "user", content: toolResultText, model: "[tool_results]", hidden: true });
 
     // 创建新的 assistant 消息
     const followUp = { role: "assistant", content: "", model: state.currentModel?.name || "" };
@@ -653,7 +685,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260730-18");
+    const { toast } = await import("../app.js?v=20260730-22");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -672,7 +704,7 @@ function toggleBrainstormMode() {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260730-18").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260730-22").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -696,7 +728,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260730-18");
+    const { toast } = await import("../app.js?v=20260730-22");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -729,7 +761,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260730-18");
+    const { toast } = await import("../app.js?v=20260730-22");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -897,7 +929,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260730-18");
+      const { toast } = await import("../app.js?v=20260730-22");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }

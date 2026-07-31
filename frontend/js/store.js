@@ -332,7 +332,7 @@ function setModelRegistry(registry) {
 export {
   API_BASE, state, subscribe, notify,
   setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel,
-  resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateContextTokens,
+  resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens, estimateContextTokens,
   setMessages, addMessage, updateLastAssistantMessage,
   setConversations, setBoardCards, addBoardCard,
   setConstitution, setSkills, setModelRegistry,
