@@ -78,18 +78,34 @@ function notify(key, data) {
 
 // ── 持久化 ──────────────────────────────────
 
-function savePersistent() {
-  const data = {
+function buildPersistentData() {
+  return {
     theme: state.theme,
     modelKeys: state.modelKeys,
     customModels: state.customModels,
-    currentModelId: state.currentModel?.id || null,
+    currentModelId: state.currentModel?.id || state._pendingModelId || null,
     boardCards: state.boardCards,
     lastProjectPath: state.project?.path || null,
     conversationUsage: state.conversationUsage,
   };
+}
+
+function saveLocalPersistent(data = buildPersistentData()) {
   try { localStorage.setItem("slate_state", JSON.stringify(data)); } catch (e) {}
+}
+
+function savePersistent() {
+  const data = buildPersistentData();
+  saveLocalPersistent(data);
   saveSharedPersistent(data);
+}
+
+function getSharedPersistentData(data = buildPersistentData()) {
+  return {
+    modelKeys: data.modelKeys || {},
+    customModels: data.customModels || [],
+    currentModelId: data.currentModelId || null,
+  };
 }
 
 function saveSharedPersistent(data) {
@@ -97,7 +113,7 @@ function saveSharedPersistent(data) {
     fetch(`${API_BASE}/settings/state`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data }),
+      body: JSON.stringify({ data: getSharedPersistentData(data) }),
     }).catch(() => {});
   } catch (e) {}
 }
@@ -124,13 +140,17 @@ async function loadSharedPersistent() {
     const res = await resp.json();
     const data = res?.data || {};
     state.modelKeys = { ...(data.modelKeys || {}), ...state.modelKeys };
-    if (Array.isArray(data.customModels) && data.customModels.length > 0 && state.customModels.length === 0) {
-      state.customModels = data.customModels;
+    if (Array.isArray(data.customModels) && data.customModels.length > 0) {
+      const merged = [...state.customModels];
+      for (const model of data.customModels) {
+        if (model?.id && !merged.some(item => item.id === model.id)) merged.push(model);
+      }
+      state.customModels = merged;
     }
     if (!state._pendingModelId && data.currentModelId) {
       state._pendingModelId = data.currentModelId;
     }
-    savePersistent();
+    saveLocalPersistent();
   } catch (e) {}
 }
 

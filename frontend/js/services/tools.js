@@ -7,8 +7,26 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-29";
-import { post } from "../services/api.js?v=20260730-29";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-33";
+import { post } from "../services/api.js?v=20260730-33";
+
+function normalizeProjectRelativePath(rawPath) {
+  const raw = String(rawPath || "").trim().replace(/\\/g, "/");
+  if (!raw) return { error: "Missing file_path" };
+  if (/^[A-Za-z]:\//.test(raw) || raw.startsWith("//")) {
+    return { error: "file_path must be relative to the project root" };
+  }
+  const parts = raw.split("/").filter(part => part && part !== ".");
+  if (!parts.length) return { error: "file_path must point to a file" };
+  if (parts.includes("..")) return { error: "file_path cannot contain .." };
+  const relative = parts.join("/");
+  const projectRoot = String(state.project?.path || "").replace(/\\/g, "/").replace(/\/+$/, "");
+  return {
+    relative,
+    abs: `${projectRoot}/${relative}`,
+    fileName: parts[parts.length - 1],
+  };
+}
 
 // ── 工具注册表 ────────────────────────────────
 
@@ -137,7 +155,13 @@ const TOOLS = {
           if (!p.directory && (skill === "file_tree")) p.directory = state.project.path;
           if (!p.work_dir && (skill === "terminal")) p.work_dir = state.project.path;
           if (!p.file_path && skill === "file_peek" && p.relative_path) {
-            p.file_path = state.project.path + "/" + p.relative_path;
+            const target = normalizeProjectRelativePath(p.relative_path);
+            if (target.error) return `Invalid relative_path: ${target.error}`;
+            p.file_path = target.abs;
+          } else if (p.file_path && ["file_peek", "file_edit", "file_create"].includes(skill)) {
+            const target = normalizeProjectRelativePath(p.file_path);
+            if (target.error) return `Invalid file_path: ${target.error}`;
+            p.file_path = target.abs;
           }
         }
         const res = await post("/skills/execute", { skill, params: p });
@@ -200,7 +224,21 @@ const TOOLS = {
       if (!file_path) return "缺少 file_path";
       if (!edits || !edits.length) return "缺少 edits";
 
-      const absPath = state.project.path + "/" + file_path.replace(/^\/+/, "");
+      const target = normalizeProjectRelativePath(file_path);
+      if (target.error) {
+        return {
+          _type: "file_edit",
+          file: "",
+          file_path_rel: String(file_path || ""),
+          file_name: String(file_path || "").replace(/\\/g, "/").split("/").pop() || "",
+          diff: "",
+          new_content: "",
+          stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+          errors: [target.error],
+          applied: [],
+        };
+      }
+      const absPath = target.abs;
       let res;
       try {
         res = await post("/skills/execute", {
@@ -211,7 +249,8 @@ const TOOLS = {
         return {
           _type: "file_edit",
           file: absPath,
-          file_name: file_path.split("/").pop(),
+          file_path_rel: target.relative,
+          file_name: target.fileName,
           diff: "",
           new_content: "",
           stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
@@ -223,7 +262,8 @@ const TOOLS = {
         return {
           _type: "file_edit",
           file: absPath,
-          file_name: file_path.split("/").pop(),
+          file_path_rel: target.relative,
+          file_name: target.fileName,
           diff: "",
           new_content: "",
           stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
@@ -236,7 +276,8 @@ const TOOLS = {
         return {
           _type: "file_edit",
           file: absPath,
-          file_name: file_path.split("/").pop(),
+          file_path_rel: target.relative,
+          file_name: target.fileName,
           diff: "",
           new_content: "",
           stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
@@ -249,6 +290,7 @@ const TOOLS = {
       return {
         _type: "file_edit",
         file: data.file,
+        file_path_rel: target.relative,
         file_name: data.file_name,
         diff: data.diff,
         new_content: data.new_content,
@@ -271,7 +313,20 @@ const TOOLS = {
       if (!file_path) return "缺少 file_path";
       if (content === undefined || content === null) return "缺少 content";
 
-      const absPath = state.project.path + "/" + file_path.replace(/^\/+/, "");
+      const target = normalizeProjectRelativePath(file_path);
+      if (target.error) {
+        return {
+          _type: "file_create",
+          file: "",
+          file_path_rel: String(file_path || ""),
+          file_name: String(file_path || "").replace(/\\/g, "/").split("/").pop() || "",
+          diff: "",
+          content,
+          stats: { lines: String(content).split("\n").length, chars: String(content).length },
+          errors: [target.error],
+        };
+      }
+      const absPath = target.abs;
       let res;
       try {
         res = await post("/skills/execute", {
@@ -282,7 +337,8 @@ const TOOLS = {
         return {
           _type: "file_create",
           file: absPath,
-          file_name: file_path.split("/").pop(),
+          file_path_rel: target.relative,
+          file_name: target.fileName,
           diff: "",
           content,
           stats: { lines: content.split("\n").length, chars: content.length },
@@ -293,7 +349,8 @@ const TOOLS = {
         return {
           _type: "file_create",
           file: absPath,
-          file_name: file_path.split("/").pop(),
+          file_path_rel: target.relative,
+          file_name: target.fileName,
           diff: "",
           content,
           stats: { lines: content.split("\n").length, chars: content.length },
@@ -305,7 +362,8 @@ const TOOLS = {
         return {
           _type: "file_create",
           file: absPath,
-          file_name: file_path.split("/").pop(),
+          file_path_rel: target.relative,
+          file_name: target.fileName,
           diff: "",
           content,
           stats: { lines: content.split("\n").length, chars: content.length },
@@ -316,6 +374,7 @@ const TOOLS = {
       return {
         _type: "file_create",
         file: data.file,
+        file_path_rel: target.relative,
         file_name: data.file_name,
         diff: data.diff,
         content: data.content,
@@ -377,13 +436,16 @@ async function executeTool(name, params) {
       let summary = `[工具 ${name}] `;
       if (output._type === "file_edit") {
         const s = output.stats;
-        summary = `[工具 file_edit] 文件: ${output.file_name}，共 ${s.edits_total} 处编辑，${s.edits_applied} 处成功，+${s.lines_added} -${s.lines_removed} 行。`;
+        const targetPath = output.file_path_rel || output.file_name || output.file || "";
+        summary = `[工具 file_edit] 文件: ${output.file_name}（${targetPath}），共 ${s.edits_total} 处编辑，${s.edits_applied} 处成功，+${s.lines_added} -${s.lines_removed} 行。`;
         if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
-        summary += " diff 已展示给用户，等待用户确认。";
+        summary += " diff 已展示给用户，尚未写入磁盘，等待用户确认。";
       } else if (output._type === "file_create") {
         const s = output.stats;
-        summary = `[工具 file_create] 新文件: ${output.file_name}，${s.lines} 行，${s.chars} 字符。`;
-        summary += " 预览已展示给用户，等待用户确认。";
+        const targetPath = output.file_path_rel || output.file_name || output.file || "";
+        summary = `[工具 file_create] 新文件: ${output.file_name}（${targetPath}），${s.lines} 行，${s.chars} 字符。`;
+        if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
+        summary += " 预览已展示给用户，尚未写入磁盘，等待用户确认。";
       }
       return { success: true, output: summary, _structured: output };
     }
@@ -451,6 +513,7 @@ function getToolsSystemPrompt() {
   s += "当用户要求修改、编辑、修复项目中的已有文件时，你必须使用 file_edit 工具。\n";
   s += "核心原则：你说改它就真改，你不说它绝不碰。\n";
   s += "- file_path: 相对于项目根目录的路径\n";
+  s += "- file_path 只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
   s += "- edits: JSON 数组，每项包含 old_text（要替换的原文）和 new_text（替换后的内容）\n";
   s += "- old_text 必须在文件中唯一出现，否则会报错\n";
   s += "- 只包含你要修改的部分，不要包含整个文件内容\n";
@@ -462,6 +525,8 @@ function getToolsSystemPrompt() {
   s += "\n\n[文件创建规则 — file_create 工具]\n";
   s += "当用户要求创建新文件时，你必须使用 file_create 工具。\n";
   s += "- file_path: 相对于项目根目录的路径（文件不能已存在）\n";
+  s += "- file_path 只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
+  s += "- 如果用户只要求输出文件但没有指定位置，默认放在 outputs/ 下，并使用清晰的文件名\n";
   s += "- content: 文件的完整内容\n";
   s += "- 如果文件已存在，应使用 file_edit 工具而非 file_create\n";
   s += "- 用户会看到内容预览，并可以选择「接受」「拒绝」或「复制」\n";

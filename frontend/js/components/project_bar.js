@@ -2,8 +2,8 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260730-29";
-import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260730-29";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260730-33";
+import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260730-33";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let fileTreeContainer, projectInfoEl, projectCloseBtn;
@@ -43,6 +43,13 @@ function renderProjectBar() {
     info.appendChild(name);
 
     projectBar.appendChild(info);
+
+    const refreshBtn = document.createElement("button");
+    refreshBtn.className = "icon-btn";
+    refreshBtn.textContent = "↻";
+    refreshBtn.title = "刷新项目";
+    refreshBtn.addEventListener("click", () => handleRefreshProject(refreshBtn));
+    actions.appendChild(refreshBtn);
 
     const configBtn = document.createElement("button");
     configBtn.className = "icon-btn";
@@ -139,6 +146,25 @@ async function handleCloseProject() {
   setProjectFileTree([]);
 }
 
+async function handleRefreshProject(button) {
+  if (!state.project) return;
+  const path = state.project.path;
+  const browsePath = currentBrowsePath || "";
+  if (button) button.disabled = true;
+  try {
+    const opened = await openProject(path);
+    if (opened.code === 0) {
+      setProject(opened.data);
+    }
+    const refreshed = await refreshFileTree(browsePath);
+    if (!refreshed && browsePath) {
+      await refreshFileTree("");
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 // ── 文件树 ────────────────────────────────────
 
 async function refreshFileTree(path) {
@@ -147,7 +173,9 @@ async function refreshFileTree(path) {
     setProjectFileTree(res.data);
     currentBrowsePath = res.data.path || "";
     renderFileTree();
+    return true;
   }
+  return false;
 }
 
 function renderFileTree() {
@@ -307,7 +335,7 @@ function openProjectSettings() {
     try {
       const constData = JSON.parse(constitutionInput.value.trim());
       const config = { ...(state.project?.config || {}), constitution: constData };
-      const res = await (await import("../services/project.js?v=20260730-29")).updateProjectConfig(config);
+      const res = await (await import("../services/project.js?v=20260730-33")).updateProjectConfig(config);
       if (res.code === 0) {
         setProject(res.data);
         settingsModal.classList.add("hidden");

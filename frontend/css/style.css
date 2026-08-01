@@ -2376,6 +2376,17 @@ textarea::-webkit-scrollbar-thumb {
   color: var(--text-muted);
 }
 
+.file-edit-path {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
 .file-edit-diff-pre {
   margin: 0;
   padding: 8px 10px;

@@ -2,11 +2,11 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-29";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-29";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-29";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-29";
-import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-29";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260730-33";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260730-33";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260730-33";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260730-33";
+import { openMemoryModal, openSnippetModal } from "./memory.js?v=20260730-33";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -215,6 +215,21 @@ function shouldHideToolOutput(call) {
   return ["skill_run", "project_files", "project_read_file", "project_find_file", "board_read", "chat_context"].includes(call?.name);
 }
 
+function formatToolResultForModel(call, result) {
+  const structured = result?._structured;
+  if (structured?._type === "file_edit") {
+    const path = structured.file_path_rel || structured.file_name || structured.file || call?.params?.file_path || "";
+    const errors = structured.errors?.length ? `\nWarnings: ${structured.errors.join("; ")}` : "";
+    return `[工具 file_edit 结果]: ${result.output}\nTarget path: ${path}\nStatus: preview only; not written to disk until the user accepts.${errors}`;
+  }
+  if (structured?._type === "file_create") {
+    const path = structured.file_path_rel || structured.file_name || structured.file || call?.params?.file_path || "";
+    const errors = structured.errors?.length ? `\nWarnings: ${structured.errors.join("; ")}` : "";
+    return `[工具 file_create 结果]: ${result.output}\nTarget path: ${path}\nStatus: preview only; not written to disk until the user accepts.${errors}`;
+  }
+  return `[工具 ${call.name} 结果]: ${result.output}`;
+}
+
 function looksLikeInspectionStall(content) {
   if (!content || detectToolCalls(content).length > 0) return false;
   const text = content.replace(/```[\s\S]*?```/g, " ");
@@ -232,6 +247,32 @@ function extractInspectionPath(content) {
   const pathLike = quoted?.[1] || text.match(/([A-Za-z0-9_.@-]+(?:[\\/][A-Za-z0-9_.@ -]+)*\.[A-Za-z0-9]{1,12})/)?.[1];
   if (!pathLike) return null;
   return pathLike.replace(/\\/g, "/").replace(/[，。；：、,.!?;:]+$/g, "");
+}
+
+function looksLikeFileOutputStall(content) {
+  if (!content || detectToolCalls(content).length > 0) return false;
+  const text = String(content || "");
+  const noCode = text.replace(/```[\s\S]*?```/g, " ");
+  const offerOrQuestion = /(需要我|要我|是否需要|要不要|你需要|如果你需要|我可以(?:直接)?(?:动手|继续|帮你|给出)|是否要|吗[？?]?|呢[？?]?)/;
+  if (offerOrQuestion.test(noCode)) return false;
+  const intent = /(生成|创建|输出|保存|写入).{0,24}(文件|文档|代码|\.md|\.txt|\.json|\.py|\.js|\.html)|(?:文件|文档|代码).{0,24}(生成|创建|输出|保存|写入)/i;
+  const hasUsableContent = /```[\s\S]{80,}?```/.test(text) || (text.length > 500 && /(^|\n)#{1,3}\s|\n[-*]\s|\n\d+\.\s/.test(text));
+  return intent.test(noCode) && hasUsableContent;
+}
+
+function extractFileCreateCandidate(content) {
+  const text = String(content || "");
+  if (!looksLikeFileOutputStall(text)) return null;
+  const fenced = text.match(/```[A-Za-z0-9_-]*\r?\n([\s\S]*?)```/);
+  const rawContent = (fenced?.[1] || text).trim();
+  if (rawContent.length < 80) return null;
+  let filePath = extractInspectionPath(text) || "outputs/slate-output.md";
+  filePath = filePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!filePath.includes("/")) filePath = `outputs/${filePath}`;
+  if (/^[A-Za-z]:\//.test(filePath) || filePath.split("/").includes("..")) {
+    filePath = `outputs/${filePath.split("/").pop() || "slate-output.md"}`;
+  }
+  return { file_path: filePath, content: rawContent };
 }
 
 function getInspectionQueries(content) {
@@ -258,7 +299,16 @@ function appendSyntheticToolCalls(msgEl, calls) {
 async function autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params) {
   const lastMsg = state.messages[state.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return msgEl;
-  if (lastMsg.autoAdvanced || !looksLikeInspectionStall(lastMsg.content)) return msgEl;
+  if (lastMsg.autoAdvanced) return msgEl;
+
+  const fileCandidate = extractFileCreateCandidate(lastMsg.content);
+  if (fileCandidate) {
+    lastMsg.autoAdvanced = true;
+    appendSyntheticToolCalls(msgEl, [{ name: "file_create", params: fileCandidate }]);
+    return msgEl;
+  }
+
+  if (!looksLikeInspectionStall(lastMsg.content)) return msgEl;
 
   lastMsg.autoAdvanced = true;
 
@@ -342,6 +392,14 @@ function renderFileEditDiff(data) {
     `<span class="file-edit-stats">+${s.lines_added} −${s.lines_removed}</span>`;
   wrap.appendChild(head);
 
+  const targetPath = data.file_path_rel || data.file;
+  if (targetPath) {
+    const pathDiv = document.createElement("div");
+    pathDiv.className = "file-edit-path";
+    pathDiv.textContent = targetPath;
+    wrap.appendChild(pathDiv);
+  }
+
   // 显示错误信息
   if (data.errors && data.errors.length > 0) {
     const errDiv = document.createElement("div");
@@ -415,6 +473,8 @@ function renderFileEditDiff(data) {
     } catch (e) {}
   });
 
+  if (!data.file) btnAccept.disabled = true;
+
   actions.appendChild(btnAccept);
   actions.appendChild(btnReject);
   actions.appendChild(btnCopy);
@@ -435,6 +495,14 @@ function renderFileCreateDiff(data) {
   head.innerHTML = `<span class="file-edit-file-name">✨ ${data.file_name || "未知文件"}</span>` +
     `<span class="file-edit-stats file-create-badge">新文件 · ${s.lines} 行 · ${s.chars} 字符</span>`;
   wrap.appendChild(head);
+
+  const targetPath = data.file_path_rel || data.file;
+  if (targetPath) {
+    const pathDiv = document.createElement("div");
+    pathDiv.className = "file-edit-path";
+    pathDiv.textContent = targetPath;
+    wrap.appendChild(pathDiv);
+  }
 
   // 显示错误信息
   if (data.errors && data.errors.length > 0) {
@@ -468,7 +536,7 @@ function renderFileCreateDiff(data) {
   btnAccept.className = "file-edit-btn file-edit-btn-accept";
   btnAccept.textContent = "✓ 创建";
   btnAccept.addEventListener("click", async () => {
-    btnAccept.disabled = true; btnReject.disabled = true; btnCopy.disabled = true;
+    btnAccept.disabled = true; btnReject.disabled = true; btnCopy.disabled = true; btnDownload.disabled = true;
     try {
       const res = await post("/projects/create-file", { file_path: data.file, content: data.content });
       if (res.code === 0) {
@@ -478,11 +546,11 @@ function renderFileCreateDiff(data) {
       } else {
         btnAccept.textContent = "✗ 失败";
         btnAccept.classList.add("failed");
-        btnAccept.disabled = false; btnReject.disabled = false; btnCopy.disabled = false;
+        btnAccept.disabled = false; btnReject.disabled = false; btnCopy.disabled = false; btnDownload.disabled = false;
       }
     } catch (e) {
       btnAccept.textContent = "✗ 失败";
-      btnAccept.disabled = false; btnReject.disabled = false; btnCopy.disabled = false;
+      btnAccept.disabled = false; btnReject.disabled = false; btnCopy.disabled = false; btnDownload.disabled = false;
     }
   });
 
@@ -490,7 +558,7 @@ function renderFileCreateDiff(data) {
   btnReject.className = "file-edit-btn file-edit-btn-reject";
   btnReject.textContent = "✗ 放弃";
   btnReject.addEventListener("click", () => {
-    btnAccept.disabled = true; btnReject.disabled = true; btnCopy.disabled = true;
+    btnAccept.disabled = true; btnReject.disabled = true; btnCopy.disabled = true; btnDownload.disabled = true;
     btnReject.textContent = "✓ 已放弃";
     wrap.classList.add("file-edit-rejected");
   });
@@ -506,9 +574,27 @@ function renderFileCreateDiff(data) {
     } catch (e) {}
   });
 
+  const btnDownload = document.createElement("button");
+  btnDownload.className = "file-edit-btn file-edit-btn-copy";
+  btnDownload.textContent = "下载文件";
+  btnDownload.addEventListener("click", () => {
+    const blob = new Blob([data.content || ""], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = data.file_name || "output.txt";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  if (!data.file) btnAccept.disabled = true;
+
   actions.appendChild(btnAccept);
   actions.appendChild(btnReject);
   actions.appendChild(btnCopy);
+  actions.appendChild(btnDownload);
   wrap.appendChild(actions);
 
   return wrap;
@@ -556,9 +642,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     chatScroll.scrollTop = chatScroll.scrollHeight;
 
     // Keep tool results in model context without rendering them as chat bubbles.
-    const toolResultText = results.map((r, i) =>
-      `[工具 ${calls[i].name} 结果]: ${r.output}`
-    ).join("\n\n");
+    const toolResultText = results.map((r, i) => formatToolResultForModel(calls[i], r)).join("\n\n");
     addMessage({ role: "user", content: toolResultText, model: "[tool_results]", hidden: true });
 
     // 创建新的 assistant 消息
@@ -750,7 +834,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260730-29");
+    const { toast } = await import("../app.js?v=20260730-33");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -769,7 +853,7 @@ function toggleBrainstormMode() {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260730-29").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260730-33").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -793,7 +877,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260730-29");
+    const { toast } = await import("../app.js?v=20260730-33");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -826,7 +910,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260730-29");
+    const { toast } = await import("../app.js?v=20260730-33");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -994,7 +1078,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260730-29");
+      const { toast } = await import("../app.js?v=20260730-33");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }

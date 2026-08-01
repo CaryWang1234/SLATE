@@ -2,7 +2,7 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260730-29";
+import { API_BASE } from "../store.js?v=20260730-33";
 
 /**
  * 通用 JSON 请求

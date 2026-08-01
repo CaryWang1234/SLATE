@@ -78,7 +78,7 @@ def start_uvicorn(port):
     return process
 
 def start_embedded_uvicorn(port):
-    os.environ.setdefault('SLATE_DATA_DIR', os.path.join(BASE_DIR, 'data'))
+    os.environ['SLATE_DATA_DIR'] = os.path.join(BASE_DIR, 'data')
     log_file = open(LOG_PATH, 'a', encoding='utf-8')
     log(f'starting embedded backend on port {port}')
 
@@ -149,8 +149,9 @@ def main():
     preferred_port = 8000
     preferred_url = f'http://127.0.0.1:{preferred_port}'
     uvicorn_process = None
+    frozen = getattr(sys, 'frozen', False)
 
-    if can_reuse_server(preferred_url):
+    if not frozen and can_reuse_server(preferred_url):
         port = preferred_port
         app_url = preferred_url
         log(f'reusing existing backend: {app_url}')
@@ -164,7 +165,7 @@ def main():
 
     log(f'app url: {app_url}')
     if uvicorn_process is None and not can_reuse_server(app_url):
-        uvicorn_process = start_embedded_uvicorn(port) if getattr(sys, 'frozen', False) else start_uvicorn(port)
+        uvicorn_process = start_embedded_uvicorn(port) if frozen else start_uvicorn(port)
         atexit.register(stop_process, uvicorn_process)
         ready, error = wait_for_server(uvicorn_process, app_url)
         if not ready:

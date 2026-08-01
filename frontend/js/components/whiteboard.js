@@ -2,16 +2,20 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260730-29";
-import { streamChat } from "../services/api.js?v=20260730-29";
+import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260730-33";
+import { streamChat } from "../services/api.js?v=20260730-33";
 
-let boardCards, boardEmpty, mermaidPreview, mermaidCode, mermaidRenderArea;
+let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
 let btnCardDelete, btnCardSave, btnCardCancel;
 let editingCardId = null;
 let selectedColor = "default";
 let svgOverlay = null;
 let mermaidVisible = false;
+let currentToolMode = "select";
+let connectSourceId = null;
+let strokes = [];
+let currentStroke = null;
 
 // 颜色选项
 const CARD_COLORS = [
@@ -29,7 +33,7 @@ const CARD_COLORS = [
 function renderCard(card) {
   const el = document.createElement("div");
   el.className = "board-card";
-  el.draggable = true;
+  el.draggable = currentToolMode === "select";
   el.dataset.cardId = card.id;
 
   // 应用颜色
@@ -70,11 +74,23 @@ function renderCard(card) {
   });
   el.appendChild(deleteBtn);
 
+  el.addEventListener("click", (e) => {
+    if (currentToolMode !== "connect") return;
+    e.stopPropagation();
+    handleConnectCard(card.id);
+  });
+
   // 双击编辑
-  el.addEventListener("dblclick", () => openCardModal(card));
+  el.addEventListener("dblclick", () => {
+    if (currentToolMode === "select") openCardModal(card);
+  });
 
   // 拖拽事件
   el.addEventListener("dragstart", (e) => {
+    if (currentToolMode !== "select") {
+      e.preventDefault();
+      return;
+    }
     el.classList.add("dragging");
     e.dataTransfer.setData("text/plain", card.id);
     e.dataTransfer.effectAllowed = "move";
@@ -89,6 +105,7 @@ function renderCard(card) {
 
 function renderAllCards() {
   boardCards.innerHTML = "";
+  svgOverlay = null;
   if (state.boardCards.length === 0) {
     boardEmpty.style.display = "";
     return;
@@ -106,7 +123,7 @@ function renderAllCards() {
 function initSvgOverlay() {
   if (svgOverlay) return;
   svgOverlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svgOverlay.setAttribute("class", "board-svg-overlay");
+  svgOverlay.setAttribute("class", "board-svg-layer board-svg-overlay");
   boardCards.insertBefore(svgOverlay, boardCards.firstChild);
 }
 
@@ -160,6 +177,172 @@ function drawArrows() {
     </marker>
   `;
   svgOverlay.insertBefore(defs, svgOverlay.firstChild);
+}
+
+// ── 工具模式 ───────────────────────────────────
+
+function setToolMode(mode) {
+  currentToolMode = mode || "select";
+  connectSourceId = null;
+  document.querySelectorAll(".board-tool-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.mode === currentToolMode);
+  });
+  if (boardCanvas) {
+    boardCanvas.classList.remove("mode-select", "mode-connect", "mode-draw", "mode-text");
+    boardCanvas.classList.add(`mode-${currentToolMode}`);
+  }
+  if (drawCanvas) {
+    drawCanvas.classList.toggle("drawing", currentToolMode === "draw");
+  }
+  renderAllCards();
+}
+
+function setupBoardTools() {
+  document.querySelectorAll(".board-tool-btn").forEach(btn => {
+    btn.addEventListener("click", () => setToolMode(btn.dataset.mode || "select"));
+  });
+  document.getElementById("btn-undo-stroke")?.addEventListener("click", undoStroke);
+  document.getElementById("btn-clear-strokes")?.addEventListener("click", clearStrokesAndNotes);
+  setToolMode(currentToolMode);
+}
+
+function handleConnectCard(cardId) {
+  if (!connectSourceId) {
+    connectSourceId = cardId;
+    boardCards.querySelectorAll(".board-card").forEach(el => {
+      el.classList.toggle("connect-source", el.dataset.cardId === cardId);
+    });
+    return;
+  }
+  if (connectSourceId === cardId) {
+    connectSourceId = null;
+    renderAllCards();
+    return;
+  }
+  const cards = state.boardCards.map(card => {
+    if (card.id !== connectSourceId) return card;
+    const arrows = Array.isArray(card.arrows) ? [...card.arrows] : [];
+    if (!arrows.includes(cardId)) arrows.push(cardId);
+    return { ...card, arrows };
+  });
+  connectSourceId = null;
+  setBoardCards(cards);
+}
+
+function getCanvasPoint(e) {
+  const rect = drawCanvas.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top,
+  };
+}
+
+function resizeDrawCanvas() {
+  if (!drawCanvas || !boardCanvas) return;
+  const rect = boardCanvas.getBoundingClientRect();
+  const scale = window.devicePixelRatio || 1;
+  const width = Math.max(1, Math.round(rect.width * scale));
+  const height = Math.max(1, Math.round(rect.height * scale));
+  if (drawCanvas.width !== width || drawCanvas.height !== height) {
+    drawCanvas.width = width;
+    drawCanvas.height = height;
+    drawCanvas.style.width = `${rect.width}px`;
+    drawCanvas.style.height = `${rect.height}px`;
+  }
+  drawCtx = drawCanvas.getContext("2d");
+  drawCtx.setTransform(scale, 0, 0, scale, 0, 0);
+  redrawStrokes();
+}
+
+function redrawStrokes() {
+  if (!drawCtx || !drawCanvas) return;
+  const rect = drawCanvas.getBoundingClientRect();
+  drawCtx.clearRect(0, 0, rect.width, rect.height);
+  for (const stroke of strokes) drawStroke(stroke);
+  if (currentStroke) drawStroke(currentStroke);
+}
+
+function drawStroke(stroke) {
+  if (!drawCtx || !stroke?.points?.length) return;
+  drawCtx.save();
+  drawCtx.strokeStyle = stroke.color || "#1A1A1A";
+  drawCtx.lineWidth = stroke.width || 2;
+  drawCtx.lineCap = "round";
+  drawCtx.lineJoin = "round";
+  drawCtx.beginPath();
+  stroke.points.forEach((point, index) => {
+    if (index === 0) drawCtx.moveTo(point.x, point.y);
+    else drawCtx.lineTo(point.x, point.y);
+  });
+  drawCtx.stroke();
+  drawCtx.restore();
+}
+
+function setupDrawing() {
+  if (!drawCanvas) return;
+  drawCanvas.addEventListener("pointerdown", (e) => {
+    if (currentToolMode !== "draw") return;
+    e.preventDefault();
+    drawCanvas.setPointerCapture(e.pointerId);
+    currentStroke = {
+      color: getComputedStyle(document.documentElement).getPropertyValue("--text").trim() || "#1A1A1A",
+      width: 2,
+      points: [getCanvasPoint(e)],
+    };
+    redrawStrokes();
+  });
+  drawCanvas.addEventListener("pointermove", (e) => {
+    if (!currentStroke) return;
+    currentStroke.points.push(getCanvasPoint(e));
+    redrawStrokes();
+  });
+  const endStroke = (e) => {
+    if (!currentStroke) return;
+    if (currentStroke.points.length > 1) strokes.push(currentStroke);
+    currentStroke = null;
+    try { drawCanvas.releasePointerCapture(e.pointerId); } catch (err) {}
+    redrawStrokes();
+  };
+  drawCanvas.addEventListener("pointerup", endStroke);
+  drawCanvas.addEventListener("pointercancel", endStroke);
+}
+
+function undoStroke() {
+  if (strokes.length > 0) {
+    strokes.pop();
+    redrawStrokes();
+  }
+}
+
+function clearStrokesAndNotes() {
+  strokes = [];
+  currentStroke = null;
+  if (notesLayer) notesLayer.innerHTML = "";
+  redrawStrokes();
+}
+
+function setupTextNotes() {
+  if (!boardCanvas || !notesLayer) return;
+  boardCanvas.addEventListener("click", (e) => {
+    if (currentToolMode !== "text") return;
+    if (e.target.closest(".board-card, .board-note, button")) return;
+    const rect = boardCanvas.getBoundingClientRect();
+    const note = document.createElement("textarea");
+    note.className = "board-note";
+    note.value = "";
+    note.style.left = `${e.clientX - rect.left + boardCanvas.scrollLeft}px`;
+    note.style.top = `${e.clientY - rect.top + boardCanvas.scrollTop}px`;
+    note.rows = 1;
+    note.addEventListener("input", () => {
+      note.style.height = "auto";
+      note.style.height = `${Math.max(24, note.scrollHeight)}px`;
+    });
+    note.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") note.blur();
+    });
+    notesLayer.appendChild(note);
+    note.focus();
+  });
 }
 
 // ── 拖拽排序 ─────────────────────────────────
@@ -479,8 +662,11 @@ function parseCardsFromLLM(text) {
 // ── 初始化 ───────────────────────────────────
 
 function initWhiteboard() {
+  boardCanvas = document.getElementById("whiteboard-canvas");
   boardCards = document.getElementById("board-cards");
   boardEmpty = document.getElementById("board-empty");
+  drawCanvas = document.getElementById("board-draw-canvas");
+  notesLayer = document.getElementById("board-notes");
   mermaidPreview = document.getElementById("mermaid-preview");
   mermaidCode = document.getElementById("mermaid-code");
   mermaidRenderArea = document.getElementById("mermaid-render-area");
@@ -531,6 +717,15 @@ function initWhiteboard() {
   });
 
   setupDragDrop();
+  setupBoardTools();
+  setupDrawing();
+  setupTextNotes();
+  resizeDrawCanvas();
+  if (window.ResizeObserver && boardCanvas) {
+    new ResizeObserver(resizeDrawCanvas).observe(boardCanvas);
+  } else {
+    window.addEventListener("resize", resizeDrawCanvas);
+  }
 
   // 初始化 Mermaid
   function initMermaidTheme() {
@@ -550,6 +745,7 @@ function initWhiteboard() {
 
   subscribe("theme", () => {
     initMermaidTheme();
+    redrawStrokes();
     if (state.boardCards.length > 0) renderMermaid();
   });
 

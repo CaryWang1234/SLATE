@@ -48,6 +48,13 @@ def _project_info(project_dir: Path, config: dict) -> dict:
     }
 
 
+def _safe_file_size(path: Path) -> int | None:
+    try:
+        return path.stat().st_size if path.is_file() else None
+    except OSError:
+        return None
+
+
 # ── 请求模型 ──────────────────────────────────
 
 class OpenProjectRequest(BaseModel):
@@ -158,7 +165,7 @@ async def browse_files(req: BrowseRequest):
                         "type": "file",
                         "name": target.name,
                         "path": str(target.relative_to(project_dir)),
-                        "size": target.stat().st_size,
+                        "size": _safe_file_size(target),
                         "content": content[:50000],
                     },
                 }
@@ -170,7 +177,7 @@ async def browse_files(req: BrowseRequest):
     entries = []
     try:
         items = sorted(target.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
-    except PermissionError:
+    except OSError:
         return {"code": 1, "message": "无权限访问"}
 
     for item in items:
@@ -182,7 +189,7 @@ async def browse_files(req: BrowseRequest):
             "name": item.name,
             "type": "dir" if item.is_dir() else "file",
             "path": str(item.relative_to(project_dir)),
-            "size": item.stat().st_size if item.is_file() else None,
+            "size": _safe_file_size(item),
         })
 
     return {
@@ -215,7 +222,7 @@ async def find_files(req: FindRequest):
         current = stack.pop()
         try:
             children = sorted(current.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
-        except PermissionError:
+        except OSError:
             continue
         for path in children:
             if len(matches) >= limit:
@@ -232,7 +239,7 @@ async def find_files(req: FindRequest):
                     "name": path.name,
                     "type": "dir" if path.is_dir() else "file",
                     "path": rel,
-                    "size": path.stat().st_size if path.is_file() else None,
+                    "size": _safe_file_size(path),
                 })
             if path.is_dir():
                 stack.append(path)

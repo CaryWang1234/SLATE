@@ -4,9 +4,7 @@
 /build
 /data
 /installer
-build_installer.bat
-build_desktop.bat
-desktop_backend.log
-SLATE_InnoSetup.iss
-SLATE.spec
 */__pycache__
+**/__pycache__/
+*.pyc
+desktop_backend.log
