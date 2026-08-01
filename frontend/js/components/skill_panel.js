@@ -2,8 +2,8 @@
  * SLATE 技能面板：内置技能列表 + 自定义 Skill 上传
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260730-33";
-import { get, post, upload } from "../services/api.js?v=20260730-33";
+import { state, subscribe, setSkills } from "../store.js?v=20260801-04";
+import { get, post, upload } from "../services/api.js?v=20260801-04";
 
 let skillList, btnUpload, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -52,6 +52,32 @@ const SKILL_PARAM_DEFS = {
   file_create: [
     { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/new_file.js" },
     { key: "content", label: "文件内容", type: "textarea", placeholder: "文件内容..." },
+  ],
+  text_summarize: [
+    { key: "text", label: "文本", type: "textarea", placeholder: "粘贴要总结的文本" },
+    { key: "max_points", label: "要点数", type: "number", placeholder: "5" },
+    { key: "keyword_limit", label: "关键词数", type: "number", placeholder: "12" },
+  ],
+  json_tool: [
+    { key: "text", label: "JSON 文本", type: "textarea", placeholder: "{\"name\":\"SLATE\"}" },
+    { key: "mode", label: "模式", type: "text", placeholder: "format / minify / path" },
+    { key: "path", label: "路径", type: "text", placeholder: "items.0.name" },
+    { key: "indent", label: "缩进", type: "number", placeholder: "2" },
+  ],
+  regex_test: [
+    { key: "pattern", label: "正则", type: "text", placeholder: "\\bTODO\\b" },
+    { key: "text", label: "测试文本", type: "textarea", placeholder: "输入用于测试的文本" },
+    { key: "flags", label: "标志", type: "text", placeholder: "i / m / s" },
+    { key: "limit", label: "最大结果", type: "number", placeholder: "20" },
+  ],
+  repo_stats: [
+    { key: "directory", label: "目录路径", type: "text", placeholder: "C:\\path\\to\\project" },
+    { key: "max_files", label: "最大文件数", type: "number", placeholder: "5000" },
+  ],
+  todo_scan: [
+    { key: "directory", label: "目录路径", type: "text", placeholder: "C:\\path\\to\\project" },
+    { key: "markers", label: "标记", type: "text", placeholder: "TODO,FIXME,待办" },
+    { key: "limit", label: "最大结果", type: "number", placeholder: "100" },
   ],
 };
 

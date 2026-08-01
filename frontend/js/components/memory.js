@@ -9,12 +9,14 @@ import {
   setUserProfile, resetUserProfile,
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
-} from "../store.js?v=20260730-33";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260730-33";
+} from "../store.js?v=20260801-04";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260801-04";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList;
 let memoryTabs, memoryTabContents;
+let autoRefineRunning = false;
+let lastAutoRefineAt = 0;
 
 const CATEGORY_LABELS = {
   preference: "偏好",
@@ -91,12 +93,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260730-33");
+    const { toast } = await import("../app.js?v=20260801-04");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260730-33");
+  const { toast } = await import("../app.js?v=20260801-04");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -162,6 +164,123 @@ async function extractMemoriesFromConversation() {
   } catch (e) {
     console.error("提取记忆失败:", e);
     toast("提取失败: " + e.message);
+  }
+}
+
+function buildMemoryProfilePrompt(dialogText) {
+  const existingMemories = state.memories
+    .slice(-40)
+    .map(m => `- [${m.category || "general"}] ${m.content || ""}`)
+    .join("\n");
+  const profile = state.userProfile || {};
+  return `请分析以下最近对话，自主提炼可以长期保留的信息。
+
+你需要同时更新两类内容：
+1. 长期记忆：稳定、可复用、以后会影响协作的信息，例如用户偏好、项目背景、重要决策、常用术语、明确约束。
+2. 用户画像：用户的角色、工作风格、技术栈、协作习惯、其他长期偏好。
+
+严格规则：
+- 只保留长期有价值的信息，不要记录一次性任务、临时状态、寒暄、工具结果、纯代码输出。
+- 不要重复已有记忆。
+- 不要编造用户没有表达过的信息。
+- 如果没有新增内容，memories 输出空数组。
+- profile 只输出需要新增或修正的字段；不确定就省略。
+- 只输出 JSON，不要 Markdown，不要解释。
+
+输出格式：
+{
+  "memories": [{"category":"preference|decision|project|term|fact|other","content":"..."}],
+  "profile": {
+    "role": "",
+    "style": "",
+    "techStack": "",
+    "habits": "",
+    "custom": ""
+  }
+}
+
+已有记忆：
+${existingMemories || "无"}
+
+当前用户画像：
+${JSON.stringify(profile, null, 2)}
+
+最近对话：
+${dialogText.slice(-7000)}`;
+}
+
+function normalizeProfilePatch(profile) {
+  const patch = {};
+  for (const key of ["role", "style", "techStack", "habits", "custom"]) {
+    const value = String(profile?.[key] || "").trim();
+    if (value) patch[key] = value;
+  }
+  return patch;
+}
+
+function isDuplicateMemory(content) {
+  const normalized = String(content || "").trim().toLowerCase();
+  if (!normalized) return true;
+  return state.memories.some(mem => String(mem.content || "").trim().toLowerCase() === normalized);
+}
+
+async function autoRefineMemoryAndProfile({ silent = true } = {}) {
+  if (autoRefineRunning) return { added: 0, profileUpdated: false };
+  if (Date.now() - lastAutoRefineAt < 45000) return { added: 0, profileUpdated: false };
+  const visibleMessages = state.messages.filter(m => !m.hidden && (m.role === "user" || m.role === "assistant"));
+  if (visibleMessages.length < 4) return { added: 0, profileUpdated: false };
+
+  const modelId = state.currentModel?.id;
+  if (!modelId) return { added: 0, profileUpdated: false };
+  const apiKey = getModelKey(modelId);
+  if (!apiKey && modelId !== "local") return { added: 0, profileUpdated: false };
+
+  const recent = visibleMessages.slice(-8)
+    .map(m => `[${m.role === "user" ? "用户" : "助手"}]: ${String(m.content || "").slice(0, 1600)}`)
+    .join("\n\n");
+
+  autoRefineRunning = true;
+  lastAutoRefineAt = Date.now();
+  try {
+    const baseUrl = state.currentModel?.base_url || undefined;
+    let result = "";
+    for await (const chunk of streamChat({
+      model: modelId,
+      messages: [{ role: "user", content: buildMemoryProfilePrompt(recent) }],
+      api_key: apiKey,
+      base_url: baseUrl,
+      temperature: 0.2,
+      max_tokens: 1200,
+      stream: true,
+    })) {
+      result += chunk;
+    }
+
+    const jsonMatch = result.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return { added: 0, profileUpdated: false };
+    const parsed = JSON.parse(jsonMatch[0]);
+    let added = 0;
+    for (const mem of Array.isArray(parsed.memories) ? parsed.memories : []) {
+      const content = String(mem?.content || "").trim();
+      if (!content || isDuplicateMemory(content)) continue;
+      const saved = addMemory({ category: mem.category || "general", content });
+      post("/chat/memories", { category: saved.category, content: saved.content }).catch(() => {});
+      added++;
+    }
+
+    const patch = normalizeProfilePatch(parsed.profile);
+    const profileUpdated = Object.keys(patch).length > 0;
+    if (profileUpdated) setUserProfile(patch);
+    if (!silent && (added || profileUpdated)) {
+      const { toast } = await import("../app.js?v=20260801-04");
+      toast(`已自动提炼 ${added} 条记忆${profileUpdated ? "，并更新画像" : ""}`);
+    }
+    return { added, profileUpdated };
+  } catch (e) {
+    console.warn("自动提炼记忆失败:", e);
+    return { added: 0, profileUpdated: false, error: e.message };
+  } finally {
+    autoRefineRunning = false;
   }
 }
 
@@ -297,14 +416,16 @@ function initMemoryPanel() {
   // 绑定按钮事件
   const btnAddMemory = document.getElementById("btn-add-memory");
   const btnExtractMemory = document.getElementById("btn-extract-memory");
+  const btnAutoRefineMemory = document.getElementById("btn-auto-refine-memory");
   const btnSaveProfile = document.getElementById("btn-save-profile");
   const btnResetProfile = document.getElementById("btn-reset-profile");
 
   if (btnAddMemory) btnAddMemory.addEventListener("click", showAddMemoryDialog);
   if (btnExtractMemory) btnExtractMemory.addEventListener("click", extractMemoriesFromConversation);
+  if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260730-33").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260801-04").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", () => {
     if (confirm("确定要重置用户资料吗？")) {
@@ -349,4 +470,11 @@ function openSnippetModal() {
   snippetModal.classList.remove("hidden");
 }
 
-export { initMemoryPanel, openMemoryModal, openSnippetModal, renderMemoryList, renderSnippetList };
+export {
+  initMemoryPanel,
+  openMemoryModal,
+  openSnippetModal,
+  renderMemoryList,
+  renderSnippetList,
+  autoRefineMemoryAndProfile,
+};

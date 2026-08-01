@@ -177,7 +177,7 @@ def main():
                 width=720,
                 height=360,
             )
-            webview.start(debug=True)
+            webview.start(debug=False)
             return
 
     # 2. 创建 pywebview 窗口，加载本地地址
@@ -194,7 +194,7 @@ def main():
     # 3. 启动 pywebview 事件循环（阻塞）
     log('starting webview')
     webview.start(
-        debug=True,
+        debug=False,
         gui='edgechromium',
         private_mode=False,
         storage_path=STORAGE_PATH,

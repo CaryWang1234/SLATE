@@ -26,6 +26,11 @@ BUILTIN_SKILLS: dict[str, str] = {
     "doc_write": "生成 Markdown 格式技术文档或需求说明",
     "file_edit": "基于 diff 精确编辑文件（只改指定内容）",
     "file_create": "创建新文件（预览后确认写入）",
+    "text_summarize": "文本摘要与关键词提取",
+    "json_tool": "JSON 校验、格式化、压缩与路径读取",
+    "regex_test": "正则表达式测试与匹配结果预览",
+    "repo_stats": "项目文件类型、体积与数量统计",
+    "todo_scan": "扫描项目中的 TODO/FIXME/待办标记",
 }
 
 

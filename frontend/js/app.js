@@ -2,19 +2,21 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260730-33";
-import { get, put } from "./services/api.js?v=20260730-33";
-import { initChat } from "./components/chat.js?v=20260730-33";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260730-33";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260730-33";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260730-33";
-import { initTeamPanel } from "./components/team.js?v=20260730-33";
-import { initProjectBar } from "./components/project_bar.js?v=20260730-33";
-import { initMemoryPanel } from "./components/memory.js?v=20260730-33";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260730-33";
-import { setProject, setProjectFileTree } from "./store.js?v=20260730-33";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260801-04";
+import { get, put } from "./services/api.js?v=20260801-04";
+import { initChat } from "./components/chat.js?v=20260801-04";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260801-04";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260801-04";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260801-04";
+import { initTeamPanel } from "./components/team.js?v=20260801-04";
+import { initProjectBar } from "./components/project_bar.js?v=20260801-04";
+import { initMemoryPanel } from "./components/memory.js?v=20260801-04";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260801-04";
+import { setProject, setProjectFileTree } from "./store.js?v=20260801-04";
 
 // ── Toast 通知 ──────────────────────────────
+
+let activePanelName = "chat";
 
 function toast(msg, duration = 2200) {
   const container = document.getElementById("toast-container");
@@ -27,6 +29,16 @@ function toast(msg, duration = 2200) {
     el.classList.add("out");
     el.addEventListener("animationend", () => el.remove());
   }, duration);
+}
+
+function switchPanel(panelName) {
+  activePanelName = panelName || "chat";
+  document.querySelectorAll(".tab-btn").forEach(t => {
+    t.classList.toggle("active", t.dataset.panel === activePanelName);
+  });
+  document.querySelectorAll(".panel").forEach(el => {
+    el.classList.toggle("active", el.id === `panel-${activePanelName}`);
+  });
 }
 
 function safeInit(name, fn) {
@@ -126,42 +138,43 @@ function handleModelSelect(e) {
 
 // ── 密钥输入弹窗 ────────────────────────────
 
-let keyModal, keyModalModelName, keyModalInput;
 let pendingKeyModel = null;
 
 function openKeyInputModal(model) {
   pendingKeyModel = model;
-  keyModalModelName.textContent = `${model.name} — 输入 API Key`;
-  keyModalInput.value = getModelKey(model.id) || "";
-  keyModalInput.placeholder = `${model.base_url}`;
-  keyModal.classList.remove("hidden");
-  keyModalInput.focus();
+  openSettings({ focusModelId: model.id });
+  toast(`请先配置 API Key: ${model.name}`);
 }
 
-function saveKeyFromModal() {
-  if (!pendingKeyModel) return;
-  const key = keyModalInput.value.trim();
-  if (key) {
-    setModelKey(pendingKeyModel.id, key);
-    setCurrentModel(pendingKeyModel);
-    resetUsage();
-    toast(`已保存密钥并切换: ${pendingKeyModel.name}`);
-    populateModelSelect();
-  } else {
-    toast("请输入有效的 API Key");
-    return;
-  }
-  keyModal.classList.add("hidden");
-  pendingKeyModel = null;
+// ── 自定义模型编辑 ──────────────────────────
+
+let editingCustomModelId = null;
+
+function openCustomModelModal(model = null) {
+  switchPanel("settings");
+  renderCustomModelManagement();
+  renderKeyManagement();
+  editingCustomModelId = model?.id || null;
+  const editor = document.getElementById("custom-model-editor");
+  document.getElementById("custom-model-editor-title").textContent = model ? "编辑自定义模型" : "添加自定义模型";
+  document.getElementById("btn-save-custom-model").textContent = model ? "保存" : "添加";
+  document.getElementById("custom-model-name").value = model?.id || "";
+  document.getElementById("custom-model-url").value = model?.base_url || "";
+  document.getElementById("custom-model-key").value = model ? (getModelKey(model.id) || "") : "";
+  document.getElementById("custom-model-ctx").value = model?.context_window || 32768;
+  editor?.classList.remove("hidden");
+  document.getElementById("custom-model-name").focus();
 }
 
-// ── 自定义模型弹窗 ──────────────────────────
-
-let customModelModal;
-
-function openCustomModelModal() {
-  customModelModal = document.getElementById("custom-model-modal");
-  customModelModal.classList.remove("hidden");
+function closeCustomModelModal() {
+  document.getElementById("custom-model-editor")?.classList.add("hidden");
+  editingCustomModelId = null;
+  document.getElementById("custom-model-name").value = "";
+  document.getElementById("custom-model-url").value = "";
+  document.getElementById("custom-model-key").value = "";
+  document.getElementById("custom-model-ctx").value = "32768";
+  document.getElementById("custom-model-editor-title").textContent = "添加自定义模型";
+  document.getElementById("btn-save-custom-model").textContent = "添加";
 }
 
 function saveCustomModel() {
@@ -176,21 +189,87 @@ function saveCustomModel() {
   }
 
   const model = { id: name, name, provider: "openai", base_url: baseUrl, context_window: ctx };
-  addCustomModel(model);
-  if (key) setModelKey(name, key);
+  const duplicate = state.customModels.some(m => m.id === name && m.id !== editingCustomModelId);
+  if (duplicate) {
+    toast("模型名称已存在");
+    return;
+  }
+
+  if (editingCustomModelId) {
+    updateCustomModel(editingCustomModelId, model);
+  } else {
+    addCustomModel(model);
+  }
+  setModelKey(name, key);
+  const wasEditing = !!editingCustomModelId;
   setCurrentModel(model);
   resetUsage();
   populateModelSelect();
-  customModelModal.classList.add("hidden");
-  toast(`已添加自定义模型: ${name}`);
-
-  // 清空输入
-  document.getElementById("custom-model-name").value = "";
-  document.getElementById("custom-model-url").value = "";
-  document.getElementById("custom-model-key").value = "";
+  renderCustomModelManagement();
+  renderKeyManagement();
+  closeCustomModelModal();
+  toast(wasEditing ? `已更新自定义模型: ${name}` : `已添加自定义模型: ${name}`);
 }
 
 // ── 密钥管理面板（设置弹窗内） ──────────────
+
+function renderCustomModelManagement() {
+  const container = document.getElementById("custom-model-list");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (!state.customModels.length) {
+    const empty = document.createElement("div");
+    empty.className = "custom-model-empty";
+    empty.textContent = "暂无自定义模型";
+    container.appendChild(empty);
+    return;
+  }
+
+  for (const model of state.customModels) {
+    const row = document.createElement("div");
+    row.className = "custom-model-row";
+
+    const info = document.createElement("div");
+    info.className = "custom-model-info";
+    const name = document.createElement("div");
+    name.className = "custom-model-name";
+    name.textContent = model.name;
+    const meta = document.createElement("div");
+    meta.className = "custom-model-meta";
+    meta.textContent = `${model.base_url} · ${model.context_window || 32768} ctx`;
+    info.appendChild(name);
+    info.appendChild(meta);
+
+    const actions = document.createElement("div");
+    actions.className = "custom-model-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "icon-btn";
+    editBtn.textContent = "✎";
+    editBtn.title = "编辑";
+    editBtn.addEventListener("click", () => openCustomModelModal(model));
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "icon-btn custom-model-delete";
+    deleteBtn.textContent = "×";
+    deleteBtn.title = "删除";
+    deleteBtn.addEventListener("click", () => {
+      if (!confirm(`删除自定义模型「${model.name}」？`)) return;
+      removeCustomModel(model.id);
+      populateModelSelect();
+      renderCustomModelManagement();
+      renderKeyManagement();
+      toast(`已删除自定义模型: ${model.name}`);
+    });
+
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+    row.appendChild(info);
+    row.appendChild(actions);
+    container.appendChild(row);
+  }
+}
 
 function renderKeyManagement() {
   const container = document.getElementById("key-management-list");
@@ -201,7 +280,6 @@ function renderKeyManagement() {
   for (const models of Object.values(state.modelRegistry)) {
     allModels.push(...models);
   }
-  allModels.push(...state.customModels);
 
   for (const m of allModels) {
     const row = document.createElement("div");
@@ -223,6 +301,7 @@ function renderKeyManagement() {
     const input = document.createElement("input");
     input.type = "password";
     input.className = "setting-input key-mgmt-input";
+    input.dataset.modelKey = m.id;
     input.value = getModelKey(m.id) || "";
     input.placeholder = hasModelKey(m.id) ? "已配置 (留空删除)" : "未配置";
 
@@ -234,6 +313,12 @@ function renderKeyManagement() {
       const val = input.value.trim();
       setModelKey(m.id, val);
       populateModelSelect();
+      if (val && pendingKeyModel?.id === m.id) {
+        setCurrentModel(m);
+        resetUsage();
+        pendingKeyModel = null;
+        populateModelSelect();
+      }
       toast(val ? `已保存: ${m.name}` : `已删除: ${m.name}`);
     });
 
@@ -244,23 +329,44 @@ function renderKeyManagement() {
     row.appendChild(inputWrap);
     container.appendChild(row);
   }
+  if (!allModels.length) {
+    const empty = document.createElement("div");
+    empty.className = "custom-model-empty";
+    empty.textContent = "暂无内置模型";
+    container.appendChild(empty);
+  }
 }
 
 // ── 设置弹窗 ────────────────────────────────
 
 let settingsModal;
 
-function openSettings() {
-  settingsModal = document.getElementById("settings-modal");
+function openSettings(options = {}) {
+  settingsModal = document.getElementById("panel-settings");
   document.getElementById("setting-max-tokens").value = 64000;
   if (state.constitution) {
     document.getElementById("setting-constitution").value = JSON.stringify(state.constitution, null, 2);
   }
+  renderCustomModelManagement();
   renderKeyManagement();
-  settingsModal.classList.remove("hidden");
+  switchPanel("settings");
+  if (options.focusModelId) {
+    requestAnimationFrame(() => {
+      const input = [...document.querySelectorAll("[data-model-key]")]
+        .find(el => el.dataset.modelKey === options.focusModelId);
+      input?.focus();
+      input?.scrollIntoView({ block: "center" });
+    });
+  } else if (options.focusConstitution) {
+    requestAnimationFrame(() => {
+      const input = document.getElementById("setting-constitution");
+      input?.focus();
+      input?.scrollIntoView({ block: "center" });
+    });
+  }
 }
 
-function closeSettings() { settingsModal.classList.add("hidden"); }
+function closeSettings() { switchPanel("chat"); }
 
 async function saveSettings() {
   const maxTokens = parseInt(document.getElementById("setting-max-tokens").value) || 64000;
@@ -270,13 +376,19 @@ async function saveSettings() {
   if (constText) {
     try {
       const constData = JSON.parse(constText);
-      await put("/constitution", constData);
+      if (state.project) {
+        const { updateProjectConfig } = await import("./services/project.js?v=20260801-04");
+        const config = { ...(state.project.config || {}), constitution: constData };
+        const res = await updateProjectConfig(config);
+        if (res.code === 0) setProject(res.data);
+      } else {
+        await put("/constitution", constData);
+      }
       state.constitution = constData;
     } catch (e) { /* ignore */ }
   }
 
   savePersistent();
-  closeSettings();
   toast("设置已保存");
 }
 
@@ -284,21 +396,17 @@ async function saveSettings() {
 
 function initTabs() {
   const tabs = document.querySelectorAll(".tab-btn");
-
-  function switchTab(panelName) {
-    tabs.forEach(t => t.classList.toggle("active", t.dataset.panel === panelName));
-    document.querySelectorAll(".panel").forEach(el => {
-      el.classList.toggle("active", el.id === `panel-${panelName}`);
-    });
-  }
-
-  tabs.forEach(tab => tab.addEventListener("click", () => switchTab(tab.dataset.panel)));
+  tabs.forEach(tab => tab.addEventListener("click", () => switchPanel(tab.dataset.panel)));
 }
 
 // ── 键盘快捷键 ──────────────────────────────
 
 function initKeyboardShortcuts() {
   document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && copySelectedText()) {
+      e.preventDefault();
+      return;
+    }
     // Ctrl+N: 新建对话
     if (e.ctrlKey && e.key === "n") {
       e.preventDefault();
@@ -314,6 +422,36 @@ function initKeyboardShortcuts() {
     if (e.key === "Escape") {
       document.querySelectorAll(".modal:not(.hidden)").forEach(m => m.classList.add("hidden"));
     }
+  });
+}
+
+function getSelectedPageText() {
+  const active = document.activeElement;
+  if (active && ["INPUT", "TEXTAREA"].includes(active.tagName)) return "";
+  const selection = window.getSelection();
+  const text = selection ? selection.toString() : "";
+  return text.trim() ? text : "";
+}
+
+function copySelectedText() {
+  const text = getSelectedPageText();
+  if (!text) return false;
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {
+      try { document.execCommand("copy"); } catch (e) {}
+    });
+  } else {
+    try { document.execCommand("copy"); } catch (e) {}
+  }
+  return true;
+}
+
+function initSelectionCopySupport() {
+  document.addEventListener("copy", (e) => {
+    const text = getSelectedPageText();
+    if (!text || !e.clipboardData) return;
+    e.clipboardData.setData("text/plain", text);
+    e.preventDefault();
   });
 }
 
@@ -349,6 +487,7 @@ async function init() {
   safeInit("项目栏", initProjectBar);
   safeInit("记忆面板", initMemoryPanel);
   safeInit("快捷键", initKeyboardShortcuts);
+  safeInit("文本复制", initSelectionCopySupport);
 
   // 模型选择
   document.getElementById("model-select").addEventListener("change", handleModelSelect);
@@ -356,21 +495,10 @@ async function init() {
   // 密钥管理按钮
   document.getElementById("btn-manage-keys").addEventListener("click", openSettings);
 
-  // 密钥输入弹窗
-  keyModal = document.getElementById("key-input-modal");
-  keyModalModelName = document.getElementById("key-modal-model-name");
-  keyModalInput = document.getElementById("key-modal-input");
-  document.getElementById("btn-save-key").addEventListener("click", saveKeyFromModal);
-  keyModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
-    el.addEventListener("click", () => keyModal.classList.add("hidden"));
-  });
-
-  // 自定义模型弹窗
-  customModelModal = document.getElementById("custom-model-modal");
+  // 自定义模型编辑器
   document.getElementById("btn-save-custom-model").addEventListener("click", saveCustomModel);
-  customModelModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
-    el.addEventListener("click", () => customModelModal.classList.add("hidden"));
-  });
+  document.getElementById("btn-add-custom-model-settings")?.addEventListener("click", () => openCustomModelModal());
+  document.getElementById("btn-cancel-custom-model")?.addEventListener("click", closeCustomModelModal);
 
   // 主题切换
   document.getElementById("btn-theme").addEventListener("click", () => {
@@ -380,9 +508,8 @@ async function init() {
 
   // 设置弹窗
   document.getElementById("btn-settings").addEventListener("click", openSettings);
-  document.querySelectorAll("#settings-modal .modal-close, #settings-modal .modal-backdrop")
-    .forEach(el => el.addEventListener("click", closeSettings));
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
+  window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
   await loadModels();
 
@@ -392,7 +519,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260730-33");
+      const { openProject } = await import("./services/project.js?v=20260801-04");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

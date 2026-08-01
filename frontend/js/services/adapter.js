@@ -3,7 +3,8 @@
  * 根据不同模型特点优化提示词
  */
 
-import { getToolsSystemPrompt } from "./tools.js?v=20260730-33";
+import { state } from "../store.js?v=20260801-04";
+import { getToolsSystemPrompt } from "./tools.js?v=20260801-04";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -45,6 +46,34 @@ function getSystemPrompt(modelId) {
   return SYSTEM_PROMPTS.default;
 }
 
+function getMemorySystemPrompt() {
+  const parts = [];
+  const profile = state.userProfile || {};
+  const profileLines = [];
+  if (profile.role) profileLines.push(`- 角色: ${profile.role}`);
+  if (profile.style) profileLines.push(`- 工作风格: ${profile.style}`);
+  if (profile.techStack) profileLines.push(`- 技术栈: ${profile.techStack}`);
+  if (profile.habits) profileLines.push(`- 协作习惯: ${profile.habits}`);
+  if (profile.custom) profileLines.push(`- 其他: ${profile.custom}`);
+  if (profileLines.length) {
+    parts.push("[用户画像]");
+    parts.push(...profileLines);
+  }
+
+  const memories = (state.memories || []).slice(-16);
+  if (memories.length) {
+    parts.push("[长期记忆]");
+    for (const mem of memories) {
+      const category = mem.category || "general";
+      const content = String(mem.content || "").slice(0, 220);
+      if (content) parts.push(`- [${category}] ${content}`);
+    }
+  }
+
+  if (!parts.length) return "";
+  return "\n\n" + parts.join("\n");
+}
+
 /**
  * 构建完整的消息列表（注入系统提示 + 宪法 + 工具 + 黑板上下文）
  */
@@ -54,6 +83,7 @@ function buildMessages(userMessages, constitution) {
   // 系统提示
   const modelId = userMessages._modelId || "";
   let systemContent = getSystemPrompt(modelId);
+  systemContent += getMemorySystemPrompt();
 
   // 注入项目宪法
   if (constitution) {

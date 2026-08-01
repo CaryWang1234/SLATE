@@ -1,5 +1,5 @@
-#define MyAppName "SLATE"
-#define MyAppVersion "0.1.1"
+#define MyAppName "SLATE 砚"
+#define MyAppVersion "0.1.3"
 #define MyAppPublisher "SLATE"
 #define MyAppExeName "SLATE.exe"
 #define MyAppSourceDir "dist\SLATE"

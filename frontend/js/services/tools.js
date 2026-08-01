@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260730-33";
-import { post } from "../services/api.js?v=20260730-33";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260801-04";
+import { post } from "../services/api.js?v=20260801-04";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -142,7 +142,7 @@ const TOOLS = {
 
   skill_run: {
     name: "执行技能",
-    description: "调用内置技能。可用：file_tree(目录树), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架)",
+    description: "调用内置技能。可用：file_tree(目录树), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描)",
     params: {
       skill: { type: "string", description: "技能名称", required: true },
       params: { type: "object", description: "技能参数" },
@@ -152,7 +152,7 @@ const TOOLS = {
         const p = params || {};
         // 自动注入项目目录作为默认工作目录
         if (state.project) {
-          if (!p.directory && (skill === "file_tree")) p.directory = state.project.path;
+          if (!p.directory && ["file_tree", "repo_stats", "todo_scan"].includes(skill)) p.directory = state.project.path;
           if (!p.work_dir && (skill === "terminal")) p.work_dir = state.project.path;
           if (!p.file_path && skill === "file_peek" && p.relative_path) {
             const target = normalizeProjectRelativePath(p.relative_path);

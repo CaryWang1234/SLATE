@@ -1,0 +1,8 @@
+{
+  "currentModelId": "deepseek-chat",
+  "modelKeys": {
+    "deepseek-v4-flash": "sk-d9b1baa61abe4f7d98df2ed30fa612a9",
+    "deepseek-chat": "sk-61afc8d826b14ceeb40d790ec208ed99"
+  },
+  "customModels": []
+}

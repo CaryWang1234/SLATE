@@ -85,6 +85,9 @@ function buildPersistentData() {
     customModels: state.customModels,
     currentModelId: state.currentModel?.id || state._pendingModelId || null,
     boardCards: state.boardCards,
+    memories: state.memories,
+    userProfile: state.userProfile,
+    promptSnippets: state.promptSnippets,
     lastProjectPath: state.project?.path || null,
     conversationUsage: state.conversationUsage,
   };
@@ -127,6 +130,9 @@ function loadPersistent() {
     state.modelKeys = data.modelKeys || {};
     state.customModels = data.customModels || [];
     state.boardCards = data.boardCards || [];
+    state.memories = data.memories || [];
+    state.userProfile = data.userProfile || {};
+    state.promptSnippets = data.promptSnippets || [];
     state._pendingModelId = data.currentModelId;
     state._lastProjectPath = data.lastProjectPath || null;
     state.conversationUsage = data.conversationUsage || {};
@@ -195,7 +201,41 @@ function addCustomModel(model) {
   if (!state.customModels.find(m => m.id === model.id)) {
     state.customModels.push(model);
     savePersistent();
+    notify("customModels", state.customModels);
   }
+}
+
+function updateCustomModel(originalId, model) {
+  const idx = state.customModels.findIndex(m => m.id === originalId);
+  if (idx < 0) return false;
+  state.customModels[idx] = model;
+  if (originalId !== model.id && state.modelKeys[originalId] && !state.modelKeys[model.id]) {
+    state.modelKeys[model.id] = state.modelKeys[originalId];
+    delete state.modelKeys[originalId];
+  }
+  if (state.currentModel?.id === originalId) {
+    state.currentModel = model;
+    notify("model", model);
+  }
+  savePersistent();
+  notify("customModels", state.customModels);
+  notify("modelKeys", state.modelKeys);
+  return true;
+}
+
+function removeCustomModel(modelId) {
+  const idx = state.customModels.findIndex(m => m.id === modelId);
+  if (idx < 0) return false;
+  state.customModels.splice(idx, 1);
+  delete state.modelKeys[modelId];
+  if (state.currentModel?.id === modelId) {
+    state.currentModel = null;
+    notify("model", null);
+  }
+  savePersistent();
+  notify("customModels", state.customModels);
+  notify("modelKeys", state.modelKeys);
+  return true;
 }
 
 function resetUsage() {
@@ -312,25 +352,30 @@ function setProjectFileTree(data) {
 
 function setMemories(list) {
   state.memories = list;
+  savePersistent();
   notify("memories", list);
 }
 
 function addMemory(mem) {
   const newMem = { ...mem, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), createdAt: Date.now() };
   state.memories.push(newMem);
+  savePersistent();
   notify("memories", state.memories);
+  return newMem;
 }
 
 function updateMemory(id, updates) {
   const idx = state.memories.findIndex(m => m.id === id);
   if (idx >= 0) {
     Object.assign(state.memories[idx], updates);
+    savePersistent();
     notify("memories", state.memories);
   }
 }
 
 function removeMemory(id) {
   state.memories = state.memories.filter(m => m.id !== id);
+  savePersistent();
   notify("memories", state.memories);
 }
 
@@ -338,11 +383,13 @@ function removeMemory(id) {
 
 function setUserProfile(profile) {
   state.userProfile = { ...state.userProfile, ...profile };
+  savePersistent();
   notify("userProfile", state.userProfile);
 }
 
 function resetUserProfile() {
   state.userProfile = {};
+  savePersistent();
   notify("userProfile", state.userProfile);
 }
 
@@ -382,7 +429,7 @@ function setModelRegistry(registry) {
 
 export {
   API_BASE, state, subscribe, notify,
-  setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel,
+  setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel,
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens, estimateContextTokens,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage,

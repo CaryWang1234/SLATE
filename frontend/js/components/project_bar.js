@@ -2,8 +2,8 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260730-33";
-import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260730-33";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260801-04";
+import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260801-04";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let fileTreeContainer, projectInfoEl, projectCloseBtn;
@@ -318,32 +318,7 @@ async function openFile(path) {
 // ── 项目设置 ──────────────────────────────────
 
 function openProjectSettings() {
-  // 复用全局设置弹窗，但显示项目级配置
-  const settingsModal = document.getElementById("settings-modal");
-  const constitutionInput = document.getElementById("setting-constitution");
-
-  // 填入项目宪法
-  const projConstitution = state.project?.constitution || {};
-  constitutionInput.value = JSON.stringify(projConstitution, null, 2) || '{\n  "rules": []\n}';
-
-  settingsModal.classList.remove("hidden");
-
-  // 覆盖保存按钮行为
-  const saveBtn = document.getElementById("btn-save-settings");
-  const originalHandler = saveBtn.onclick;
-  saveBtn.onclick = async () => {
-    try {
-      const constData = JSON.parse(constitutionInput.value.trim());
-      const config = { ...(state.project?.config || {}), constitution: constData };
-      const res = await (await import("../services/project.js?v=20260730-33")).updateProjectConfig(config);
-      if (res.code === 0) {
-        setProject(res.data);
-        settingsModal.classList.add("hidden");
-      }
-    } catch (e) {
-      alert("JSON 格式错误");
-    }
-  };
+  window.dispatchEvent(new CustomEvent("slate:open-settings", { detail: { focusConstitution: true } }));
 }
 
 // ── 初始化 ────────────────────────────────────

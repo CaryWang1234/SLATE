@@ -2,9 +2,11 @@
 /.tmp-chrome-codex-*
 /dist
 /build
-/data
 /installer
 */__pycache__
 **/__pycache__/
 *.pyc
 desktop_backend.log
+/data/chat_history.db
+repo-doctor.py
+/data/webview_profile
