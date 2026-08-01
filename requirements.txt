@@ -1,0 +1,13 @@
+# Backend
+fastapi
+uvicorn[standard]
+httpx
+python-multipart
+aiofiles
+aiosqlite
+
+# Desktop wrapper
+pywebview
+
+# Packaging
+pyinstaller
