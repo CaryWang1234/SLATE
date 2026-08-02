@@ -61,6 +61,19 @@ const state = {
 
   // 提示词素材
   promptSnippets: [],
+
+  // 自动推进审阅
+  autoReview: {
+    enabled: true,
+    modelId: "",
+    minChars: 120,
+  },
+
+  knowledgeSettings: {
+    enabled: true,
+    topK: 5,
+  },
+  knowledgeContext: [],
 };
 
 // ── 订阅者 ──────────────────────────────────
@@ -90,6 +103,8 @@ function buildPersistentData() {
     promptSnippets: state.promptSnippets,
     lastProjectPath: state.project?.path || null,
     conversationUsage: state.conversationUsage,
+    autoReview: state.autoReview,
+    knowledgeSettings: state.knowledgeSettings,
   };
 }
 
@@ -108,6 +123,8 @@ function getSharedPersistentData(data = buildPersistentData()) {
     modelKeys: data.modelKeys || {},
     customModels: data.customModels || [],
     currentModelId: data.currentModelId || null,
+    autoReview: data.autoReview || {},
+    knowledgeSettings: data.knowledgeSettings || {},
   };
 }
 
@@ -136,6 +153,14 @@ function loadPersistent() {
     state._pendingModelId = data.currentModelId;
     state._lastProjectPath = data.lastProjectPath || null;
     state.conversationUsage = data.conversationUsage || {};
+    state.autoReview = {
+      ...state.autoReview,
+      ...(data.autoReview || {}),
+    };
+    state.knowledgeSettings = {
+      ...state.knowledgeSettings,
+      ...(data.knowledgeSettings || {}),
+    };
   } catch (e) {}
 }
 
@@ -156,6 +181,14 @@ async function loadSharedPersistent() {
     if (!state._pendingModelId && data.currentModelId) {
       state._pendingModelId = data.currentModelId;
     }
+    state.autoReview = {
+      ...state.autoReview,
+      ...(data.autoReview || {}),
+    };
+    state.knowledgeSettings = {
+      ...state.knowledgeSettings,
+      ...(data.knowledgeSettings || {}),
+    };
     saveLocalPersistent();
   } catch (e) {}
 }
@@ -400,6 +433,11 @@ function setPromptSnippets(list) {
   notify("promptSnippets", list);
 }
 
+function setKnowledgeContext(items) {
+  state.knowledgeContext = Array.isArray(items) ? items : [];
+  notify("knowledgeContext", state.knowledgeContext);
+}
+
 function addPromptSnippet(snip) {
   const newSnip = {
     id: snip.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -439,5 +477,6 @@ export {
   setMemories, addMemory, updateMemory, removeMemory,
   setUserProfile, resetUserProfile,
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
+  setKnowledgeContext,
   savePersistent, loadPersistent,
 };

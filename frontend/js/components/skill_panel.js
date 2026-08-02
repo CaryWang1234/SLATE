@@ -2,8 +2,8 @@
  * SLATE 技能面板：内置技能列表 + 自定义 Skill 上传
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260801-04";
-import { get, post, upload } from "../services/api.js?v=20260801-04";
+import { state, subscribe, setSkills } from "../store.js?v=20260802-01";
+import { get, post, upload } from "../services/api.js?v=20260802-01";
 
 let skillList, btnUpload, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 

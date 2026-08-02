@@ -2365,6 +2365,22 @@ textarea::-webkit-scrollbar-thumb {
   border-bottom: none;
 }
 
+.setting-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 12px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.setting-check input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
 .setting-section-head {
   display: flex;
   align-items: center;
@@ -3348,6 +3364,93 @@ body.resizing {
   padding: 24px;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* ── 知识中心 ─────────────────────────── */
+
+.knowledge-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.knowledge-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.knowledge-topk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.knowledge-topk input {
+  width: 72px;
+}
+
+.knowledge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 440px;
+  overflow-y: auto;
+}
+
+.knowledge-item {
+  position: relative;
+  padding: 10px 38px 10px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+}
+
+.knowledge-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.knowledge-item-title {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-item-meta {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.knowledge-item-content {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.knowledge-item-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 
 /* ── 消息收藏按钮 ─────────────────────── */

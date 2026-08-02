@@ -2,11 +2,11 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage } from "../store.js?v=20260801-04";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260801-04";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260801-04";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260801-04";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260801-04";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext } from "../store.js?v=20260802-01";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260802-01";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260802-01";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260802-01";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260802-01";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -228,7 +228,7 @@ function summarizeParams(params) {
 }
 
 function shouldHideToolOutput(call) {
-  return ["skill_run", "project_files", "project_read_file", "project_find_file", "board_read", "chat_context"].includes(call?.name);
+  return ["skill_run", "project_files", "project_read_file", "project_find_file", "board_read", "chat_context", "knowledge_search"].includes(call?.name);
 }
 
 function formatToolResultForModel(call, result) {
@@ -302,6 +302,105 @@ function getInspectionQueries(content) {
   return [...new Set(queries)].slice(0, 3);
 }
 
+function getAllModels() {
+  const allModels = [];
+  for (const models of Object.values(state.modelRegistry || {})) {
+    allModels.push(...models);
+  }
+  allModels.push(...(state.customModels || []));
+  return allModels;
+}
+
+function findModelById(modelId) {
+  return getAllModels().find(m => m.id === modelId) || null;
+}
+
+async function refreshKnowledgeContext(query) {
+  if (state.knowledgeSettings?.enabled === false) {
+    setKnowledgeContext([]);
+    return [];
+  }
+  const text = String(query || "").trim();
+  if (!text) {
+    setKnowledgeContext([]);
+    return [];
+  }
+  try {
+    const limit = Math.max(1, Math.min(12, parseInt(state.knowledgeSettings?.topK) || 5));
+    const res = await post("/knowledge/search", { query: text.slice(-4000), limit });
+    const items = res.code === 0 ? (res.data || []) : [];
+    setKnowledgeContext(items);
+    return items;
+  } catch (e) {
+    console.warn("知识库检索失败:", e);
+    setKnowledgeContext([]);
+    return [];
+  }
+}
+
+function isShortReviewCandidate(content) {
+  const cfg = state.autoReview || {};
+  if (cfg.enabled === false) return false;
+  if (!content || detectToolCalls(content).length > 0) return false;
+  if (/^⚠/.test(String(content).trim())) return false;
+  const clean = stripToolCalls(content).replace(/```[\s\S]*?```/g, " ").trim();
+  const minChars = Math.max(20, Math.min(800, parseInt(cfg.minChars) || 120));
+  return clean.length > 0 && clean.length <= minChars;
+}
+
+function buildAutoReviewMessages(lastContent) {
+  const recent = state.messages
+    .slice(-8, -1)
+    .filter(m => !isHiddenContextMessage(m))
+    .map(m => `${m.role}: ${String(m.content || "").slice(0, 1200)}`)
+    .join("\n\n");
+  const projectLine = state.project ? `当前项目: ${state.project.name} (${state.project.path})` : "当前未打开项目";
+  return [
+    {
+      role: "system",
+      content: `你是 SLATE 的自动推进审阅器。你的任务是审查主模型刚才的短回复是否卡住。
+
+如果短回复只是正常确认、向用户提问、等待用户选择、说明已完成、或没有必要读取/操作环境，输出空字符串。
+如果短回复表达了“我需要查看/读取/检查/了解/生成文件/调用技能”但没有实际工具调用，你必须只输出一个或多个工具调用块，不要解释，不要寒暄。
+优先选择最小必要动作：知道路径就读文件，只知道名称就找文件，不知道目标就浏览项目根目录。需要内置技能时使用 skill_run。
+
+${projectLine}
+${getToolsSystemPrompt()}`,
+    },
+    {
+      role: "user",
+      content: `[最近上下文]\n${recent || "(无)"}\n\n[主模型短回复]\n${lastContent}\n\n请判断是否需要自动补工具/技能调用。只输出工具调用块或空字符串。`,
+    },
+  ];
+}
+
+async function reviewShortReplyForToolCalls(lastContent, modelId, apiKey, baseUrl) {
+  if (!isShortReviewCandidate(lastContent)) return [];
+  const reviewerId = state.autoReview?.modelId || modelId;
+  const reviewerModel = findModelById(reviewerId) || state.currentModel || { id: modelId, base_url: baseUrl };
+  const reviewerKey = getModelKey(reviewerModel.id) || (reviewerModel.id === modelId ? apiKey : "");
+  if (!reviewerKey && reviewerModel.id !== "local") return [];
+
+  let reviewText = "";
+  try {
+    for await (const chunk of streamChat({
+      model: reviewerModel.id,
+      messages: buildAutoReviewMessages(lastContent),
+      api_key: reviewerKey,
+      base_url: reviewerModel.base_url || baseUrl,
+      temperature: 0.1,
+      max_tokens: 900,
+      stream: true,
+    })) {
+      reviewText += chunk;
+    }
+  } catch (e) {
+    console.warn("自动审阅失败:", e);
+    return [];
+  }
+  return detectToolCalls(reviewText).slice(0, 4);
+}
+
 function appendSyntheticToolCalls(msgEl, calls) {
   const lastMsg = state.messages[state.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return false;
@@ -343,6 +442,18 @@ async function autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params) {
     { name: "project_files", params: { path: "" } },
     ...queries.map(query => ({ name: "project_find_file", params: { query } })),
   ]);
+  return msgEl;
+}
+
+async function autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl) {
+  const lastMsg = state.messages[state.messages.length - 1];
+  if (!lastMsg || lastMsg.role !== "assistant") return msgEl;
+  if (lastMsg.autoReviewed) return msgEl;
+  if (!isShortReviewCandidate(lastMsg.content)) return msgEl;
+
+  lastMsg.autoReviewed = true;
+  const calls = await reviewShortReplyForToolCalls(lastMsg.content, modelId, apiKey, baseUrl);
+  if (calls.length > 0) appendSyntheticToolCalls(msgEl, calls);
   return msgEl;
 }
 
@@ -675,6 +786,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     chatScroll.scrollTop = chatScroll.scrollHeight;
 
     // 流式续写
+    await refreshKnowledgeContext(state.messages.slice(-6).map(m => m.content || "").join("\n"));
     const history = state.messages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
     history._modelId = modelId;
     const messages = buildMessages(history, state.constitution);
@@ -701,6 +813,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     }
 
     msgEl = await autoAdvanceIfStalled(followEl, modelId, apiKey, baseUrl, params);
+    msgEl = await autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl);
   }
 }
 
@@ -739,6 +852,7 @@ async function sendMessage() {
   }
 
   const fullText = text + fileContext;
+  await refreshKnowledgeContext(fullText);
   const userMsg = { role: "user", content: fullText, model: "", files: fileMeta.length > 0 ? fileMeta : undefined };
   addMessage(userMsg);
 
@@ -806,6 +920,7 @@ async function sendMessage() {
   }
 
   msgEl = await autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params);
+  msgEl = await autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl);
 
   // 工具调用循环（最多 5 轮）
   await runToolLoop(msgEl, modelId, apiKey, baseUrl, params);
@@ -851,7 +966,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260801-04");
+    const { toast } = await import("../app.js?v=20260802-01");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -870,7 +985,7 @@ function toggleBrainstormMode() {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260801-04").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260802-01").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -894,7 +1009,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260801-04");
+    const { toast } = await import("../app.js?v=20260802-01");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -927,7 +1042,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260801-04");
+    const { toast } = await import("../app.js?v=20260802-01");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -1095,7 +1210,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260801-04");
+      const { toast } = await import("../app.js?v=20260802-01");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }

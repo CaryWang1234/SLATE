@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示词
  */
 
-import { state } from "../store.js?v=20260801-04";
-import { getToolsSystemPrompt } from "./tools.js?v=20260801-04";
+import { state } from "../store.js?v=20260802-01";
+import { getToolsSystemPrompt } from "./tools.js?v=20260802-01";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -74,6 +74,18 @@ function getMemorySystemPrompt() {
   return "\n\n" + parts.join("\n");
 }
 
+function getKnowledgeSystemPrompt() {
+  const items = Array.isArray(state.knowledgeContext) ? state.knowledgeContext.slice(0, 8) : [];
+  if (!items.length) return "";
+  const lines = ["[相关知识库片段]"];
+  for (const item of items) {
+    const title = item.title || item.source || "知识";
+    const content = String(item.content || "").slice(0, 700);
+    if (content) lines.push(`- ${title}: ${content}`);
+  }
+  return "\n\n" + lines.join("\n");
+}
+
 /**
  * 构建完整的消息列表（注入系统提示 + 宪法 + 工具 + 黑板上下文）
  */
@@ -84,6 +96,7 @@ function buildMessages(userMessages, constitution) {
   const modelId = userMessages._modelId || "";
   let systemContent = getSystemPrompt(modelId);
   systemContent += getMemorySystemPrompt();
+  systemContent += getKnowledgeSystemPrompt();
 
   // 注入项目宪法
   if (constitution) {

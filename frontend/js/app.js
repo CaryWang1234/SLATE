@@ -2,17 +2,17 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260801-04";
-import { get, put } from "./services/api.js?v=20260801-04";
-import { initChat } from "./components/chat.js?v=20260801-04";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260801-04";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260801-04";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260801-04";
-import { initTeamPanel } from "./components/team.js?v=20260801-04";
-import { initProjectBar } from "./components/project_bar.js?v=20260801-04";
-import { initMemoryPanel } from "./components/memory.js?v=20260801-04";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260801-04";
-import { setProject, setProjectFileTree } from "./store.js?v=20260801-04";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260802-01";
+import { get, put } from "./services/api.js?v=20260802-01";
+import { initChat } from "./components/chat.js?v=20260802-01";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260802-01";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260802-01";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260802-01";
+import { initTeamPanel } from "./components/team.js?v=20260802-01";
+import { initProjectBar } from "./components/project_bar.js?v=20260802-01";
+import { initMemoryPanel } from "./components/memory.js?v=20260802-01";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260802-01";
+import { setProject, setProjectFileTree } from "./store.js?v=20260802-01";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -96,6 +96,29 @@ function populateModelSelect() {
   select.appendChild(customOpt);
 
   if (state.currentModel) select.value = state.currentModel.id;
+}
+
+function getAllModels() {
+  const allModels = [];
+  for (const models of Object.values(state.modelRegistry)) {
+    allModels.push(...models);
+  }
+  allModels.push(...state.customModels);
+  return allModels;
+}
+
+function populateAutoReviewModelSelect() {
+  const select = document.getElementById("setting-auto-review-model");
+  if (!select) return;
+  const currentValue = state.autoReview?.modelId || "";
+  select.innerHTML = '<option value="">跟随当前主模型</option>';
+  for (const m of getAllModels()) {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = m.name || m.id;
+    select.appendChild(opt);
+  }
+  select.value = currentValue;
 }
 
 function handleModelSelect(e) {
@@ -205,6 +228,7 @@ function saveCustomModel() {
   setCurrentModel(model);
   resetUsage();
   populateModelSelect();
+  populateAutoReviewModelSelect();
   renderCustomModelManagement();
   renderKeyManagement();
   closeCustomModelModal();
@@ -257,7 +281,12 @@ function renderCustomModelManagement() {
     deleteBtn.addEventListener("click", () => {
       if (!confirm(`删除自定义模型「${model.name}」？`)) return;
       removeCustomModel(model.id);
+      if (state.autoReview?.modelId === model.id) {
+        state.autoReview.modelId = "";
+        savePersistent();
+      }
       populateModelSelect();
+      populateAutoReviewModelSelect();
       renderCustomModelManagement();
       renderKeyManagement();
       toast(`已删除自定义模型: ${model.name}`);
@@ -276,10 +305,7 @@ function renderKeyManagement() {
   if (!container) return;
   container.innerHTML = "";
 
-  const allModels = [];
-  for (const models of Object.values(state.modelRegistry)) {
-    allModels.push(...models);
-  }
+  const allModels = getAllModels().filter(m => !state.customModels.some(custom => custom.id === m.id));
 
   for (const m of allModels) {
     const row = document.createElement("div");
@@ -344,6 +370,9 @@ let settingsModal;
 function openSettings(options = {}) {
   settingsModal = document.getElementById("panel-settings");
   document.getElementById("setting-max-tokens").value = 64000;
+  document.getElementById("setting-auto-review-enabled").checked = state.autoReview?.enabled !== false;
+  document.getElementById("setting-auto-review-min-chars").value = state.autoReview?.minChars || 120;
+  populateAutoReviewModelSelect();
   if (state.constitution) {
     document.getElementById("setting-constitution").value = JSON.stringify(state.constitution, null, 2);
   }
@@ -371,13 +400,18 @@ function closeSettings() { switchPanel("chat"); }
 async function saveSettings() {
   const maxTokens = parseInt(document.getElementById("setting-max-tokens").value) || 64000;
   state.maxTokens = maxTokens;
+  state.autoReview = {
+    enabled: document.getElementById("setting-auto-review-enabled").checked,
+    modelId: document.getElementById("setting-auto-review-model").value || "",
+    minChars: Math.max(20, Math.min(800, parseInt(document.getElementById("setting-auto-review-min-chars").value) || 120)),
+  };
 
   const constText = document.getElementById("setting-constitution").value.trim();
   if (constText) {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260801-04");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260802-01");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -463,6 +497,7 @@ async function loadModels() {
     if (res.code === 0) {
       setModelRegistry(res.data);
       populateModelSelect();
+      populateAutoReviewModelSelect();
     }
   } catch (e) {
     console.warn("加载模型列表失败:", e);
@@ -519,7 +554,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260801-04");
+      const { openProject } = await import("./services/project.js?v=20260802-01");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

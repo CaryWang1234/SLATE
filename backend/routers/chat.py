@@ -12,6 +12,8 @@ from typing import Any
 
 from fastapi import APIRouter
 
+from backend.routers.knowledge import delete_document, upsert_document
+
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
@@ -309,6 +311,15 @@ async def create_memory(body: dict[str, Any]) -> dict[str, Any]:
                  (mem_id, category, content, now))
     conn.commit()
     conn.close()
+    if content:
+        upsert_document(
+            doc_id=f"memory:{mem_id}",
+            title=f"长期记忆 · {category}",
+            source="long-term-memory",
+            kind="memory",
+            content=content,
+            metadata={"memory_id": mem_id, "category": category},
+        )
     return {"code": 0, "data": {"id": mem_id}, "message": "ok"}
 
 
@@ -322,7 +333,17 @@ async def update_memory(mem_id: str, body: dict[str, Any]) -> dict[str, Any]:
     if content is not None:
         conn.execute("UPDATE memories SET content=? WHERE id=?", (content, mem_id))
     conn.commit()
+    row = conn.execute("SELECT id, category, content FROM memories WHERE id=?", (mem_id,)).fetchone()
     conn.close()
+    if row and row["content"]:
+        upsert_document(
+            doc_id=f"memory:{mem_id}",
+            title=f"长期记忆 · {row['category']}",
+            source="long-term-memory",
+            kind="memory",
+            content=row["content"],
+            metadata={"memory_id": mem_id, "category": row["category"]},
+        )
     return {"code": 0, "data": None, "message": "ok"}
 
 
@@ -332,6 +353,7 @@ async def delete_memory(mem_id: str) -> dict[str, Any]:
     conn.execute("DELETE FROM memories WHERE id=?", (mem_id,))
     conn.commit()
     conn.close()
+    delete_document(f"memory:{mem_id}")
     return {"code": 0, "data": None, "message": "ok"}
 
 

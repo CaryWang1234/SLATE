@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260801-04";
-import { post } from "../services/api.js?v=20260801-04";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260802-01";
+import { post } from "../services/api.js?v=20260802-01";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -174,6 +174,47 @@ const TOOLS = {
       } catch (e) {
         return `技能调用出错: ${e.message}`;
       }
+    },
+  },
+
+  knowledge_search: {
+    name: "检索知识库",
+    description: "从本地轻量向量知识库中检索长期记忆、资料摘录和知识中心内容",
+    params: {
+      query: { type: "string", description: "检索问题或关键词", required: true },
+      limit: { type: "number", description: "返回片段数，默认 5" },
+    },
+    async execute({ query, limit }) {
+      const res = await post("/knowledge/search", { query: query || "", limit: limit || 5 });
+      if (res.code !== 0) return res.message || "知识库检索失败";
+      const items = res.data || [];
+      if (!items.length) return "未检索到相关知识";
+      return items.map((item, i) => {
+        const title = item.title || item.source || "知识";
+        return `${i + 1}. [${title}] score=${item.score}\n${item.content}`;
+      }).join("\n\n");
+    },
+  },
+
+  knowledge_add: {
+    name: "添加知识",
+    description: "把稳定、可复用的信息保存到本地知识中心。不要保存临时任务、工具输出或一次性状态",
+    params: {
+      title: { type: "string", description: "知识标题", required: true },
+      content: { type: "string", description: "知识正文", required: true },
+      source: { type: "string", description: "来源说明" },
+      kind: { type: "string", description: "类型，如 note/memory/project/fact" },
+    },
+    async execute({ title, content, source, kind }) {
+      if (!content) return "缺少 content";
+      const res = await post("/knowledge/docs", {
+        title: title || "未命名知识",
+        content,
+        source: source || "assistant",
+        kind: kind || "note",
+      });
+      if (res.code !== 0) return res.message || "添加知识失败";
+      return `已添加知识: ${title || res.data?.id || "未命名知识"}`;
     },
   },
 

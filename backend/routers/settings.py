@@ -40,6 +40,8 @@ async def save_shared_state(req: SharedStateRequest):
         "modelKeys",
         "customModels",
         "currentModelId",
+        "autoReview",
+        "knowledgeSettings",
     }
     data = {key: req.data.get(key) for key in allowed_keys if key in req.data}
     try:

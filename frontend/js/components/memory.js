@@ -9,14 +9,16 @@ import {
   setUserProfile, resetUserProfile,
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
-} from "../store.js?v=20260801-04";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260801-04";
+  savePersistent,
+} from "../store.js?v=20260802-01";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260802-01";
 
 let memoryModal, snippetModal;
-let memoryList, snippetList;
+let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
 let memoryTabs, memoryTabContents;
 let autoRefineRunning = false;
 let lastAutoRefineAt = 0;
+let memoryReindexDone = false;
 
 const CATEGORY_LABELS = {
   preference: "偏好",
@@ -56,6 +58,8 @@ function renderMemoryList() {
       const newText = prompt("编辑记忆内容：", mem.content);
       if (newText !== null && newText.trim()) {
         updateMemory(mem.id, { content: newText.trim() });
+        patch(`/chat/memories/${mem.id}`, { content: newText.trim() }).catch(() => {});
+        indexMemoryInKnowledge({ ...mem, content: newText.trim() });
       }
     });
     item.appendChild(content);
@@ -71,6 +75,8 @@ function renderMemoryList() {
       const newCat = prompt(`编辑分类（可选: ${cats}）：`, mem.category);
       if (newCat !== null && newCat.trim()) {
         updateMemory(mem.id, { category: newCat.trim() });
+        patch(`/chat/memories/${mem.id}`, { category: newCat.trim() }).catch(() => {});
+        indexMemoryInKnowledge({ ...mem, category: newCat.trim() });
       }
     });
     actions.appendChild(editBtn);
@@ -81,6 +87,7 @@ function renderMemoryList() {
     delBtn.addEventListener("click", async () => {
       removeMemory(mem.id);
       try { await del(`/chat/memories/${mem.id}`); } catch (e) {}
+      try { await del(`/knowledge/docs/memory:${mem.id}`); } catch (e) {}
     });
     actions.appendChild(delBtn);
 
@@ -93,12 +100,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260801-04");
+    const { toast } = await import("../app.js?v=20260802-01");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260801-04");
+  const { toast } = await import("../app.js?v=20260802-01");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -224,6 +231,21 @@ function isDuplicateMemory(content) {
   return state.memories.some(mem => String(mem.content || "").trim().toLowerCase() === normalized);
 }
 
+async function indexMemoryInKnowledge(memory) {
+  const content = String(memory?.content || "").trim();
+  if (!content) return;
+  try {
+    await post("/knowledge/docs", {
+      id: `memory:${memory.id}`,
+      title: `长期记忆 · ${memory.category || "general"}`,
+      source: "long-term-memory",
+      kind: "memory",
+      content,
+      metadata: { memory_id: memory.id, category: memory.category || "general" },
+    });
+  } catch (e) {}
+}
+
 async function autoRefineMemoryAndProfile({ silent = true } = {}) {
   if (autoRefineRunning) return { added: 0, profileUpdated: false };
   if (Date.now() - lastAutoRefineAt < 45000) return { added: 0, profileUpdated: false };
@@ -264,7 +286,8 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
       const content = String(mem?.content || "").trim();
       if (!content || isDuplicateMemory(content)) continue;
       const saved = addMemory({ category: mem.category || "general", content });
-      post("/chat/memories", { category: saved.category, content: saved.content }).catch(() => {});
+      post("/chat/memories", { id: saved.id, category: saved.category, content: saved.content }).catch(() => {});
+      indexMemoryInKnowledge(saved);
       added++;
     }
 
@@ -272,7 +295,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260801-04");
+      const { toast } = await import("../app.js?v=20260802-01");
       toast(`已自动提炼 ${added} 条记忆${profileUpdated ? "，并更新画像" : ""}`);
     }
     return { added, profileUpdated };
@@ -294,8 +317,115 @@ function showAddMemoryDialog() {
   const category = prompt(`选择分类（可选: ${cats}）：`, "general") || "general";
 
   const mem = { category: category.trim(), content: content.trim() };
-  addMemory(mem);
-  post("/chat/memories", mem).catch(() => {});
+  const saved = addMemory(mem);
+  post("/chat/memories", { id: saved.id, category: saved.category, content: saved.content })
+    .then(() => indexMemoryInKnowledge(saved))
+    .catch(() => indexMemoryInKnowledge(saved));
+}
+
+function renderKnowledgeList(items = []) {
+  if (!knowledgeList) return;
+  knowledgeList.innerHTML = "";
+  if (!items.length) {
+    knowledgeList.innerHTML = '<div class="memory-empty">暂无知识条目<br><small>可以添加笔记、项目背景、资料摘录等长期可复用内容</small></div>';
+    return;
+  }
+  for (const item of items) {
+    const row = document.createElement("div");
+    row.className = "knowledge-item";
+
+    const head = document.createElement("div");
+    head.className = "knowledge-item-head";
+    const title = document.createElement("span");
+    title.className = "knowledge-item-title";
+    title.textContent = item.title || "未命名知识";
+    const meta = document.createElement("span");
+    meta.className = "knowledge-item-meta";
+    meta.textContent = `${item.kind || "note"}${item.chunk_count ? ` · ${item.chunk_count} 片段` : ""}${item.score ? ` · ${(item.score * 100).toFixed(0)}%` : ""}`;
+    head.appendChild(title);
+    head.appendChild(meta);
+
+    const body = document.createElement("div");
+    body.className = "knowledge-item-content";
+    body.textContent = (item.content || item.source || "").slice(0, 520);
+
+    const actions = document.createElement("div");
+    actions.className = "knowledge-item-actions";
+    const delBtn = document.createElement("button");
+    delBtn.className = "icon-btn";
+    delBtn.textContent = "×";
+    delBtn.title = "删除";
+    delBtn.addEventListener("click", async () => {
+      if (!confirm(`删除知识「${item.title || item.id}」？`)) return;
+      await del(`/knowledge/docs/${item.doc_id || item.id}`);
+      await loadKnowledgeDocs();
+    });
+    actions.appendChild(delBtn);
+
+    row.appendChild(head);
+    row.appendChild(body);
+    row.appendChild(actions);
+    knowledgeList.appendChild(row);
+  }
+}
+
+async function loadKnowledgeDocs() {
+  if (!knowledgeList) return;
+  try {
+    if (!memoryReindexDone) {
+      memoryReindexDone = true;
+      await post("/knowledge/reindex-memories", {});
+    }
+    const res = await get("/knowledge/docs");
+    renderKnowledgeList(res.code === 0 ? (res.data || []) : []);
+  } catch (e) {
+    renderKnowledgeList([]);
+  }
+}
+
+async function searchKnowledge() {
+  const query = knowledgeSearchInput?.value.trim() || "";
+  if (!query) {
+    await loadKnowledgeDocs();
+    return;
+  }
+  const res = await post("/knowledge/search", { query, limit: 12 });
+  renderKnowledgeList(res.code === 0 ? (res.data || []) : []);
+}
+
+async function addKnowledgeDialog() {
+  const title = prompt("知识标题：");
+  if (title === null) return;
+  const content = prompt("知识内容：");
+  if (!content || !content.trim()) return;
+  const res = await post("/knowledge/docs", {
+    title: title.trim() || "未命名知识",
+    source: "manual",
+    kind: "note",
+    content: content.trim(),
+  });
+  if (res.code === 0) {
+    const { toast } = await import("../app.js?v=20260802-01");
+    toast("知识已添加");
+    await loadKnowledgeDocs();
+  }
+}
+
+function loadKnowledgeSettingsToForm() {
+  const enabled = document.getElementById("knowledge-enabled");
+  const topK = document.getElementById("knowledge-topk");
+  if (enabled) enabled.checked = state.knowledgeSettings?.enabled !== false;
+  if (topK) topK.value = state.knowledgeSettings?.topK || 5;
+}
+
+function saveKnowledgeSettingsFromForm() {
+  const enabled = document.getElementById("knowledge-enabled");
+  const topK = document.getElementById("knowledge-topk");
+  state.knowledgeSettings = {
+    enabled: enabled ? enabled.checked : true,
+    topK: Math.max(1, Math.min(12, parseInt(topK?.value) || 5)),
+  };
+  savePersistent();
 }
 
 // ── 用户资料 ─────────────────────────────────────────────────────────────────
@@ -402,6 +532,8 @@ function initMemoryPanel() {
   snippetModal = document.getElementById("snippet-modal");
   memoryList = document.getElementById("memory-list");
   snippetList = document.getElementById("snippet-list");
+  knowledgeList = document.getElementById("knowledge-list");
+  knowledgeSearchInput = document.getElementById("knowledge-search-input");
 
   if (!memoryModal || !snippetModal) return;
 
@@ -419,13 +551,15 @@ function initMemoryPanel() {
   const btnAutoRefineMemory = document.getElementById("btn-auto-refine-memory");
   const btnSaveProfile = document.getElementById("btn-save-profile");
   const btnResetProfile = document.getElementById("btn-reset-profile");
+  const btnSearchKnowledge = document.getElementById("btn-search-knowledge");
+  const btnAddKnowledge = document.getElementById("btn-add-knowledge");
 
   if (btnAddMemory) btnAddMemory.addEventListener("click", showAddMemoryDialog);
   if (btnExtractMemory) btnExtractMemory.addEventListener("click", extractMemoriesFromConversation);
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260801-04").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260802-01").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", () => {
     if (confirm("确定要重置用户资料吗？")) {
@@ -433,6 +567,13 @@ function initMemoryPanel() {
       loadProfileToForm();
     }
   });
+  if (btnSearchKnowledge) btnSearchKnowledge.addEventListener("click", searchKnowledge);
+  if (knowledgeSearchInput) knowledgeSearchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") searchKnowledge();
+  });
+  if (btnAddKnowledge) btnAddKnowledge.addEventListener("click", addKnowledgeDialog);
+  document.getElementById("knowledge-enabled")?.addEventListener("change", saveKnowledgeSettingsFromForm);
+  document.getElementById("knowledge-topk")?.addEventListener("change", saveKnowledgeSettingsFromForm);
 
   // 素材的添加按钮
   const btnAddSnippet = document.getElementById("btn-add-snippet");
@@ -453,6 +594,8 @@ function initMemoryPanel() {
   // 初始渲染
   renderMemoryList();
   renderSnippetList();
+  loadKnowledgeSettingsToForm();
+  loadKnowledgeDocs();
 }
 
 // ── 打开弹窗 ─────────────────────────────────────────────────────────────────
@@ -461,6 +604,8 @@ function openMemoryModal() {
   if (!memoryModal) memoryModal = document.getElementById("memory-modal");
   loadProfileToForm();
   renderMemoryList();
+  loadKnowledgeSettingsToForm();
+  loadKnowledgeDocs();
   memoryModal.classList.remove("hidden");
 }
 
