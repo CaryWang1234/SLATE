@@ -2,11 +2,11 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext } from "../store.js?v=20260802-01";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260802-01";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260802-01";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260802-01";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260802-01";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext } from "../store.js?v=20260802-02";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260802-02";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260802-02";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260802-02";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260802-02";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -348,30 +348,35 @@ function isShortReviewCandidate(content) {
   return clean.length > 0 && clean.length <= minChars;
 }
 
-function buildAutoReviewMessages(lastContent) {
-  const recent = state.messages
-    .slice(-8, -1)
-    .filter(m => !isHiddenContextMessage(m))
-    .map(m => `${m.role}: ${String(m.content || "").slice(0, 1200)}`)
-    .join("\n\n");
-  const projectLine = state.project ? `当前项目: ${state.project.name} (${state.project.path})` : "当前未打开项目";
-  return [
-    {
-      role: "system",
-      content: `你是 SLATE 的自动推进审阅器。你的任务是审查主模型刚才的短回复是否卡住。
+function buildAutoReviewMessages(lastContent, mainModelId) {
+  const history = state.messages
+    .slice(0, -1)
+    .map(m => ({ role: m.role, content: m.content }));
+  history._modelId = mainModelId;
+  const messages = buildMessages(history, state.constitution);
+  const reviewInstruction = `
 
-如果短回复只是正常确认、向用户提问、等待用户选择、说明已完成、或没有必要读取/操作环境，输出空字符串。
-如果短回复表达了“我需要查看/读取/检查/了解/生成文件/调用技能”但没有实际工具调用，你必须只输出一个或多个工具调用块，不要解释，不要寒暄。
-优先选择最小必要动作：知道路径就读文件，只知道名称就找文件，不知道目标就浏览项目根目录。需要内置技能时使用 skill_run。
+[自动推进审查模式]
+你现在不是主回复模型，而是 SLATE 的审查模型。你和主模型共用以上完整上下文：项目宪法、长期记忆、知识库片段、隐藏工具结果、历史对话和工具说明都已经包含在内。
 
-${projectLine}
-${getToolsSystemPrompt()}`,
-    },
-    {
-      role: "user",
-      content: `[最近上下文]\n${recent || "(无)"}\n\n[主模型短回复]\n${lastContent}\n\n请判断是否需要自动补工具/技能调用。只输出工具调用块或空字符串。`,
-    },
-  ];
+你的唯一任务：审查主模型刚才的短回复是否因为“想查看/读取/检查/了解/生成文件/调用技能”但没有实际调用工具而卡住。
+
+输出规则：
+- 如果短回复是正常确认、向用户提问、等待用户选择、说明已完成、闲聊回应，或没有必要读取/操作环境，输出空字符串。
+- 如果需要推进，只输出一个或多个工具调用块，不要解释，不要寒暄，不要输出 Markdown。
+- 优先选择最小必要动作：知道路径就读文件，只知道名称就找文件，不知道目标就浏览项目根目录；需要内置技能时使用 skill_run。
+- 不要替主模型回答用户，不要总结工具结果，只负责补出应该执行的工具/技能调用。`;
+  if (messages[0]?.role === "system") {
+    messages[0].content += reviewInstruction;
+  } else {
+    messages.unshift({ role: "system", content: reviewInstruction.trim() });
+  }
+  messages.push({ role: "assistant", content: lastContent });
+  messages.push({
+    role: "user",
+    content: "请审查上一条主模型短回复是否需要自动补工具/技能调用。只输出工具调用块或空字符串。",
+  });
+  return messages;
 }
 
 async function reviewShortReplyForToolCalls(lastContent, modelId, apiKey, baseUrl) {
@@ -385,7 +390,7 @@ async function reviewShortReplyForToolCalls(lastContent, modelId, apiKey, baseUr
   try {
     for await (const chunk of streamChat({
       model: reviewerModel.id,
-      messages: buildAutoReviewMessages(lastContent),
+      messages: buildAutoReviewMessages(lastContent, modelId),
       api_key: reviewerKey,
       base_url: reviewerModel.base_url || baseUrl,
       temperature: 0.1,
@@ -966,7 +971,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260802-01");
+    const { toast } = await import("../app.js?v=20260802-02");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -985,7 +990,7 @@ function toggleBrainstormMode() {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260802-01").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260802-02").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -1009,7 +1014,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260802-01");
+    const { toast } = await import("../app.js?v=20260802-02");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -1042,7 +1047,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260802-01");
+    const { toast } = await import("../app.js?v=20260802-02");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -1210,7 +1215,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260802-01");
+      const { toast } = await import("../app.js?v=20260802-02");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }

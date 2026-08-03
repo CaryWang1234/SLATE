@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260802-01";
-import { post } from "../services/api.js?v=20260802-01";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260802-02";
+import { post } from "../services/api.js?v=20260802-02";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");

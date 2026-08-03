@@ -2,17 +2,17 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260802-01";
-import { get, put } from "./services/api.js?v=20260802-01";
-import { initChat } from "./components/chat.js?v=20260802-01";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260802-01";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260802-01";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260802-01";
-import { initTeamPanel } from "./components/team.js?v=20260802-01";
-import { initProjectBar } from "./components/project_bar.js?v=20260802-01";
-import { initMemoryPanel } from "./components/memory.js?v=20260802-01";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260802-01";
-import { setProject, setProjectFileTree } from "./store.js?v=20260802-01";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260802-02";
+import { get, put } from "./services/api.js?v=20260802-02";
+import { initChat } from "./components/chat.js?v=20260802-02";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260802-02";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260802-02";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260802-02";
+import { initTeamPanel } from "./components/team.js?v=20260802-02";
+import { initProjectBar } from "./components/project_bar.js?v=20260802-02";
+import { initMemoryPanel } from "./components/memory.js?v=20260802-02";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260802-02";
+import { setProject, setProjectFileTree } from "./store.js?v=20260802-02";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -411,7 +411,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260802-01");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260802-02");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -554,7 +554,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260802-01");
+      const { openProject } = await import("./services/project.js?v=20260802-02");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }
