@@ -24,5 +24,5 @@ if %errorlevel% neq 0 (
   exit /b 1
 )
 
-echo [SLATE] Done: installer\SLATE-Setup-0.1.0.exe
+echo [SLATE] Done: installer\SLATE-Setup-20260803-1.exe
 pause

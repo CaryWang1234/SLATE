@@ -298,6 +298,15 @@ textarea:focus-visible {
   opacity: 0.85;
 }
 
+.send-btn.is-stopping {
+  background: #9f3a38;
+  color: #fff;
+}
+
+.send-btn.is-stopping:hover {
+  opacity: 0.92;
+}
+
 .send-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;

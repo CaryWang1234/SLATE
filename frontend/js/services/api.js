@@ -2,7 +2,7 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260802-02";
+import { API_BASE } from "../store.js?v=20260803-1";
 
 /**
  * 通用 JSON 请求
@@ -54,10 +54,12 @@ function patch(path, body) {
  */
 async function* streamChat(payload) {
   const url = `${API_BASE}/proxy/chat`;
+  const { signal, ...body } = payload || {};
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...payload, stream: true }),
+    body: JSON.stringify({ ...body, stream: true }),
+    signal,
   });
 
   if (!resp.ok) {

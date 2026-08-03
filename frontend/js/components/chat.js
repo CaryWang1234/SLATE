@@ -2,17 +2,20 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext } from "../store.js?v=20260802-02";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260802-02";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260802-02";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260802-02";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260802-02";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext } from "../store.js?v=20260803-1";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260803-1";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260803-1";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260803-1";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260803-1";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
 let btnBrainstorm, btnCompress, btnMemory, btnSnippets, btnDoCompress, compressModal;
 let pendingFiles = []; // { name, size, content, type }
 let brainstormMode = false;
+let isGenerating = false;
+let activeGenerationController = null;
+let inputQueue = [];
 
 // ── 用量同步到后端 ──────────────────────────
 
@@ -315,6 +318,43 @@ function findModelById(modelId) {
   return getAllModels().find(m => m.id === modelId) || null;
 }
 
+function isAbortError(err) {
+  return err?.name === "AbortError" || /abort/i.test(String(err?.message || ""));
+}
+
+function updateSendState() {
+  if (!btnSend) return;
+  btnSend.disabled = false;
+  btnSend.textContent = isGenerating ? "停止" : (inputQueue.length ? `发送(${inputQueue.length})` : "发送");
+  btnSend.classList.toggle("is-stopping", isGenerating);
+  if (chatInput) {
+    const queueHint = inputQueue.length ? ` · 队列 ${inputQueue.length}` : "";
+    chatInput.placeholder = isGenerating
+      ? `继续输入可加入队列，点击停止中断输出${queueHint}`
+      : (brainstormMode
+        ? "灵感发散模式：输入想法、问题、素材或方向…"
+        : "输入想法、问题、素材或方向… (Enter 发送, Shift+Enter 换行)");
+  }
+}
+
+function captureCurrentInputForQueue() {
+  const text = chatInput?.value.trim() || "";
+  if (!text && pendingFiles.length === 0) return false;
+  inputQueue.push({ text, files: [...pendingFiles] });
+  chatInput.value = "";
+  chatInput.style.height = "auto";
+  pendingFiles = [];
+  renderFilePreview();
+  updateSendState();
+  return true;
+}
+
+function stopGeneration() {
+  if (!isGenerating) return;
+  activeGenerationController?.abort();
+  updateSendState();
+}
+
 async function refreshKnowledgeContext(query) {
   if (state.knowledgeSettings?.enabled === false) {
     setKnowledgeContext([]);
@@ -348,6 +388,21 @@ function isShortReviewCandidate(content) {
   return clean.length > 0 && clean.length <= minChars;
 }
 
+function looksLikeContinuationStall(content) {
+  if (!isShortReviewCandidate(content)) return false;
+  const text = String(content || "").replace(/```[\s\S]*?```/g, " ").trim();
+  if (/(需要我|要我|是否需要|要不要|你需要|如果你需要|吗[？?]?|呢[？?]?)/.test(text)) return false;
+  return /(我(?:来|会|先|再)?(?:整理|分析|构思|展开|推演|发散|梳理|想想)|接下来|下面|继续|开始)/.test(text);
+}
+
+function getLastVisibleUserContent() {
+  for (let i = state.messages.length - 1; i >= 0; i--) {
+    const msg = state.messages[i];
+    if (msg?.role === "user" && !isHiddenContextMessage(msg)) return msg.content || "";
+  }
+  return "";
+}
+
 function buildAutoReviewMessages(lastContent, mainModelId) {
   const history = state.messages
     .slice(0, -1)
@@ -379,8 +434,9 @@ function buildAutoReviewMessages(lastContent, mainModelId) {
   return messages;
 }
 
-async function reviewShortReplyForToolCalls(lastContent, modelId, apiKey, baseUrl) {
+async function reviewShortReplyForToolCalls(lastContent, modelId, apiKey, baseUrl, signal = null) {
   if (!isShortReviewCandidate(lastContent)) return [];
+  if (signal?.aborted) return [];
   const reviewerId = state.autoReview?.modelId || modelId;
   const reviewerModel = findModelById(reviewerId) || state.currentModel || { id: modelId, base_url: baseUrl };
   const reviewerKey = getModelKey(reviewerModel.id) || (reviewerModel.id === modelId ? apiKey : "");
@@ -396,10 +452,12 @@ async function reviewShortReplyForToolCalls(lastContent, modelId, apiKey, baseUr
       temperature: 0.1,
       max_tokens: 900,
       stream: true,
+      signal,
     })) {
       reviewText += chunk;
     }
   } catch (e) {
+    if (isAbortError(e)) return [];
     console.warn("自动审阅失败:", e);
     return [];
   }
@@ -450,15 +508,23 @@ async function autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params) {
   return msgEl;
 }
 
-async function autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl) {
+async function autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl, signal = null) {
   const lastMsg = state.messages[state.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return msgEl;
+  if (signal?.aborted) return msgEl;
   if (lastMsg.autoReviewed) return msgEl;
   if (!isShortReviewCandidate(lastMsg.content)) return msgEl;
 
   lastMsg.autoReviewed = true;
-  const calls = await reviewShortReplyForToolCalls(lastMsg.content, modelId, apiKey, baseUrl);
-  if (calls.length > 0) appendSyntheticToolCalls(msgEl, calls);
+  const calls = await reviewShortReplyForToolCalls(lastMsg.content, modelId, apiKey, baseUrl, signal);
+  if (calls.length > 0) {
+    appendSyntheticToolCalls(msgEl, calls);
+  } else if (looksLikeContinuationStall(lastMsg.content)) {
+    appendSyntheticToolCalls(msgEl, [{
+      name: "knowledge_search",
+      params: { query: `${getLastVisibleUserContent()}\n${lastMsg.content}`.trim(), limit: 3 },
+    }]);
+  }
   return msgEl;
 }
 
@@ -732,9 +798,10 @@ function renderFileCreateDiff(data) {
   return wrap;
 }
 
-async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperature: 0.7, max_tokens: 4096 }) {
+async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperature: 0.7, max_tokens: 4096 }, signal = null) {
   const MAX_ROUNDS = 5;
   for (let round = 0; round < MAX_ROUNDS; round++) {
+    if (signal?.aborted) break;
     const lastMsg = state.messages[state.messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") break;
 
@@ -754,6 +821,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
 
     // 执行工具
     const results = await executeToolCalls(calls);
+    if (signal?.aborted) break;
 
     // 渲染工具卡片
     lastMsg.toolResults = [
@@ -792,19 +860,22 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
 
     // 流式续写
     await refreshKnowledgeContext(state.messages.slice(-6).map(m => m.content || "").join("\n"));
+    if (signal?.aborted) break;
     const history = state.messages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
     history._modelId = modelId;
     const messages = buildMessages(history, state.constitution);
 
     let followContent2 = "";
     try {
-      for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: 0.7, max_tokens: 4096, stream: true })) {
+      for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: 0.7, max_tokens: 4096, stream: true, signal })) {
         followContent2 += chunk;
         renderAssistantContent(followContent, followContent2, cursor);
         chatScroll.scrollTop = chatScroll.scrollHeight;
       }
     } catch (err) {
-      followContent2 = `⚠ 续写失败: ${err.message}`;
+      followContent2 = isAbortError(err)
+        ? (followContent2 ? `${followContent2}\n\n[已停止]` : "已停止")
+        : `⚠ 续写失败: ${err.message}`;
     }
 
     removeStreamingCursor(cursor);
@@ -817,34 +888,55 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
       if (saved.code === 0 && saved.data?.id) followUp.id = saved.data.id;
     }
 
+    if (signal?.aborted) break;
     msgEl = await autoAdvanceIfStalled(followEl, modelId, apiKey, baseUrl, params);
-    msgEl = await autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl);
+    msgEl = await autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl, signal);
   }
 }
 
 // ── 发送消息 ────────────────────────────────
 
-async function sendMessage() {
-  const text = chatInput.value.trim();
-  if (!text && pendingFiles.length === 0) return;
+async function sendMessage(queuedPayload = null) {
+  if (isGenerating) {
+    if (queuedPayload) inputQueue.push(queuedPayload);
+    else if (captureCurrentInputForQueue()) {
+      const { toast } = await import("../app.js?v=20260803-1");
+      toast(`已加入输入队列（${inputQueue.length}）`);
+    }
+    updateSendState();
+    return;
+  }
 
+  const text = queuedPayload?.text ?? chatInput.value.trim();
+  const filesForMessage = queuedPayload?.files ?? [...pendingFiles];
+  if (!text && filesForMessage.length === 0) return;
+
+  isGenerating = true;
+  activeGenerationController = new AbortController();
+  const signal = activeGenerationController.signal;
+  updateSendState();
+
+  try {
   if (!state.currentConversationId) {
-    const res = await post("/chat/conversations", { title: (text || pendingFiles[0]?.name || "新对话").slice(0, 30) });
+    const res = await post("/chat/conversations", { title: (text || filesForMessage[0]?.name || "新对话").slice(0, 30) });
     if (res.code === 0) {
       state.currentConversationId = res.data.id;
       await refreshConversationList();
     }
   }
 
-  chatInput.value = "";
-  chatInput.style.height = "auto";
-  btnSend.disabled = true;
+  if (!queuedPayload) {
+    chatInput.value = "";
+    chatInput.style.height = "auto";
+    pendingFiles = [];
+    renderFilePreview();
+  }
 
   // 收集文件内容
   const fileMeta = [];
   let fileContext = "";
-  if (pendingFiles.length > 0) {
-    for (const f of pendingFiles) {
+  if (filesForMessage.length > 0) {
+    for (const f of filesForMessage) {
       fileMeta.push({ name: f.name, type: f.type, thumbnail: f.type === "image" ? f.content : null });
       if (f.type === "image") {
         fileContext += `\n[图片: ${f.name}]`;
@@ -895,14 +987,16 @@ async function sendMessage() {
 
   let fullContent = "";
   try {
-    for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, stream: true })) {
+    for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, stream: true, signal })) {
       fullContent += chunk;
       const contentEl = msgEl.querySelector(".msg-content");
       renderAssistantContent(contentEl, fullContent, cursor);
       chatScroll.scrollTop = chatScroll.scrollHeight;
     }
   } catch (err) {
-    fullContent = `⚠ 请求失败: ${err.message}`;
+    fullContent = isAbortError(err)
+      ? (fullContent ? `${fullContent}\n\n[已停止]` : "已停止")
+      : `⚠ 请求失败: ${err.message}`;
   }
 
   removeStreamingCursor(cursor);
@@ -924,22 +1018,35 @@ async function sendMessage() {
     if (saved.code === 0 && saved.data?.id) assistantMsg.id = saved.data.id;
   }
 
-  msgEl = await autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params);
-  msgEl = await autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl);
+  if (!signal.aborted) {
+    msgEl = await autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params);
+    msgEl = await autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl, signal);
+  }
 
   // 工具调用循环（最多 5 轮）
-  await runToolLoop(msgEl, modelId, apiKey, baseUrl, params);
+  if (!signal.aborted) await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal);
 
   // 后台检查上下文压缩
-  checkAndCompress(modelId, apiKey, baseUrl);
-  autoRefineMemoryAndProfile({ silent: true });
+  if (!signal.aborted) {
+    checkAndCompress(modelId, apiKey, baseUrl);
+    autoRefineMemoryAndProfile({ silent: true });
+  }
 
-  // 清除已发送的文件附件
-  pendingFiles = [];
-  renderFilePreview();
-
-  btnSend.disabled = false;
+  } catch (err) {
+    console.error("发送失败:", err);
+    const { toast } = await import("../app.js?v=20260803-1");
+    toast(isAbortError(err) ? "已停止输出" : `发送失败: ${err.message}`);
+  } finally {
+  isGenerating = false;
+  activeGenerationController = null;
+  updateSendState();
   chatInput.focus();
+  if (inputQueue.length > 0) {
+    const next = inputQueue.shift();
+    updateSendState();
+    setTimeout(() => sendMessage(next), 0);
+  }
+  }
 }
 
 // ── 上下文压缩 ──────────────────────────────
@@ -971,7 +1078,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260802-02");
+    const { toast } = await import("../app.js?v=20260803-1");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -982,15 +1089,13 @@ function toggleBrainstormMode() {
   brainstormMode = !brainstormMode;
   state.brainstormMode = brainstormMode;
   btnBrainstorm?.classList.toggle("active", brainstormMode);
-  chatInput.placeholder = brainstormMode
-    ? "头脑风暴模式：先发散想法，再收束结论…"
-    : "输入消息… (Enter 发送, Shift+Enter 换行)";
+  updateSendState();
 }
 
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260802-02").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260803-1").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -1014,7 +1119,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260802-02");
+    const { toast } = await import("../app.js?v=20260803-1");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -1047,7 +1152,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260802-02");
+    const { toast } = await import("../app.js?v=20260803-1");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -1215,7 +1320,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260802-02");
+      const { toast } = await import("../app.js?v=20260803-1");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }
@@ -1264,7 +1369,10 @@ function initChat() {
   btnDoCompress = document.getElementById("btn-do-compress");
   compressModal = document.getElementById("compress-modal");
 
-  btnSend.addEventListener("click", sendMessage);
+  btnSend.addEventListener("click", () => {
+    if (isGenerating) stopGeneration();
+    else sendMessage();
+  });
   btnBrainstorm?.addEventListener("click", toggleBrainstormMode);
   btnCompress?.addEventListener("click", openCompressModal);
   btnMemory?.addEventListener("click", openMemoryModal);
@@ -1334,6 +1442,7 @@ function initChat() {
 
   refreshConversationList();
   renderUsageBar();
+  updateSendState();
 }
 
 export { initChat, sendMessage, renderMarkdown };

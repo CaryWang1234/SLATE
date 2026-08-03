@@ -13,7 +13,7 @@ from backend.routers import chat, constitution, files, knowledge, proxy, project
 
 PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 
-app = FastAPI(title="SLATE", version="0.1.0")
+app = FastAPI(title="SLATE", version="20260803-1")
 
 # CORS：开发阶段允许全部来源
 app.add_middleware(
