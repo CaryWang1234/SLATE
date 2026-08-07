@@ -32,6 +32,9 @@ const state = {
   // 每个对话的用量统计（convId → usage）
   conversationUsage: {},
 
+  // 每个对话的 TODOLIST（convId → items），Harness 六阶段闭环的任务清单
+  conversationTodos: {},
+
   // 模型列表
   modelRegistry: {},
 
@@ -115,6 +118,7 @@ function buildPersistentData() {
     promptSnippets: state.promptSnippets,
     lastProjectPath: state.project?.path || null,
     conversationUsage: state.conversationUsage,
+    conversationTodos: state.conversationTodos,
     autoReview: state.autoReview,
     outputSettings: state.outputSettings,
     harness: state.harness,
@@ -168,6 +172,7 @@ function loadPersistent() {
     state._pendingModelId = data.currentModelId;
     state._lastProjectPath = data.lastProjectPath || null;
     state.conversationUsage = data.conversationUsage || {};
+    state.conversationTodos = data.conversationTodos || {};
     state.autoReview = {
       ...state.autoReview,
       ...(data.autoReview || {}),
@@ -319,6 +324,21 @@ function restoreUsageForConversation(convId) {
 
 function setConversationUsage(convId, usage) {
   state.conversationUsage[convId] = { ...usage };
+}
+
+// ── TODOLIST（按对话隔离，Harness 任务清单） ────────
+
+function getConversationTodos(convId) {
+  return state.conversationTodos[convId || "_scratch"] || [];
+}
+
+function setConversationTodos(convId, items) {
+  const key = convId || "_scratch";
+  const clean = Array.isArray(items) ? items.filter(t => t && t.content) : [];
+  if (!clean.length) delete state.conversationTodos[key];
+  else state.conversationTodos[key] = clean;
+  savePersistent();
+  notify("todos", getConversationTodos(key));
 }
 
 function addUsage(usage) {
@@ -496,6 +516,7 @@ export {
   API_BASE, state, subscribe, notify,
   setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel,
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens, estimateContextTokens,
+  getConversationTodos, setConversationTodos,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage,
   setConversations, setBoardCards, addBoardCard,

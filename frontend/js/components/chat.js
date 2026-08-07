@@ -2,12 +2,12 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent } from "../store.js?v=20260807-10";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260807-10";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260807-10";
-import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail } from "../services/tools.js?v=20260807-10";
-import { renderMarkdown } from "../services/markdown.js?v=20260807-10";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260807-10";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos } from "../store.js?v=20260807-12";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260807-12";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260807-12";
+import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail } from "../services/tools.js?v=20260807-12";
+import { renderMarkdown } from "../services/markdown.js?v=20260807-12";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260807-12";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -34,18 +34,25 @@ function isNearBottom(threshold = 90) {
   return chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight < threshold;
 }
 
+// 统一的按钮显隐：仅当内容可滚动且不在底部附近时显示
+function updateScrollBtn() {
+  if (!btnScrollBottom || !chatScroll) return;
+  const scrollable = chatScroll.scrollHeight > chatScroll.clientHeight + 8;
+  btnScrollBottom.classList.toggle("hidden", !scrollable || isNearBottom());
+}
+
 function autoScroll(force = false) {
   if (!chatScroll) return;
   if (force || stickToBottom) chatScroll.scrollTop = chatScroll.scrollHeight;
-  btnScrollBottom?.classList.toggle("hidden", isNearBottom());
+  updateScrollBtn();
 }
 
-// ── Harness 自主执行 ───────────────────────────
-// 开启后：发送时注入自主执行指令，工具循环轮数上限提升到 maxRounds
+// ── Harness 自主执行（六阶段闭环：目标→计划→执行→验证→汇报→追溯） ──
+// 开启后：发送时注入六阶段指令，大任务强制建立 TODOLIST，工具循环轮数上限提升到 maxRounds
 let harnessStatusEl = null;
 let btnHarness = null;
 
-const HARNESS_PREFIX = "[Harness 自主执行模式]\n请自主完成以下任务，不要向我提问：\n① 自行拆解步骤并逐步执行；\n② 需要信息或操作时直接调用 MCP 工具；\n③ 每步完成后验证结果，失败则重试或换方案；\n④ 全部完成后输出完结报告（已完成 / 未完成及原因）。\n\n任务：";
+const HARNESS_PREFIX = "[Harness 自主执行模式 · 六阶段闭环]\n请自主完成以下任务，不要向我提问，严格按六阶段推进：\n① 目标：开篇用一句话明确本次任务的目标与验收标准；\n② 计划：面临大任务（多步骤 / 多文件 / 复杂修改）必须先调用 todo_manage(action=init) 建立 TODOLIST，拆解为可执行、可验证的步骤；简单任务可跳过；\n③ 执行：逐项推进，每完成一项立即调用 todo_manage(action=update) 标记 done；受阻项标记 blocked 并说明原因；需要信息或操作时直接调用 MCP 工具；\n④ 验证：每步完成后自行验证结果（重新读取文件 / 执行命令 / 核对输出），失败则修复后重新验证；\n⑤ 汇报：全部完成后输出完结报告，逐条核对 TODOLIST（done / blocked+原因），未全部了结不得宣称任务完成；\n⑥ 追溯：用 1-3 句总结本次任务的关键决策、踩坑与可复用经验。\n\n任务：";
 
 function setHarnessProgress(text) {
   if (!harnessStatusEl) return;
@@ -56,6 +63,66 @@ function setHarnessProgress(text) {
   }
   harnessStatusEl.textContent = "⚡ " + text;
   harnessStatusEl.classList.remove("hidden");
+}
+
+// ── TODOLIST 实时面板（输入区上方，按对话隔离） ─────────────
+let todoPanelEl = null;
+let todoPanelCollapsed = false;
+
+function renderTodoPanel() {
+  if (!todoPanelEl) return;
+  const items = getConversationTodos(state.currentConversationId);
+  if (!items.length) {
+    todoPanelEl.classList.add("hidden");
+    todoPanelEl.innerHTML = "";
+    return;
+  }
+  const done = items.filter(t => t.status === "done").length;
+  const blocked = items.filter(t => t.status === "blocked").length;
+  const inProgress = items.filter(t => t.status === "in_progress").length;
+  todoPanelEl.innerHTML = "";
+  todoPanelEl.classList.remove("hidden");
+
+  const header = document.createElement("div");
+  header.className = "todo-panel-header";
+  header.title = todoPanelCollapsed ? "展开任务清单" : "折叠任务清单";
+  const title = document.createElement("span");
+  title.className = "todo-panel-title";
+  title.textContent = `☰ 任务清单 ${done}/${items.length}` + (blocked ? ` · 受阻 ${blocked}` : "") + (inProgress ? ` · 进行中 ${inProgress}` : "");
+  const bar = document.createElement("span");
+  bar.className = "todo-progress";
+  const fill = document.createElement("span");
+  fill.className = "todo-progress-fill";
+  fill.style.width = Math.round((done / items.length) * 100) + "%";
+  bar.appendChild(fill);
+  const toggle = document.createElement("span");
+  toggle.className = "todo-toggle";
+  toggle.textContent = todoPanelCollapsed ? "▸" : "▾";
+  header.append(title, bar, toggle);
+  header.addEventListener("click", () => {
+    todoPanelCollapsed = !todoPanelCollapsed;
+    renderTodoPanel();
+  });
+  todoPanelEl.appendChild(header);
+  if (todoPanelCollapsed) return;
+
+  const body = document.createElement("div");
+  body.className = "todo-panel-body";
+  const icons = { done: "✔", in_progress: "▶", blocked: "✕", pending: "○" };
+  for (const t of items) {
+    const status = ["done", "in_progress", "blocked"].includes(t.status) ? t.status : "pending";
+    const row = document.createElement("div");
+    row.className = "todo-item todo-" + status;
+    const icon = document.createElement("span");
+    icon.className = "todo-icon";
+    icon.textContent = icons[status];
+    const text = document.createElement("span");
+    text.className = "todo-text";
+    text.textContent = t.content;
+    row.append(icon, text);
+    body.appendChild(row);
+  }
+  todoPanelEl.appendChild(body);
 }
 
 // ── @ 提及 MCP / Skill ──────────────────────
@@ -321,6 +388,7 @@ function renderAllMessages() {
   });
   stickToBottom = true;
   chatScroll.scrollTop = chatScroll.scrollHeight;
+  updateScrollBtn();
 }
 
 // ── 流式光标 ────────────────────────────────
@@ -1058,7 +1126,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     if (signal?.aborted || !stuck) break;
     const contPrompt = hasTruncatedTail(content) ? CONTINUE_PROMPT_TOOL : CONTINUE_PROMPT_TEXT;
     try {
-      const { toast } = await import("../app.js?v=20260807-10");
+      const { toast } = await import("../app.js?v=20260807-12");
       toast(`输出达到长度上限，自动续写中（${round}/${MAX_CONTINUE_ROUNDS}）…`);
     } catch {}
 
@@ -1091,15 +1159,42 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
 }
 
 async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperature: 0.7, max_tokens: getOutputMaxTokens() }, signal = null, maxRounds = 5) {
+  const harnessOn = state.harness?.enabled === true;
+  const MAX_TODO_NUDGES = 2; // TODOLIST 闭环催办上限，防止无限循环
+  let todoNudges = 0;
   for (let round = 0; round < maxRounds; round++) {
     if (signal?.aborted) break;
     const lastMsg = state.messages[state.messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") break;
 
     const calls = detectToolCalls(lastMsg.content);
-    if (calls.length === 0) break;
+    let nudged = false;
+    if (calls.length === 0) {
+      // Harness 闭环强制：模型想收尾但 TODOLIST 仍有未完成项 → 注入系统催办继续推进
+      if (harnessOn && todoNudges < MAX_TODO_NUDGES && round < maxRounds - 1) {
+        const pending = getConversationTodos(state.currentConversationId)
+          .filter(t => t.status !== "done" && t.status !== "blocked");
+        if (pending.length > 0) {
+          todoNudges++;
+          setHarnessProgress(`Harness 闭环校验 · 清单剩余 ${pending.length} 项，自动催办（${todoNudges}/${MAX_TODO_NUDGES}）`);
+          addMessage({
+            role: "user",
+            content: `[系统校验] 任务尚未完成，TODOLIST 仍有 ${pending.length} 项未了结：\n${pending.map(t => `- [${t.id}] ${t.content}`).join("\n")}\n请继续执行剩余事项（完成后调用 todo_manage 标记 done），全部了结后再输出汇报与追溯。`,
+            model: "[todo_enforce]",
+            hidden: true,
+          });
+          nudged = true;
+        }
+      }
+      if (!nudged) break;
+    }
 
-    if (maxRounds > 5) setHarnessProgress(`Harness 自主执行 · 第 ${round + 1}/${maxRounds} 轮`);
+    if (harnessOn) {
+      const todos = getConversationTodos(state.currentConversationId);
+      const doneCount = todos.filter(t => t.status === "done").length;
+      const todoText = todos.length ? ` · 清单 ${doneCount}/${todos.length}` : "";
+      setHarnessProgress(`Harness 自主执行 · 第 ${round + 1}/${maxRounds} 轮${todoText}`);
+    }
 
     // 更新最后一条 assistant 消息（去掉工具标记）
     const cleanContent = stripToolCalls(lastMsg.content);
@@ -1112,33 +1207,35 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
       contentEl.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
     }
 
-    // 执行工具
-    markActivity();
-    const results = await executeToolCalls(calls);
-    markActivity();
-    if (signal?.aborted) break;
+    if (!nudged) {
+      // 执行工具
+      markActivity();
+      const results = await executeToolCalls(calls);
+      markActivity();
+      if (signal?.aborted) break;
 
-    // 渲染工具卡片
-    lastMsg.toolResults = [
-      ...(lastMsg.toolResults || []),
-      ...results.map((result, i) => ({ call: calls[i], result })),
-    ];
-    setMessages([...state.messages]);
-    if (lastMsg.id) {
-      try {
-        await patch(`/chat/messages/${lastMsg.id}`, {
-          content: lastMsg.content,
-          metadata: { toolResults: lastMsg.toolResults },
-        });
-      } catch (e) {
-        console.warn("工具结果保存失败:", e);
+      // 渲染工具卡片
+      lastMsg.toolResults = [
+        ...(lastMsg.toolResults || []),
+        ...results.map((result, i) => ({ call: calls[i], result })),
+      ];
+      setMessages([...state.messages]);
+      if (lastMsg.id) {
+        try {
+          await patch(`/chat/messages/${lastMsg.id}`, {
+            content: lastMsg.content,
+            metadata: { toolResults: lastMsg.toolResults },
+          });
+        } catch (e) {
+          console.warn("工具结果保存失败:", e);
+        }
       }
-    }
-    autoScroll();
+      autoScroll();
 
-    // Keep tool results in model context without rendering them as chat bubbles.
-    const toolResultText = results.map((r, i) => formatToolResultForModel(calls[i], r)).join("\n\n");
-    addMessage({ role: "user", content: toolResultText, model: "[tool_results]", hidden: true });
+      // Keep tool results in model context without rendering them as chat bubbles.
+      const toolResultText = results.map((r, i) => formatToolResultForModel(calls[i], r)).join("\n\n");
+      addMessage({ role: "user", content: toolResultText, model: "[tool_results]", hidden: true });
+    }
 
     // 创建新的 assistant 消息
     const followUp = { role: "assistant", content: "", model: state.currentModel?.name || "" };
@@ -1201,7 +1298,7 @@ async function sendMessage(queuedPayload = null) {
   if (isGenerating) {
     if (queuedPayload) inputQueue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260807-10");
+      const { toast } = await import("../app.js?v=20260807-12");
       toast(`已加入输入队列（${inputQueue.length}）`);
     }
     updateSendState();
@@ -1225,6 +1322,13 @@ async function sendMessage(queuedPayload = null) {
       state.currentConversationId = res.data.id;
       await refreshConversationList();
     }
+  }
+
+  // TODOLIST：若对话建立前产生了临时清单（_scratch），迁移到正式对话
+  const scratchTodos = getConversationTodos(null);
+  if (state.currentConversationId && scratchTodos.length) {
+    setConversationTodos(state.currentConversationId, [...getConversationTodos(state.currentConversationId), ...scratchTodos]);
+    setConversationTodos(null, []);
   }
 
   if (!queuedPayload) {
@@ -1350,7 +1454,7 @@ async function sendMessage(queuedPayload = null) {
 
   } catch (err) {
     console.error("发送失败:", err);
-    const { toast } = await import("../app.js?v=20260807-10");
+    const { toast } = await import("../app.js?v=20260807-12");
     toast(isAbortError(err) ? "已停止输出" : `发送失败: ${err.message}`);
   } finally {
   isGenerating = false;
@@ -1394,7 +1498,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260807-10");
+    const { toast } = await import("../app.js?v=20260807-12");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -1411,7 +1515,7 @@ function toggleBrainstormMode() {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260807-10").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260807-12").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -1435,7 +1539,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260807-10");
+    const { toast } = await import("../app.js?v=20260807-12");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -1468,7 +1572,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260807-10");
+    const { toast } = await import("../app.js?v=20260807-12");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -1558,6 +1662,7 @@ async function switchConversation(convId) {
   }
 
   renderConvList(state.conversations);
+  renderTodoPanel();
 }
 
 // ── 用量显示 ────────────────────────────────
@@ -1636,7 +1741,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260807-10");
+      const { toast } = await import("../app.js?v=20260807-12");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }
@@ -1675,7 +1780,7 @@ async function handleFiles(fileList) {
  */
 async function regenerateMessage(msg, msgEl) {
   if (isGenerating) {
-    const { toast } = await import("../app.js?v=20260807-10");
+    const { toast } = await import("../app.js?v=20260807-12");
     toast("正在生成中，请稍候");
     return;
   }
@@ -1683,7 +1788,7 @@ async function regenerateMessage(msg, msgEl) {
   if (idx < 0) return;
   const after = state.messages.slice(idx + 1).filter(m => !m.hidden && m.role !== "system");
   if (after.length > 0) {
-    const { toast } = await import("../app.js?v=20260807-10");
+    const { toast } = await import("../app.js?v=20260807-12");
     toast("只能重新生成最后一条助手回复");
     return;
   }
@@ -1691,7 +1796,7 @@ async function regenerateMessage(msg, msgEl) {
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    const { toast } = await import("../app.js?v=20260807-10");
+    const { toast } = await import("../app.js?v=20260807-12");
     toast("请先在设置中配置该模型的 API Key");
     return;
   }
@@ -1701,7 +1806,7 @@ async function regenerateMessage(msg, msgEl) {
     .filter(m => !m.hidden && m.role !== "system")
     .map(m => ({ role: m.role, content: m.content }));
   if (!history.some(m => m.role === "user")) {
-    const { toast } = await import("../app.js?v=20260807-10");
+    const { toast } = await import("../app.js?v=20260807-12");
     toast("没有可重新生成的上下文");
     return;
   }
@@ -1798,7 +1903,7 @@ function initChat() {
     markActivity(); // 防止重复触发
     try { activeGenerationController?.abort(); } catch {}
     try {
-      const { toast } = await import("../app.js?v=20260807-10");
+      const { toast } = await import("../app.js?v=20260807-12");
       toast("连接长时间无响应，已自动中断，可重试");
     } catch {}
   }, 15000);
@@ -1809,13 +1914,15 @@ function initChat() {
   btnScrollBottom.textContent = "↓ 回到底部";
   btnScrollBottom.addEventListener("click", () => {
     stickToBottom = true;
+    btnScrollBottom.classList.add("hidden"); // 点击后立即隐藏，不等平滑滚动结束
     chatScroll.scrollTo({ top: chatScroll.scrollHeight, behavior: "smooth" });
   });
-  document.getElementById("chat-input-area")?.appendChild(btnScrollBottom);
+  (document.querySelector(".chat-scroll-wrap") || document.getElementById("chat-input-area"))?.appendChild(btnScrollBottom);
   chatScroll.addEventListener("scroll", () => {
     stickToBottom = isNearBottom();
-    btnScrollBottom?.classList.toggle("hidden", stickToBottom);
+    updateScrollBtn();
   });
+  window.addEventListener("resize", updateScrollBtn);
 
   btnSend.addEventListener("click", () => {
     if (isGenerating) stopGeneration();
@@ -1831,12 +1938,15 @@ function initChat() {
     state.harness.enabled = !state.harness.enabled;
     btnHarness.classList.toggle("active", state.harness.enabled);
     savePersistent();
-    const { toast } = await import("../app.js?v=20260807-10");
-    toast(state.harness.enabled ? "Harness 已开启：模型将自主多轮执行直至任务完成" : "Harness 已关闭");
+    const { toast } = await import("../app.js?v=20260807-12");
+    toast(state.harness.enabled ? "Harness 已开启：目标→计划→执行→验证→汇报→追溯 六阶段自主闭环，大任务自动建立 TODOLIST" : "Harness 已关闭");
   });
   harnessStatusEl = document.createElement("div");
   harnessStatusEl.className = "harness-status hidden";
   document.getElementById("chat-input-area")?.insertAdjacentElement("beforebegin", harnessStatusEl);
+  todoPanelEl = document.createElement("div");
+  todoPanelEl.className = "todo-panel hidden";
+  document.getElementById("chat-input-area")?.insertAdjacentElement("beforebegin", todoPanelEl);
   btnCompress?.addEventListener("click", openCompressModal);
   btnMemory?.addEventListener("click", openMemoryModal);
   btnSnippets?.addEventListener("click", openSnippetModal);
@@ -1918,15 +2028,18 @@ function initChat() {
     setMessages([]);
     resetUsage();
     renderConvList(state.conversations);
+    renderTodoPanel();
   });
 
   subscribe("messages", renderAllMessages);
   subscribe("conversations", (convs) => renderConvList(convs));
   subscribe("usage", renderUsageBar);
   subscribe("model", renderUsageBar);
+  subscribe("todos", renderTodoPanel);
 
   refreshConversationList();
   renderUsageBar();
+  renderTodoPanel();
   updateSendState();
 }
 

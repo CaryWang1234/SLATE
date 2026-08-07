@@ -366,6 +366,15 @@ textarea:focus-visible {
   gap: 10px;
 }
 
+/* 消息滚动区包裹层：“回到底部”按钮的定位参照 */
+.chat-scroll-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .chat-scroll:empty::before {
   content: "开始一段对话，或先从左侧打开项目补充上下文。";
   margin: auto;
@@ -813,12 +822,12 @@ textarea::-webkit-scrollbar-thumb {
   border-color: var(--border-hover);
 }
 
-/* ── 回到底部按钮 ─────────────────── */
+/* ── 回到底部按钮：悬浮在消息区右下角，不遮挡输入区/进度条 ── */
 
 .btn-scroll-bottom {
   position: absolute;
-  bottom: calc(100% + 10px);
-  right: 18px;
+  bottom: 14px;
+  right: 20px;
   z-index: 45;
   padding: 4px 12px;
   font-size: 12px;
@@ -3425,6 +3434,115 @@ body.resizing {
   background: var(--bg-alt);
   border: 1px dashed var(--gold);
   border-radius: var(--radius);
+}
+
+/* ── TODOLIST 任务清单面板（Harness 六阶段闭环） ─── */
+
+.todo-panel {
+  margin: 0 16px 6px;
+  font-size: 12px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.todo-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.todo-panel-header:hover {
+  background: var(--gold-dim);
+}
+
+.todo-panel-title {
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.todo-progress {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.todo-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.todo-toggle {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.todo-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 12px 8px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+
+.todo-icon {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.todo-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.todo-done {
+  color: var(--text-muted);
+}
+
+.todo-done .todo-icon {
+  color: var(--gold);
+}
+
+.todo-done .todo-text {
+  text-decoration: line-through;
+}
+
+.todo-in_progress {
+  color: var(--text);
+}
+
+.todo-in_progress .todo-icon {
+  color: var(--gold);
+}
+
+.todo-blocked {
+  color: var(--text-muted);
+}
+
+.todo-blocked .todo-icon {
+  color: #c0392b;
 }
 
 /* ── 定时任务 ─────────────────────── */

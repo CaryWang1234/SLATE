@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260807-10";
-import { post } from "../services/api.js?v=20260807-10";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260807-12";
+import { post } from "../services/api.js?v=20260807-12";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -461,6 +461,62 @@ const TOOLS = {
         `上下文限制: ${state.currentModel?.context_window || "未知"}`,
         `黑板卡片: ${state.boardCards.length}`,
       ].join("\n");
+    },
+  },
+
+  todo_manage: {
+    name: "任务清单",
+    description: "为当前任务创建并推进 TODOLIST。面临大任务（多步骤、多文件、复杂修改）时必须先 action=init 拆解计划；执行中每完成一项立即 action=update 标记 done，受阻标记 blocked。任务结束前所有项必须为 done 或 blocked。status 取值: pending/in_progress/done/blocked",
+    params: {
+      action: { type: "string", description: "init(创建或整体替换清单) / add(追加事项) / update(更新状态或描述) / remove(删除事项) / clear(清空)", required: true },
+      items: { type: "array", description: 'init/add: [{"content":"事项描述"}]；update: [{"id":"t1","status":"done"}]（可带 content 改描述）；remove: [{"id":"t1"}]' },
+    },
+    async execute({ action, items }) {
+      const convId = state.currentConversationId;
+      let list = getConversationTodos(convId).map(t => ({ ...t }));
+      const input = Array.isArray(items) ? items : [];
+      const VALID_STATUS = ["pending", "in_progress", "done", "blocked"];
+
+      if (action === "init") {
+        const contents = input.filter(i => i && i.content).map(i => String(i.content));
+        if (!contents.length) return "缺少 items：init 需要 [{\"content\": \"事项描述\"}] 形式的列表";
+        list = contents.map((c, i) => ({ id: "t" + (i + 1), content: c, status: "pending" }));
+      } else if (action === "add") {
+        const contents = input.filter(i => i && i.content).map(i => String(i.content));
+        if (!contents.length) return "缺少 items：add 需要 [{\"content\": \"事项描述\"}]";
+        let seq = list.reduce((m, t) => Math.max(m, parseInt(String(t.id || "").slice(1), 10) || 0), 0);
+        for (const c of contents) list.push({ id: "t" + (++seq), content: c, status: "pending" });
+      } else if (action === "update") {
+        if (!input.length) return "缺少 items：update 需要 [{\"id\": \"t1\", \"status\": \"done\"}]";
+        let changed = 0;
+        for (const patch of input) {
+          if (!patch?.id) continue;
+          const target = list.find(t => t.id === String(patch.id));
+          if (!target) continue;
+          if (patch.status && VALID_STATUS.includes(patch.status)) target.status = patch.status;
+          if (patch.content) target.content = String(patch.content);
+          changed++;
+        }
+        if (!changed) return `未找到可更新的事项（现有 ID: ${list.map(t => t.id).join(", ") || "无"}）`;
+      } else if (action === "remove") {
+        const ids = input.map(i => String(i?.id || "")).filter(Boolean);
+        if (!ids.length) return "缺少 items：remove 需要 [{\"id\": \"t1\"}]";
+        list = list.filter(t => !ids.includes(t.id));
+      } else if (action === "clear") {
+        list = [];
+      } else {
+        return `未知 action: ${action}（可用 init/add/update/remove/clear）`;
+      }
+
+      setConversationTodos(convId, list);
+      if (!list.length) return "TODOLIST 已清空";
+      const icons = { done: "✔", in_progress: "▶", blocked: "✕", pending: "○" };
+      const done = list.filter(t => t.status === "done").length;
+      const lines = list.map(t => `${icons[t.status] || "○"} [${t.id}] ${t.content}`);
+      return `TODOLIST 已更新（${done}/${list.length} 完成）：\n${lines.join("\n")}` +
+        (done === list.length
+          ? "\n全部完成，进入验证与汇报阶段。"
+          : "\n请继续推进未完成事项，每完成一项立即调用 todo_manage 更新状态。");
     },
   },
 };
