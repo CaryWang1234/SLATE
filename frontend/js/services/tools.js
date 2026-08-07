@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260807-3";
-import { post } from "../services/api.js?v=20260807-3";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260807-10";
+import { post } from "../services/api.js?v=20260807-10";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -142,7 +142,7 @@ const TOOLS = {
 
   skill_run: {
     name: "执行 MCP 工具",
-    description: "调用 MCP 内置工具。可用：file_tree(目录树), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描)。也可传入 SKILL.md 技能名读取其定义内容。",
+    description: "调用 MCP 内置工具。可用：file_tree(目录树), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，mode=fetch时query为URL)。也可传入 SKILL.md 技能名读取其定义内容。",
     params: {
       skill: { type: "string", description: "MCP 工具或技能名称", required: true },
       params: { type: "object", description: "工具参数" },
@@ -602,6 +602,13 @@ function detectToolCalls(text) {
   return calls;
 }
 
+// 末尾是否存在被截断的工具调用块（缺少闭合标记 ◈◆◆，通常是输出达到 max_tokens 上限）
+function hasTruncatedTail(text) {
+  if (!text) return false;
+  const calls = detectToolCalls(text);
+  return calls.length > 0 && calls[calls.length - 1].params._truncated === true;
+}
+
 function stripToolCalls(text) {
   const stripped = text.replace(TOOL_RE, "");
   // 同时移除末尾未闭合的截断工具块，避免残缺 JSON 残留在消息正文
@@ -736,7 +743,7 @@ function _example(params) {
 }
 
 export {
-  TOOLS, detectToolCalls, stripToolCalls,
+  TOOLS, detectToolCalls, stripToolCalls, hasTruncatedTail,
   executeTool, executeToolCalls,
   getToolsSystemPrompt,
 };

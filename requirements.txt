@@ -5,6 +5,7 @@ httpx
 python-multipart
 aiofiles
 aiosqlite
+ddgs
 
 # Desktop wrapper
 pywebview

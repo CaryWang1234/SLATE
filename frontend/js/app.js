@@ -2,17 +2,18 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260807-3";
-import { get, put } from "./services/api.js?v=20260807-3";
-import { initChat } from "./components/chat.js?v=20260807-3";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260807-3";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260807-3";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260807-3";
-import { initTeamPanel } from "./components/team.js?v=20260807-3";
-import { initProjectBar } from "./components/project_bar.js?v=20260807-3";
-import { initMemoryPanel } from "./components/memory.js?v=20260807-3";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260807-3";
-import { setProject, setProjectFileTree } from "./store.js?v=20260807-3";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260807-10";
+import { get, put } from "./services/api.js?v=20260807-10";
+import { initChat } from "./components/chat.js?v=20260807-10";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260807-10";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260807-10";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260807-10";
+import { initTeamPanel } from "./components/team.js?v=20260807-10";
+import { initProjectBar } from "./components/project_bar.js?v=20260807-10";
+import { initMemoryPanel } from "./components/memory.js?v=20260807-10";
+import { initSchedule } from "./components/schedule.js?v=20260807-10";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260807-10";
+import { setProject, setProjectFileTree } from "./store.js?v=20260807-10";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -370,6 +371,8 @@ let settingsModal;
 function openSettings(options = {}) {
   settingsModal = document.getElementById("panel-settings");
   document.getElementById("setting-max-tokens").value = 64000;
+  document.getElementById("setting-output-max-tokens").value = state.outputSettings?.maxTokens || 16384;
+  document.getElementById("setting-output-unlimited").checked = state.outputSettings?.unlimitedFileOutput !== false;
   document.getElementById("setting-auto-review-enabled").checked = state.autoReview?.enabled !== false;
   document.getElementById("setting-auto-review-min-chars").value = state.autoReview?.minChars || 120;
   populateAutoReviewModelSelect();
@@ -400,6 +403,10 @@ function closeSettings() { switchPanel("chat"); }
 async function saveSettings() {
   const maxTokens = parseInt(document.getElementById("setting-max-tokens").value) || 64000;
   state.maxTokens = maxTokens;
+  state.outputSettings = {
+    maxTokens: Math.max(1024, Math.min(65536, parseInt(document.getElementById("setting-output-max-tokens").value) || 16384)),
+    unlimitedFileOutput: document.getElementById("setting-output-unlimited").checked,
+  };
   state.autoReview = {
     enabled: document.getElementById("setting-auto-review-enabled").checked,
     modelId: document.getElementById("setting-auto-review-model").value || "",
@@ -411,7 +418,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260807-3");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260807-10");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -521,6 +528,7 @@ async function init() {
   safeInit("AI 团队", initTeamPanel);
   safeInit("项目栏", initProjectBar);
   safeInit("记忆面板", initMemoryPanel);
+  safeInit("定时任务", initSchedule);
   safeInit("快捷键", initKeyboardShortcuts);
   safeInit("文本复制", initSelectionCopySupport);
 
@@ -554,7 +562,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260807-3");
+      const { openProject } = await import("./services/project.js?v=20260807-10");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

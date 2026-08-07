@@ -69,6 +69,18 @@ const state = {
     minChars: 120,
   },
 
+  // 输出控制：单次输出上限与“输出文件不限量”开关
+  outputSettings: {
+    maxTokens: 16384,
+    unlimitedFileOutput: true,
+  },
+
+  // Harness 自主执行：模型自主多轮调用工具直至任务完成
+  harness: {
+    enabled: false,
+    maxRounds: 20,
+  },
+
   knowledgeSettings: {
     enabled: true,
     topK: 5,
@@ -104,6 +116,8 @@ function buildPersistentData() {
     lastProjectPath: state.project?.path || null,
     conversationUsage: state.conversationUsage,
     autoReview: state.autoReview,
+    outputSettings: state.outputSettings,
+    harness: state.harness,
     knowledgeSettings: state.knowledgeSettings,
   };
 }
@@ -124,6 +138,7 @@ function getSharedPersistentData(data = buildPersistentData()) {
     customModels: data.customModels || [],
     currentModelId: data.currentModelId || null,
     autoReview: data.autoReview || {},
+    outputSettings: data.outputSettings || {},
     knowledgeSettings: data.knowledgeSettings || {},
   };
 }
@@ -157,6 +172,14 @@ function loadPersistent() {
       ...state.autoReview,
       ...(data.autoReview || {}),
     };
+    state.outputSettings = {
+      ...state.outputSettings,
+      ...(data.outputSettings || {}),
+    };
+    state.harness = {
+      ...state.harness,
+      ...(data.harness || {}),
+    };
     state.knowledgeSettings = {
       ...state.knowledgeSettings,
       ...(data.knowledgeSettings || {}),
@@ -184,6 +207,10 @@ async function loadSharedPersistent() {
     state.autoReview = {
       ...state.autoReview,
       ...(data.autoReview || {}),
+    };
+    state.outputSettings = {
+      ...state.outputSettings,
+      ...(data.outputSettings || {}),
     };
     state.knowledgeSettings = {
       ...state.knowledgeSettings,

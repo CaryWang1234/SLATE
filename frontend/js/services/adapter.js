@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示词
  */
 
-import { state } from "../store.js?v=20260807-3";
-import { getToolsSystemPrompt } from "./tools.js?v=20260807-3";
+import { state } from "../store.js?v=20260807-10";
+import { getToolsSystemPrompt } from "./tools.js?v=20260807-10";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -124,14 +124,25 @@ function buildMessages(userMessages, constitution) {
 
 /**
  * 获取模型的默认参数
- * max_tokens 需足够大：file_create 等工具调用携带完整文件内容，
- * 过小（如 4096）会导致输出被截断、文件内容残缺
+ * max_tokens 由设置页“输出控制”决定：
+ * - 基础值：单次输出 Token 上限（默认 16384）
+ * - 开关开启时提升到 65536：file_create 等工具调用携带完整文件内容，
+ *   过小会导致输出被截断、文件内容残缺
  */
-function getDefaultParams(modelId) {
-  if (REASONING_MODELS.includes(modelId)) {
-    return { temperature: 0.6, max_tokens: 16384 };
-  }
-  return { temperature: 0.7, max_tokens: 16384 };
+const UNLIMITED_OUTPUT_TOKENS = 65536;
+
+function getOutputMaxTokens() {
+  const s = state.outputSettings || {};
+  if (s.unlimitedFileOutput) return UNLIMITED_OUTPUT_TOKENS;
+  return Math.max(1024, parseInt(s.maxTokens) || 16384);
 }
 
-export { getSystemPrompt, buildMessages, getDefaultParams, SYSTEM_PROMPTS };
+function getDefaultParams(modelId) {
+  const max_tokens = getOutputMaxTokens();
+  if (REASONING_MODELS.includes(modelId)) {
+    return { temperature: 0.6, max_tokens };
+  }
+  return { temperature: 0.7, max_tokens };
+}
+
+export { getSystemPrompt, buildMessages, getDefaultParams, getOutputMaxTokens, SYSTEM_PROMPTS };

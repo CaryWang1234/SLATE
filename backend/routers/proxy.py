@@ -11,6 +11,10 @@ from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/proxy", tags=["proxy"])
 
+# 分段超时：connect 快失败，read 为两包数据间隔上限（流式长思考模型不误杀）
+STREAM_TIMEOUT = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
+REQUEST_TIMEOUT = httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=10.0)
+
 # ── 模型注册表（2026-07 时效性校验） ──────────────────────────
 
 MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
@@ -124,7 +128,7 @@ def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
 async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, Any]):
     """流式转发 OpenAI 兼容 API（自管理 client 生命周期）。"""
     async with httpx.AsyncClient() as client:
-        async with client.stream("POST", url, json=payload, headers=headers, timeout=120) as resp:
+        async with client.stream("POST", url, json=payload, headers=headers, timeout=STREAM_TIMEOUT) as resp:
             async for line in resp.aiter_lines():
                 if line:
                     yield f"{line}\n\n"
@@ -133,7 +137,7 @@ async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, A
 async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str, Any]):
     """流式转发 Anthropic API，转换为 OpenAI 兼容 SSE 格式（自管理 client）。"""
     async with httpx.AsyncClient() as client:
-        async with client.stream("POST", url, json=payload, headers=headers, timeout=120) as resp:
+        async with client.stream("POST", url, json=payload, headers=headers, timeout=STREAM_TIMEOUT) as resp:
             buffer = ""
             async for line in resp.aiter_lines():
                 buffer += line + "\n"
@@ -199,7 +203,7 @@ async def proxy_chat(request: Request) -> Any:
             )
 
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, headers=headers, timeout=120)
+            resp = await client.post(url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT)
         data = resp.json()
         content = ""
         if "content" in data and data["content"]:
@@ -227,7 +231,7 @@ async def proxy_chat(request: Request) -> Any:
             payload["generationConfig"] = {"temperature": body["temperature"]}
 
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, headers=headers, timeout=120)
+            resp = await client.post(url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT)
         data = resp.json()
         text = ""
         if "candidates" in data and data["candidates"]:
@@ -257,6 +261,6 @@ async def proxy_chat(request: Request) -> Any:
         )
 
     async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload, headers=headers, timeout=120)
+        resp = await client.post(url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT)
     data = resp.json()
     return {"code": 0, "data": data, "message": "ok"}

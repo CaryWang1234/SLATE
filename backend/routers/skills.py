@@ -34,6 +34,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "regex_test": "正则表达式测试与匹配结果预览",
     "repo_stats": "项目文件类型、体积与数量统计",
     "todo_scan": "扫描项目中的 TODO/FIXME/待办标记",
+    "web_search": "网络搜索/网页抓取，获取实时信息（免 Key，DuckDuckGo）",
 }
 
 

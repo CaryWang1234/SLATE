@@ -2,12 +2,17 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260807-3";
+import { API_BASE } from "../store.js?v=20260807-10";
+
+// ── 超时与重试常量（参考主流 Agent：idle watchdog + 零内容自动重试） ──
+const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（含 MCP 工具）总超时
+const STREAM_IDLE_TIMEOUT_MS = 90000;   // 流式：90 秒无任何数据视为连接已死
+const STREAM_MAX_RETRIES = 2;           // 未产出任何内容时的自动重试次数
 
 /**
- * 通用 JSON 请求
+ * 通用 JSON 请求（带超时保护，防止工具/接口挂起导致界面永久卡死）
  */
-async function request(path, options = {}) {
+async function request(path, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   const url = `${API_BASE}${path}`;
   const defaults = {
     headers: { "Content-Type": "application/json" },
@@ -17,7 +22,17 @@ async function request(path, options = {}) {
     config.body = JSON.stringify(config.body);
   }
 
-  const resp = await fetch(url, config);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let resp;
+  try {
+    resp = await fetch(url, { ...config, signal: controller.signal });
+  } catch (err) {
+    clearTimeout(timer);
+    if (controller.signal.aborted) throw new Error(`请求超时（${Math.round(timeoutMs / 1000)}s），可重试`);
+    throw err;
+  }
+  clearTimeout(timer);
   if (!resp.ok) {
     throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
   }
@@ -51,64 +66,98 @@ function patch(path, body) {
 
 /**
  * 流式聊天请求：返回 AsyncIterator<string>
+ * 参考主流 Agent 的流式健壮性方案：
+ * - Idle watchdog：超过 STREAM_IDLE_TIMEOUT_MS 无任何数据 → 主动中断（区分“慢”与“已死”）
+ * - 零内容自动重试：连接失败/挂死且未产出任何内容时，退避重试
+ * - payload.meta：可选对象，回写 finish_reason 到 meta.finishReason
  */
 async function* streamChat(payload) {
-  const url = `${API_BASE}/proxy/chat`;
-  const { signal, ...body } = payload || {};
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, stream: true }),
-    signal,
-  });
-
-  if (!resp.ok) {
-    throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
-  }
-
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
+  const { signal, meta, ...body } = payload || {};
+  let attempt = 0;
 
   while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+    attempt++;
+    if (signal?.aborted) return;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
+    const controller = new AbortController();
+    let idleAborted = false;
+    let idleTimer = 0;
+    const resetIdle = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => { idleAborted = true; controller.abort(); }, STREAM_IDLE_TIMEOUT_MS);
+    };
+    const onUserAbort = () => controller.abort();
+    if (signal) signal.addEventListener("abort", onUserAbort);
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("data:")) continue;
-      const data = trimmed.slice(5).trim();
-      if (data === "[DONE]") return;
-
-      try {
-        const parsed = JSON.parse(data);
-        const content = parsed?.choices?.[0]?.delta?.content;
-        if (content) yield content;
-      } catch (e) {
-        // 非 JSON 行，跳过
-      }
-    }
-  }
-
-  // 流结束：flush 解码器内残留字节（跨 chunk 截断的多字节中文字符）并处理缓冲区尾部
-  buffer += decoder.decode();
-  const tailLines = buffer.split("\n");
-  for (const line of tailLines) {
-    const trimmed = line.trim();
-    if (!trimmed || !trimmed.startsWith("data:")) continue;
-    const data = trimmed.slice(5).trim();
-    if (data === "[DONE]") return;
-
+    let receivedAny = false;
     try {
-      const parsed = JSON.parse(data);
-      const content = parsed?.choices?.[0]?.delta?.content;
-      if (content) yield content;
-    } catch (e) {
-      // 非 JSON 行，跳过
+      resetIdle();
+      const resp = await fetch(`${API_BASE}/proxy/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, stream: true }),
+        signal: controller.signal,
+      });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+      let done = false;
+
+      // 解析 SSE 行：收集 content 增量，回写 finish_reason，遇 [DONE] 结束
+      const parseLines = (lines) => {
+        const chunks = [];
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith("data:")) continue;
+          const data = trimmed.slice(5).trim();
+          if (data === "[DONE]") { done = true; break; }
+          try {
+            const parsed = JSON.parse(data);
+            const fr = parsed?.choices?.[0]?.finish_reason;
+            if (fr && meta) meta.finishReason = fr;
+            const content = parsed?.choices?.[0]?.delta?.content;
+            if (content) chunks.push(content);
+          } catch (e) {
+            // 非 JSON 行，跳过
+          }
+        }
+        return chunks;
+      };
+
+      while (!done) {
+        const { done: streamDone, value } = await reader.read();
+        if (streamDone) break;
+        receivedAny = true;   // 任何数据到达（含心跳注释）都重置看门狗
+        resetIdle();
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const chunk of parseLines(lines)) yield chunk;
+      }
+
+      // 流结束：flush 解码器内残留字节（跨 chunk 截断的多字节中文字符）并处理缓冲区尾部
+      if (!done) {
+        buffer += decoder.decode();
+        for (const chunk of parseLines(buffer.split("\n"))) yield chunk;
+      }
+      return;
+    } catch (err) {
+      if (signal?.aborted) throw err;   // 用户主动停止：保持 AbortError 语义
+      // 未产出任何内容 → 自动重试（连接失败/瞬断/服务端无响应）
+      if (!receivedAny && attempt <= STREAM_MAX_RETRIES) {
+        await new Promise(r => setTimeout(r, 700 * attempt));
+        continue;
+      }
+      if (idleAborted) throw new Error(`流式响应 ${STREAM_IDLE_TIMEOUT_MS / 1000} 秒无响应，已自动中断连接`);
+      throw err;
+    } finally {
+      clearTimeout(idleTimer);
+      if (signal) signal.removeEventListener("abort", onUserAbort);
     }
   }
 }

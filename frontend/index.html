@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260807-3">
+  <link rel="stylesheet" href="./css/style.css?v=20260807-10">
 </head>
 <body>
 
@@ -59,6 +59,8 @@
             </div>
             <div class="panel-actions">
               <button id="btn-brainstorm" class="icon-btn" title="头脑风暴模式">💡</button>
+              <button id="btn-harness" class="icon-btn" title="Harness 自主执行：模型自主多轮调用工具直至任务完成">⚡</button>
+              <button id="btn-schedule" class="icon-btn" title="定时任务">⏰</button>
               <button id="btn-compress" class="icon-btn" title="手动压缩上下文">⟲</button>
               <button id="btn-memory" class="icon-btn" title="记忆与画像">🧠</button>
               <button id="btn-snippets" class="icon-btn" title="提示词素材">✂</button>
@@ -321,6 +323,14 @@
             <input id="setting-max-tokens" type="number" class="setting-input" value="64000">
           </div>
           <div class="setting-group">
+            <label class="setting-label">单次输出 Token 上限</label>
+            <input id="setting-output-max-tokens" type="number" class="setting-input" min="1024" max="65536" step="1024" value="16384">
+          </div>
+          <label class="setting-check">
+            <input id="setting-output-unlimited" type="checkbox" checked>
+            <span>输出文件时不限制输出长度（提升到 65536，防止大文件被截断）</span>
+          </label>
+          <div class="setting-group">
             <label class="setting-label">项目宪法</label>
             <textarea id="setting-constitution" class="setting-input setting-textarea" rows="8"></textarea>
           </div>
@@ -519,10 +529,41 @@
     </div>
   </div>
 
+  <!-- ═══ 定时任务弹窗 ═══ -->
+  <div id="schedule-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <span>定时任务</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label class="setting-label">新建任务</label>
+          <input id="schedule-name" class="setting-input" placeholder="任务名称，如：每日晨报">
+          <textarea id="schedule-prompt" class="setting-input schedule-prompt" rows="3" placeholder="到点后发送给模型的提示词，如：总结今天的对话重点并列出明日待办"></textarea>
+          <div class="schedule-row">
+            <select id="schedule-model" class="setting-input"></select>
+            <select id="schedule-mode" class="setting-input">
+              <option value="daily">每天</option>
+              <option value="once">单次</option>
+              <option value="interval">间隔</option>
+            </select>
+            <input id="schedule-time" type="time" class="setting-input" value="09:00">
+            <input id="schedule-minutes" type="number" class="setting-input" min="1" value="60" title="间隔分钟数" style="display:none">
+          </div>
+          <button id="btn-add-schedule" class="send-btn send-btn-sm">+ 添加任务</button>
+        </div>
+        <div id="schedule-list" class="schedule-list"></div>
+        <p class="schedule-note">⚠ 定时任务由本地后端执行：请保持 SLATE 运行，并确保所选模型已配置 API Key（仅支持 OpenAI 兼容模型）。结果将归档到标题带 [定时] 的新会话。</p>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ Toast 容器 ═══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260807-3"></script>
+  <script type="module" src="./js/app.js?v=20260807-10"></script>
 
 </body>
 </html>

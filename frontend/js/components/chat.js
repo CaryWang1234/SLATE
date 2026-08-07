@@ -2,12 +2,12 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext } from "../store.js?v=20260807-3";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260807-3";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260807-3";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260807-3";
-import { renderMarkdown } from "../services/markdown.js?v=20260807-3";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260807-3";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent } from "../store.js?v=20260807-10";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260807-10";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260807-10";
+import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail } from "../services/tools.js?v=20260807-10";
+import { renderMarkdown } from "../services/markdown.js?v=20260807-10";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260807-10";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -17,7 +17,46 @@ let brainstormMode = false;
 let isGenerating = false;
 let activeGenerationController = null;
 let inputQueue = [];
+
+// ── UI 看门狗（防卡死最后防线） ───────────────
+// 生成期间超过 180 秒无任何活动（流式增量/工具执行）→ 强制中断
+let lastActivityAt = 0;
+function markActivity() { lastActivityAt = Date.now(); }
 const CHAT_DRAFT_KEY = "slate_chat_draft";
+
+// ── 智能滚动跟随 ──────────────────────────────
+// 用户向上滚动浏览历史时不强制拉到底部，改为显示“回到底部”按钮
+let stickToBottom = true;
+let btnScrollBottom = null;
+
+function isNearBottom(threshold = 90) {
+  if (!chatScroll) return true;
+  return chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight < threshold;
+}
+
+function autoScroll(force = false) {
+  if (!chatScroll) return;
+  if (force || stickToBottom) chatScroll.scrollTop = chatScroll.scrollHeight;
+  btnScrollBottom?.classList.toggle("hidden", isNearBottom());
+}
+
+// ── Harness 自主执行 ───────────────────────────
+// 开启后：发送时注入自主执行指令，工具循环轮数上限提升到 maxRounds
+let harnessStatusEl = null;
+let btnHarness = null;
+
+const HARNESS_PREFIX = "[Harness 自主执行模式]\n请自主完成以下任务，不要向我提问：\n① 自行拆解步骤并逐步执行；\n② 需要信息或操作时直接调用 MCP 工具；\n③ 每步完成后验证结果，失败则重试或换方案；\n④ 全部完成后输出完结报告（已完成 / 未完成及原因）。\n\n任务：";
+
+function setHarnessProgress(text) {
+  if (!harnessStatusEl) return;
+  if (!text) {
+    harnessStatusEl.classList.add("hidden");
+    harnessStatusEl.textContent = "";
+    return;
+  }
+  harnessStatusEl.textContent = "⚡ " + text;
+  harnessStatusEl.classList.remove("hidden");
+}
 
 // ── @ 提及 MCP / Skill ──────────────────────
 let mentionPopup = null;
@@ -79,6 +118,14 @@ function renderMentionPopup() {
     item.addEventListener("mousedown", (e) => { e.preventDefault(); applyMention(c); });
     mentionPopup.appendChild(item);
   });
+  // 无 SKILL.md 技能时给出提示，避免误以为只能提及 MCP
+  const skillCount = Object.keys(state.skills?.skills || {}).length;
+  if (skillCount === 0) {
+    const hint = document.createElement("div");
+    hint.className = "mention-hint";
+    hint.textContent = "暂无 Skill：在右侧「MCP / 技能」面板点击「导入技能」或「新建技能」添加 SKILL.md";
+    mentionPopup.appendChild(hint);
+  }
 }
 
 function updateMentionPopup() {
@@ -243,6 +290,17 @@ function renderMessage(msg, index) {
       } catch (e) {}
     });
     actions.appendChild(copyBtn);
+
+    // 重新生成按钮（仅助手消息）
+    if (msg.role === "assistant") {
+      const regenBtn = document.createElement("button");
+      regenBtn.className = "msg-action-btn";
+      regenBtn.textContent = "↻";
+      regenBtn.title = "重新生成";
+      regenBtn.addEventListener("click", () => regenerateMessage(msg, div));
+      actions.appendChild(regenBtn);
+    }
+
     div.appendChild(actions);
   }
 
@@ -250,6 +308,7 @@ function renderMessage(msg, index) {
   content.querySelectorAll("pre code").forEach((block) => {
     if (window.hljs) hljs.highlightElement(block);
   });
+  attachCodeCopyButtons(content);
 
   return div;
 }
@@ -260,6 +319,7 @@ function renderAllMessages() {
     if (isHiddenContextMessage(msg)) return;
     chatScroll.appendChild(renderMessage(msg, i));
   });
+  stickToBottom = true;
   chatScroll.scrollTop = chatScroll.scrollHeight;
 }
 
@@ -291,6 +351,25 @@ function updateStreamingCursor(cursor, content) {
   }
 }
 
+// 为代码块右上角添加一键复制按钮（每次渲染重建，无需去重）
+function attachCodeCopyButtons(container) {
+  container?.querySelectorAll("pre").forEach(pre => {
+    const btn = document.createElement("button");
+    btn.className = "code-copy-btn";
+    btn.textContent = "⧉ 复制";
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(pre.querySelector("code")?.innerText ?? pre.innerText);
+        btn.textContent = "✓ 已复制";
+      } catch (e) {
+        btn.textContent = "复制失败";
+      }
+      setTimeout(() => { btn.textContent = "⧉ 复制"; }, 1500);
+    });
+    pre.appendChild(btn);
+  });
+}
+
 function renderAssistantContent(contentEl, content, cursor = null) {
   if (!contentEl) return;
   updateStreamingCursor(cursor, content);
@@ -298,6 +377,7 @@ function renderAssistantContent(contentEl, content, cursor = null) {
   contentEl.innerHTML = renderMarkdown(displayContent);
   if (cursor) contentEl.appendChild(cursor);
   contentEl.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
+  attachCodeCopyButtons(contentEl);
 }
 
 function summarizeParams(params) {
@@ -555,6 +635,7 @@ async function reviewShortReplyForToolCalls(lastContent, modelId, apiKey, baseUr
       signal,
     })) {
       reviewText += chunk;
+      markActivity();
     }
   } catch (e) {
     if (isAbortError(e)) return [];
@@ -957,15 +1038,68 @@ function renderFileCreateDiff(data) {
   return wrap;
 }
 
-async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperature: 0.7, max_tokens: 16384 }, signal = null) {
-  const MAX_ROUNDS = 5;
-  for (let round = 0; round < MAX_ROUNDS; round++) {
+// ── 截断自动续写 ──────────────────────────────
+
+/**
+ * 输出达到模型单次上限时，工具调用块会在末尾缺闭合标记 ◈◆◆。
+ * 此时自动追加一轮请求，让模型从断点继续输出，把续写内容拼回原消息；
+ * 拼合成功后 detectToolCalls 能完整解析，不再触发截断警告。
+ */
+const MAX_CONTINUE_ROUNDS = 3;
+const CONTINUE_PROMPT_TOOL = "你上一次的输出达到长度上限被截断了。请从被截断的精确位置继续输出：不要重复已输出的任何内容，不要输出任何解释、前言或代码围栏标记，一直续写到工具调用以 ◈◆◆ 闭合为止。";
+const CONTINUE_PROMPT_TEXT = "你上一次的输出达到长度上限被截断了。请从被截断的精确位置继续输出：不要重复已输出的任何内容，不要输出任何解释或前言，一直续写到内容完整结束为止。";
+
+async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl, params, signal, finishReason = "") {
+  const contentEl = msgEl?.querySelector(".msg-content");
+  let fr = finishReason;
+  for (let round = 1; round <= MAX_CONTINUE_ROUNDS; round++) {
+    // 工具块未闭合 或 模型自报 finish_reason=length 都视为被截断
+    const stuck = hasTruncatedTail(content) || fr === "length";
+    if (signal?.aborted || !stuck) break;
+    const contPrompt = hasTruncatedTail(content) ? CONTINUE_PROMPT_TOOL : CONTINUE_PROMPT_TEXT;
+    try {
+      const { toast } = await import("../app.js?v=20260807-10");
+      toast(`输出达到长度上限，自动续写中（${round}/${MAX_CONTINUE_ROUNDS}）…`);
+    } catch {}
+
+    // 历史 + 被截断的助手消息原文 + 续写指令（模型需看到断点才能接续）
+    const history = state.messages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+    history.push({ role: "assistant", content });
+    history.push({ role: "user", content: contPrompt });
+    history._modelId = modelId;
+    const messages = buildMessages(history, state.constitution);
+
+    const cursor = msgEl ? addStreamingCursor(msgEl) : null;
+    const contMeta = {};
+    try {
+      for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: params?.temperature ?? 0.7, max_tokens: params?.max_tokens ?? getOutputMaxTokens(), stream: true, signal, meta: contMeta })) {
+        content += chunk;
+        markActivity();
+        if (contentEl) renderAssistantContent(contentEl, content, cursor);
+        autoScroll();
+      }
+      fr = contMeta.finishReason || "";
+    } catch (err) {
+      if (cursor) removeStreamingCursor(cursor);
+      if (!isAbortError(err)) console.warn("自动续写失败:", err);
+      break;
+    }
+    if (cursor) removeStreamingCursor(cursor);
+  }
+  if (contentEl) renderAssistantContent(contentEl, content);
+  return content;
+}
+
+async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperature: 0.7, max_tokens: getOutputMaxTokens() }, signal = null, maxRounds = 5) {
+  for (let round = 0; round < maxRounds; round++) {
     if (signal?.aborted) break;
     const lastMsg = state.messages[state.messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") break;
 
     const calls = detectToolCalls(lastMsg.content);
     if (calls.length === 0) break;
+
+    if (maxRounds > 5) setHarnessProgress(`Harness 自主执行 · 第 ${round + 1}/${maxRounds} 轮`);
 
     // 更新最后一条 assistant 消息（去掉工具标记）
     const cleanContent = stripToolCalls(lastMsg.content);
@@ -979,7 +1113,9 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     }
 
     // 执行工具
+    markActivity();
     const results = await executeToolCalls(calls);
+    markActivity();
     if (signal?.aborted) break;
 
     // 渲染工具卡片
@@ -998,7 +1134,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
         console.warn("工具结果保存失败:", e);
       }
     }
-    chatScroll.scrollTop = chatScroll.scrollHeight;
+    autoScroll();
 
     // Keep tool results in model context without rendering them as chat bubbles.
     const toolResultText = results.map((r, i) => formatToolResultForModel(calls[i], r)).join("\n\n");
@@ -1015,7 +1151,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     followEl.appendChild(followContent);
     chatScroll.appendChild(followEl);
     const cursor = addStreamingCursor(followEl);
-    chatScroll.scrollTop = chatScroll.scrollHeight;
+    autoScroll();
 
     // 流式续写
     await refreshKnowledgeContext(state.messages.slice(-6).map(m => m.content || "").join("\n"));
@@ -1025,11 +1161,13 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     const messages = buildMessages(history, state.constitution);
 
     let followContent2 = "";
+    const followMeta = {};
     try {
-      for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: params.temperature ?? 0.7, max_tokens: params.max_tokens ?? 16384, stream: true, signal })) {
+      for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: params.temperature ?? 0.7, max_tokens: params.max_tokens ?? getOutputMaxTokens(), stream: true, signal, meta: followMeta })) {
         followContent2 += chunk;
+        markActivity();
         renderAssistantContent(followContent, followContent2, cursor);
-        chatScroll.scrollTop = chatScroll.scrollHeight;
+        autoScroll();
       }
     } catch (err) {
       followContent2 = isAbortError(err)
@@ -1038,6 +1176,9 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     }
 
     removeStreamingCursor(cursor);
+    if (!signal?.aborted && (hasTruncatedTail(followContent2) || followMeta.finishReason === "length")) {
+      followContent2 = await continueTruncatedOutput(followEl, followContent2, modelId, apiKey, baseUrl, params, signal, followMeta.finishReason || "");
+    }
     updateLastAssistantMessage(followContent2);
     renderAssistantContent(followContent, followContent2);
 
@@ -1051,6 +1192,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     msgEl = await autoAdvanceIfStalled(followEl, modelId, apiKey, baseUrl, params);
     msgEl = await autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl, signal);
   }
+  if (maxRounds > 5) setHarnessProgress(null);
 }
 
 // ── 发送消息 ────────────────────────────────
@@ -1059,7 +1201,7 @@ async function sendMessage(queuedPayload = null) {
   if (isGenerating) {
     if (queuedPayload) inputQueue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260807-3");
+      const { toast } = await import("../app.js?v=20260807-10");
       toast(`已加入输入队列（${inputQueue.length}）`);
     }
     updateSendState();
@@ -1071,6 +1213,7 @@ async function sendMessage(queuedPayload = null) {
   if (!text && filesForMessage.length === 0) return;
 
   isGenerating = true;
+  markActivity(); // 看门狗计时基准：从本次生成开始算
   activeGenerationController = new AbortController();
   const signal = activeGenerationController.signal;
   updateSendState();
@@ -1109,7 +1252,8 @@ async function sendMessage(queuedPayload = null) {
   }
 
   const mentionContext = await resolveMentions(text);
-  const fullText = text + mentionContext + fileContext;
+  const harnessOn = state.harness?.enabled === true;
+  const fullText = (harnessOn ? HARNESS_PREFIX : "") + text + mentionContext + fileContext;
   await refreshKnowledgeContext(fullText);
   const userMsg = { role: "user", content: fullText, model: "", files: fileMeta.length > 0 ? fileMeta : undefined };
   addMessage(userMsg);
@@ -1130,6 +1274,7 @@ async function sendMessage(queuedPayload = null) {
   let msgEl = renderMessage(assistantMsg, state.messages.length - 1);
   chatScroll.appendChild(msgEl);
   const cursor = addStreamingCursor(msgEl);
+  stickToBottom = true;
   chatScroll.scrollTop = chatScroll.scrollHeight;
 
   const modelId = state.currentModel?.id || "gpt-4o";
@@ -1147,12 +1292,14 @@ async function sendMessage(queuedPayload = null) {
   const messages = buildMessages(historyForAdapter, state.constitution);
 
   let fullContent = "";
+  const streamMeta = {};
   try {
-    for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, stream: true, signal })) {
+    for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, stream: true, signal, meta: streamMeta })) {
       fullContent += chunk;
+      markActivity();
       const contentEl = msgEl.querySelector(".msg-content");
       renderAssistantContent(contentEl, fullContent, cursor);
-      chatScroll.scrollTop = chatScroll.scrollHeight;
+      autoScroll();
     }
   } catch (err) {
     fullContent = isAbortError(err)
@@ -1161,6 +1308,11 @@ async function sendMessage(queuedPayload = null) {
   }
 
   removeStreamingCursor(cursor);
+
+  // 输出被截断（工具块未闭合 或 finish_reason=length）→ 自动续写拼回本条消息
+  if (!signal.aborted && (hasTruncatedTail(fullContent) || streamMeta.finishReason === "length")) {
+    fullContent = await continueTruncatedOutput(msgEl, fullContent, modelId, apiKey, baseUrl, params, signal, streamMeta.finishReason || "");
+  }
   updateLastAssistantMessage(fullContent);
 
   // 估算并记录用量
@@ -1184,8 +1336,11 @@ async function sendMessage(queuedPayload = null) {
     msgEl = await autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl, signal);
   }
 
-  // 工具调用循环（最多 5 轮）
-  if (!signal.aborted) await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal);
+  // 工具调用循环（默认 5 轮；Harness 模式提升到 maxRounds）
+  const toolRounds = harnessOn ? Math.max(10, Math.min(50, state.harness?.maxRounds || 20)) : 5;
+  if (harnessOn) setHarnessProgress(`自主执行已启动 · 最多 ${toolRounds} 轮工具调用，可随时点发送键停止`);
+  if (!signal.aborted) await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal, toolRounds);
+  if (harnessOn) setHarnessProgress(null);
 
   // 后台检查上下文压缩
   if (!signal.aborted) {
@@ -1195,7 +1350,7 @@ async function sendMessage(queuedPayload = null) {
 
   } catch (err) {
     console.error("发送失败:", err);
-    const { toast } = await import("../app.js?v=20260807-3");
+    const { toast } = await import("../app.js?v=20260807-10");
     toast(isAbortError(err) ? "已停止输出" : `发送失败: ${err.message}`);
   } finally {
   isGenerating = false;
@@ -1239,7 +1394,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260807-3");
+    const { toast } = await import("../app.js?v=20260807-10");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -1256,7 +1411,7 @@ function toggleBrainstormMode() {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260807-3").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260807-10").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -1280,7 +1435,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260807-3");
+    const { toast } = await import("../app.js?v=20260807-10");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -1313,7 +1468,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260807-3");
+    const { toast } = await import("../app.js?v=20260807-10");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -1481,7 +1636,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260807-3");
+      const { toast } = await import("../app.js?v=20260807-10");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }
@@ -1512,6 +1667,107 @@ async function handleFiles(fileList) {
 
 // ── 初始化 ──────────────────────────────────
 
+// ── 重新生成 ────────────────────────────────
+
+/**
+ * 重新生成最后一条助手回复：以该消息之前的历史重新请求，
+ * 原地替换内容与工具卡片；完成后照常进入工具调用循环。
+ */
+async function regenerateMessage(msg, msgEl) {
+  if (isGenerating) {
+    const { toast } = await import("../app.js?v=20260807-10");
+    toast("正在生成中，请稍候");
+    return;
+  }
+  const idx = state.messages.indexOf(msg);
+  if (idx < 0) return;
+  const after = state.messages.slice(idx + 1).filter(m => !m.hidden && m.role !== "system");
+  if (after.length > 0) {
+    const { toast } = await import("../app.js?v=20260807-10");
+    toast("只能重新生成最后一条助手回复");
+    return;
+  }
+  const modelId = state.currentModel?.id || "gpt-4o";
+  const baseUrl = state.currentModel?.base_url || undefined;
+  const apiKey = getModelKey(modelId);
+  if (!apiKey) {
+    const { toast } = await import("../app.js?v=20260807-10");
+    toast("请先在设置中配置该模型的 API Key");
+    return;
+  }
+  const params = getDefaultParams(modelId);
+
+  const history = state.messages.slice(0, idx)
+    .filter(m => !m.hidden && m.role !== "system")
+    .map(m => ({ role: m.role, content: m.content }));
+  if (!history.some(m => m.role === "user")) {
+    const { toast } = await import("../app.js?v=20260807-10");
+    toast("没有可重新生成的上下文");
+    return;
+  }
+  history._modelId = modelId;
+  const messages = buildMessages(history, state.constitution);
+
+  isGenerating = true;
+  markActivity(); // 看门狗计时基准：从本次生成开始算
+  activeGenerationController = new AbortController();
+  const signal = activeGenerationController.signal;
+  updateSendState();
+
+  // 重置消息与卡片
+  msg.content = "";
+  msg.toolResults = [];
+  msg.model = state.currentModel?.name || msg.model;
+  setMessages([...state.messages]);
+  const label = msgEl.querySelector(".msg-model-label");
+  if (label) label.textContent = msg.model;
+  msgEl.querySelector(".tool-call-group")?.remove();
+  const contentEl = msgEl.querySelector(".msg-content");
+  if (contentEl) contentEl.innerHTML = "";
+
+  stickToBottom = true;
+  const cursor = addStreamingCursor(msgEl);
+  chatScroll.scrollTop = chatScroll.scrollHeight;
+  let fullContent = "";
+  const regenMeta = {};
+  try {
+    for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, stream: true, signal, meta: regenMeta })) {
+      fullContent += chunk;
+      markActivity();
+      renderAssistantContent(contentEl, fullContent, cursor);
+      autoScroll();
+    }
+  } catch (err) {
+    fullContent = isAbortError(err)
+      ? (fullContent ? `${fullContent}\n\n[已停止]` : "已停止")
+      : `⚠ 请求失败: ${err.message}`;
+  }
+  removeStreamingCursor(cursor);
+
+  if (!signal.aborted && (hasTruncatedTail(fullContent) || regenMeta.finishReason === "length")) {
+    fullContent = await continueTruncatedOutput(msgEl, fullContent, modelId, apiKey, baseUrl, params, signal, regenMeta.finishReason || "");
+  }
+  updateLastAssistantMessage(fullContent);
+  renderAssistantContent(contentEl, fullContent);
+
+  addUsage({ prompt_tokens: estimateContextTokens(state.messages.slice(0, idx)), completion_tokens: Math.ceil(fullContent.length / 3) });
+  syncUsageToBackend();
+
+  if (msg.id) {
+    try {
+      await patch(`/chat/messages/${msg.id}`, { content: fullContent, metadata: { toolResults: [] } });
+    } catch (e) {
+      console.warn("重新生成保存失败:", e);
+    }
+  }
+
+  isGenerating = false;
+  activeGenerationController = null;
+  updateSendState();
+
+  if (!signal.aborted) await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal);
+}
+
 function initChat() {
   chatScroll = document.getElementById("chat-messages");
   chatInput = document.getElementById("chat-input");
@@ -1535,11 +1791,52 @@ function initChat() {
   document.getElementById("chat-input-area")?.insertAdjacentElement("beforebegin", queueStatus);
   queueStatus.querySelector(".queue-clear-btn")?.addEventListener("click", clearInputQueue);
 
+  // UI 看门狗：生成期间长时间无活动（流挂死/工具挂起）→ 强制中断恢复界面
+  setInterval(async () => {
+    if (!isGenerating || !lastActivityAt) return;
+    if (Date.now() - lastActivityAt <= 180000) return;
+    markActivity(); // 防止重复触发
+    try { activeGenerationController?.abort(); } catch {}
+    try {
+      const { toast } = await import("../app.js?v=20260807-10");
+      toast("连接长时间无响应，已自动中断，可重试");
+    } catch {}
+  }, 15000);
+
+  // 智能滚动跟随：用户向上滚动浏览历史时不强制拉底，显示“回到底部”按钮
+  btnScrollBottom = document.createElement("button");
+  btnScrollBottom.className = "btn-scroll-bottom hidden";
+  btnScrollBottom.textContent = "↓ 回到底部";
+  btnScrollBottom.addEventListener("click", () => {
+    stickToBottom = true;
+    chatScroll.scrollTo({ top: chatScroll.scrollHeight, behavior: "smooth" });
+  });
+  document.getElementById("chat-input-area")?.appendChild(btnScrollBottom);
+  chatScroll.addEventListener("scroll", () => {
+    stickToBottom = isNearBottom();
+    btnScrollBottom?.classList.toggle("hidden", stickToBottom);
+  });
+
   btnSend.addEventListener("click", () => {
     if (isGenerating) stopGeneration();
     else sendMessage();
   });
   btnBrainstorm?.addEventListener("click", toggleBrainstormMode);
+
+  // Harness 自主执行开关
+  btnHarness = document.getElementById("btn-harness");
+  btnHarness?.classList.toggle("active", state.harness?.enabled === true);
+  btnHarness?.addEventListener("click", async () => {
+    state.harness = state.harness || { enabled: false, maxRounds: 20 };
+    state.harness.enabled = !state.harness.enabled;
+    btnHarness.classList.toggle("active", state.harness.enabled);
+    savePersistent();
+    const { toast } = await import("../app.js?v=20260807-10");
+    toast(state.harness.enabled ? "Harness 已开启：模型将自主多轮执行直至任务完成" : "Harness 已关闭");
+  });
+  harnessStatusEl = document.createElement("div");
+  harnessStatusEl.className = "harness-status hidden";
+  document.getElementById("chat-input-area")?.insertAdjacentElement("beforebegin", harnessStatusEl);
   btnCompress?.addEventListener("click", openCompressModal);
   btnMemory?.addEventListener("click", openMemoryModal);
   btnSnippets?.addEventListener("click", openSnippetModal);
