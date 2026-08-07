@@ -2,7 +2,7 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260803-1";
+import { API_BASE } from "../store.js?v=20260807-3";
 
 /**
  * 通用 JSON 请求
@@ -67,7 +67,7 @@ async function* streamChat(payload) {
   }
 
   const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
+  const decoder = new TextDecoder("utf-8");
   let buffer = "";
 
   while (true) {
@@ -91,6 +91,24 @@ async function* streamChat(payload) {
       } catch (e) {
         // 非 JSON 行，跳过
       }
+    }
+  }
+
+  // 流结束：flush 解码器内残留字节（跨 chunk 截断的多字节中文字符）并处理缓冲区尾部
+  buffer += decoder.decode();
+  const tailLines = buffer.split("\n");
+  for (const line of tailLines) {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith("data:")) continue;
+    const data = trimmed.slice(5).trim();
+    if (data === "[DONE]") return;
+
+    try {
+      const parsed = JSON.parse(data);
+      const content = parsed?.choices?.[0]?.delta?.content;
+      if (content) yield content;
+    } catch (e) {
+      // 非 JSON 行，跳过
     }
   }
 }

@@ -1,14 +1,17 @@
-"""技能路由：统一挂载 Skill 调用入口，支持内置与自定义技能。"""
+"""技能路由：MCP 内置工具 + SKILL.md 技能，支持执行、上传与本地导入。"""
 
 from __future__ import annotations
 
 import importlib
 import json
 import os
+import re
+import shutil
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, UploadFile, File
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
@@ -16,7 +19,7 @@ SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
 USER_SKILLS_DIR = DATA_DIR / "skills"
 
-# 内置技能注册表
+# MCP 内置工具注册表（原“内置技能”，现统一称 MCP 工具）
 BUILTIN_SKILLS: dict[str, str] = {
     "file_tree": "扫描目录树（仅第一层）",
     "file_peek": "读取文件前 N 行（≤50行）",
@@ -34,15 +37,17 @@ BUILTIN_SKILLS: dict[str, str] = {
 }
 
 
-@router.get("")
-async def list_skills() -> dict[str, Any]:
-    """列出所有可用技能（内置 + 自定义）。"""
+def _list_md_skills() -> dict[str, str]:
+    """扫描 SKILL.md 组成的自定义技能。"""
     custom_skills: dict[str, str] = {}
     if USER_SKILLS_DIR.is_dir():
         for skill_md in USER_SKILLS_DIR.glob("*/SKILL.md"):
             skill_name = skill_md.parent.name
-            text = skill_md.read_text(encoding="utf-8")
-            # 提取第一行 # 标题后的描述
+            try:
+                text = skill_md.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                text = ""
+            # 提取 description 字段作为描述
             desc = skill_name
             for line in text.split("\n"):
                 stripped = line.strip()
@@ -50,12 +55,17 @@ async def list_skills() -> dict[str, Any]:
                     desc = stripped.split(":", 1)[1].strip()
                     break
             custom_skills[skill_name] = desc
+    return custom_skills
 
+
+@router.get("")
+async def list_skills() -> dict[str, Any]:
+    """列出所有可用能力：MCP 内置工具 + SKILL.md 技能。"""
     return {
         "code": 0,
         "data": {
-            "builtin": BUILTIN_SKILLS,
-            "custom": custom_skills,
+            "mcp": BUILTIN_SKILLS,
+            "skills": _list_md_skills(),
         },
         "message": "ok",
     }
@@ -131,3 +141,77 @@ async def upload_skill(
         "data": {"skill": skill_name, "files": saved_files},
         "message": "ok",
     }
+
+
+class ImportSkillRequest(BaseModel):
+    path: str
+    name: str = ""
+
+
+def _sanitize_skill_name(name: str) -> str:
+    """技能名只保留安全字符，防止路径穿越。"""
+    cleaned = re.sub(r"[^\w\u4e00-\u9fff.-]", "-", name.strip()).strip(".")
+    return cleaned[:64]
+
+
+@router.post("/import")
+async def import_skill(req: ImportSkillRequest) -> dict[str, Any]:
+    """从本地路径导入 SKILL.md 技能。
+
+    支持两种形式：
+    1. 目录：目录内必须包含 SKILL.md，整个目录被复制导入
+    2. 单个 .md 文件：以文件名（或指定 name）建立技能目录
+    """
+    src = Path(os.path.expanduser(req.path.strip()))
+    if not src.exists():
+        return {"code": 1, "message": f"路径不存在: {req.path}"}
+
+    try:
+        if src.is_dir():
+            skill_md = src / "SKILL.md"
+            if not skill_md.is_file():
+                return {"code": 1, "message": "目录中未找到 SKILL.md，无法导入"}
+            skill_name = _sanitize_skill_name(req.name or src.name)
+            if not skill_name:
+                return {"code": 1, "message": "无效的技能名称"}
+            dest = USER_SKILLS_DIR / skill_name
+            USER_SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(src.resolve(), dest)
+            file_count = sum(1 for _ in dest.rglob("*") if _.is_file())
+        else:
+            if src.suffix.lower() not in (".md", ".markdown"):
+                return {"code": 1, "message": "单文件导入仅支持 .md 文件"}
+            default_name = src.stem if src.name.lower() != "skill.md" else src.parent.name
+            skill_name = _sanitize_skill_name(req.name or default_name)
+            if not skill_name:
+                return {"code": 1, "message": "无效的技能名称"}
+            dest = USER_SKILLS_DIR / skill_name
+            dest.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src.resolve(), dest / "SKILL.md")
+            file_count = 1
+    except OSError as e:
+        return {"code": 1, "message": f"导入失败: {e}"}
+
+    return {
+        "code": 0,
+        "data": {"skill": skill_name, "files": file_count, "path": str(dest)},
+        "message": "ok",
+    }
+
+
+@router.delete("/{skill_name}")
+async def delete_skill(skill_name: str) -> dict[str, Any]:
+    """删除自定义 SKILL.md 技能（不影响 MCP 内置工具）。"""
+    clean = _sanitize_skill_name(skill_name)
+    if clean != skill_name or not clean:
+        return {"code": 1, "message": "无效的技能名称"}
+    target = USER_SKILLS_DIR / clean
+    if not target.is_dir():
+        return {"code": 1, "message": f"技能不存在: {skill_name}"}
+    try:
+        shutil.rmtree(target)
+    except OSError as e:
+        return {"code": 1, "message": f"删除失败: {e}"}
+    return {"code": 0, "data": None, "message": "ok"}

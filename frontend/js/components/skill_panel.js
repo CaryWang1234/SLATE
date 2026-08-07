@@ -1,11 +1,11 @@
 /**
- * SLATE 技能面板：内置技能列表 + 自定义 Skill 上传
+ * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除）
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260803-1";
-import { get, post, upload } from "../services/api.js?v=20260803-1";
+import { state, subscribe, setSkills } from "../store.js?v=20260807-3";
+import { get, post, del, upload } from "../services/api.js?v=20260807-3";
 
-let skillList, btnUpload, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
+let skillList, btnUpload, btnImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
 function showToast(msg) {
   const container = document.getElementById("toast-container");
@@ -81,110 +81,162 @@ const SKILL_PARAM_DEFS = {
   ],
 };
 
-// ── 技能列表渲染 ────────────────────────────
+// ── 列表渲染：MCP 工具区 + SKILL.md 技能区 ────────────
+
+function createSectionHeader(text, count) {
+  const head = document.createElement("div");
+  head.className = "skill-section-header";
+  const title = document.createElement("span");
+  title.className = "skill-section-title";
+  title.textContent = text;
+  const badge = document.createElement("span");
+  badge.className = "skill-section-count";
+  badge.textContent = String(count);
+  head.appendChild(title);
+  head.appendChild(badge);
+  return head;
+}
 
 function renderSkillList() {
   skillList.innerHTML = "";
 
-  // 内置技能
-  const builtin = state.skills.builtin || {};
-  for (const [name, desc] of Object.entries(builtin)) {
-    skillList.appendChild(createSkillItem(name, desc, false));
+  // MCP 内置工具
+  const mcp = state.skills.mcp || {};
+  skillList.appendChild(createSectionHeader("MCP 工具", Object.keys(mcp).length));
+  for (const [name, desc] of Object.entries(mcp)) {
+    skillList.appendChild(createSkillItem(name, desc, "MCP"));
   }
 
-  // 自定义技能
-  const custom = state.skills.custom || {};
-  for (const [name, desc] of Object.entries(custom)) {
-    skillList.appendChild(createSkillItem(name, desc, true));
+  // SKILL.md 技能
+  const skills = state.skills.skills || {};
+  skillList.appendChild(createSectionHeader("技能 · SKILL.md", Object.keys(skills).length));
+  if (Object.keys(skills).length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "skill-empty-hint";
+    empty.textContent = "暂无技能，可点击下方「导入技能」或「新建技能」";
+    skillList.appendChild(empty);
+  }
+  for (const [name, desc] of Object.entries(skills)) {
+    skillList.appendChild(createSkillItem(name, desc, "Skill"));
   }
 }
 
-function createSkillItem(name, desc, isCustom) {
+function createSkillItem(name, desc, kind) {
   const item = document.createElement("div");
   item.className = "skill-item";
 
   const info = document.createElement("div");
-  const nameEl = document.createElement("div");
-  nameEl.className = "skill-item-name";
-  nameEl.textContent = name + (isCustom ? " ✦" : "");
+  const nameRow = document.createElement("div");
+  nameRow.className = "skill-item-name";
+  const badge = document.createElement("span");
+  badge.className = "skill-kind-badge" + (kind === "MCP" ? " skill-kind-mcp" : " skill-kind-skill");
+  badge.textContent = kind;
+  nameRow.appendChild(badge);
+  nameRow.appendChild(document.createTextNode(" " + name));
   const descEl = document.createElement("div");
   descEl.className = "skill-item-desc";
   descEl.textContent = desc;
-  info.appendChild(nameEl);
+  info.appendChild(nameRow);
   info.appendChild(descEl);
   item.appendChild(info);
 
-  item.addEventListener("click", () => openSkillModal(name, isCustom));
+  // Skill 支持删除；MCP 内置工具不可删
+  if (kind === "Skill") {
+    const delBtn = document.createElement("button");
+    delBtn.className = "skill-item-del";
+    delBtn.title = "删除技能";
+    delBtn.textContent = "×";
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleDeleteSkill(name);
+    });
+    item.appendChild(delBtn);
+  }
+
+  item.addEventListener("click", () => {
+    if (kind === "MCP") openSkillModal(name, false);
+    else openSkillViewer(name);
+  });
   return item;
 }
 
-// ── 技能执行弹窗 ─────────────────────────────
+async function handleDeleteSkill(name) {
+  if (!confirm(`确定删除技能 ${name}？`)) return;
+  try {
+    const res = await del(`/skills/${encodeURIComponent(name)}`);
+    showToast(res.code === 0 ? `已删除技能 ${name}` : `删除失败: ${res.message}`);
+    if (res.code === 0) refreshSkills();
+  } catch (e) {
+    showToast(`删除失败: ${e.message}`);
+  }
+}
+
+// ── MCP 工具执行弹窗 ─────────────────────────────
 
 let currentSkillName = "";
 
-function openSkillModal(name, isCustom) {
+function openSkillModal(name) {
   currentSkillName = name;
-  skillModalTitle.textContent = `执行: ${name}`;
+  skillModalTitle.textContent = `执行 MCP 工具: ${name}`;
   skillParams.innerHTML = "";
   skillResult.classList.add("hidden");
   skillResult.textContent = "";
+  btnRunSkill.classList.remove("hidden");
 
-  if (isCustom) {
-    // 自定义技能没有预定义参数
+  const defs = SKILL_PARAM_DEFS[name] || [];
+  for (const def of defs) {
     const label = document.createElement("label");
-    label.textContent = "参数（JSON 格式）";
-    const input = document.createElement("textarea");
-    input.id = "skill-param-custom";
-    input.rows = 4;
-    input.placeholder = '{"key": "value"}';
+    label.textContent = def.label;
+
+    let input;
+    if (def.type === "textarea") {
+      input = document.createElement("textarea");
+      input.rows = 3;
+    } else {
+      input = document.createElement("input");
+      input.type = def.type;
+    }
+    input.id = `skill-param-${def.key}`;
+    input.placeholder = def.placeholder || "";
+    if (def.type === "number") input.value = "30";
+
     skillParams.appendChild(label);
     skillParams.appendChild(input);
-  } else {
-    const defs = SKILL_PARAM_DEFS[name] || [];
-    for (const def of defs) {
-      const label = document.createElement("label");
-      label.textContent = def.label;
-
-      let input;
-      if (def.type === "textarea") {
-        input = document.createElement("textarea");
-        input.rows = 3;
-      } else {
-        input = document.createElement("input");
-        input.type = def.type;
-      }
-      input.id = `skill-param-${def.key}`;
-      input.placeholder = def.placeholder || "";
-      if (def.type === "number") input.value = "30";
-
-      skillParams.appendChild(label);
-      skillParams.appendChild(input);
-    }
   }
 
   skillModal.classList.remove("hidden");
 }
 
+// ── SKILL.md 技能查看器（只读展示定义内容） ─────────────
+
+async function openSkillViewer(name) {
+  skillModalTitle.textContent = `技能: ${name}`;
+  skillParams.innerHTML = "";
+  btnRunSkill.classList.add("hidden");
+  skillResult.classList.remove("hidden");
+  skillResult.textContent = "读取中…";
+  skillModal.classList.remove("hidden");
+
+  try {
+    const res = await post("/skills/execute", { skill: name, params: {} });
+    if (res.code === 0 && res.data?.content) {
+      skillResult.textContent = res.data.content;
+    } else {
+      skillResult.textContent = `读取失败: ${res.message || "未知错误"}`;
+    }
+  } catch (e) {
+    skillResult.textContent = `请求失败: ${e.message}`;
+  }
+}
+
 async function executeSkill() {
   const params = {};
 
-  if (SKILL_PARAM_DEFS[currentSkillName]) {
-    for (const def of SKILL_PARAM_DEFS[currentSkillName]) {
-      const el = document.getElementById(`skill-param-${def.key}`);
-      if (el) {
-        params[def.key] = def.type === "number" ? parseInt(el.value) || 0 : el.value;
-      }
-    }
-  } else {
-    // 自定义技能
-    const el = document.getElementById("skill-param-custom");
-    if (el && el.value.trim()) {
-      try {
-        Object.assign(params, JSON.parse(el.value));
-      } catch (e) {
-        showToast("参数格式错误，请输入有效的 JSON");
-        return;
-      }
+  const defs = SKILL_PARAM_DEFS[currentSkillName] || [];
+  for (const def of defs) {
+    const el = document.getElementById(`skill-param-${def.key}`);
+    if (el) {
+      params[def.key] = def.type === "number" ? parseInt(el.value) || 0 : el.value;
     }
   }
 
@@ -246,6 +298,26 @@ function handleUploadSkill() {
   input.click();
 }
 
+// ── 导入 SKILL.md 技能（本地路径） ────────────────
+
+async function handleImportSkill() {
+  const path = prompt("输入本地路径（包含 SKILL.md 的目录，或单个 .md 文件）：");
+  if (!path || !path.trim()) return;
+  const name = prompt("技能名称（留空则自动取目录/文件名）：") || "";
+
+  try {
+    const res = await post("/skills/import", { path: path.trim(), name });
+    if (res.code === 0) {
+      showToast(`技能 ${res.data.skill} 导入成功（${res.data.files} 个文件）`);
+      refreshSkills();
+    } else {
+      showToast(`导入失败: ${res.message}`);
+    }
+  } catch (e) {
+    showToast(`导入失败: ${e.message}`);
+  }
+}
+
 // ── 刷新技能列表 ─────────────────────────────
 
 async function refreshSkills() {
@@ -260,6 +332,7 @@ async function refreshSkills() {
 function initSkillPanel() {
   skillList = document.getElementById("skill-list");
   btnUpload = document.getElementById("btn-upload-skill");
+  btnImport = document.getElementById("btn-import-skill");
   skillModal = document.getElementById("skill-modal");
   skillModalTitle = document.getElementById("skill-modal-title");
   skillParams = document.getElementById("skill-params");
@@ -267,6 +340,7 @@ function initSkillPanel() {
   btnRunSkill = document.getElementById("btn-run-skill");
 
   btnUpload.addEventListener("click", handleUploadSkill);
+  btnImport.addEventListener("click", handleImportSkill);
   btnRunSkill.addEventListener("click", executeSkill);
 
   // 关闭弹窗

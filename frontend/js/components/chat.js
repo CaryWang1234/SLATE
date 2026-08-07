@@ -2,20 +2,132 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext } from "../store.js?v=20260803-1";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260803-1";
-import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260803-1";
-import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260803-1";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260803-1";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext } from "../store.js?v=20260807-3";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260807-3";
+import { buildMessages, getDefaultParams } from "../services/adapter.js?v=20260807-3";
+import { detectToolCalls, stripToolCalls, executeToolCalls } from "../services/tools.js?v=20260807-3";
+import { renderMarkdown } from "../services/markdown.js?v=20260807-3";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260807-3";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
-let btnBrainstorm, btnCompress, btnMemory, btnSnippets, btnDoCompress, compressModal;
+let btnBrainstorm, btnCompress, btnMemory, btnSnippets, btnDoCompress, compressModal, queueStatus;
 let pendingFiles = []; // { name, size, content, type }
 let brainstormMode = false;
 let isGenerating = false;
 let activeGenerationController = null;
 let inputQueue = [];
+const CHAT_DRAFT_KEY = "slate_chat_draft";
+
+// ── @ 提及 MCP / Skill ──────────────────────
+let mentionPopup = null;
+let mentionCandidates = [];
+let mentionIndex = 0;
+
+function getMentionCandidates(query) {
+  const mcp = state.skills?.mcp || {};
+  const skills = state.skills?.skills || {};
+  const list = [
+    ...Object.entries(mcp).map(([name, desc]) => ({ name, desc, type: "MCP" })),
+    ...Object.entries(skills).map(([name, desc]) => ({ name, desc, type: "Skill" })),
+  ];
+  const q = query.toLowerCase();
+  if (!q) return list;
+  return list.filter(c => c.name.toLowerCase().includes(q) || String(c.desc).toLowerCase().includes(q));
+}
+
+// 获取光标前正在输入的 @token；返回 { start, query } 或 null
+function detectMentionToken() {
+  const pos = chatInput.selectionStart ?? chatInput.value.length;
+  const before = chatInput.value.slice(0, pos);
+  const m = /(^|[\s（(])@([\w\u4e00-\u9fff.-]*)$/.exec(before);
+  if (!m) return null;
+  return { start: pos - m[2].length - 1, query: m[2] };
+}
+
+function hideMentionPopup() {
+  if (mentionPopup) { mentionPopup.remove(); mentionPopup = null; }
+  mentionCandidates = [];
+  mentionIndex = 0;
+}
+
+function renderMentionPopup() {
+  const area = document.getElementById("chat-input-area");
+  if (!area) return;
+  if (!mentionCandidates.length) { hideMentionPopup(); return; }
+  if (!mentionPopup) {
+    mentionPopup = document.createElement("div");
+    mentionPopup.className = "mention-popup";
+    area.appendChild(mentionPopup);
+  }
+  mentionPopup.innerHTML = "";
+  mentionCandidates.forEach((c, i) => {
+    const item = document.createElement("div");
+    item.className = "mention-item" + (i === mentionIndex ? " active" : "");
+    const badge = document.createElement("span");
+    badge.className = "skill-kind-badge " + (c.type === "MCP" ? "skill-kind-mcp" : "skill-kind-skill");
+    badge.textContent = c.type;
+    const name = document.createElement("span");
+    name.className = "mention-name";
+    name.textContent = c.name;
+    const desc = document.createElement("span");
+    desc.className = "mention-desc";
+    desc.textContent = c.desc;
+    item.appendChild(badge);
+    item.appendChild(name);
+    item.appendChild(desc);
+    item.addEventListener("mousedown", (e) => { e.preventDefault(); applyMention(c); });
+    mentionPopup.appendChild(item);
+  });
+}
+
+function updateMentionPopup() {
+  const token = detectMentionToken();
+  if (!token) { hideMentionPopup(); return; }
+  mentionCandidates = getMentionCandidates(token.query).slice(0, 10);
+  mentionIndex = 0;
+  renderMentionPopup();
+}
+
+function applyMention(candidate) {
+  const token = detectMentionToken();
+  if (!token) { hideMentionPopup(); return; }
+  const pos = chatInput.selectionStart ?? chatInput.value.length;
+  const insert = `@${candidate.name} `;
+  chatInput.value = chatInput.value.slice(0, token.start) + insert + chatInput.value.slice(pos);
+  const caret = token.start + insert.length;
+  chatInput.setSelectionRange(caret, caret);
+  chatInput.focus();
+  hideMentionPopup();
+  try { localStorage.setItem(CHAT_DRAFT_KEY, chatInput.value); } catch (e) {}
+}
+
+// 发送时解析消息中的 @提及：MCP 注入调用提示，Skill 注入 SKILL.md 定义内容
+async function resolveMentions(text) {
+  const mcp = state.skills?.mcp || {};
+  const skills = state.skills?.skills || {};
+  const tokens = [...new Set((text.match(/@[\w\u4e00-\u9fff.-]+/g) || []))];
+  let context = "";
+  for (const token of tokens) {
+    const name = token.slice(1);
+    if (mcp[name]) {
+      context += `\n\n[提及 MCP 工具] ${name} — ${mcp[name]}。任务需要时请通过 skill_run 工具调用。`;
+    } else if (skills[name]) {
+      let injected = false;
+      try {
+        const res = await post("/skills/execute", { skill: name, params: {} });
+        if (res.code === 0 && res.data?.content) {
+          context += `\n\n[提及技能: ${name}]\n请遵循以下 SKILL.md 定义完成任务：\n${res.data.content}`;
+          injected = true;
+        }
+      } catch (e) { /* 降级为描述 */ }
+      if (!injected) {
+        context += `\n\n[提及技能: ${name}] — ${skills[name]}`;
+      }
+    }
+  }
+  return context;
+}
 
 // ── 用量同步到后端 ──────────────────────────
 
@@ -35,31 +147,7 @@ async function syncUsageToBackend() {
   }
 }
 
-// ─ 简易 Markdown → HTML ────────────────────
-
-function renderMarkdown(text) {
-  if (!text) return "";
-  let html = text
-    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-      const escaped = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      return `<pre><code class="language-${lang || "text"}">${escaped}</code></pre>`;
-    })
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-    .replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>")
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
-    .replace(/\n/g, "<br>");
-
-  html = html.replace(/((?:<li>.*?<\/li><br>?)+)/g, (match) => {
-    const items = match.replace(/<br>/g, "");
-    return `<ul>${items}</ul>`;
-  });
-  return html;
-}
+// ─ Markdown 渲染：统一使用 services/markdown.js（代码块保护 + HTML 转义 + 流式部分输出兼容） ─
 
 function normalizeMessageForRender(msg) {
   const normalized = {
@@ -134,9 +222,7 @@ function renderMessage(msg, index) {
   div.appendChild(content);
 
   if (Array.isArray(msg.toolResults)) {
-    for (const item of msg.toolResults) {
-      div.appendChild(renderToolCallCard(item.call || item, item.result || item));
-    }
+    div.appendChild(renderToolCallGroup(msg.toolResults));
   }
 
   // 消息操作按钮
@@ -327,6 +413,13 @@ function updateSendState() {
   btnSend.disabled = false;
   btnSend.textContent = isGenerating ? "停止" : (inputQueue.length ? `发送(${inputQueue.length})` : "发送");
   btnSend.classList.toggle("is-stopping", isGenerating);
+  if (queueStatus) {
+    queueStatus.classList.toggle("hidden", !isGenerating && inputQueue.length === 0);
+    const statusText = queueStatus.querySelector(".queue-status-text");
+    if (statusText) {
+      statusText.textContent = `${isGenerating ? "正在生成" : "待发送"}${inputQueue.length ? ` · 队列 ${inputQueue.length}` : ""}`;
+    }
+  }
   if (chatInput) {
     const queueHint = inputQueue.length ? ` · 队列 ${inputQueue.length}` : "";
     chatInput.placeholder = isGenerating
@@ -343,6 +436,7 @@ function captureCurrentInputForQueue() {
   inputQueue.push({ text, files: [...pendingFiles] });
   chatInput.value = "";
   chatInput.style.height = "auto";
+  try { localStorage.removeItem(CHAT_DRAFT_KEY); } catch (e) {}
   pendingFiles = [];
   renderFilePreview();
   updateSendState();
@@ -352,6 +446,12 @@ function captureCurrentInputForQueue() {
 function stopGeneration() {
   if (!isGenerating) return;
   activeGenerationController?.abort();
+  updateSendState();
+}
+
+function clearInputQueue() {
+  if (inputQueue.length === 0) return;
+  inputQueue = [];
   updateSendState();
 }
 
@@ -530,15 +630,65 @@ async function autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl, signal = 
 
 // ── 工具调用渲染 ─────────────────────────────
 
-function renderToolCallCard(call, result) {
-  const el = document.createElement("div");
-  el.className = "tool-call-card";
+function getToolCallLabel(call) {
+  const skillName = call?.name === "skill_run" ? call.params?.skill : "";
+  return skillName ? `Skill · ${skillName}` : `Tool · ${call?.name || "unknown"}`;
+}
 
-  const header = document.createElement("div");
+function getToolCallStatus(result) {
+  if (result?.success === false) return "失败";
+  if (result?._structured?._type === "file_edit") return "diff 预览";
+  if (result?._structured?._type === "file_create") return "文件预览";
+  return "已执行";
+}
+
+function renderToolCallGroup(items) {
+  const normalized = (items || []).map(item => ({ call: item.call || item, result: item.result || item }));
+  if (normalized.length === 0) return document.createDocumentFragment();
+  if (normalized.length === 1) return renderToolCallCard(normalized[0].call, normalized[0].result);
+
+  const group = document.createElement("details");
+  group.className = "tool-call-group";
+
+  const summary = document.createElement("summary");
+  summary.className = "tool-call-group-summary";
+  const labels = normalized.map(item => getToolCallLabel(item.call)).slice(0, 3).join(" / ");
+  const title = document.createElement("span");
+  title.textContent = `调用 ${normalized.length} 项`;
+  const meta = document.createElement("span");
+  meta.className = "tool-call-summary-meta";
+  meta.textContent = `${labels}${normalized.length > 3 ? " / ..." : ""}`;
+  summary.append(title, meta);
+  group.appendChild(summary);
+
+  const body = document.createElement("div");
+  body.className = "tool-call-group-body";
+  for (const item of normalized) {
+    body.appendChild(renderToolCallCard(item.call, item.result));
+  }
+  group.appendChild(body);
+  return group;
+}
+
+function renderToolCallCard(call, result) {
+  const el = document.createElement("details");
+  el.className = "tool-call-card";
+  el.open = result?._structured?._type === "file_edit" || result?._structured?._type === "file_create";
+
+  const header = document.createElement("summary");
   header.className = "tool-call-header";
-  const skillName = call.name === "skill_run" ? call.params?.skill : "";
-  header.textContent = skillName ? `Skill · ${skillName}` : `Tool · ${call.name}`;
+  const label = document.createElement("span");
+  label.className = "tool-call-name";
+  label.textContent = getToolCallLabel(call);
+  const status = document.createElement("span");
+  status.className = result?.success === false ? "tool-call-status-pill failed" : "tool-call-status-pill";
+  status.textContent = getToolCallStatus(result);
+  header.appendChild(label);
+  header.appendChild(status);
   el.appendChild(header);
+
+  const body = document.createElement("div");
+  body.className = "tool-call-body";
 
   if (call.params && Object.keys(call.params).length > 0) {
     const input = document.createElement("div");
@@ -557,23 +707,24 @@ function renderToolCallCard(call, result) {
     } else {
       input.textContent = JSON.stringify(call.params, null, 2);
     }
-    el.appendChild(input);
+    body.appendChild(input);
   }
 
   // 检测结构化结果
   if (result._structured && result._structured._type === "file_edit") {
-    el.appendChild(renderFileEditDiff(result._structured));
+    body.appendChild(renderFileEditDiff(result._structured));
   } else if (result._structured && result._structured._type === "file_create") {
-    el.appendChild(renderFileCreateDiff(result._structured));
+    body.appendChild(renderFileCreateDiff(result._structured));
   } else {
     const output = document.createElement("div");
     output.className = "tool-call-output tool-call-status";
     output.textContent = shouldHideToolOutput(call)
       ? (result.success === false ? `执行失败: ${result.output || "未知错误"}` : "已执行，结果仅作为上下文提供给模型。")
       : (result.output || "");
-    el.appendChild(output);
+    body.appendChild(output);
   }
 
+  el.appendChild(body);
   return el;
 }
 
@@ -710,6 +861,14 @@ function renderFileCreateDiff(data) {
     wrap.appendChild(errDiv);
   }
 
+  // 模型输出被截断时的醒目警告（内容可能不完整）
+  if (data.truncated) {
+    const warn = document.createElement("div");
+    warn.className = "file-edit-errors";
+    warn.textContent = "⚠ 模型输出长度达到上限，文件内容可能在末尾被截断。请核对完整性后再创建，必要时让模型续写补全。";
+    wrap.appendChild(warn);
+  }
+
   // 只有有 diff 内容时才渲染 pre
   if (data.diff) {
     const pre = document.createElement("pre");
@@ -798,7 +957,7 @@ function renderFileCreateDiff(data) {
   return wrap;
 }
 
-async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperature: 0.7, max_tokens: 4096 }, signal = null) {
+async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperature: 0.7, max_tokens: 16384 }, signal = null) {
   const MAX_ROUNDS = 5;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (signal?.aborted) break;
@@ -867,7 +1026,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
 
     let followContent2 = "";
     try {
-      for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: 0.7, max_tokens: 4096, stream: true, signal })) {
+      for await (const chunk of streamChat({ model: modelId, messages, api_key: apiKey, base_url: baseUrl, temperature: params.temperature ?? 0.7, max_tokens: params.max_tokens ?? 16384, stream: true, signal })) {
         followContent2 += chunk;
         renderAssistantContent(followContent, followContent2, cursor);
         chatScroll.scrollTop = chatScroll.scrollHeight;
@@ -900,7 +1059,7 @@ async function sendMessage(queuedPayload = null) {
   if (isGenerating) {
     if (queuedPayload) inputQueue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260803-1");
+      const { toast } = await import("../app.js?v=20260807-3");
       toast(`已加入输入队列（${inputQueue.length}）`);
     }
     updateSendState();
@@ -928,6 +1087,7 @@ async function sendMessage(queuedPayload = null) {
   if (!queuedPayload) {
     chatInput.value = "";
     chatInput.style.height = "auto";
+    try { localStorage.removeItem(CHAT_DRAFT_KEY); } catch (e) {}
     pendingFiles = [];
     renderFilePreview();
   }
@@ -948,7 +1108,8 @@ async function sendMessage(queuedPayload = null) {
     }
   }
 
-  const fullText = text + fileContext;
+  const mentionContext = await resolveMentions(text);
+  const fullText = text + mentionContext + fileContext;
   await refreshKnowledgeContext(fullText);
   const userMsg = { role: "user", content: fullText, model: "", files: fileMeta.length > 0 ? fileMeta : undefined };
   addMessage(userMsg);
@@ -1034,7 +1195,7 @@ async function sendMessage(queuedPayload = null) {
 
   } catch (err) {
     console.error("发送失败:", err);
-    const { toast } = await import("../app.js?v=20260803-1");
+    const { toast } = await import("../app.js?v=20260807-3");
     toast(isAbortError(err) ? "已停止输出" : `发送失败: ${err.message}`);
   } finally {
   isGenerating = false;
@@ -1078,7 +1239,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260803-1");
+    const { toast } = await import("../app.js?v=20260807-3");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -1095,7 +1256,7 @@ function toggleBrainstormMode() {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260803-1").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260807-3").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -1119,7 +1280,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260803-1");
+    const { toast } = await import("../app.js?v=20260807-3");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -1152,7 +1313,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260803-1");
+    const { toast } = await import("../app.js?v=20260807-3");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -1320,7 +1481,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260803-1");
+      const { toast } = await import("../app.js?v=20260807-3");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }
@@ -1368,6 +1529,11 @@ function initChat() {
   btnSnippets = document.getElementById("btn-snippets");
   btnDoCompress = document.getElementById("btn-do-compress");
   compressModal = document.getElementById("compress-modal");
+  queueStatus = document.createElement("div");
+  queueStatus.className = "queue-status hidden";
+  queueStatus.innerHTML = '<span class="queue-status-text"></span><button type="button" class="queue-clear-btn">清空队列</button>';
+  document.getElementById("chat-input-area")?.insertAdjacentElement("beforebegin", queueStatus);
+  queueStatus.querySelector(".queue-clear-btn")?.addEventListener("click", clearInputQueue);
 
   btnSend.addEventListener("click", () => {
     if (isGenerating) stopGeneration();
@@ -1420,13 +1586,35 @@ function initChat() {
   });
 
   chatInput.addEventListener("keydown", (e) => {
+    // @ 提及弹窗优先接管方向键 / Enter / Tab / Esc
+    if (mentionPopup) {
+      if (e.key === "ArrowDown") { e.preventDefault(); mentionIndex = (mentionIndex + 1) % mentionCandidates.length; renderMentionPopup(); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); mentionIndex = (mentionIndex - 1 + mentionCandidates.length) % mentionCandidates.length; renderMentionPopup(); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); applyMention(mentionCandidates[mentionIndex]); return; }
+      if (e.key === "Escape") { e.preventDefault(); hideMentionPopup(); return; }
+    }
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
 
   chatInput.addEventListener("input", () => {
     chatInput.style.height = "auto";
     chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + "px";
+    try { localStorage.setItem(CHAT_DRAFT_KEY, chatInput.value); } catch (e) {}
+    updateMentionPopup();
   });
+
+  chatInput.addEventListener("blur", () => {
+    // 延迟隐藏，保证弹窗 mousedown 先触发
+    setTimeout(hideMentionPopup, 150);
+  });
+
+  try {
+    const draft = localStorage.getItem(CHAT_DRAFT_KEY);
+    if (draft && !chatInput.value) {
+      chatInput.value = draft;
+      chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + "px";
+    }
+  } catch (e) {}
 
   btnNewChat.addEventListener("click", () => {
     state.currentConversationId = null;

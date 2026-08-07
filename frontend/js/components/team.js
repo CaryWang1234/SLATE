@@ -3,9 +3,10 @@
  * 轻量模型初步讨论 → 重型模型最终决策
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260803-1";
-import { streamChat } from "../services/api.js?v=20260803-1";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260803-1";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260807-3";
+import { streamChat } from "../services/api.js?v=20260807-3";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260807-3";
+import { renderMarkdown } from "../services/markdown.js?v=20260807-3";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -449,11 +450,7 @@ function findModel(modelId) {
 }
 
 function renderSimpleMarkdown(text) {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
-    .replace(/\n/g, "<br>")
-    .replace(/((?:<li>.*?<\/li><br>?)+)/g, (m) => `<ul>${m.replace(/<br>/g, "")}</ul>`);
+  return renderMarkdown(text);
 }
 
 // ── 初始化 ──────────────────────────────────

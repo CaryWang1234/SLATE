@@ -46,8 +46,8 @@ const state = {
   // 宪法
   constitution: null,
 
-  // 技能
-  skills: { builtin: {}, custom: {} },
+  // MCP 内置工具 + SKILL.md 技能
+  skills: { mcp: {}, skills: {} },
 
   // 项目
   project: null,        // { path, name, config, constitution }

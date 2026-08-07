@@ -1,5 +1,5 @@
 /**
- * SLATE AI 工具系统：让 AI 直接操作黑板、技能、提示词工厂
+ * SLATE AI 工具系统：让 AI 直接操作黑板、MCP 工具、提示词工厂
  *
  * 工具调用格式（AI 输出）：
  *   ◈◈◈tool_name
@@ -7,8 +7,8 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards } from "../store.js?v=20260803-1";
-import { post } from "../services/api.js?v=20260803-1";
+import { state, addBoardCard, setBoardCards } from "../store.js?v=20260807-3";
+import { post } from "../services/api.js?v=20260807-3";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -141,11 +141,11 @@ const TOOLS = {
   },
 
   skill_run: {
-    name: "执行技能",
-    description: "调用内置技能。可用：file_tree(目录树), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描)",
+    name: "执行 MCP 工具",
+    description: "调用 MCP 内置工具。可用：file_tree(目录树), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描)。也可传入 SKILL.md 技能名读取其定义内容。",
     params: {
-      skill: { type: "string", description: "技能名称", required: true },
-      params: { type: "object", description: "技能参数" },
+      skill: { type: "string", description: "MCP 工具或技能名称", required: true },
+      params: { type: "object", description: "工具参数" },
     },
     async execute({ skill, params }) {
       try {
@@ -170,9 +170,9 @@ const TOOLS = {
           if (typeof data === "string") return data.length > 2000 ? data.slice(0, 2000) + "…" : data;
           return JSON.stringify(data, null, 2);
         }
-        return `技能执行失败: ${res.message}`;
+        return `MCP 工具执行失败: ${res.message}`;
       } catch (e) {
-        return `技能调用出错: ${e.message}`;
+        return `MCP 工具调用出错: ${e.message}`;
       }
     },
   },
@@ -260,10 +260,26 @@ const TOOLS = {
       file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录）", required: true },
       edits: { type: "array", description: '编辑列表，每项含 old_text 和 new_text，如 [{"old_text":"原内容","new_text":"新内容"}]', required: true },
     },
-    async execute({ file_path, edits }) {
+    async execute({ file_path, edits, _truncated }) {
       if (!state.project) return "未打开项目";
       if (!file_path) return "缺少 file_path";
       if (!edits || !edits.length) return "缺少 edits";
+
+      // 输出被截断时 edits 列表可能不完整，只应用部分编辑很危险，拒绝执行
+      if (_truncated) {
+        return {
+          _type: "file_edit",
+          file: "",
+          file_path_rel: String(file_path || ""),
+          file_name: String(file_path || "").replace(/\\/g, "/").split("/").pop() || "",
+          diff: "",
+          new_content: "",
+          stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+          errors: ["模型输出被截断，edits 可能不完整，已拒绝执行。请减少单次编辑量或重试"],
+          applied: [],
+          truncated: true,
+        };
+      }
 
       const target = normalizeProjectRelativePath(file_path);
       if (target.error) {
@@ -349,10 +365,11 @@ const TOOLS = {
       file_path: { type: "string", description: "新文件相对路径（相对于项目根目录），如 src/utils/helper.js", required: true },
       content: { type: "string", description: "文件完整内容", required: true },
     },
-    async execute({ file_path, content }) {
+    async execute({ file_path, content, _truncated }) {
       if (!state.project) return "未打开项目";
       if (!file_path) return "缺少 file_path";
       if (content === undefined || content === null) return "缺少 content";
+      const truncated = Boolean(_truncated);
 
       const target = normalizeProjectRelativePath(file_path);
       if (target.error) {
@@ -365,6 +382,7 @@ const TOOLS = {
           content,
           stats: { lines: String(content).split("\n").length, chars: String(content).length },
           errors: [target.error],
+          truncated,
         };
       }
       const absPath = target.abs;
@@ -384,6 +402,7 @@ const TOOLS = {
           content,
           stats: { lines: content.split("\n").length, chars: content.length },
           errors: ["网络请求失败: " + e.message],
+          truncated,
         };
       }
       if (res.code !== 0) {
@@ -396,6 +415,7 @@ const TOOLS = {
           content,
           stats: { lines: content.split("\n").length, chars: content.length },
           errors: [res.message || "未知错误"],
+          truncated,
         };
       }
       const data = res.data;
@@ -409,6 +429,7 @@ const TOOLS = {
           content,
           stats: { lines: content.split("\n").length, chars: content.length },
           errors: [data.error],
+          truncated,
         };
       }
 
@@ -421,6 +442,7 @@ const TOOLS = {
         content: data.content,
         stats: data.stats || { lines: content.split("\n").length, chars: content.length },
         errors: data.errors || [],
+        truncated,
       };
     },
   },
@@ -447,22 +469,146 @@ const TOOLS = {
 
 const TOOL_RE = /◈◈◈\s*(\w+)\s*\r?\n([\s\S]*?)(?:◈◆◆|◆◆)/g;
 
+/**
+ * 从 start 位置（必须是 "）读取一个 JSON 字符串，正确处理转义。
+ * 返回 { value, end, complete }。未闭合时 complete=false，
+ * 不完整的 \uXXXX 转义整体丢弃，避免产生损坏的中文字符。
+ */
+function readJsonString(raw, start) {
+  let out = "";
+  let i = start + 1;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === '"') return { value: out, end: i + 1, complete: true };
+    if (ch !== "\\") { out += ch; i += 1; continue; }
+    const next = raw[i + 1];
+    if (next === undefined) break; // 转义序列被截断，丢弃残余
+    if (next === "u") {
+      const hex = raw.slice(i + 2, i + 6);
+      if (hex.length === 4 && /^[0-9a-fA-F]{4}$/.test(hex)) {
+        out += String.fromCharCode(parseInt(hex, 16));
+        i += 6;
+      } else {
+        break; // 不完整的 unicode 转义，丢弃以防乱码
+      }
+    } else {
+      const map = { n: "\n", t: "\t", r: "\r", b: "\b", f: "\f", '"': '"', "\\": "\\", "/": "/" };
+      out += map[next] !== undefined ? map[next] : next;
+      i += 2;
+    }
+  }
+  return { value: out, end: raw.length, complete: false };
+}
+
+/**
+ * 从 start 位置读取一个 JSON 值（数组/对象/数字等）。
+ * 被截断时自动补齐括号，并剔除末尾不完整的字符串，尽力解析出可用结果。
+ */
+function readJsonValueWithRepair(raw, start) {
+  const stack = [];
+  let i = start;
+  while (i < raw.length) {
+    const c = raw[i];
+    if (c === '"') {
+      const s = readJsonString(raw, i);
+      if (!s.complete) break; // 截断点位于字符串内部，到此为止
+      i = s.end;
+      continue;
+    }
+    if (c === "{" || c === "[") stack.push(c);
+    else if (c === "}" || c === "]") {
+      if (!stack.length) break; // 当前值已结束
+      stack.pop();
+    } else if (c === "," && !stack.length) {
+      break; // 当前值已结束
+    }
+    i += 1;
+  }
+  let seg = raw.slice(start, i).replace(/,\s*$/, "").trim();
+  for (let k = stack.length - 1; k >= 0; k--) seg += stack[k] === "{" ? "}" : "]";
+  try {
+    return { value: JSON.parse(seg), end: i };
+  } catch {
+    return { value: undefined, end: i };
+  }
+}
+
+/**
+ * 从被截断的工具调用参数文本中尽力抢救出参数对象。
+ * 典型场景：输出长度达到 max_tokens 上限，JSON 缺少闭合引号/括号。
+ */
+function salvageTruncatedParams(raw) {
+  const params = {};
+  let i = raw.indexOf("{");
+  if (i < 0) return params;
+  i += 1;
+  while (i < raw.length) {
+    while (i < raw.length && /[\s,]/.test(raw[i])) i += 1;
+    if (i >= raw.length || raw[i] === "}") break;
+    if (raw[i] !== '"') break;
+    const key = readJsonString(raw, i);
+    if (!key.complete) break;
+    i = key.end;
+    while (i < raw.length && /\s/.test(raw[i])) i += 1;
+    if (raw[i] !== ":") break;
+    i += 1;
+    while (i < raw.length && /\s/.test(raw[i])) i += 1;
+    if (i >= raw.length) break;
+    if (raw[i] === '"') {
+      const val = readJsonString(raw, i);
+      params[key.value] = val.value;
+      i = val.end;
+      if (!val.complete) break; // 字符串值被截断，抢救到此为止
+    } else {
+      const val = readJsonValueWithRepair(raw, i);
+      if (val.value !== undefined) params[key.value] = val.value;
+      i = val.end;
+      break; // 非字符串值通常是最后一项，且可能不完整，停止抢救
+    }
+  }
+  return params;
+}
+
 function detectToolCalls(text) {
   const calls = [];
   let match;
+  let lastEnd = 0;
   const re = new RegExp(TOOL_RE.source, "g");
   while ((match = re.exec(text)) !== null) {
+    lastEnd = re.lastIndex;
     try {
       calls.push({ name: match[1], params: JSON.parse(match[2] || "{}") });
     } catch {
       calls.push({ name: match[1], params: {} });
     }
   }
+
+  // 处理末尾被截断的工具调用块（缺少闭合标记 ◈◆◆，通常是输出达到 max_tokens 上限）
+  // 不能直接丢弃：file_create 的 content 往往已输出了大部分内容，应尽力抢救
+  const rest = text.slice(lastEnd);
+  const openMatch = /◈◈◈[ \t]*(\w+)[ \t]*\r?\n([\s\S]*)$/.exec(rest);
+  if (openMatch) {
+    const name = openMatch[1];
+    const rawBody = openMatch[2];
+    let params;
+    try {
+      params = JSON.parse(rawBody.trim());
+    } catch {
+      params = salvageTruncatedParams(rawBody);
+    }
+    params._truncated = true;
+    calls.push({ name, params });
+  }
   return calls;
 }
 
 function stripToolCalls(text) {
-  return text.replace(TOOL_RE, "").replace(/\n{3,}/g, "\n\n").trim();
+  const stripped = text.replace(TOOL_RE, "");
+  // 同时移除末尾未闭合的截断工具块，避免残缺 JSON 残留在消息正文
+  return stripped
+    .replace(/◈◈◈[ \t]*\w+[ \t]*\r?\n[\s\S]*$/, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // ── 工具执行 ──────────────────────────────────
@@ -516,7 +662,7 @@ function getToolsSystemPrompt() {
   s += "**调用规则：必须使用下方指定格式调用工具。不要只描述你要做什么——必须实际发出调用。**\n";
   s += "每次调用独占一行，格式严格如下（◈◈◈ 和 ◈◆◆ 是固定标记，不可省略）：\n";
   s += "◈◈◈tool_name\n{JSON参数}\n◈◆◆\n\n";
-  s += "如果当前任务已经需要你查看文件、目录、项目结构、黑板内容或技能结果，当前回复必须包含工具调用块。\n";
+  s += "如果当前任务已经需要你查看文件、目录、项目结构、黑板内容或 MCP 工具结果，当前回复必须包含工具调用块。\n";
   s += "如果你只是在问用户是否需要继续、是否要你动手、是否要给出方案，不要调用工具。\n";
   s += "禁止只输出“我先查看”“我需要读取”“让我看看”等意图描述后停止。\n\n";
   s += "只知道文件名但不知道相对路径时，先调用 project_find_file；拿到匹配路径后再调用 project_read_file 读取目标文件。\n\n";
@@ -569,6 +715,8 @@ function getToolsSystemPrompt() {
   s += "- file_path 只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
   s += "- 如果用户只要求输出文件但没有指定位置，默认放在 outputs/ 下，并使用清晰的文件名\n";
   s += "- content: 文件的完整内容\n";
+  s += "- content 必须输出完整内容，绝不允许用“…其余省略”“// 同上”等方式缩写\n";
+  s += "- 超长文件（预计超过 300 行）应拆分为多次 file_create/file_edit 调用，不要单次硬塞\n";
   s += "- 如果文件已存在，应使用 file_edit 工具而非 file_create\n";
   s += "- 用户会看到内容预览，并可以选择「接受」「拒绝」或「复制」\n";
   s += "- 创建完成后，等待用户确认\n";
