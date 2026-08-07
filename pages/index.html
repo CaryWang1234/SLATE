@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLATE（砚）· 本地 AI 协作调度台</title>
+  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Harness 自主执行、MCP 工具、AI 团队辩论与白板式逻辑链，将灵感转化为结构化方案。">
+  <link rel="icon" type="image/png" href="./icon.png">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+  <!-- ═══ 导航 ═══ -->
+  <nav class="nav">
+    <div class="container nav-inner">
+      <a class="nav-brand" href="#top">
+        <img src="./icon.png" alt="SLATE">
+        <span>SLATE · 砚</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">功能</a>
+        <a href="#highlights">亮点</a>
+        <a href="#stack">技术栈</a>
+        <a href="#start">快速开始</a>
+      </div>
+      <a class="nav-github" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+  </nav>
+
+  <!-- ═══ Hero ═══ -->
+  <header class="hero" id="top">
+    <div class="container">
+      <img class="hero-logo" src="./icon.png" alt="SLATE Logo">
+      <h1 class="hero-title">SLATE<span class="ink">（砚）</span></h1>
+      <p class="hero-sub">本地 AI 协作调度台 · 将灵感转化为结构化方案</p>
+      <p class="hero-en">Local AI collaboration studio — turn sparks of ideas into structured plans.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ 下载安装包</a>
+        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">查看源码 →</a>
+      </div>
+      <div class="hero-badges">
+        <span class="badge">MIT License</span>
+        <span class="badge">Python 3.13+</span>
+        <span class="badge">零 npm · 零构建</span>
+        <span class="badge">本地优先</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══ 功能全景 ═══ -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-tag">Features</div>
+      <h2 class="section-title">功能全景</h2>
+      <p class="section-desc">既能直接驱动内置工具完成任务，也能生成高质量 Prompt 交给外部 Coding Agent（Claude Code、Codex、Cursor 等）执行。</p>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🗣️</div>
+          <div class="feature-name">多模型统一接入</div>
+          <div class="feature-desc">GPT / Claude / Gemini、DeepSeek / Kimi / Qwen / GLM 等国内外主流模型，支持自定义 OpenAI 兼容端点与本地模型（Ollama / LM Studio）。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-name">Harness 自主执行</div>
+          <div class="feature-desc">模型自主规划、多轮调用工具直至任务完成，进度实时可见，随时可停止。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛠️</div>
+          <div class="feature-name">13 个内置 MCP 工具</div>
+          <div class="feature-desc">文件读写编辑、终端沙箱、仓库统计、正则测试、文本摘要等，@提及即用。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧩</div>
+          <div class="feature-name">自定义 Skill 系统</div>
+          <div class="feature-desc">SKILL.md 即插即用，上传或导入即可扩展新能力，聊天中 @ 提及自动注入上下文。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">👥</div>
+          <div class="feature-name">AI 团队多轮辩论</div>
+          <div class="feature-desc">多角色提案 / 反驳 / 决策，轻量模型讨论、重型模型拍板，自动摘要节约 token。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⏰</div>
+          <div class="feature-name">定时对话任务</div>
+          <div class="feature-desc">单次 / 每日定点 / 固定间隔调度，到点自动执行预设提示词，结果归档独立会话。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧠</div>
+          <div class="feature-name">白板式逻辑链</div>
+          <div class="feature-desc">灵感卡片化，拖拽布局、箭头连线标识依赖与数据流，Mermaid 渲染图表。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💾</div>
+          <div class="feature-name">长期记忆 & 知识库</div>
+          <div class="feature-desc">自动沉淀对话要点，跨会话召回；本地知识片段检索注入。</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🏭</div>
+          <div class="feature-name">提示词工厂</div>
+          <div class="feature-desc">宪法摘要 → 上下文片段 → 任务描述 → 约束 → 交付要求，一键整合为可交付 Prompt。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 三大亮点 ═══ -->
+  <section class="section" id="highlights">
+    <div class="container">
+      <div class="section-tag">Highlights</div>
+      <h2 class="section-title">为长任务而生的工程细节</h2>
+
+      <div class="highlight">
+        <div class="highlight-text">
+          <h3>⚡ Harness：让模型自己干完</h3>
+          <p>开启 Harness 后，模型按"拆解 → 执行 → 验证 → 报告"自主推进，无需人工逐步喂指令。</p>
+          <ul>
+            <li>工具调用轮数提升至 10–50 轮</li>
+            <li>金色进度条实时显示执行轮次</li>
+            <li>输出截断自动续写，最多 3 轮拼回原文</li>
+          </ul>
+        </div>
+        <div class="code-box">
+          <div class="code-box-bar"><i></i><i></i><i></i></div>
+          <pre><span class="c-muted"># 开启 ⚡ 后发送任务</span>
+<span class="c-prompt">你 ▸</span> <span class="c-text">整理本项目全部 API 并生成文档</span>
+<span class="c-muted">Harness 自主执行 · 第 3/20 轮</span>
+<span class="c-prompt">砚 ▸</span> <span class="c-text">✓ 完结报告：已生成 docs/api.md …</span></pre>
+        </div>
+      </div>
+
+      <div class="highlight">
+        <div class="highlight-text">
+          <h3>🛡️ 永不卡死的四层防线</h3>
+          <p>参考主流 Agent 的流式健壮性方案，从连接层到界面层层兜底。</p>
+          <ul>
+            <li>流式 idle 看门狗：90 秒无数据主动断开</li>
+            <li>零内容自动退避重试</li>
+            <li>请求 / MCP 工具 180 秒超时</li>
+            <li>UI 兜底看门狗强制恢复界面</li>
+          </ul>
+        </div>
+        <div class="code-box">
+          <div class="code-box-bar"><i></i><i></i><i></i></div>
+          <pre><span class="c-muted">// frontend/js/services/api.js</span>
+<span class="c-text">STREAM_IDLE_TIMEOUT_MS = 90000</span>
+<span class="c-text">STREAM_MAX_RETRIES     = 2</span>
+<span class="c-text">REQUEST_TIMEOUT_MS     = 180000</span>
+<span class="c-muted">// 慢 ≠ 死：持续有数据永不干扰</span></pre>
+        </div>
+      </div>
+
+      <div class="highlight">
+        <div class="highlight-text">
+          <h3>🧩 能力即文件</h3>
+          <p>13 个内置 MCP 工具开箱即用，自定义能力只需一个 SKILL.md 文件。</p>
+          <ul>
+            <li>file_tree / file_edit / terminal / repo_stats …</li>
+            <li>上传 SKILL.md 即刻扩展新技能</li>
+            <li>聊天输入 @ 提及，上下文自动注入</li>
+          </ul>
+        </div>
+        <div class="code-box">
+          <div class="code-box-bar"><i></i><i></i><i></i></div>
+          <pre><span class="c-muted"># data/skills/my-skill/SKILL.md</span>
+<span class="c-text">---</span>
+<span class="c-text">name: my-skill</span>
+<span class="c-text">description: 我的自定义能力</span>
+<span class="c-text">---</span>
+<span class="c-muted"># 具体指令内容…</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 技术栈 ═══ -->
+  <section class="section" id="stack">
+    <div class="container">
+      <div class="section-tag">Tech Stack</div>
+      <h2 class="section-title">原生技术，零构建</h2>
+      <p class="section-desc">前端即文件，改完即生效；没有 npm，没有打包器，没有框架税。</p>
+
+      <table class="stack-table">
+        <tr><th>层级</th><th>选型</th></tr>
+        <tr><td>前端</td><td>原生 HTML + CSS + JavaScript（ES Modules，零构建）</td></tr>
+        <tr><td>后端</td><td>Python 3.13+ · FastAPI · Uvicorn · httpx</td></tr>
+        <tr><td>存储</td><td>SQLite（对话历史）· JSON（状态 / 定时任务 / 宪法）</td></tr>
+        <tr><td>渲染</td><td>Highlight.js · Mermaid.js（CDN）</td></tr>
+        <tr><td>桌面</td><td>webview2 壳 + PyInstaller 打包 + Inno Setup 安装器</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══ 快速开始 ═══ -->
+  <section class="section" id="start">
+    <div class="container">
+      <div class="section-tag">Quick Start</div>
+      <h2 class="section-title">三步开始研磨</h2>
+
+      <div class="start-steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <h4>获取 SLATE</h4>
+          <p>下载 Windows 安装包开箱即用，或克隆源码：</p>
+          <code>git clone https://github.com/CaryWang1234/SLATE.git</code>
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <h4>启动</h4>
+          <p>源码运行需要 Python 3.13+：</p>
+          <code>pip install -r requirements.txt<br>start.bat &nbsp;# 或 ./start.sh</code>
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <h4>配置模型</h4>
+          <p>在设置中填入所需模型的 API Key，访问本地服务：</p>
+          <code>http://127.0.0.1:8000</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Footer ═══ -->
+  <footer class="footer">
+    <div class="container">
+      <p class="ink-line">SLATE（砚）—— 研磨灵感，落笔成章。</p>
+      <p>
+        <a href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">Releases</a> ·
+        <a href="https://github.com/CaryWang1234/SLATE/issues" target="_blank" rel="noopener">Issues</a>
+      </p>
+      <p style="margin-top: 8px;">Released under the MIT License · © 2026 Cary</p>
+    </div>
+  </footer>
+
+</body>
+</html>
