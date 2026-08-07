@@ -20,10 +20,14 @@
       <div class="nav-links">
         <a href="#features">功能</a>
         <a href="#highlights">亮点</a>
+        <a href="#tools">工具箱</a>
         <a href="#stack">技术栈</a>
         <a href="#start">快速开始</a>
       </div>
-      <a class="nav-github" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub ↗</a>
+      <div class="nav-right">
+        <button class="theme-toggle" id="theme-toggle" title="切换主题">☾</button>
+        <a class="nav-github" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
     </div>
   </nav>
 
@@ -43,59 +47,104 @@
         <span class="badge">Python 3.13+</span>
         <span class="badge">零 npm · 零构建</span>
         <span class="badge">本地优先</span>
+        <span class="badge">双主题</span>
       </div>
     </div>
   </header>
 
+  <!-- ═══ 界面预览：CSS 模拟三栏 ═══ -->
+  <section class="preview">
+    <div class="container">
+      <div class="window reveal">
+        <div class="window-bar">
+          <span class="window-dot"></span>
+          <span class="window-dot"></span>
+          <span class="window-dot gold"></span>
+          <span class="window-title">SLATE — 对话 · 黑板 · 提示词工厂</span>
+        </div>
+        <div class="window-body">
+          <div class="pane">
+            <div class="pane-label">对话</div>
+            <div class="chat-bubble me"><div class="skel w80"></div><div class="skel w60"></div></div>
+            <div class="tool-chip">⚡ Harness · 第 3/20 轮</div>
+            <div class="chat-bubble ai"><div class="skel"></div><div class="skel w80"></div></div>
+            <div class="chat-bubble me"><div class="skel w60"></div></div>
+            <div class="chat-bubble ai"><div class="skel w80"></div><div class="skel w40"></div></div>
+          </div>
+          <div class="pane">
+            <div class="pane-label">黑板 · 逻辑链</div>
+            <div class="board-card"><div class="skel w60"></div><div class="skel"></div></div>
+            <div class="board-arrow">↓</div>
+            <div class="board-card"><div class="skel w80"></div><div class="skel w60"></div></div>
+            <div class="board-arrow">↓</div>
+            <div class="board-card"><div class="skel w40"></div><div class="skel"></div></div>
+          </div>
+          <div class="pane">
+            <div class="pane-label">提示词工厂 · 能力</div>
+            <div class="harness-bar">⚡ 自主执行中 · 可随时停止</div>
+            <div class="tool-chip">🛠 file_edit</div>
+            <div class="tool-chip">🧩 @my-skill</div>
+            <div class="skel"></div>
+            <div class="skel w80"></div>
+            <div class="skel w60"></div>
+          </div>
+        </div>
+      </div>
+      <p class="preview-caption">三栏工作台：对话（左）· 黑板（中）· 提示词工厂与能力（右）</p>
+    </div>
+  </section>
+
   <!-- ═══ 功能全景 ═══ -->
   <section class="section" id="features">
     <div class="container">
-      <div class="section-tag">Features</div>
-      <h2 class="section-title">功能全景</h2>
-      <p class="section-desc">既能直接驱动内置工具完成任务，也能生成高质量 Prompt 交给外部 Coding Agent（Claude Code、Codex、Cursor 等）执行。</p>
+      <div class="reveal">
+        <div class="section-tag">Features</div>
+        <h2 class="section-title">功能全景</h2>
+        <p class="section-desc">既能直接驱动内置工具完成任务，也能生成高质量 Prompt 交给外部 Coding Agent（Claude Code、Codex、Cursor 等）执行。</p>
+      </div>
 
       <div class="features-grid">
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">🗣️</div>
           <div class="feature-name">多模型统一接入</div>
           <div class="feature-desc">GPT / Claude / Gemini、DeepSeek / Kimi / Qwen / GLM 等国内外主流模型，支持自定义 OpenAI 兼容端点与本地模型（Ollama / LM Studio）。</div>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">⚡</div>
           <div class="feature-name">Harness 自主执行</div>
-          <div class="feature-desc">模型自主规划、多轮调用工具直至任务完成，进度实时可见，随时可停止。</div>
+          <div class="feature-desc">模型自主规划、多轮调用工具直至任务完成，金色进度条实时可见，随时可停止。</div>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">🛠️</div>
           <div class="feature-name">13 个内置 MCP 工具</div>
           <div class="feature-desc">文件读写编辑、终端沙箱、仓库统计、正则测试、文本摘要等，@提及即用。</div>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">🧩</div>
           <div class="feature-name">自定义 Skill 系统</div>
           <div class="feature-desc">SKILL.md 即插即用，上传或导入即可扩展新能力，聊天中 @ 提及自动注入上下文。</div>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">👥</div>
           <div class="feature-name">AI 团队多轮辩论</div>
           <div class="feature-desc">多角色提案 / 反驳 / 决策，轻量模型讨论、重型模型拍板，自动摘要节约 token。</div>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">⏰</div>
           <div class="feature-name">定时对话任务</div>
           <div class="feature-desc">单次 / 每日定点 / 固定间隔调度，到点自动执行预设提示词，结果归档独立会话。</div>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">🧠</div>
           <div class="feature-name">白板式逻辑链</div>
           <div class="feature-desc">灵感卡片化，拖拽布局、箭头连线标识依赖与数据流，Mermaid 渲染图表。</div>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">💾</div>
           <div class="feature-name">长期记忆 & 知识库</div>
           <div class="feature-desc">自动沉淀对话要点，跨会话召回；本地知识片段检索注入。</div>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">🏭</div>
           <div class="feature-name">提示词工厂</div>
           <div class="feature-desc">宪法摘要 → 上下文片段 → 任务描述 → 约束 → 交付要求，一键整合为可交付 Prompt。</div>
@@ -107,10 +156,12 @@
   <!-- ═══ 三大亮点 ═══ -->
   <section class="section" id="highlights">
     <div class="container">
-      <div class="section-tag">Highlights</div>
-      <h2 class="section-title">为长任务而生的工程细节</h2>
+      <div class="reveal">
+        <div class="section-tag">Highlights</div>
+        <h2 class="section-title">为长任务而生的工程细节</h2>
+      </div>
 
-      <div class="highlight">
+      <div class="highlight reveal">
         <div class="highlight-text">
           <h3>⚡ Harness：让模型自己干完</h3>
           <p>开启 Harness 后，模型按"拆解 → 执行 → 验证 → 报告"自主推进，无需人工逐步喂指令。</p>
@@ -129,7 +180,7 @@
         </div>
       </div>
 
-      <div class="highlight">
+      <div class="highlight reveal">
         <div class="highlight-text">
           <h3>🛡️ 永不卡死的四层防线</h3>
           <p>参考主流 Agent 的流式健壮性方案，从连接层到界面层层兜底。</p>
@@ -150,7 +201,7 @@
         </div>
       </div>
 
-      <div class="highlight">
+      <div class="highlight reveal">
         <div class="highlight-text">
           <h3>🧩 能力即文件</h3>
           <p>13 个内置 MCP 工具开箱即用，自定义能力只需一个 SKILL.md 文件。</p>
@@ -173,14 +224,42 @@
     </div>
   </section>
 
+  <!-- ═══ 工具箱 ═══ -->
+  <section class="section" id="tools">
+    <div class="container">
+      <div class="reveal">
+        <div class="section-tag">Built-in Tools</div>
+        <h2 class="section-title">13 个内置 MCP 工具</h2>
+        <p class="section-desc">全部以 Python 实现于 backend/skills/，由模型在对话中自主调用。</p>
+      </div>
+      <div class="tools-grid">
+        <div class="tool-item reveal"><code>file_tree</code><span>项目目录浏览</span></div>
+        <div class="tool-item reveal"><code>file_peek</code><span>文件读取预览</span></div>
+        <div class="tool-item reveal"><code>file_create</code><span>文件创建</span></div>
+        <div class="tool-item reveal"><code>file_edit</code><span>差异预览式编辑</span></div>
+        <div class="tool-item reveal"><code>terminal</code><span>受限沙箱命令</span></div>
+        <div class="tool-item reveal"><code>html_render</code><span>HTML 骨架生成</span></div>
+        <div class="tool-item reveal"><code>css_color</code><span>CSS 调色</span></div>
+        <div class="tool-item reveal"><code>doc_write</code><span>文档编写</span></div>
+        <div class="tool-item reveal"><code>text_summarize</code><span>文本摘要</span></div>
+        <div class="tool-item reveal"><code>json_tool</code><span>JSON 处理</span></div>
+        <div class="tool-item reveal"><code>regex_test</code><span>正则测试</span></div>
+        <div class="tool-item reveal"><code>repo_stats</code><span>仓库统计</span></div>
+        <div class="tool-item reveal"><code>todo_scan</code><span>TODO 扫描</span></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ 技术栈 ═══ -->
   <section class="section" id="stack">
     <div class="container">
-      <div class="section-tag">Tech Stack</div>
-      <h2 class="section-title">原生技术，零构建</h2>
-      <p class="section-desc">前端即文件，改完即生效；没有 npm，没有打包器，没有框架税。</p>
+      <div class="reveal">
+        <div class="section-tag">Tech Stack</div>
+        <h2 class="section-title">原生技术，零构建</h2>
+        <p class="section-desc">前端即文件，改完即生效；没有 npm，没有打包器，没有框架税。</p>
+      </div>
 
-      <table class="stack-table">
+      <table class="stack-table reveal">
         <tr><th>层级</th><th>选型</th></tr>
         <tr><td>前端</td><td>原生 HTML + CSS + JavaScript（ES Modules，零构建）</td></tr>
         <tr><td>后端</td><td>Python 3.13+ · FastAPI · Uvicorn · httpx</td></tr>
@@ -188,34 +267,67 @@
         <tr><td>渲染</td><td>Highlight.js · Mermaid.js（CDN）</td></tr>
         <tr><td>桌面</td><td>webview2 壳 + PyInstaller 打包 + Inno Setup 安装器</td></tr>
       </table>
+
+      <div class="principles">
+        <div class="principle reveal">
+          <h4>纯黑白灰基底</h4>
+          <p>无蓝紫渐变、无圆角大礼包、无阴影毛玻璃。</p>
+        </div>
+        <div class="principle reveal">
+          <h4>本地优先</h4>
+          <p>数据全部存本地，API Key 仅用于 LLM 调用。</p>
+        </div>
+        <div class="principle reveal">
+          <h4>Token 节约</h4>
+          <p>智能压缩、分级调用、静默处理。</p>
+        </div>
+        <div class="principle reveal">
+          <h4>永不卡死</h4>
+          <p>四层超时防线，流式与工具调用全程兜底。</p>
+        </div>
+      </div>
     </div>
   </section>
 
   <!-- ═══ 快速开始 ═══ -->
   <section class="section" id="start">
     <div class="container">
-      <div class="section-tag">Quick Start</div>
-      <h2 class="section-title">三步开始研磨</h2>
+      <div class="reveal">
+        <div class="section-tag">Quick Start</div>
+        <h2 class="section-title">三步开始研磨</h2>
+      </div>
 
       <div class="start-steps">
-        <div class="step">
+        <div class="step reveal">
           <div class="step-num">01</div>
           <h4>获取 SLATE</h4>
           <p>下载 Windows 安装包开箱即用，或克隆源码：</p>
           <code>git clone https://github.com/CaryWang1234/SLATE.git</code>
         </div>
-        <div class="step">
+        <div class="step reveal">
           <div class="step-num">02</div>
           <h4>启动</h4>
           <p>源码运行需要 Python 3.13+：</p>
           <code>pip install -r requirements.txt<br>start.bat &nbsp;# 或 ./start.sh</code>
         </div>
-        <div class="step">
+        <div class="step reveal">
           <div class="step-num">03</div>
           <h4>配置模型</h4>
           <p>在设置中填入所需模型的 API Key，访问本地服务：</p>
           <code>http://127.0.0.1:8000</code>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ CTA ═══ -->
+  <section class="cta">
+    <div class="container reveal">
+      <h2>研磨灵感，落笔成章。</h2>
+      <p>开源免费 · MIT 协议 · 欢迎 Star 与贡献</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">★ Star on GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ 下载最新版本</a>
       </div>
     </div>
   </section>
@@ -232,6 +344,33 @@
       <p style="margin-top: 8px;">Released under the MIT License · © 2026 Cary</p>
     </div>
   </footer>
+
+  <script>
+    // ── 双主题切换（呼应 SLATE 亮/暗主题） ──
+    const themeBtn = document.getElementById("theme-toggle");
+    const applyTheme = (t) => {
+      document.body.dataset.theme = t;
+      themeBtn.textContent = t === "light" ? "☀" : "☾";
+      try { localStorage.setItem("slate-site-theme", t); } catch {}
+    };
+    let saved = "dark";
+    try { saved = localStorage.getItem("slate-site-theme") || "dark"; } catch {}
+    applyTheme(saved);
+    themeBtn.addEventListener("click", () => {
+      applyTheme(document.body.dataset.theme === "light" ? "dark" : "light");
+    });
+
+    // ── 滚动入场动画 ──
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("in");
+          observer.unobserve(entry.target);
+        }
+      }
+    }, { threshold: 0.12 });
+    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+  </script>
 
 </body>
 </html>
