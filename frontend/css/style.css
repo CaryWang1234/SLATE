@@ -406,6 +406,58 @@ textarea:focus-visible {
   text-align: center;
 }
 
+/* ── 新对话欢迎页 ───────────────────── */
+
+.chat-welcome {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px 16px;
+  user-select: none;
+}
+
+.chat-welcome-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  opacity: 0.92;
+  margin-bottom: 6px;
+}
+
+.chat-welcome-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 6px;
+  text-indent: 6px; /* 抵消末字间距，视觉居中 */
+}
+
+.chat-welcome-sep {
+  width: 28px;
+  height: 2px;
+  background: var(--gold);
+}
+
+.chat-welcome-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+.chat-welcome-hint {
+  margin: 10px 0 0;
+  padding: 5px 14px;
+  font-size: 11px;
+  color: var(--text-faint);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
 /* 滚动条 */
 .chat-scroll::-webkit-scrollbar,
 textarea::-webkit-scrollbar,

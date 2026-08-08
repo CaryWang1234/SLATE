@@ -3,8 +3,8 @@
  * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话。
  */
 
-import { state } from "../store.js?v=20260808-8";
-import { get, post, del, patch } from "../services/api.js?v=20260808-8";
+import { state } from "../store.js?v=20260808-9";
+import { get, post, del, patch } from "../services/api.js?v=20260808-9";
 
 let modal, listEl;
 let pollTimer = null;
@@ -24,7 +24,7 @@ function formatTs(ts) {
 
 async function toast(msg) {
   try {
-    const app = await import("../app.js?v=20260808-8");
+    const app = await import("../app.js?v=20260808-9");
     app.toast(msg);
   } catch {}
 }

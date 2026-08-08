@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示词
  */
 
-import { state } from "../store.js?v=20260808-8";
-import { getToolsSystemPrompt } from "./tools.js?v=20260808-8";
+import { state } from "../store.js?v=20260808-9";
+import { getToolsSystemPrompt } from "./tools.js?v=20260808-9";
 
 // ── System Prompt 模板 ──────────────────────
 
