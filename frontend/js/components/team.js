@@ -3,10 +3,11 @@
  * 轻量模型初步讨论 → 重型模型最终决策
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260808-6";
-import { streamChat } from "../services/api.js?v=20260808-6";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260808-6";
-import { renderMarkdown } from "../services/markdown.js?v=20260808-6";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260808-8";
+import { streamChat } from "../services/api.js?v=20260808-8";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260808-8";
+import { renderMarkdown } from "../services/markdown.js?v=20260808-8";
+import { loadWorkflows, getWorkflow, runWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260808-8";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -453,6 +454,211 @@ function renderSimpleMarkdown(text) {
   return renderMarkdown(text);
 }
 
+// ── 工作流视图 ────────────────────────────
+
+let wfSelect, wfDesc, wfInput, btnWfRun, wfRunStatus, wfNodeList, wfResultBar;
+let wfList = [];
+let wfRunning = false;
+
+const WF_STATUS_TEXT = {
+  waiting: "⏸ 等待",
+  running: "● 运行中",
+  success: "✓ 成功",
+  failed: "✗ 失败",
+  skipped: "⊘ 跳过",
+};
+
+async function initWorkflowView() {
+  wfSelect = document.getElementById("wf-select");
+  wfDesc = document.getElementById("wf-desc");
+  wfInput = document.getElementById("wf-input");
+  btnWfRun = document.getElementById("btn-wf-run");
+  wfRunStatus = document.getElementById("wf-run-status");
+  wfNodeList = document.getElementById("wf-node-list");
+  wfResultBar = document.getElementById("wf-result-bar");
+  if (!wfSelect) return;
+
+  // 讨论 / 工作流视图切换（不影响原有团队讨论功能）
+  const discussView = document.getElementById("team-discuss-view");
+  const workflowView = document.getElementById("team-workflow-view");
+  const tabDiscuss = document.getElementById("btn-team-view-discuss");
+  const tabWorkflow = document.getElementById("btn-team-view-workflow");
+  const switchView = (isWorkflow) => {
+    discussView?.classList.toggle("hidden", isWorkflow);
+    workflowView?.classList.toggle("hidden", !isWorkflow);
+    tabDiscuss?.classList.toggle("active", !isWorkflow);
+    tabWorkflow?.classList.toggle("active", isWorkflow);
+  };
+  tabDiscuss?.addEventListener("click", () => switchView(false));
+  tabWorkflow?.addEventListener("click", () => switchView(true));
+
+  wfSelect.addEventListener("change", renderWfDesc);
+  btnWfRun.addEventListener("click", runSelectedWorkflow);
+  await refreshWorkflowList();
+}
+
+async function refreshWorkflowList() {
+  try {
+    wfList = await loadWorkflows();
+    wfSelect.innerHTML = "";
+    if (wfList.length === 0) {
+      wfDesc.textContent = "暂无工作流，请在 backend/workflows/ 目录放置 JSON 定义文件";
+      return;
+    }
+    for (const wf of wfList) {
+      const opt = document.createElement("option");
+      opt.value = wf.id;
+      opt.textContent = wf.valid ? `${wf.name}（${wf.node_count} 节点）` : `⚠ ${wf.name}（定义非法）`;
+      wfSelect.appendChild(opt);
+    }
+    renderWfDesc();
+  } catch (e) {
+    wfDesc.textContent = `工作流列表加载失败: ${e.message}`;
+  }
+}
+
+function renderWfDesc() {
+  const wf = wfList.find(w => w.id === wfSelect.value);
+  if (!wf) { wfDesc.textContent = ""; return; }
+  wfDesc.textContent = wf.valid
+    ? `${wf.description || ""}（节点 ${wf.node_count} · 依赖边 ${wf.edge_count}）`
+    : `⚠ 该工作流定义非法：${wf.error}`;
+}
+
+function makeWfIo(label, text) {
+  const box = document.createElement("div");
+  box.className = "wf-node-io";
+  const labelEl = document.createElement("div");
+  labelEl.className = "wf-node-io-label";
+  labelEl.textContent = label;
+  const pre = document.createElement("pre");
+  pre.textContent = text;
+  box.appendChild(labelEl);
+  box.appendChild(pre);
+  return box;
+}
+
+function renderWfNodeRows(wf) {
+  wfNodeList.innerHTML = "";
+  // 按拓扑顺序展示（后端已返回 order）
+  const orderIndex = new Map((wf.order || []).map((id, i) => [id, i]));
+  const nodes = [...(wf.nodes || [])].sort((a, b) =>
+    (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0)
+  );
+  for (const node of nodes) {
+    const row = document.createElement("div");
+    row.className = "wf-node";
+    row.dataset.nodeId = node.id;
+    row.dataset.status = "waiting";
+
+    const head = document.createElement("div");
+    head.className = "wf-node-head";
+
+    const statusEl = document.createElement("span");
+    statusEl.className = "wf-node-status";
+    statusEl.textContent = WF_STATUS_TEXT.waiting;
+    head.appendChild(statusEl);
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "wf-node-name";
+    nameEl.textContent = node.name;
+    head.appendChild(nameEl);
+
+    const bindEl = document.createElement("span");
+    bindEl.className = "wf-node-bind";
+    bindEl.textContent = node.skill ? `⚙ ${node.skill}` : "";
+    head.appendChild(bindEl);
+
+    const caret = document.createElement("span");
+    caret.className = "wf-node-caret";
+    caret.textContent = "▾";
+    head.appendChild(caret);
+
+    const detail = document.createElement("div");
+    detail.className = "wf-node-detail hidden";
+
+    head.addEventListener("click", () => detail.classList.toggle("hidden"));
+    row.appendChild(head);
+    row.appendChild(detail);
+    wfNodeList.appendChild(row);
+  }
+}
+
+function updateWfNodeRow(rec) {
+  const row = wfNodeList?.querySelector(`.wf-node[data-node-id="${rec.id}"]`);
+  if (!row) return;
+  row.dataset.status = rec.status;
+  row.querySelector(".wf-node-status").textContent = WF_STATUS_TEXT[rec.status] || rec.status;
+  if (rec.modelLabel) row.querySelector(".wf-node-bind").textContent = rec.modelLabel;
+
+  const detail = row.querySelector(".wf-node-detail");
+  detail.innerHTML = "";
+  if (rec.error) {
+    const errEl = document.createElement("div");
+    errEl.className = "wf-node-error";
+    errEl.textContent = `✗ ${rec.error}`;
+    detail.appendChild(errEl);
+  }
+  if (rec.inputPreview) detail.appendChild(makeWfIo("输入", rec.inputPreview));
+  if (rec.output) detail.appendChild(makeWfIo("输出", rec.output));
+}
+
+async function runSelectedWorkflow() {
+  if (wfRunning) return;
+  const userInput = wfInput.value.trim();
+  if (!userInput) {
+    wfRunStatus.textContent = "请先输入任务需求";
+    return;
+  }
+  const selected = wfList.find(w => w.id === wfSelect.value);
+  if (!selected) return;
+  if (!selected.valid) {
+    wfRunStatus.textContent = `该工作流定义非法，无法执行：${selected.error}`;
+    return;
+  }
+
+  wfRunning = true;
+  btnWfRun.disabled = true;
+  wfResultBar.innerHTML = "";
+  wfRunStatus.textContent = "加载工作流定义…";
+
+  try {
+    const wf = await getWorkflow(selected.id);
+    renderWfNodeRows(wf);
+
+    const total = (wf.nodes || []).length;
+    let doneCount = 0;
+    wfRunStatus.textContent = `运行中（0/${total}）…`;
+
+    const result = await runWorkflow(wf, userInput, teamMembers, {
+      onNode: (rec) => {
+        updateWfNodeRow(rec);
+        if (["success", "failed", "skipped"].includes(rec.status)) {
+          doneCount += 1;
+          wfRunStatus.textContent = doneCount < total
+            ? `运行中（${doneCount}/${total}）…`
+            : "工作流已结束，正在将产物写入知识库…";
+        }
+      },
+    });
+
+    const okCount = result.order.filter(id => result.records[id].status === "success").length;
+    try {
+      const docId = await saveRunToKnowledge(wf, result);
+      wfResultBar.innerHTML = `<span class="wf-result-ok">✓ ${okCount}/${total} 节点成功 · 产物已写入知识库（${docId}），可在记忆面板查看</span>`;
+    } catch (e) {
+      wfResultBar.innerHTML = `<span class="wf-result-error">节点成功 ${okCount}/${total}，但写入知识库失败: ${e.message}</span>`;
+    }
+    wfRunStatus.textContent = "";
+  } catch (e) {
+    wfRunStatus.textContent = "";
+    wfResultBar.innerHTML = `<span class="wf-result-error">✗ 工作流执行失败: ${e.message}</span>`;
+  } finally {
+    wfRunning = false;
+    btnWfRun.disabled = false;
+  }
+}
+
 // ── 初始化 ──────────────────────────────────
 
 function initTeamPanel() {
@@ -493,6 +699,9 @@ function initTeamPanel() {
     teamHistoryList?.querySelectorAll(".team-history-item.active").forEach(item => item.classList.remove("active"));
     teamTopicInput.focus();
   });
+
+  // 工作流视图初始化（讨论视图之外的新能力）
+  initWorkflowView();
 
   // 团队/对话切换
   const btnTeamMode = document.getElementById("btn-team-mode");

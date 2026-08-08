@@ -3,6 +3,7 @@
 datas = [
     ('frontend', 'frontend'),
     ('backend/skills', 'backend/skills'),
+    ('backend/workflows', 'backend/workflows'),
 ]
 
 hiddenimports = [
@@ -15,6 +16,7 @@ hiddenimports = [
     'backend.routers.proxy',
     'backend.routers.settings',
     'backend.routers.skills',
+    'backend.routers.workflows',
     'backend.skills.css_color',
     'backend.skills.doc_write',
     'backend.skills.file_create',

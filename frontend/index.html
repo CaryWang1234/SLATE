@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260808-6">
+  <link rel="stylesheet" href="./css/style.css?v=20260808-8">
 </head>
 <body>
 
@@ -101,26 +101,46 @@
               <div id="team-history-list" class="team-history-list"></div>
             </aside>
             <div class="team-main">
-              <div class="team-config">
-                <div class="team-members-header">
-                  <span class="team-label">团队成员</span>
-                  <button id="btn-add-member" class="icon-btn" title="添加成员">+</button>
-                </div>
-                <div id="team-members-area" class="team-members-area"></div>
+              <div class="team-view-tabs">
+                <button id="btn-team-view-discuss" class="team-view-tab active">团队讨论</button>
+                <button id="btn-team-view-workflow" class="team-view-tab">工作流</button>
               </div>
-              <div class="team-discuss">
-                <div id="team-usage-bar" class="team-usage-bar"></div>
-                <div class="team-input-row">
-                  <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题…">
-                  <select id="team-max-rounds" class="team-rounds-select" title="最大辩论轮数">
-                    <option value="3">3轮</option>
-                    <option value="5" selected>5轮</option>
-                    <option value="8">8轮</option>
-                    <option value="10">10轮</option>
-                  </select>
-                  <button id="btn-start-discuss" class="send-btn">开始讨论</button>
+              <div id="team-discuss-view">
+                <div class="team-config">
+                  <div class="team-members-header">
+                    <span class="team-label">团队成员</span>
+                    <button id="btn-add-member" class="icon-btn" title="添加成员">+</button>
+                  </div>
+                  <div id="team-members-area" class="team-members-area"></div>
                 </div>
-                <div id="team-output" class="team-output"></div>
+                <div class="team-discuss">
+                  <div id="team-usage-bar" class="team-usage-bar"></div>
+                  <div class="team-input-row">
+                    <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题…">
+                    <select id="team-max-rounds" class="team-rounds-select" title="最大辩论轮数">
+                      <option value="3">3轮</option>
+                      <option value="5" selected>5轮</option>
+                      <option value="8">8轮</option>
+                      <option value="10">10轮</option>
+                    </select>
+                    <button id="btn-start-discuss" class="send-btn">开始讨论</button>
+                  </div>
+                  <div id="team-output" class="team-output"></div>
+                </div>
+              </div>
+              <div id="team-workflow-view" class="team-workflow-view hidden">
+                <div class="wf-config">
+                  <span class="team-label">工作流</span>
+                  <select id="wf-select" class="wf-select"></select>
+                  <div id="wf-desc" class="wf-desc">加载中…</div>
+                </div>
+                <div class="wf-input-row">
+                  <textarea id="wf-input" class="wf-input" rows="3" placeholder="输入交给工作流的任务需求（作为 $input 传入各节点）…"></textarea>
+                  <button id="btn-wf-run" class="send-btn">▶ 运行工作流</button>
+                </div>
+                <div id="wf-run-status" class="wf-run-status"></div>
+                <div id="wf-node-list" class="wf-node-list"></div>
+                <div id="wf-result-bar" class="wf-result-bar"></div>
               </div>
             </div>
           </div>
@@ -569,7 +589,7 @@
   <!-- ═══ Toast 容器 ═══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260808-6"></script>
+  <script type="module" src="./js/app.js?v=20260808-8"></script>
 
 </body>
 </html>

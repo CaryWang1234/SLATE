@@ -2,18 +2,18 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-6";
-import { get, put } from "./services/api.js?v=20260808-6";
-import { initChat } from "./components/chat.js?v=20260808-6";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260808-6";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-6";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260808-6";
-import { initTeamPanel } from "./components/team.js?v=20260808-6";
-import { initProjectBar } from "./components/project_bar.js?v=20260808-6";
-import { initMemoryPanel } from "./components/memory.js?v=20260808-6";
-import { initSchedule } from "./components/schedule.js?v=20260808-6";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-6";
-import { setProject, setProjectFileTree } from "./store.js?v=20260808-6";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-8";
+import { get, put } from "./services/api.js?v=20260808-8";
+import { initChat } from "./components/chat.js?v=20260808-8";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260808-8";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-8";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260808-8";
+import { initTeamPanel } from "./components/team.js?v=20260808-8";
+import { initProjectBar } from "./components/project_bar.js?v=20260808-8";
+import { initMemoryPanel } from "./components/memory.js?v=20260808-8";
+import { initSchedule } from "./components/schedule.js?v=20260808-8";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-8";
+import { setProject, setProjectFileTree } from "./store.js?v=20260808-8";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -400,6 +400,22 @@ function openSettings(options = {}) {
 
 function closeSettings() { switchPanel("chat"); }
 
+// 自动推进设置：变更后立即持久化，无需点保存按钮
+function applyAutoReviewSettings() {
+  state.autoReview = {
+    enabled: document.getElementById("setting-auto-review-enabled").checked,
+    modelId: document.getElementById("setting-auto-review-model").value || "",
+    minChars: Math.max(20, Math.min(800, parseInt(document.getElementById("setting-auto-review-min-chars").value) || 120)),
+  };
+  savePersistent();
+}
+
+function initAutoReviewPersistence() {
+  document.getElementById("setting-auto-review-enabled")?.addEventListener("change", applyAutoReviewSettings);
+  document.getElementById("setting-auto-review-model")?.addEventListener("change", applyAutoReviewSettings);
+  document.getElementById("setting-auto-review-min-chars")?.addEventListener("change", applyAutoReviewSettings);
+}
+
 async function saveSettings() {
   const maxTokens = parseInt(document.getElementById("setting-max-tokens").value) || 64000;
   state.maxTokens = maxTokens;
@@ -418,7 +434,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260808-6");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260808-8");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -552,6 +568,7 @@ async function init() {
   // 设置弹窗
   document.getElementById("btn-settings").addEventListener("click", openSettings);
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
+  initAutoReviewPersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
   await loadModels();
@@ -562,7 +579,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260808-6");
+      const { openProject } = await import("./services/project.js?v=20260808-8");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

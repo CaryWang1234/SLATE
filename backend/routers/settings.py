@@ -44,7 +44,19 @@ async def save_shared_state(req: SharedStateRequest):
         "outputSettings",
         "knowledgeSettings",
     }
-    data = {key: req.data.get(key) for key in allowed_keys if key in req.data}
+    # 合并式写入：只更新本次提交的字段，避免漏传字段把已存设置抹掉
+    existing: dict[str, Any] = {}
+    if STATE_PATH.exists():
+        try:
+            existing = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+            if not isinstance(existing, dict):
+                existing = {}
+        except Exception:
+            existing = {}
+    data = {**existing}
+    for key in allowed_keys:
+        if key in req.data and req.data[key] is not None:
+            data[key] = req.data[key]
     try:
         STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
         STATE_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

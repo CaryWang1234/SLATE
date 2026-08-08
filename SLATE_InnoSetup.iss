@@ -4,7 +4,7 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define MyAppName "SLATE 砚"
-#define MyAppVersion "0.2.2"
+#define MyAppVersion "0.2.3"
 #define MyAppPublisher "SLATE"
 #define MyAppURL "https://github.com/CaryWang1234/SLATE"
 #define MyAppExeName "SLATE.exe"
