@@ -15,22 +15,28 @@ router = APIRouter(prefix="/proxy", tags=["proxy"])
 STREAM_TIMEOUT = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
 REQUEST_TIMEOUT = httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=10.0)
 
-# ── 模型注册表（2026-07 时效性校验） ──────────────────────────
+# ── 模型注册表（2026-08 时效性校验） ──────────────────────────
 
 MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
     "international": [
-        {"id": "gpt-4o", "name": "GPT-4o", "provider": "openai",
-         "base_url": "https://api.openai.com/v1", "context_window": 128000},
-        {"id": "o3-mini", "name": "o3-mini", "provider": "openai",
-         "base_url": "https://api.openai.com/v1", "context_window": 200000},
-        {"id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4", "provider": "anthropic",
-         "base_url": "https://api.anthropic.com", "context_window": 200000},
-        {"id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet", "provider": "anthropic",
-         "base_url": "https://api.anthropic.com", "context_window": 200000},
-        {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "provider": "google",
+        {"id": "gpt-5.6-sol", "name": "GPT-5.6 Sol", "provider": "openai",
+         "base_url": "https://api.openai.com/v1", "context_window": 1050000},
+        {"id": "gpt-5.6-terra", "name": "GPT-5.6 Terra", "provider": "openai",
+         "base_url": "https://api.openai.com/v1", "context_window": 1050000},
+        {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna", "provider": "openai",
+         "base_url": "https://api.openai.com/v1", "context_window": 1050000},
+        {"id": "claude-fable-5", "name": "Claude Fable 5", "provider": "anthropic",
+         "base_url": "https://api.anthropic.com", "context_window": 1000000},
+        {"id": "claude-opus-5", "name": "Claude Opus 5", "provider": "anthropic",
+         "base_url": "https://api.anthropic.com", "context_window": 1000000},
+        {"id": "claude-sonnet-5", "name": "Claude Sonnet 5", "provider": "anthropic",
+         "base_url": "https://api.anthropic.com", "context_window": 1000000},
+        {"id": "gemini-3.6-flash", "name": "Gemini 3.6 Flash", "provider": "google",
          "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576},
-        {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "provider": "google",
-         "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 2097152},
+        {"id": "gemini-3.1-pro", "name": "Gemini 3.1 Pro", "provider": "google",
+         "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576},
+        {"id": "gemini-3.5-flash-lite", "name": "Gemini 3.5 Flash-Lite", "provider": "google",
+         "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576},
     ],
     "domestic": [
         {"id": "deepseek-chat", "name": "DeepSeek-V4-Pro", "provider": "openai",
@@ -39,6 +45,8 @@ MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
          "base_url": "https://api.deepseek.com/v1", "context_window": 65536},
         {"id": "deepseek-v4-flash", "name": "DeepSeek-V4-Flash", "provider": "openai",
          "base_url": "https://api.deepseek.com/v1", "context_window": 131072},
+        {"id": "kimi-k3", "name": "Kimi K3", "provider": "openai",
+         "base_url": "https://api.moonshot.cn/v1", "context_window": 1048576},
         {"id": "kimi-k2.7-code", "name": "Kimi K2.7 Code", "provider": "openai",
          "base_url": "https://api.moonshot.cn/v1", "context_window": 262144},
         {"id": "qwen3.8-max", "name": "Qwen3.8-Max", "provider": "openai",

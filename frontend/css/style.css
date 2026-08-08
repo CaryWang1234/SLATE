@@ -366,6 +366,37 @@ textarea:focus-visible {
   gap: 10px;
 }
 
+/* 会话顶部项目徽章：对话发起时打开的项目 */
+.conv-project-badge {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  align-self: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 2px 12px;
+  white-space: nowrap;
+  max-width: 80%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conv-project-badge.conv-project-none { color: var(--text-muted); }
+
+/* 历史列表中的项目标签 */
+.conv-item-project {
+  font-size: 10px;
+  color: var(--gold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conv-item-project.none { color: var(--text-muted); }
+
 .chat-scroll:empty::before {
   content: "开始一段对话，或先从左侧打开项目补充上下文。";
   margin: auto;
@@ -1505,10 +1536,22 @@ textarea::-webkit-scrollbar-thumb {
   gap: 6px;
 }
 
-.factory-skill-header {
-  padding-top: 5px;
-  padding-bottom: 5px;
-  background: var(--bg-alt);
+/* 设置页内的 MCP / 技能面板：去掉工厂页底部小窗的限高与分隔线 */
+#settings-skills .skill-panel {
+  max-height: none;
+  overflow: visible;
+  border-top: none;
+  padding: 0;
+}
+
+#settings-skills .skill-list {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+#settings-skills .skill-upload {
+  justify-content: flex-start;
 }
 
 #btn-upload-skill,

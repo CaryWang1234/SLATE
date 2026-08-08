@@ -2,8 +2,8 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260808-2";
-import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260808-2";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260808-6";
+import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260808-6";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let fileTreeContainer, projectInfoEl, projectCloseBtn;

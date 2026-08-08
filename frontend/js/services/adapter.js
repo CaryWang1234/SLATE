@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示词
  */
 
-import { state } from "../store.js?v=20260808-2";
-import { getToolsSystemPrompt } from "./tools.js?v=20260808-2";
+import { state } from "../store.js?v=20260808-6";
+import { getToolsSystemPrompt } from "./tools.js?v=20260808-6";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -35,8 +35,8 @@ const SYSTEM_PROMPTS = {
 
 // ── 模型分类 ────────────────────────────────
 
-const REASONING_MODELS = ["deepseek-v4-pro", "o3-mini"];
-const LIGHTWEIGHT_MODELS = ["gemini-2.5-flash", "deepseek-v4-flash", "kimi-k2.7-code", "doubao-pro-256k"];
+const REASONING_MODELS = ["gpt-5.6-sol", "claude-fable-5", "deepseek-reasoner"];
+const LIGHTWEIGHT_MODELS = ["gpt-5.6-luna", "gemini-3.6-flash", "gemini-3.5-flash-lite", "deepseek-v4-flash", "kimi-k2.7-code", "doubao-pro-256k"];
 
 /**
  * 根据模型 ID 获取适配的系统提示

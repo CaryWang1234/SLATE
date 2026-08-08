@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260808-2">
+  <link rel="stylesheet" href="./css/style.css?v=20260808-6">
 </head>
 <body>
 
@@ -242,16 +242,6 @@
           <pre id="prompt-result" class="prompt-result"></pre>
         </div>
       </div>
-      <div class="panel-header factory-skill-header">
-        <span class="panel-title">MCP / 技能</span>
-      </div>
-      <div id="skill-panel" class="skill-panel">
-        <div id="skill-list" class="skill-list"></div>
-        <div class="skill-upload">
-          <button id="btn-import-skill" class="icon-btn" title="从本地路径导入 SKILL.md 技能">⤣ 导入技能</button>
-          <button id="btn-upload-skill" class="icon-btn" title="上传文件新建 SKILL.md 技能">+ 新建技能</button>
-        </div>
-      </div>
     </section>
 
     <!-- 设置页 -->
@@ -354,6 +344,22 @@
           <div class="setting-group">
             <label class="setting-label">短回复阈值（字符）</label>
             <input id="setting-auto-review-min-chars" type="number" class="setting-input" min="20" max="800" step="10" value="120">
+          </div>
+        </section>
+
+        <section class="settings-block" id="settings-skills">
+          <div class="settings-block-head">
+            <div>
+              <h2>MCP / 技能</h2>
+              <p>查看 MCP 内置工具，管理 SKILL.md 技能。</p>
+            </div>
+          </div>
+          <div id="skill-panel" class="skill-panel">
+            <div id="skill-list" class="skill-list"></div>
+            <div class="skill-upload">
+              <button id="btn-import-skill" class="icon-btn" title="从本地路径导入 SKILL.md 技能">⤣ 导入技能</button>
+              <button id="btn-upload-skill" class="icon-btn" title="上传文件新建 SKILL.md 技能">+ 新建技能</button>
+            </div>
           </div>
         </section>
       </div>
@@ -563,7 +569,7 @@
   <!-- ═══ Toast 容器 ═══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260808-2"></script>
+  <script type="module" src="./js/app.js?v=20260808-6"></script>
 
 </body>
 </html>

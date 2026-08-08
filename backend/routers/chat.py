@@ -37,7 +37,8 @@ def _get_db() -> sqlite3.Connection:
             prompt_tokens INTEGER DEFAULT 0,
             completion_tokens INTEGER DEFAULT 0,
             message_count INTEGER DEFAULT 0,
-            context_tokens INTEGER DEFAULT 0
+            context_tokens INTEGER DEFAULT 0,
+            project TEXT DEFAULT ''
         )
     """)
     # 迁移：为已有表添加用量字段
@@ -45,6 +46,8 @@ def _get_db() -> sqlite3.Connection:
     for col in ("total_tokens", "prompt_tokens", "completion_tokens", "message_count", "context_tokens"):
         if col not in cols:
             conn.execute(f"ALTER TABLE conversations ADD COLUMN {col} INTEGER DEFAULT 0")
+    if "project" not in cols:
+        conn.execute("ALTER TABLE conversations ADD COLUMN project TEXT DEFAULT ''")
     conn.commit()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS messages (
@@ -87,7 +90,7 @@ async def list_conversations() -> dict[str, Any]:
     conn = _get_db()
     rows = conn.execute(
         "SELECT id, title, created_at, updated_at, total_tokens, prompt_tokens, "
-        "completion_tokens, message_count, context_tokens "
+        "completion_tokens, message_count, context_tokens, project "
         "FROM conversations ORDER BY updated_at DESC"
     ).fetchall()
     conn.close()
@@ -100,17 +103,19 @@ async def create_conversation(body: dict[str, Any] | None = None) -> dict[str, A
     """创建新对话。"""
     conv_id = str(uuid.uuid4())[:8]
     title = ""
+    project = ""
     if body:
         title = body.get("title", "")
+        project = body.get("project", "") or ""
     now = time.time()
     conn = _get_db()
     conn.execute(
-        "INSERT INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
-        (conv_id, title, now, now),
+        "INSERT INTO conversations (id, title, created_at, updated_at, project) VALUES (?, ?, ?, ?, ?)",
+        (conv_id, title, now, now, project),
     )
     conn.commit()
     conn.close()
-    return {"code": 0, "data": {"id": conv_id, "title": title}, "message": "ok"}
+    return {"code": 0, "data": {"id": conv_id, "title": title, "project": project}, "message": "ok"}
 
 
 @router.get("/conversations/{conv_id}/messages")

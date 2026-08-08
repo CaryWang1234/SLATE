@@ -2,8 +2,8 @@
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除）
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260808-2";
-import { get, post, del, upload } from "../services/api.js?v=20260808-2";
+import { state, subscribe, setSkills } from "../store.js?v=20260808-6";
+import { get, post, del, upload } from "../services/api.js?v=20260808-6";
 
 let skillList, btnUpload, btnImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -83,6 +83,11 @@ const SKILL_PARAM_DEFS = {
     { key: "query", label: "搜索关键词 / URL", type: "text", placeholder: "FastAPI 最新版本号（fetch 模式填 URL）" },
     { key: "mode", label: "模式", type: "text", placeholder: "search / fetch" },
     { key: "max_results", label: "结果数（≤10）", type: "number", placeholder: "5" },
+  ],
+  web_fetch: [
+    { key: "url", label: "网页 URL", type: "text", placeholder: "https://example.com/article" },
+    { key: "mode", label: "模式", type: "text", placeholder: "text / html" },
+    { key: "max_chars", label: "截断长度（≤30000）", type: "number", placeholder: "8000" },
   ],
 };
 

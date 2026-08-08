@@ -3,10 +3,10 @@
  * 轻量模型初步讨论 → 重型模型最终决策
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260808-2";
-import { streamChat } from "../services/api.js?v=20260808-2";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260808-2";
-import { renderMarkdown } from "../services/markdown.js?v=20260808-2";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260808-6";
+import { streamChat } from "../services/api.js?v=20260808-6";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260808-6";
+import { renderMarkdown } from "../services/markdown.js?v=20260808-6";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -23,8 +23,8 @@ const TEAM_HISTORY_KEY = "slate_team_history";
 
 const DEFAULT_MEMBERS = [
   { id: "member-1", name: "分析师", modelId: "deepseek-v4-flash", persona: "你是务实派分析师。关注可行性和成本，回答简洁（1-3句）。", role: "analyst" },
-  { id: "member-2", name: "创意官", modelId: "gemini-2.5-flash", persona: "你是创意导向的思考者。关注创新可能性和用户体验，回答简洁（1-3句）。", role: "creative" },
-  { id: "member-3", name: "决策者", modelId: "gpt-4o", persona: "你是最终决策者。综合各方观点给出明确建议和理由，回答简洁（1-3句）。", role: "decider" },
+  { id: "member-2", name: "创意官", modelId: "gemini-3.6-flash", persona: "你是创意导向的思考者。关注创新可能性和用户体验，回答简洁（1-3句）。", role: "creative" },
+  { id: "member-3", name: "决策者", modelId: "gpt-5.6-sol", persona: "你是最终决策者。综合各方观点给出明确建议和理由，回答简洁（1-3句）。", role: "decider" },
 ];
 
 function fmtTok(n) {
@@ -477,7 +477,7 @@ function initTeamPanel() {
     teamMembers.push({
       id: `member-${Date.now()}`,
       name: `成员${teamMembers.length + 1}`,
-      modelId: "gpt-4o",
+      modelId: "gpt-5.6-terra",
       persona: "你是团队成员。简洁发表观点（1-3句）。",
       role: "member",
     });

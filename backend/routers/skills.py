@@ -35,6 +35,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "repo_stats": "项目文件类型、体积与数量统计",
     "todo_scan": "扫描项目中的 TODO/FIXME/待办标记",
     "web_search": "网络搜索/网页抓取，获取实时信息（免 Key，DuckDuckGo）",
+    "web_fetch": "获取指定网页内容：提取标题/描述/正文纯文本，支持返回原始 HTML（免 Key 直连）",
 }
 
 
