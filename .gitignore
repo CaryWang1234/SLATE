@@ -10,4 +10,5 @@ desktop_backend.log
 /data/chat_history.db
 repo-doctor.py
 /data/webview_profile
+/uiexample
 /data/desktop_state.json

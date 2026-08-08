@@ -2,7 +2,7 @@
  * SLATE 项目服务：封装项目相关 API
  */
 
-import { get, post, put } from "./api.js?v=20260807-12";
+import { get, post, put } from "./api.js?v=20260808-2";
 
 async function openProject(path) {
   return post("/projects/open", { path });
