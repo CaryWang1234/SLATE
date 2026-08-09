@@ -306,8 +306,10 @@ async def compress_context(body: dict[str, Any]) -> dict[str, Any]:
 
     # 构建待压缩文本供前端发送给 LLM
     compress_prompt = (
-        "请将以下对话历史压缩为简洁摘要，保留关键决策、重要结论和核心上下文，"
-        "去除冗余细节。输出纯文本摘要，不超过 500 字。\n\n"
+        "请将以下对话历史压缩为简洁摘要。按四部分组织："
+        "① 核心话题与目标 ② 关键决策与结论 ③ 待办与未完成事项 ④ 重要约束与上下文。"
+        "保留文件路径、名称、数值等后续可能引用的事实，去除寒暄与冗余细节。"
+        "输出纯文本摘要，不超过 500 字。\n\n"
     )
     for m in to_compress:
         role_label = "用户" if m["role"] == "user" else "助手"
@@ -437,8 +439,10 @@ async def extract_memories(body: dict[str, Any]) -> dict[str, Any]:
     text = body.get("text", "")
     existing = body.get("existing_memories", [])
     prompt = (
-        "分析以下对话，提取值得长期记忆的关键信息（用户偏好、重要决策、项目背景、常用术语等）。\n"
-        "以 JSON 数组格式输出，每项包含 category 和 content 字段。\n"
+        "分析以下对话，提取值得长期记忆的关键信息。\n"
+        "筛选标准：只记录跨对话仍然有用的稳定信息（用户偏好、重要决策、项目背景、常用术语），"
+        "不记录一次性任务细节或临时状态。\n"
+        "以 JSON 数组格式输出，每项包含 category 和 content 字段，content 写成一条独立、完整的陈述。\n"
         "category 可选: preference, decision, project, term, fact, other。\n"
         "只输出 JSON，不要其他文字。如果没有值得记忆的内容，输出空数组 []。\n\n"
     )
@@ -470,9 +474,12 @@ async def compress_manual(body: dict[str, Any]) -> dict[str, Any]:
     to_keep = messages[split_point:]
 
     if level == "heavy":
-        instruction = "将以下对话压缩为极简摘要，仅保留核心结论和关键决策，不超过 200 字。"
+        instruction = "将以下对话压缩为极简摘要：仅保留核心结论、关键决策和明确的待办事项，不超过 200 字。"
     else:
-        instruction = "将以下对话压缩为摘要，保留关键细节、重要结论和核心上下文，不超过 500 字。"
+        instruction = (
+            "将以下对话压缩为摘要：按「核心话题 / 关键决策 / 待办事项 / 重要约束」组织，"
+            "保留文件路径、名称、数值等后续可能引用的事实，不超过 500 字。"
+        )
 
     compress_prompt = instruction + "\n\n"
     for m in to_compress:

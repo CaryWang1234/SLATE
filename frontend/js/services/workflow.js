@@ -4,9 +4,9 @@
  * - 执行完成后通过 /knowledge/docs 复用现有知识库写入逻辑
  */
 
-import { get, post } from "./api.js?v=20260808-23";
-import { state, getModelKey } from "../store.js?v=20260808-23";
-import { guardSkillParams } from "./riskguard.js?v=20260808-23";
+import { get, post } from "./api.js?v=20260808-24";
+import { state, getModelKey } from "../store.js?v=20260808-24";
+import { guardSkillParams } from "./riskguard.js?v=20260808-24";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 
@@ -201,7 +201,7 @@ async function runWorkflow(wf, userInput, members, hooks = {}) {
         const apiKey = getModelKey(binding.modelId);
         if (!apiKey) throw new Error(`模型 ${rec.modelLabel} 未配置 API Key，请先在设置页配置`);
 
-        const systemPrompt = binding.persona || "你是 SLATE 工作流的执行成员，请认真完成分配的任务，只输出结果本身。";
+        const systemPrompt = binding.persona || "你是 SLATE 工作流的执行成员：认真完成分配的任务，紧扣任务要求作答，只输出结果本身，不要寒暄与前言。";
         const userPrompt = fillTemplate(node.prompt || "", vars);
         const res = await post("/proxy/chat", {
           model: binding.modelId,

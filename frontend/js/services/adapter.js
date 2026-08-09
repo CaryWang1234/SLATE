@@ -3,34 +3,39 @@
  * 根据不同模型特点优化提示词
  */
 
-import { state } from "../store.js?v=20260808-23";
-import { getToolsSystemPrompt } from "./tools.js?v=20260808-23";
+import { state } from "../store.js?v=20260808-24";
+import { getToolsSystemPrompt } from "./tools.js?v=20260808-24";
 
 // ── System Prompt 模板 ──────────────────────
 
-const SYSTEM_BASE = `你是 SLATE（砚），一个本地灵感激发与知识协作台助手。
-你的核心能力：
-1. 捕捉用户的零碎灵感，帮助发散、连接、命名、追问和重组
-2. 将模糊想法整理成可继续探索的方向、草图、问题清单、故事线或行动种子
-3. 维护长期记忆、用户画像和知识中心，让灵感能跨对话沉淀与复用
-4. 必要时调用工具查看环境、检索知识、执行技能、整理黑板或辅助项目，但不要把自己限制为软件开发助手
+const SYSTEM_BASE = `你是 SLATE（砚），一个本地 AI 协作调度台助手，专注于把灵感转化为结构化方案。
 
-**重要：你拥有工具。只有当用户明确要求了解、查看、修改当前项目，或你的回答必须依赖真实项目内容时，才主动调用 project_files、project_find_file 或 project_read_file 查看实际内容。**
-当用户在探索想法、创作、学习、规划、复盘或知识整理时，优先帮助打开可能性，再收束为清晰的下一步。
-如果你已经在向用户询问是否继续、是否需要方案、是否要你动手，不要自行调用工具，等待用户确认。
-如果你判断当前任务下一步必须查看、读取、浏览、搜索或确认项目内容，不要输出计划或等待用户确认，直接发出对应工具调用。
-严格禁止说“我先看看”、“我需要查看”、“我会浏览一下”后停住；这类话后必须进行实际工具调用。
-回答风格：简洁、有启发性，中文为主，技术术语保留英文。
-不要只追求完成任务；也要帮助用户发现更好的问题、更有张力的角度和可继续生长的想法。`;
+## 职责
+1. 捕捉用户零碎的想法，帮助发散、连接、命名、追问和重组
+2. 将模糊想法整理成可继续探索的方向、问题清单、故事线或行动种子
+3. 维护长期记忆、用户画像和知识中心，让灵感能跨对话沉淀与复用
+4. 必要时调用工具查看项目、检索知识、执行技能；但你不只是软件开发助手，创作、学习、规划、复盘同样是你的主场
+
+## 回答风格
+- 简洁、聚焦、有启发性；中文为主，技术术语保留英文
+- 有实质内容时用 Markdown 结构化（标题、列表、表格）；简单问题直接回答，不加多余格式
+- 先打开可能性，再收束为清晰的下一步；不只完成任务，也帮用户发现更好的问题和更有张力的角度
+
+## 工具纪律
+你拥有工具，调用格式见下方 [可用工具]。
+- 当任务的下一步需要查看、读取、搜索或确认项目内容时，直接发出工具调用，不要先输出计划或征求确认
+- 严格禁止说“我先看看”“我需要查看”后停住——这类话之后必须紧跟实际调用
+- 如果你正在向用户提问、等待用户选择或确认，不要调用工具，等待用户回复`;
 
 const SYSTEM_PROMPTS = {
   default: SYSTEM_BASE,
 
   // 针对推理模型的系统提示
-  reasoning: `${SYSTEM_BASE}\n\n当前处于深度推理模式，请在回答前仔细分析问题，给出思考过程。`,
+  reasoning: `${SYSTEM_BASE}\n\n## 深度推理模式\n回答前先深入分析：明确问题本质、权衡多种方案，再给出想清楚的结论；关键取舍用一两句点明，不堆砌过程。`,
 
   // 针对轻量模型的精简提示
-  lightweight: `你是 SLATE 助手。简洁、有启发性地回应，帮助用户发散和整理想法。用户明确要求查看或修改项目时，调用 tool 查看实际内容；如果只是在询问用户是否继续，等待用户确认。`,
+  lightweight: `你是 SLATE 助手：简洁、有启发性地回应，帮助用户发散和整理想法。中文为主，术语保留英文。
+你拥有工具：用户要求查看或修改项目时，按 [可用工具] 的 ◈◈◈ 格式直接发出调用，不要只说“我来看看”；若你正在向用户提问或等待确认，则不调用工具。`,
 };
 
 // ── 模型分类 ────────────────────────────────
@@ -72,13 +77,13 @@ function getMemorySystemPrompt() {
   }
 
   if (!parts.length) return "";
-  return "\n\n" + parts.join("\n");
+  return "\n\n以下是用户画像与长期记忆，用于调整回答风格与内容贴合用户，不要向用户复述它们：\n" + parts.join("\n");
 }
 
 function getKnowledgeSystemPrompt() {
   const items = Array.isArray(state.knowledgeContext) ? state.knowledgeContext.slice(0, 8) : [];
   if (!items.length) return "";
-  const lines = ["[相关知识库片段]"];
+  const lines = ["[相关知识库片段]（仅在与当前问题相关时参考，不要生硬引用）"];
   for (const item of items) {
     const title = item.title || item.source || "知识";
     const content = String(item.content || "").slice(0, 700);
@@ -91,7 +96,7 @@ function getKnowledgeSystemPrompt() {
 function getExpertSystemPrompt() {
   const expert = state.activeExpert;
   if (!expert) return "";
-  const parts = [`[专家包 · ${expert.name || "未命名"}]`];
+  const parts = [`[专家包 · ${expert.name || "未命名"}]（本次对话完全采纳以下人格与规则，优先于默认风格）`];
   if (String(expert.persona || "").trim()) {
     parts.push("[专家人格]");
     parts.push(String(expert.persona).trim());
@@ -108,7 +113,8 @@ function getExpertSystemPrompt() {
 }
 
 /**
- * 构建完整的消息列表（注入系统提示 + 宪法 + 工具 + 黑板上下文）
+ * 构建完整的消息列表（注入系统提示 + 宪法 + 专家/记忆/知识 + 工具）
+ * 顺序：角色定义 → 项目宪法 → 专家/记忆/知识上下文 → 工具说明（贴近对话，降低遗忘）
  */
 function buildMessages(userMessages, constitution) {
   const messages = [];
@@ -116,19 +122,18 @@ function buildMessages(userMessages, constitution) {
   // 系统提示
   const modelId = userMessages._modelId || "";
   let systemContent = getSystemPrompt(modelId);
+
+  // 注入项目宪法（项目开发规则，先于上下文注入）
+  if (constitution?.rules?.length) {
+    systemContent += "\n\n[项目宪法]（涉及该项目的代码、方案与建议时必须遵守）\n";
+    constitution.rules.forEach((rule, i) => {
+      systemContent += `${i + 1}. ${rule}\n`;
+    });
+  }
+
   systemContent += getExpertSystemPrompt();
   systemContent += getMemorySystemPrompt();
   systemContent += getKnowledgeSystemPrompt();
-
-  // 注入项目宪法
-  if (constitution) {
-    systemContent += "\n\n[项目宪法]\n";
-    if (constitution.rules) {
-      constitution.rules.forEach((rule, i) => {
-        systemContent += `${i + 1}. ${rule}\n`;
-      });
-    }
-  }
 
   // 注入工具描述（所有模型都需要，否则 AI 不知道如何调用工具）
   systemContent += getToolsSystemPrompt();

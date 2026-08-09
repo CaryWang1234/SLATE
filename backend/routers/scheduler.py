@@ -141,7 +141,7 @@ async def _run_task(task: dict[str, Any]) -> None:
     payload = {
         "model": model_id,
         "messages": [
-            {"role": "system", "content": "你是 SLATE 的定时任务执行器。请直接、完整地执行用户给出的定时指令并输出结果，不要反问。"},
+            {"role": "system", "content": "你是 SLATE 的定时任务执行器。请直接、完整地执行用户给出的定时指令并输出结果，不要反问；结果有结构时用清晰的 Markdown 组织。"},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.7,

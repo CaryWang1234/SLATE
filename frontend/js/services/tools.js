@@ -7,9 +7,9 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260808-23";
-import { post } from "../services/api.js?v=20260808-23";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260808-23";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260808-24";
+import { post } from "../services/api.js?v=20260808-24";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260808-24";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -724,23 +724,20 @@ async function executeToolCalls(calls) {
 
 // ── 系统提示词工具段 ──────────────────────────
 
-function getToolsSystemPrompt() {
+function getToolsSystemPrompt({ minimal = false } = {}) {
   let s = "\n\n[可用工具]\n";
   s += "你拥有工具，可以直接操作用户的工作环境。\n\n";
-  s += '**当用户说"了解项目"、"看看文件"、"浏览目录"时，你必须立即调用 project_files 工具，格式如下：**\n';
-  s += "◈◈◈project_files\n{\"path\": \"\"}\n◈◆◆\n\n";
-  s += "不要回答'我无法查看'——你必须发出上面的调用！\n\n";
-  s += "**调用规则：必须使用下方指定格式调用工具。不要只描述你要做什么——必须实际发出调用。**\n";
-  s += "每次调用独占一行，格式严格如下（◈◈◈ 和 ◈◆◆ 是固定标记，不可省略）：\n";
+  s += "**调用纪律：**\n";
+  s += "1. 必须使用下方格式实际发出调用，不要只描述意图；禁止说“我先看看”“我需要查看”后停住。\n";
+  s += "2. 任务需要查看文件、目录、项目结构或执行操作时，当前回复必须包含工具调用块；不要回答“我无法查看”——你可以。\n";
+  s += "3. 你只是在问用户是否继续、是否要你动手时，不要调用工具，等待用户确认。\n";
+  s += "4. 只知道文件名但不知道相对路径时，先调用 project_find_file；拿到匹配路径后再调用 project_read_file 读取目标文件。\n\n";
+  s += "**调用格式**：每次调用独占一块，◈◈◈ 与 ◈◆◆ 是固定标记，不可省略；一次回复可多次调用：\n";
   s += "◈◈◈tool_name\n{JSON参数}\n◈◆◆\n\n";
-  s += "如果当前任务已经需要你查看文件、目录、项目结构、黑板内容或 MCP 工具结果，当前回复必须包含工具调用块。\n";
-  s += "如果你只是在问用户是否需要继续、是否要你动手、是否要给出方案，不要调用工具。\n";
-  s += "禁止只输出“我先查看”“我需要读取”“让我看看”等意图描述后停止。\n\n";
-  s += "只知道文件名但不知道相对路径时，先调用 project_find_file；拿到匹配路径后再调用 project_read_file 读取目标文件。\n\n";
 
   // 具体示例
-  s += '**示例：当用户说"了解项目"时，你必须这样回复（不要文字描述，直接发出调用）：**\n';
-  s += "```\n◈◈◈project_files\n{\"path\": \"\"}\n◈◆◆\n```\n";
+  s += '**示例：用户说“了解项目”时，直接回复：**\n';
+  s += "◈◈◈project_files\n{\"path\": \"\"}\n◈◆◆\n";
   s += "（等待工具返回目录列表后，再根据结果回答用户）\n\n";
 
   // 项目上下文
@@ -750,7 +747,7 @@ function getToolsSystemPrompt() {
       s += "项目宪法:\n";
       state.project.constitution.rules.forEach((r, i) => { s += `  ${i + 1}. ${r}\n`; });
     }
-    s += "用户明确要求查看或修改项目/文件时，你必须先调用 project_files 浏览目录。\n\n";
+    s += "\n";
   }
 
   for (const [key, tool] of Object.entries(TOOLS)) {
@@ -764,10 +761,11 @@ function getToolsSystemPrompt() {
     }
     s += `示例:\n◈◈◈${key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
   }
-  s += "**再次提醒：不要只说'我来帮你查看'——必须发出 ◈◈◈ 调用。一次回复可多次调用。**";
+
+  if (minimal) return s;
 
   // file_edit 专项指导
-  s += "\n\n[文件编辑规则 — file_edit 工具]\n";
+  s += "[文件编辑规则 — file_edit 工具]\n";
   s += "当用户要求修改、编辑、修复项目中的已有文件时，你必须使用 file_edit 工具。\n";
   s += "核心原则：你说改它就真改，你不说它绝不碰。\n";
   s += "- file_path: 相对于项目根目录的路径\n";
@@ -780,7 +778,7 @@ function getToolsSystemPrompt() {
   s += "- 编辑完成后，等待用户确认，不要自动继续修改\n";
 
   // file_create 专项指导
-  s += "\n\n[文件创建规则 — file_create 工具]\n";
+  s += "\n[文件创建规则 — file_create 工具]\n";
   s += "当用户要求创建新文件时，你必须使用 file_create 工具。\n";
   s += "- file_path: 相对于项目根目录的路径（文件不能已存在）\n";
   s += "- file_path 只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";

@@ -44,7 +44,7 @@
   --bg: #0A0A0A;
   --bg-alt: #131313;
   --bg-input: #181818;
-  --text: #E8DCC8;
+  --text: #e9cea1ff;
   --text-secondary: #9b8c73;
   --text-muted: #5C5347;
   --text-faint: #2E2922;
@@ -52,7 +52,7 @@
   --border-hover: #c6b18a;
   --accent-bg: #C9A96E;
   --accent-fg: #0A0A0A;
-  --gold: #ceb381;
+  --gold: #dcb468;
   --gold-dim: rgba(201, 169, 110, 0.10);
   --code-bg: #151515;
   --code-fg: #D4C8B0;

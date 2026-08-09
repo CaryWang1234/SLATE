@@ -3,13 +3,13 @@
  * 轻量模型初步讨论 → 重型模型最终决策
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260808-23";
-import { streamChat } from "../services/api.js?v=20260808-23";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260808-23";
-import { renderMarkdown } from "../services/markdown.js?v=20260808-23";
-import { loadWorkflows, getWorkflow, runWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260808-23";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260808-23";
-import { getExpertsCached } from "./experts.js?v=20260808-23";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260808-24";
+import { streamChat } from "../services/api.js?v=20260808-24";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260808-24";
+import { renderMarkdown } from "../services/markdown.js?v=20260808-24";
+import { loadWorkflows, getWorkflow, runWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260808-24";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260808-24";
+import { getExpertsCached } from "./experts.js?v=20260808-24";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -410,7 +410,7 @@ async function startDiscussion() {
       }
 
       const entry = addDebateEntry(member, "propose");
-      const systemPrompt = `你是 SLATE 团队协作成员。${getToolsSystemPrompt()}`;
+      const systemPrompt = `你是 SLATE 团队协作成员：始终从自己的角色立场出发发表独立观点，直接给观点，不寒暄、不复述他人。${getToolsSystemPrompt({ minimal: true })}`;
       const userPrompt = buildMemberPrompt(member, topic, boardContext, entries, round, isLastRound, member.expertId ? expertDetails.get(member.expertId) : null);
 
       let fullText = "";
@@ -489,7 +489,7 @@ async function forceVerdict(topic, boardContext, entries) {
 
   addRoundHeader("最终决策");
   const entry = addDebateEntry(decider, "verdict");
-  const systemPrompt = `你是 SLATE 团队协作成员。${getToolsSystemPrompt()}`;
+  const systemPrompt = `你是 SLATE 团队协作成员：始终从自己的角色立场出发发表独立观点，直接给观点，不寒暄、不复述他人。${getToolsSystemPrompt({ minimal: true })}`;
   const userPrompt = `${decider.persona}\n\n议题: ${topic}${boardContext}\n\n辩论记录:\n${buildTranscript(entries)}\n\n讨论轮次已用尽。请综合各方观点，以【决策】开头给出最终方案、理由与取舍。`;
 
   let fullText = "";
