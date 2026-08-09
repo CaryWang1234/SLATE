@@ -98,6 +98,37 @@ async def list_conversations() -> dict[str, Any]:
     return {"code": 0, "data": conversations, "message": "ok"}
 
 
+@router.get("/usage/summary")
+async def usage_summary() -> dict[str, Any]:
+    """全部对话的累计用量汇总（设置页统计用）。"""
+    conn = _get_db()
+    row = conn.execute(
+        "SELECT COUNT(*) AS conversation_count, "
+        "COALESCE(SUM(total_tokens), 0) AS total_tokens, "
+        "COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens, "
+        "COALESCE(SUM(completion_tokens), 0) AS completion_tokens, "
+        "COALESCE(SUM(message_count), 0) AS message_count "
+        "FROM conversations"
+    ).fetchone()
+    top_rows = conn.execute(
+        "SELECT id, title, total_tokens, message_count FROM conversations "
+        "WHERE total_tokens > 0 ORDER BY total_tokens DESC LIMIT 5"
+    ).fetchall()
+    conn.close()
+    return {
+        "code": 0,
+        "data": {
+            "conversation_count": row["conversation_count"],
+            "total_tokens": row["total_tokens"],
+            "prompt_tokens": row["prompt_tokens"],
+            "completion_tokens": row["completion_tokens"],
+            "message_count": row["message_count"],
+            "top": [dict(r) for r in top_rows],
+        },
+        "message": "ok",
+    }
+
+
 @router.post("/conversations")
 async def create_conversation(body: dict[str, Any] | None = None) -> dict[str, Any]:
     """创建新对话。"""

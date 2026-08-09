@@ -2,8 +2,9 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260808-16";
-import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260808-16";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260808-21";
+import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260808-21";
+import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260808-21";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let fileTreeContainer, projectInfoEl, projectCloseBtn;
@@ -56,7 +57,7 @@ function renderProjectBar() {
     understandBtn.textContent = "📖";
     understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册";
     understandBtn.addEventListener("click", () => {
-      import("./understand.js?v=20260808-16")
+      import("./understand.js?v=20260808-21")
         .then(({ openUnderstandModal }) => openUnderstandModal())
         .catch(() => {});
     });
@@ -247,8 +248,11 @@ function renderFileTree() {
     const item = document.createElement("div");
     item.className = `file-tree-item ${entry.type === "dir" ? "file-tree-dir" : "file-tree-file"}`;
 
-    const icon = entry.type === "dir" ? "📁 " : "📄 ";
-    item.textContent = icon + entry.name;
+    item.innerHTML = fileTypeIcon(entry.name, { dir: entry.type === "dir" });
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "file-tree-name";
+    nameSpan.textContent = entry.name;
+    item.appendChild(nameSpan);
 
     if (entry.type === "dir") {
       item.addEventListener("click", () => refreshFileTree(entry.path));
@@ -285,7 +289,10 @@ async function openFile(path) {
 
   const title = document.createElement("span");
   title.className = "file-preview-title";
-  title.textContent = name;
+  title.innerHTML = fileTypeIcon(name, { size: 13 });
+  const titleText = document.createElement("span");
+  titleText.textContent = name;
+  title.appendChild(titleText);
   title.title = path;
   header.appendChild(title);
 
@@ -319,10 +326,26 @@ async function openFile(path) {
   header.appendChild(actions);
   filePreviewEl.appendChild(header);
 
-  // 文件内容
+  // 文件内容（按扩展名语法高亮，未知类型走 highlightAuto）
   const pre = document.createElement("pre");
   pre.className = "file-preview-content";
-  pre.textContent = (content || "(空文件)").slice(0, 10000);
+  const text = (content || "(空文件)").slice(0, 10000);
+  let highlighted = false;
+  if (content && window.hljs) {
+    try {
+      const lang = extToLang(name);
+      if (lang && lang !== "plaintext" && hljs.getLanguage(lang)) {
+        pre.innerHTML = hljs.highlight(text, { language: lang }).value;
+      } else if (lang !== "plaintext") {
+        pre.innerHTML = hljs.highlightAuto(text).value;
+      }
+      if (pre.innerHTML) {
+        pre.classList.add("hljs");
+        highlighted = true;
+      }
+    } catch { /* 高亮失败则退回纯文本 */ }
+  }
+  if (!highlighted) pre.textContent = text;
   filePreviewEl.appendChild(pre);
 }
 

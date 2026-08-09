@@ -2,21 +2,22 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-16";
-import { get, put } from "./services/api.js?v=20260808-16";
-import { initChat } from "./components/chat.js?v=20260808-16";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260808-16";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-16";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260808-16";
-import { initTeamPanel } from "./components/team.js?v=20260808-16";
-import { initProjectBar } from "./components/project_bar.js?v=20260808-16";
-import { initMemoryPanel } from "./components/memory.js?v=20260808-16";
-import { initExpertsPanel } from "./components/experts.js?v=20260808-16";
-import { initSchedule } from "./components/schedule.js?v=20260808-16";
-import { initRiskGuard } from "./services/riskguard.js?v=20260808-16";
-import { initUnderstandPanel } from "./components/understand.js?v=20260808-16";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-16";
-import { setProject, setProjectFileTree } from "./store.js?v=20260808-16";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-21";
+import { get, put } from "./services/api.js?v=20260808-21";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260808-21";
+import { initChat } from "./components/chat.js?v=20260808-21";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260808-21";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-21";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260808-21";
+import { initTeamPanel } from "./components/team.js?v=20260808-21";
+import { initProjectBar } from "./components/project_bar.js?v=20260808-21";
+import { initMemoryPanel } from "./components/memory.js?v=20260808-21";
+import { initExpertsPanel } from "./components/experts.js?v=20260808-21";
+import { initSchedule } from "./components/schedule.js?v=20260808-21";
+import { initRiskGuard } from "./services/riskguard.js?v=20260808-21";
+import { initUnderstandPanel } from "./components/understand.js?v=20260808-21";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-21";
+import { setProject, setProjectFileTree } from "./store.js?v=20260808-21";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -384,6 +385,7 @@ function openSettings(options = {}) {
   }
   renderCustomModelManagement();
   renderKeyManagement();
+  renderUsageSummary();
   switchPanel("settings");
   if (options.focusModelId) {
     requestAnimationFrame(() => {
@@ -402,6 +404,73 @@ function openSettings(options = {}) {
 }
 
 function closeSettings() { switchPanel("chat"); }
+
+// ── 设置页：用量统计（全部对话累计） ──────────────
+
+async function renderUsageSummary() {
+  const box = document.getElementById("usage-summary");
+  if (!box) return;
+  box.innerHTML = '<div class="usage-summary-loading">加载中…</div>';
+  try {
+    const res = await get("/chat/usage/summary");
+    if (res.code !== 0) throw new Error(res.message || "加载失败");
+    const d = res.data || {};
+    box.innerHTML = "";
+
+    const grid = document.createElement("div");
+    grid.className = "usage-summary-grid";
+    const equiv = tokenEquivalence(d.total_tokens);
+    grid.innerHTML = `
+      <div class="usage-summary-card usage-summary-main">
+        <div class="usage-summary-num">${fmtTokens(d.total_tokens)}</div>
+        <div class="usage-summary-label">总 tokens</div>
+        ${equiv ? `<div class="usage-summary-equiv">${equiv}</div>` : ""}
+      </div>
+      <div class="usage-summary-card">
+        <div class="usage-summary-num">${fmtTokens(d.prompt_tokens)}</div>
+        <div class="usage-summary-label">总输入</div>
+      </div>
+      <div class="usage-summary-card">
+        <div class="usage-summary-num">${fmtTokens(d.completion_tokens)}</div>
+        <div class="usage-summary-label">总输出</div>
+      </div>
+      <div class="usage-summary-card">
+        <div class="usage-summary-num">${(d.message_count || 0).toLocaleString()}</div>
+        <div class="usage-summary-label">总消息数</div>
+      </div>
+      <div class="usage-summary-card">
+        <div class="usage-summary-num">${d.conversation_count || 0}</div>
+        <div class="usage-summary-label">对话数</div>
+      </div>
+    `;
+    box.appendChild(grid);
+
+    const top = d.top || [];
+    if (top.length) {
+      const list = document.createElement("div");
+      list.className = "usage-summary-top";
+      const head = document.createElement("div");
+      head.className = "usage-summary-top-head";
+      head.textContent = "用量最高的对话";
+      list.appendChild(head);
+      for (const item of top) {
+        const row = document.createElement("div");
+        row.className = "usage-summary-top-row";
+        const title = document.createElement("span");
+        title.className = "usage-summary-top-title";
+        title.textContent = item.title || `对话 ${String(item.id || "").slice(0, 6)}`;
+        const tok = document.createElement("span");
+        tok.className = "usage-summary-top-tokens";
+        tok.textContent = `${fmtTokens(item.total_tokens)} tokens · ${item.message_count || 0} 条消息`;
+        row.append(title, tok);
+        list.appendChild(row);
+      }
+      box.appendChild(list);
+    }
+  } catch (e) {
+    box.innerHTML = `<div class="usage-summary-loading">用量加载失败：${e.message}</div>`;
+  }
+}
 
 // 自动推进设置：变更后立即持久化，无需点保存按钮
 function applyAutoReviewSettings() {
@@ -437,7 +506,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260808-16");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260808-21");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -585,7 +654,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260808-16");
+      const { openProject } = await import("./services/project.js?v=20260808-21");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

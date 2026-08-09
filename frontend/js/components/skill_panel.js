@@ -2,9 +2,9 @@
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除）
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260808-16";
-import { get, post, del, upload } from "../services/api.js?v=20260808-16";
-import { guardSkillParams } from "../services/riskguard.js?v=20260808-16";
+import { state, subscribe, setSkills } from "../store.js?v=20260808-21";
+import { get, post, del, upload } from "../services/api.js?v=20260808-21";
+import { guardSkillParams } from "../services/riskguard.js?v=20260808-21";
 
 let skillList, btnUpload, btnImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 

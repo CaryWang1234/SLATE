@@ -2869,6 +2869,132 @@ textarea::-webkit-scrollbar-thumb {
   font-weight: 600;
 }
 
+/* 用量条悬浮弹窗：总 token + 趣味等价换算 */
+.usage-popup {
+  position: fixed;
+  z-index: 900;
+  min-width: 220px;
+  max-width: 340px;
+  padding: 8px 12px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity var(--transition), transform var(--transition), visibility var(--transition);
+  pointer-events: none;
+}
+
+.usage-popup.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.usage-popup-main {
+  font-size: 12px;
+  color: var(--gold);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.usage-popup-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* 设置页：用量统计 */
+.usage-summary-loading {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.usage-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.usage-summary-card {
+  padding: 10px 12px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.usage-summary-main {
+  border-color: color-mix(in srgb, var(--gold) 45%, var(--border));
+}
+
+.usage-summary-num {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.usage-summary-main .usage-summary-num {
+  color: var(--gold);
+}
+
+.usage-summary-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.usage-summary-equiv {
+  font-size: 11px;
+  color: var(--gold);
+  margin-top: 4px;
+}
+
+.usage-summary-top {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.usage-summary-top-head {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.usage-summary-top-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.usage-summary-top-row:last-child {
+  border-bottom: none;
+}
+
+.usage-summary-top-title {
+  flex: 1;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-summary-top-tokens {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 /* ── 密钥管理面板 ─────────────────────── */
 
 .modal-wide {
@@ -3657,6 +3783,26 @@ body.resizing {
   flex-shrink: 0;
 }
 
+/* VSCode 风格文件类型图标（内联 SVG） */
+.file-type-icon {
+  flex-shrink: 0;
+  display: block;
+}
+
+.file-tree-name {
+  flex: 1;
+  min-width: 0;
+  margin-left: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-chip-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
 /* 文件预览面板 */
 .file-preview {
   border-top: 1px solid var(--border);
@@ -3684,6 +3830,9 @@ body.resizing {
 }
 
 .file-preview-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   font-weight: 600;
   color: var(--text);
@@ -3711,6 +3860,13 @@ body.resizing {
   white-space: pre-wrap;
   word-break: break-all;
   font-family: var(--font-mono);
+}
+
+/* 语法高亮：复用聊天代码块的 atom-one-dark 深色底，呈编辑器观感 */
+.file-preview-content.hljs {
+  padding: 8px 10px;
+  white-space: pre;
+  word-break: normal;
 }
 
 /* ── 打开项目弹窗 ─────────────────────── */
@@ -4734,6 +4890,10 @@ body.resizing {
   justify-content: center;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.exp-detail-empty.hidden {
+  display: none;
 }
 
 .exp-detail-form {
