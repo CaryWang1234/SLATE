@@ -4,8 +4,9 @@
  * - 执行完成后通过 /knowledge/docs 复用现有知识库写入逻辑
  */
 
-import { get, post } from "./api.js?v=20260808-9";
-import { state, getModelKey } from "../store.js?v=20260808-9";
+import { get, post } from "./api.js?v=20260808-16";
+import { state, getModelKey } from "../store.js?v=20260808-16";
+import { guardSkillParams } from "./riskguard.js?v=20260808-16";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 
@@ -185,6 +186,10 @@ async function runWorkflow(wf, userInput, members, hooks = {}) {
         rec.modelLabel = `⚙ ${node.skill}`;
         const params = {};
         for (const [key, raw] of Object.entries(node.inputs || {})) params[key] = vars[key] ?? raw;
+        // 高危命令审批：命中写死规则时弹框请求批准
+        if (!(await guardSkillParams(node.skill, params))) {
+          throw new Error(`高危命令被用户拒绝执行: ${params.command || node.skill}`);
+        }
         const res = await post("/skills/execute", { skill: node.skill, params });
         if (res.code !== 0) throw new Error(res.message || `技能 ${node.skill} 执行失败`);
         output = typeof res.data === "string" ? res.data : JSON.stringify(res.data, null, 2);

@@ -12,3 +12,5 @@ repo-doctor.py
 /data/webview_profile
 /uiexample
 /data/desktop_state.json
+/outputs
+/.qoder

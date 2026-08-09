@@ -7,8 +7,9 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260808-9";
-import { post } from "../services/api.js?v=20260808-9";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260808-16";
+import { post } from "../services/api.js?v=20260808-16";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260808-16";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -162,6 +163,13 @@ const TOOLS = {
             const target = normalizeProjectRelativePath(p.file_path);
             if (target.error) return `Invalid file_path: ${target.error}`;
             p.file_path = target.abs;
+          }
+        }
+        // 高危命令审批：写死规则判定，命中后弹框并用模型解释目的
+        if (skill === "terminal" && p.command) {
+          const risk = isHighRiskCommand(p.command);
+          if (risk.risk && !(await guardSkillParams(skill, p))) {
+            return `高危命令被用户拒绝执行（${risk.reason}）: ${p.command}`;
           }
         }
         const res = await post("/skills/execute", { skill, params: p });

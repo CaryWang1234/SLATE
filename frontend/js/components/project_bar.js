@@ -2,8 +2,8 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260808-9";
-import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260808-9";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260808-16";
+import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260808-16";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let fileTreeContainer, projectInfoEl, projectCloseBtn;
@@ -50,6 +50,17 @@ function renderProjectBar() {
     refreshBtn.title = "刷新项目";
     refreshBtn.addEventListener("click", () => handleRefreshProject(refreshBtn));
     actions.appendChild(refreshBtn);
+
+    const understandBtn = document.createElement("button");
+    understandBtn.className = "icon-btn";
+    understandBtn.textContent = "📖";
+    understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册";
+    understandBtn.addEventListener("click", () => {
+      import("./understand.js?v=20260808-16")
+        .then(({ openUnderstandModal }) => openUnderstandModal())
+        .catch(() => {});
+    });
+    actions.appendChild(understandBtn);
 
     const configBtn = document.createElement("button");
     configBtn.className = "icon-btn";

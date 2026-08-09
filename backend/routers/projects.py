@@ -332,3 +332,114 @@ async def create_file(req: CreateFileRequest):
         return {"code": 0, "data": {"file": str(target.relative_to(project_dir))}, "message": "ok"}
     except Exception as e:
         return {"code": 1, "message": f"创建失败: {e}"}
+
+
+# ── Better Project Understanding：项目扫描 ─────
+
+class ScanRequest(BaseModel):
+    level: str = "balanced"  # brief | balanced | detailed
+
+
+# 三档扫描预算（写死）：目录深度 / 树条目上限 / 精读文件数 / 每文件行数
+SCAN_LEVELS = {
+    "brief":    {"depth": 2, "max_tree": 300,  "max_files": 6,  "head_lines": 40},
+    "balanced": {"depth": 3, "max_tree": 600,  "max_files": 16, "head_lines": 70},
+    "detailed": {"depth": 5, "max_tree": 1200, "max_files": 36, "head_lines": 110},
+}
+
+KEY_NAMES = {
+    "readme.md", "readme", "readme.txt", "readme.rst",
+    "package.json", "requirements.txt", "pyproject.toml", "setup.py", "setup.cfg",
+    "cargo.toml", "go.mod", "pom.xml", "build.gradle", "makefile", "cmakelists.txt",
+    "dockerfile", "docker-compose.yml", "docker-compose.yaml", ".env.example",
+    "rules.md", "qoder.md", "constitution.json", "slate.spec",
+    "tsconfig.json", "vite.config.js", "vite.config.ts", "webpack.config.js",
+    "index.html", "main.py", "app.py", "desktop.py", "main.js", "app.js", "index.js",
+}
+
+
+def _file_priority(rel: str, name: str, ext: str) -> int:
+    """精读优先级：越小越重要"""
+    low = name.lower()
+    if low.startswith("readme"):
+        return 0
+    if low in KEY_NAMES:
+        return 1
+    if ext in (".md", ".json", ".toml", ".yaml", ".yml", ".cfg", ".ini"):
+        return 2
+    if ext in TEXT_EXTS:
+        return 3
+    return 9
+
+
+@router.post("/understand/scan")
+async def scan_project(req: ScanRequest):
+    """全量扫描项目：目录树 + 关键文件头部内容，供 AI 生成导览与规则"""
+    if not _current_project:
+        return {"code": 1, "message": "未打开项目"}
+    budget = SCAN_LEVELS.get(req.level, SCAN_LEVELS["balanced"])
+    project_dir = Path(_current_project["path"])
+
+    tree_lines: list[str] = []
+    files: list[tuple[str, str, str, int]] = []  # (rel, name, ext, size)
+    truncated = False
+
+    def walk(d: Path, depth: int, prefix: str) -> None:
+        nonlocal truncated
+        if truncated or depth > budget["depth"]:
+            return
+        try:
+            entries = sorted(d.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
+        except OSError:
+            return
+        visible = [
+            e for e in entries
+            if not (e.name.startswith(".") and e.name != ".env")
+            and not (e.is_dir() and e.name in IGNORE_DIRS)
+        ]
+        for i, entry in enumerate(visible):
+            if len(tree_lines) >= budget["max_tree"]:
+                truncated = True
+                return
+            last = i == len(visible) - 1
+            branch = "└─ " if last else "├─ "
+            tree_lines.append(f"{prefix}{branch}{entry.name}{'/' if entry.is_dir() else ''}")
+            if entry.is_dir():
+                walk(entry, depth + 1, prefix + ("   " if last else "│  "))
+            elif entry.is_file():
+                size = _safe_file_size(entry) or 0
+                if size <= 2 * 1024 * 1024:  # 跳过超大文件
+                    files.append(
+                        (entry.relative_to(project_dir).as_posix(), entry.name, entry.suffix.lower(), size)
+                    )
+
+    tree_lines.append(project_dir.name + "/")
+    walk(project_dir, 1, "")
+
+    # 按优先级选出精读文件
+    files.sort(key=lambda f: (_file_priority(f[0], f[1], f[2]), f[0]))
+    heads: list[dict] = []
+    for rel, name, ext, size in files[: budget["max_files"]]:
+        if ext not in TEXT_EXTS:
+            continue
+        try:
+            content = (project_dir / rel).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        lines = content.splitlines()
+        head = "\n".join(lines[: budget["head_lines"]])
+        if len(lines) > budget["head_lines"]:
+            head += f"\n…（共 {len(lines)} 行，已截取开头）"
+        heads.append({"path": rel, "content": head[:6000]})
+
+    return {
+        "code": 0,
+        "data": {
+            "project": _current_project["name"],
+            "level": req.level if req.level in SCAN_LEVELS else "balanced",
+            "tree": "\n".join(tree_lines),
+            "truncated": truncated,
+            "total_files": len(files),
+            "heads": heads,
+        },
+    }

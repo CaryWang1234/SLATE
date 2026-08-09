@@ -89,6 +89,10 @@ const state = {
     topK: 5,
   },
   knowledgeContext: [],
+
+  // 专家包：当前对话激活的专家（注入 persona + rules）
+  activeExpertId: "",
+  activeExpert: null,
 };
 
 // ── 订阅者 ──────────────────────────────────
@@ -123,6 +127,7 @@ function buildPersistentData() {
     outputSettings: state.outputSettings,
     harness: state.harness,
     knowledgeSettings: state.knowledgeSettings,
+    activeExpertId: state.activeExpertId,
   };
 }
 
@@ -189,6 +194,7 @@ function loadPersistent() {
       ...state.knowledgeSettings,
       ...(data.knowledgeSettings || {}),
     };
+    state.activeExpertId = data.activeExpertId || "";
   } catch (e) {}
 }
 
@@ -226,6 +232,13 @@ async function loadSharedPersistent() {
 }
 
 // ── 状态修改 ────────────────────────────────
+
+function setActiveExpertId(id, detail = null) {
+  state.activeExpertId = id || "";
+  state.activeExpert = detail || null;
+  savePersistent();
+  notify("activeExpert", state.activeExpert);
+}
 
 function setTheme(t) {
   state.theme = t;
@@ -515,6 +528,7 @@ function setModelRegistry(registry) {
 export {
   API_BASE, state, subscribe, notify,
   setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel,
+  setActiveExpertId,
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens, estimateContextTokens,
   getConversationTodos, setConversationTodos,
   loadSharedPersistent,

@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示词
  */
 
-import { state } from "../store.js?v=20260808-9";
-import { getToolsSystemPrompt } from "./tools.js?v=20260808-9";
+import { state } from "../store.js?v=20260808-16";
+import { getToolsSystemPrompt } from "./tools.js?v=20260808-16";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -87,6 +87,26 @@ function getKnowledgeSystemPrompt() {
   return "\n\n" + lines.join("\n");
 }
 
+/** 专家包注入：当前对话激活的专家 persona + rules */
+function getExpertSystemPrompt() {
+  const expert = state.activeExpert;
+  if (!expert) return "";
+  const parts = [`[专家包 · ${expert.name || "未命名"}]`];
+  if (String(expert.persona || "").trim()) {
+    parts.push("[专家人格]");
+    parts.push(String(expert.persona).trim());
+  }
+  if (String(expert.rules || "").trim()) {
+    parts.push("[专家规则]");
+    parts.push(String(expert.rules).trim());
+  }
+  const knowledgeNames = (expert.knowledge || []).map(f => f.name).slice(0, 20);
+  if (knowledgeNames.length) {
+    parts.push(`[专家知识文件] ${knowledgeNames.join("、")}`);
+  }
+  return parts.length > 1 ? "\n\n" + parts.join("\n") : "";
+}
+
 /**
  * 构建完整的消息列表（注入系统提示 + 宪法 + 工具 + 黑板上下文）
  */
@@ -96,6 +116,7 @@ function buildMessages(userMessages, constitution) {
   // 系统提示
   const modelId = userMessages._modelId || "";
   let systemContent = getSystemPrompt(modelId);
+  systemContent += getExpertSystemPrompt();
   systemContent += getMemorySystemPrompt();
   systemContent += getKnowledgeSystemPrompt();
 

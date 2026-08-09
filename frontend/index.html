@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260808-9">
+  <link rel="stylesheet" href="./css/style.css?v=20260808-16">
 </head>
 <body>
 
@@ -63,6 +63,7 @@
               <button id="btn-schedule" class="icon-btn" title="定时任务">⏰</button>
               <button id="btn-compress" class="icon-btn" title="手动压缩上下文">⟲</button>
               <button id="btn-memory" class="icon-btn" title="记忆与画像">🧠</button>
+              <button id="btn-experts" class="icon-btn" title="专家包管理">🎓</button>
               <button id="btn-snippets" class="icon-btn" title="提示词素材">✂</button>
               <button id="btn-toggle-history" class="icon-btn active" title="显示/隐藏历史">☰</button>
               <button id="btn-new-chat" class="icon-btn" title="新建对话 (Ctrl+N)">+</button>
@@ -80,12 +81,19 @@
               </div>
               <div id="conv-list"></div>
             </div>
-            <div id="chat-messages" class="chat-scroll"></div>
+            <div class="chat-area-row">
+              <div id="chat-messages" class="chat-scroll"></div>
+              <!-- TODOLIST 任务清单（Harness，右侧栏） -->
+              <div id="todo-panel" class="todo-panel hidden"></div>
+            </div>
             <!-- 文件附件预览区 -->
             <div id="file-preview-area" class="file-preview-area hidden"></div>
             <div id="chat-input-area">
               <button id="btn-attach-file" class="icon-btn" title="附加文件">📎</button>
               <input type="file" id="file-input" multiple hidden accept=".txt,.md,.csv,.json,.py,.js,.html,.css,.yaml,.yml,.xml,.sh,.bat,.jpg,.jpeg,.png,.gif,.webp,.svg,.pdf">
+              <select id="expert-select" class="expert-select" title="选择专家包（注入人格与规则）">
+                <option value="">无专家</option>
+              </select>
               <textarea id="chat-input" placeholder="输入消息… (Enter 发送, Shift+Enter 换行)" rows="1"></textarea>
               <button id="btn-send" class="send-btn">发送</button>
             </div>
@@ -538,6 +546,69 @@
     </div>
   </div>
 
+  <!-- ═══ 专家包弹窗 ═══ -->
+  <div id="expert-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <span>专家包</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body exp-modal-body">
+        <div class="exp-sidebar">
+          <div class="exp-toolbar">
+            <button id="btn-expert-new" class="send-btn send-btn-sm">+ 新建</button>
+            <button id="btn-expert-import" class="send-btn send-btn-sm">📥 导入 zip</button>
+            <input type="file" id="expert-zip-input" accept=".zip" hidden>
+          </div>
+          <div id="expert-list" class="exp-list"></div>
+        </div>
+        <div class="exp-detail">
+          <div id="expert-detail-empty" class="exp-detail-empty">从左侧选择专家包，或新建 / 导入一个</div>
+          <div id="expert-detail-form" class="exp-detail-form hidden">
+            <div class="exp-field-row">
+              <label class="exp-field">名称<input id="expert-name" type="text" class="exp-input" placeholder="专家名称"></label>
+              <label class="exp-field">描述<input id="expert-desc" type="text" class="exp-input" placeholder="一句话描述该专家"></label>
+            </div>
+            <div class="exp-tabs">
+              <button class="exp-tab active" data-tab="persona">人格 persona.md</button>
+              <button class="exp-tab" data-tab="rules">规则 rules.md</button>
+              <button class="exp-tab" data-tab="knowledge">知识 knowledge/</button>
+              <button class="exp-tab" data-tab="skills">技能 skills/</button>
+            </div>
+            <div id="expert-tab-persona" class="exp-tab-content active">
+              <textarea id="expert-persona" class="exp-textarea" placeholder="专家人格设定（persona.md 内容），例：你是一位资深后端架构师……"></textarea>
+            </div>
+            <div id="expert-tab-rules" class="exp-tab-content">
+              <textarea id="expert-rules" class="exp-textarea" placeholder="专家行为规则（rules.md 内容），例：1. 回答先给结论再给理由……"></textarea>
+            </div>
+            <div id="expert-tab-knowledge" class="exp-tab-content">
+              <div class="exp-file-toolbar">
+                <button id="btn-expert-add-knowledge" class="send-btn send-btn-sm">+ 添加文件</button>
+                <input type="file" id="expert-knowledge-input" multiple hidden>
+                <span class="exp-hint">专家参考资料，随专家包打包分发</span>
+              </div>
+              <div id="expert-knowledge-list" class="exp-file-list"></div>
+            </div>
+            <div id="expert-tab-skills" class="exp-tab-content">
+              <div class="exp-file-toolbar">
+                <button id="btn-expert-add-skills" class="send-btn send-btn-sm">+ 添加文件</button>
+                <input type="file" id="expert-skills-input" multiple hidden>
+                <span class="exp-hint">专家包自带的技能定义文件</span>
+              </div>
+              <div id="expert-skills-list" class="exp-file-list"></div>
+            </div>
+            <div class="modal-footer">
+              <button id="btn-expert-delete" class="send-btn btn-danger">删除</button>
+              <button id="btn-expert-save" class="send-btn">保存</button>
+              <button id="btn-expert-export" class="send-btn btn-ghost">导出 zip</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ 提示词素材弹窗 ═══ -->
   <div id="snippet-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
@@ -586,10 +657,84 @@
     </div>
   </div>
 
+  <!-- ═══ 高危命令审批弹窗 ═══ -->
+  <div id="risk-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <span>高危命令审批</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="risk-reason" class="risk-reason"></div>
+        <label class="setting-label">命令</label>
+        <pre id="risk-command" class="risk-command"></pre>
+        <label class="setting-label">目的说明（模型分析）</label>
+        <div id="risk-explain" class="risk-explain">正在分析…</div>
+        <p class="risk-note">批准后命令将直接执行，请确认已理解其影响。</p>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-risk-reject" class="send-btn btn-ghost">拒绝</button>
+        <button id="btn-risk-approve" class="send-btn risk-approve-btn">批准执行</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Better Project Understanding 弹窗 ═══ -->
+  <div id="understand-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <span>Better Project Understanding</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <!-- 设置视图：选档 -->
+      <div id="understand-setup" class="modal-body">
+        <p class="understand-intro">AI 将全量扫描当前项目（目录结构 + 关键文件），生成两份文档：</p>
+        <div class="understand-docs-hint">
+          <span>🗺 导览·百科：项目概述 / 技术栈 / 模块职责 / 入口导航</span>
+          <span>📏 规则手册：后续开发应遵守的项目规则</span>
+        </div>
+        <label class="setting-label">扫描深度</label>
+        <div id="understand-levels" class="understand-levels"></div>
+        <div class="modal-footer">
+          <button id="btn-understand-start" class="send-btn">开始生成</button>
+        </div>
+      </div>
+      <!-- 进度视图 -->
+      <div id="understand-progress" class="modal-body hidden">
+        <div id="understand-steps" class="understand-steps">
+          <div class="understand-step waiting"><span class="understand-step-icon">·</span>扫描项目</div>
+          <div class="understand-step waiting"><span class="understand-step-icon">·</span>生成导览·百科</div>
+          <div class="understand-step waiting"><span class="understand-step-icon">·</span>生成规则手册</div>
+        </div>
+        <div id="understand-log" class="understand-log"></div>
+        <div class="modal-footer">
+          <button id="btn-understand-cancel" class="send-btn btn-ghost">取消</button>
+        </div>
+      </div>
+      <!-- 结果视图 -->
+      <div id="understand-result" class="modal-body hidden">
+        <div class="understand-result-bar">
+          <div id="understand-tabs" class="understand-tabs">
+            <button class="understand-tab active" data-tab="tour">🗺 导览·百科</button>
+            <button class="understand-tab" data-tab="rules">📏 规则手册</button>
+          </div>
+          <span id="understand-meta" class="understand-meta"></span>
+        </div>
+        <div id="understand-body" class="understand-body msg-content"></div>
+        <div class="modal-footer">
+          <button id="btn-understand-copy" class="send-btn btn-ghost">复制当前文档</button>
+          <button id="btn-understand-regen" class="send-btn">重新生成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ Toast 容器 ═══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260808-9"></script>
+  <script type="module" src="./js/app.js?v=20260808-16"></script>
 
 </body>
 </html>

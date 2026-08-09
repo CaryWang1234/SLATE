@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE（砚）· 本地 AI 协作调度台</title>
-  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Harness 自主执行、MCP 工具、AI 团队辩论与 DAG 工作流、白板式逻辑链，将灵感转化为结构化方案。开源免费，安装即用。">
+  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Harness 自主执行、MCP 工具、专家包、AI 团队辩论与 DAG 工作流、白板式逻辑链、项目理解三档扫描，将灵感转化为结构化方案。开源免费，安装即用。">
   <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -93,6 +93,7 @@
             <div class="harness-bar">⚡ 自主执行中 · 可随时停止</div>
             <div class="tool-chip">🛠 file_edit</div>
             <div class="tool-chip">🧩 @my-skill</div>
+            <div class="tool-chip">🎓 @创意写作导师</div>
             <div class="tool-chip">🔀 工作流 · 节点 3/5</div>
             <div class="skel"></div>
             <div class="skel w80"></div>
@@ -166,10 +167,22 @@
           <div class="feature-plain">MCP 就是"AI 的标准插座"——给 AI 接上工具，它不但会说，还会动手做。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🛡️</div>
+          <div class="feature-name">高危命令审批</div>
+          <div class="feature-desc">终端命令经写死规则前后端双层拦截：rm / format 等 23 类高危操作必须经你确认，灾难级命令无条件禁止，批准弹窗由 AI 解释命令目的。</div>
+          <div class="feature-plain">AI 想按"删除"键之前，得先让你看清它要删什么、为什么删。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🧩</div>
           <div class="feature-name">自定义 Skill 系统</div>
           <div class="feature-desc">SKILL.md 即插即用，上传或导入即可扩展新能力，聊天中 @ 提及自动注入上下文，不用重复交代背景与规矩。</div>
           <div class="feature-plain">Skill 是写给 AI 的"岗位说明书"，一个 Markdown 文件就能教会它一项新本事。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🎓</div>
+          <div class="feature-name">专家包</div>
+          <div class="feature-desc">persona.md + rules.md + knowledge/ + skills/ 五件套，一个 zip 打包一位专属专家。对话下拉、团队成员卡、@提及三路注入，导入即用，随时分享。</div>
+          <div class="feature-plain">相当于给 AI 办"入职"：岗位说明书和参考资料一并交给它，它就按这个人设专业干活。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">👥</div>
@@ -200,6 +213,12 @@
           <div class="feature-name">长期记忆 & 知识库</div>
           <div class="feature-desc">自动沉淀对话要点，跨会话召回，AI 越用越懂你；本地知识片段按需检索注入，你的资料成为它的参考书。</div>
           <div class="feature-plain">AI 不再"金鱼记忆"——上次说过的事，这次不用从头交代。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">📖</div>
+          <div class="feature-name">Better Project Understanding</div>
+          <div class="feature-desc">简略 / 平衡 / 详细三档力度扫描整个项目，按优先级精读关键文件，自动生成导览·百科与规则手册两份文档并持久化——AI 先读懂项目，再动手干活。</div>
+          <div class="feature-plain">先让 AI 把项目"岗前培训"一遍：是什么、怎么分、守什么规矩，写得明明白白。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🏭</div>
@@ -344,7 +363,7 @@
         <div class="tool-item reveal" data-stagger><code>file_peek</code><span>文件读取预览，只看不改也安心</span></div>
         <div class="tool-item reveal" data-stagger><code>file_create</code><span>文件创建，从零起草</span></div>
         <div class="tool-item reveal" data-stagger><code>file_edit</code><span>差异预览式编辑，改哪看得见</span></div>
-        <div class="tool-item reveal" data-stagger><code>terminal</code><span>受限沙箱命令，执行有边界</span></div>
+        <div class="tool-item reveal" data-stagger><code>terminal</code><span>受限沙箱命令，高危操作需审批</span></div>
         <div class="tool-item reveal" data-stagger><code>html_render</code><span>HTML 骨架生成，页面起步快</span></div>
         <div class="tool-item reveal" data-stagger><code>css_color</code><span>CSS 调色，配色不再凭感觉</span></div>
         <div class="tool-item reveal" data-stagger><code>doc_write</code><span>文档编写，结构化输出</span></div>
@@ -521,6 +540,8 @@
     const phrases = [
       "把「帮我整理项目文档」变成一份真正交付的报告",
       "15 个内置工具，@ 一下就开始干活",
+      "专家包 @提及，AI 秒变你的专属专家",
+      "三档扫描项目：AI 先读懂项目，再动手干活",
       "灵感 → 卡片 → 逻辑链 → 可执行方案",
       "工作流流水线：需求 → 拆解 → 编码 → 审查 → 总结",
       "你的数据，始终留在你的电脑上",

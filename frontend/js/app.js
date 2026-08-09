@@ -2,18 +2,21 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-9";
-import { get, put } from "./services/api.js?v=20260808-9";
-import { initChat } from "./components/chat.js?v=20260808-9";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260808-9";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-9";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260808-9";
-import { initTeamPanel } from "./components/team.js?v=20260808-9";
-import { initProjectBar } from "./components/project_bar.js?v=20260808-9";
-import { initMemoryPanel } from "./components/memory.js?v=20260808-9";
-import { initSchedule } from "./components/schedule.js?v=20260808-9";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-9";
-import { setProject, setProjectFileTree } from "./store.js?v=20260808-9";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-16";
+import { get, put } from "./services/api.js?v=20260808-16";
+import { initChat } from "./components/chat.js?v=20260808-16";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260808-16";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-16";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260808-16";
+import { initTeamPanel } from "./components/team.js?v=20260808-16";
+import { initProjectBar } from "./components/project_bar.js?v=20260808-16";
+import { initMemoryPanel } from "./components/memory.js?v=20260808-16";
+import { initExpertsPanel } from "./components/experts.js?v=20260808-16";
+import { initSchedule } from "./components/schedule.js?v=20260808-16";
+import { initRiskGuard } from "./services/riskguard.js?v=20260808-16";
+import { initUnderstandPanel } from "./components/understand.js?v=20260808-16";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-16";
+import { setProject, setProjectFileTree } from "./store.js?v=20260808-16";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -434,7 +437,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260808-9");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260808-16");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -544,7 +547,10 @@ async function init() {
   safeInit("AI 团队", initTeamPanel);
   safeInit("项目栏", initProjectBar);
   safeInit("记忆面板", initMemoryPanel);
+  safeInit("专家包", initExpertsPanel);
   safeInit("定时任务", initSchedule);
+  safeInit("高危命令守卫", initRiskGuard);
+  safeInit("项目理解", initUnderstandPanel);
   safeInit("快捷键", initKeyboardShortcuts);
   safeInit("文本复制", initSelectionCopySupport);
 
@@ -579,7 +585,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260808-9");
+      const { openProject } = await import("./services/project.js?v=20260808-16");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

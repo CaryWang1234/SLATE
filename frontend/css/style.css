@@ -1552,15 +1552,21 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .skill-kind-mcp {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
 }
 
 .skill-kind-skill {
   color: #d9a441;
   background: rgba(217, 164, 65, 0.12);
   border: 1px solid rgba(217, 164, 65, 0.35);
+}
+
+.skill-kind-expert {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 28%, transparent);
 }
 
 .skill-item-del {
@@ -1673,6 +1679,8 @@ textarea::-webkit-scrollbar-thumb {
   padding: 10px 16px;
   border-top: 1px solid var(--border);
   display: flex;
+  align-items: center;
+  gap: 8px;
   justify-content: flex-end;
 }
 
@@ -2001,6 +2009,14 @@ textarea::-webkit-scrollbar-thumb {
   display: flex;
   flex-direction: column;
   flex: 1;
+  overflow: hidden;
+}
+
+/* 消息区 + TODOLIST 右侧栏的横向容器 */
+.chat-area-row {
+  display: flex;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -2934,7 +2950,7 @@ textarea::-webkit-scrollbar-thumb {
 .setting-check input {
   width: 14px;
   height: 14px;
-  accent-color: var(--accent);
+  accent-color: var(--gold);
 }
 
 .setting-section-head {
@@ -3775,21 +3791,29 @@ body.resizing {
 /* ── TODOLIST 任务清单面板（Harness 六阶段闭环） ─── */
 
 .todo-panel {
-  margin: 0 16px 6px;
+  width: 280px;
+  flex-shrink: 0;
   font-size: 12px;
   background: var(--bg-alt);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+}
+
+.todo-panel.hidden {
+  display: none;
 }
 
 .todo-panel-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 12px;
+  padding: 8px 12px;
   cursor: pointer;
   user-select: none;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .todo-panel-header:hover {
@@ -3827,8 +3851,8 @@ body.resizing {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 2px 12px 8px;
-  max-height: 160px;
+  padding: 6px 12px 8px;
+  flex: 1;
   overflow-y: auto;
 }
 
@@ -4604,4 +4628,537 @@ body.resizing {
     width: 100%;
     margin-left: 0;
   }
+}
+
+/* ═══ 专家包 ═══════════════════════════ */
+
+/* 对话输入区的专家选择器 */
+.expert-select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 6px;
+  font-size: 11px;
+  font-family: var(--font-main);
+  outline: none;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  max-width: 110px;
+  flex-shrink: 0;
+  transition: border-color var(--transition);
+}
+
+.expert-select:focus {
+  border-color: var(--gold);
+}
+
+/* 弹窗主体：左列表 + 右详情 */
+.exp-modal-body {
+  display: flex;
+  gap: 12px;
+  min-height: 420px;
+}
+
+.exp-sidebar {
+  width: 210px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exp-toolbar {
+  display: flex;
+  gap: 6px;
+}
+
+.exp-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.exp-list-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px 0;
+}
+
+.exp-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color var(--transition), background-color var(--transition);
+}
+
+.exp-item:hover {
+  border-color: var(--border-hover);
+}
+
+.exp-item.active {
+  border-color: var(--gold);
+  background: var(--bg-alt);
+}
+
+.exp-item-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.exp-item-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exp-detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.exp-detail-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.exp-detail-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.exp-field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.exp-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.exp-input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: var(--font-main);
+  outline: none;
+  background: var(--bg-input);
+  color: var(--text);
+  transition: border-color var(--transition);
+}
+
+.exp-input:focus {
+  border-color: var(--border-hover);
+}
+
+.exp-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.exp-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-main);
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.exp-tab:hover {
+  color: var(--text);
+}
+
+.exp-tab.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+.exp-tab-content {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exp-tab-content.active {
+  display: flex;
+}
+
+.exp-textarea {
+  flex: 1;
+  min-height: 200px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  font-family: var(--font-main);
+  outline: none;
+  background: var(--bg-input);
+  color: var(--text);
+  transition: border-color var(--transition);
+}
+
+.exp-textarea:focus {
+  border-color: var(--border-hover);
+}
+
+.exp-file-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exp-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.exp-file-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 160px;
+}
+
+.exp-file-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 20px 0;
+}
+
+.exp-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 8px;
+}
+
+.exp-file-name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exp-file-size {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.exp-file-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.exp-file-remove:hover {
+  color: #c44;
+}
+
+/* 通用次级/危险按钮（各弹窗共用） */
+.btn-ghost {
+  background: var(--bg-alt);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-danger {
+  margin-left: auto;
+  background: none;
+  border: 1px solid #c44;
+  color: #c44;
+}
+
+.btn-danger:hover {
+  background: rgba(204, 68, 68, 0.08);
+}
+
+/* 团队成员卡的专家包行 */
+.team-member-expert-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.team-member-expert-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.team-member-expert-row .member-expert-select {
+  flex: 1;
+}
+
+/* ── 高危命令审批弹窗 ── */
+
+#risk-modal .modal-content {
+  max-width: 520px;
+  border: 1px solid rgba(204, 68, 68, 0.4);
+}
+
+.risk-reason {
+  display: inline-block;
+  padding: 3px 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #c44;
+  background: rgba(204, 68, 68, 0.1);
+  border: 1px solid rgba(204, 68, 68, 0.35);
+  border-radius: var(--radius);
+}
+
+.risk-command {
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.risk-explain {
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  background: var(--bg-alt);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--gold);
+}
+
+.risk-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.risk-approve-btn {
+  background: #c44;
+  border-color: #c44;
+  color: #fff;
+}
+
+.risk-approve-btn:hover {
+  background: #b33;
+}
+
+/* ── Better Project Understanding ── */
+
+.understand-intro {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.understand-docs-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-alt);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--gold);
+}
+
+.understand-levels {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.understand-level-card {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.understand-level-card:hover {
+  border-color: var(--gold);
+}
+
+.understand-level-card.selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold);
+}
+
+.understand-level-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.understand-level-card.selected .understand-level-title {
+  color: var(--gold);
+}
+
+.understand-level-line {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.understand-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.understand-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.understand-step-icon {
+  width: 16px;
+  text-align: center;
+}
+
+.understand-step.running {
+  color: var(--gold);
+}
+
+.understand-step.running .understand-step-icon {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+.understand-step.done {
+  color: var(--text);
+}
+
+.understand-step.done .understand-step-icon {
+  color: var(--gold);
+}
+
+.understand-step.error {
+  color: #c44;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.understand-log {
+  height: 140px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+}
+
+.understand-result-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.understand-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.understand-tab {
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: var(--font-main);
+  transition: all var(--transition);
+}
+
+.understand-tab:hover {
+  color: var(--text);
+}
+
+.understand-tab.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+.understand-meta {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.understand-body {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 4px 2px;
 }

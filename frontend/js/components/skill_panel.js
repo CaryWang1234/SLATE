@@ -2,8 +2,9 @@
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除）
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260808-9";
-import { get, post, del, upload } from "../services/api.js?v=20260808-9";
+import { state, subscribe, setSkills } from "../store.js?v=20260808-16";
+import { get, post, del, upload } from "../services/api.js?v=20260808-16";
+import { guardSkillParams } from "../services/riskguard.js?v=20260808-16";
 
 let skillList, btnUpload, btnImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -254,6 +255,12 @@ async function executeSkill() {
   btnRunSkill.textContent = "执行中…";
 
   try {
+    // 高危命令审批：命中写死规则时弹框请求批准
+    if (!(await guardSkillParams(currentSkillName, params))) {
+      skillResult.classList.remove("hidden");
+      skillResult.textContent = "高危命令已被拒绝执行";
+      return;
+    }
     const res = await post("/skills/execute", { skill: currentSkillName, params });
     skillResult.classList.remove("hidden");
     if (res.code === 0) {
