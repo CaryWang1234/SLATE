@@ -2,7 +2,7 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260808-21";
+import { API_BASE } from "../store.js?v=20260808-23";
 
 // ── 超时与重试常量（参考主流 Agent：idle watchdog + 零内容自动重试） ──
 const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（含 MCP 工具）总超时

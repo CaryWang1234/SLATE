@@ -4,18 +4,18 @@
  * 文件夹与未识别类型用手写 SVG 兜底；供项目文件树、文件预览标题、聊天附件 chip 共用
  */
 
-// ── 兜底图形（文件夹 / 未知类型） ─────────────
+// ── 兜底图形（文件夹 / 未知类型，颜色随 CSS currentColor 统一） ─
 
 function doc(color) {
-  return `<svg class="file-type-icon" width="__SIZE__" height="__SIZE__" viewBox="0 0 16 16" fill="none" aria-hidden="true">` +
+  return `<svg class="file-type-icon file-icon-fallback" width="__SIZE__" height="__SIZE__" viewBox="0 0 16 16" fill="none" aria-hidden="true">` +
     `<path d="M3.5 1.5h5.8l3.2 3.2V13a1.5 1.5 0 0 1-1.5 1.5H3.5A1.5 1.5 0 0 1 2 13V3a1.5 1.5 0 0 1 1.5-1.5z" ` +
-    `fill="none" stroke="${color}" stroke-width="1.1"/>` +
-    `<path d="M9.3 1.5v3.2h3.2" fill="none" stroke="${color}" stroke-width="1.1"/></svg>`;
+    `fill="none" stroke="currentColor" stroke-width="1.1"/>` +
+    `<path d="M9.3 1.5v3.2h3.2" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>`;
 }
 
 function folder(size) {
-  return `<svg class="file-type-icon" width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" aria-hidden="true">` +
-    `<path d="M1.5 3.2c0-.7.5-1.2 1.2-1.2h3.1l1.6 1.7h5.9c.7 0 1.2.5 1.2 1.2v7.9c0 .7-.5 1.2-1.2 1.2H2.7c-.7 0-1.2-.5-1.2-1.2V3.2z" fill="#DCB67A"/>` +
+  return `<svg class="file-type-icon file-icon-fallback" width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" aria-hidden="true">` +
+    `<path d="M1.5 3.2c0-.7.5-1.2 1.2-1.2h3.1l1.6 1.7h5.9c.7 0 1.2.5 1.2 1.2v7.9c0 .7-.5 1.2-1.2 1.2H2.7c-.7 0-1.2-.5-1.2-1.2V3.2z" fill="currentColor"/>` +
     `<path d="M1.5 5.5h13" stroke="rgba(0,0,0,0.18)" stroke-width="1"/></svg>`;
 }
 

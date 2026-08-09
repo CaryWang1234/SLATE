@@ -3783,10 +3783,29 @@ body.resizing {
   flex-shrink: 0;
 }
 
-/* VSCode 风格文件类型图标（内联 SVG） */
+/* VSCode 风格文件类型图标（本地 SVG） */
 .file-type-icon {
   flex-shrink: 0;
   display: block;
+}
+
+/* 颜色统一：多色 vscode 图标统一为单色，随主题调节亮度（浅色深灰 / 深色浅灰） */
+img.file-type-icon {
+  filter: grayscale(1) brightness(0.72) contrast(1.05);
+}
+
+[data-theme="dark"] img.file-type-icon {
+  /* 深色主题图标统一为金色（黑金主调） */
+  filter: grayscale(1) sepia(1) saturate(1.35) brightness(1.1);
+}
+
+/* 兜底图标（文件夹 / 未知类型）：与单色滤镜后的灰阶对齐 */
+.file-icon-fallback {
+  color: #6f6f6f;
+}
+
+[data-theme="dark"] .file-icon-fallback {
+  color: var(--gold);
 }
 
 .file-tree-name {
