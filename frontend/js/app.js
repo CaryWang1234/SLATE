@@ -2,22 +2,22 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-30";
-import { get, put } from "./services/api.js?v=20260808-30";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260808-30";
-import { initChat } from "./components/chat.js?v=20260808-30";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260808-30";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-30";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260808-30";
-import { initTeamPanel } from "./components/team.js?v=20260808-30";
-import { initProjectBar } from "./components/project_bar.js?v=20260808-30";
-import { initMemoryPanel } from "./components/memory.js?v=20260808-30";
-import { initExpertsPanel } from "./components/experts.js?v=20260808-30";
-import { initSchedule } from "./components/schedule.js?v=20260808-30";
-import { initRiskGuard } from "./services/riskguard.js?v=20260808-30";
-import { initUnderstandPanel } from "./components/understand.js?v=20260808-30";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-30";
-import { setProject, setProjectFileTree } from "./store.js?v=20260808-30";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-33";
+import { get, post, put } from "./services/api.js?v=20260808-33";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260808-33";
+import { initChat } from "./components/chat.js?v=20260808-33";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260808-33";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-33";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260808-33";
+import { initTeamPanel } from "./components/team.js?v=20260808-33";
+import { initProjectBar } from "./components/project_bar.js?v=20260808-33";
+import { initMemoryPanel } from "./components/memory.js?v=20260808-33";
+import { initExpertsPanel } from "./components/experts.js?v=20260808-33";
+import { initSchedule } from "./components/schedule.js?v=20260808-33";
+import { initRiskGuard } from "./services/riskguard.js?v=20260808-33";
+import { initUnderstandPanel } from "./components/understand.js?v=20260808-33";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-33";
+import { setProject, setProjectFileTree } from "./store.js?v=20260808-33";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -506,7 +506,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260808-30");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260808-33");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -599,6 +599,57 @@ async function loadModels() {
   }
 }
 
+// ── 启动时自动检查更新 ────────────────
+
+/** 查询 GitHub 最新 Release，有新版本时展示金色横幅；失败静默，不打扰用户 */
+async function checkAppUpdate() {
+  try {
+    const res = await get("/update/check");
+    const d = res?.code === 0 ? res.data : null;
+    if (!d?.hasUpdate) return;
+    let dismissed = "";
+    try { dismissed = localStorage.getItem("slate-update-dismissed") || ""; } catch {}
+    if (dismissed === d.latest) return; // 用户已选择忽略该版本
+
+    const banner = document.getElementById("update-banner");
+    if (!banner) return;
+    banner.innerHTML = "";
+
+    const txt = document.createElement("span");
+    txt.className = "update-banner-text";
+    txt.textContent = `✨ 发现新版本 v${d.latest}（当前 v${d.current}）`;
+
+    const openLink = (url) => async () => {
+      const r = await post("/update/open-url", { url });
+      if (r.code !== 0) toast(r.message || "打开链接失败", 3000);
+    };
+
+    const dl = document.createElement("button");
+    dl.className = "update-banner-btn";
+    dl.textContent = "⬇ 下载更新";
+    dl.addEventListener("click", openLink(d.downloadUrl));
+
+    const rel = document.createElement("button");
+    rel.className = "update-banner-btn update-banner-ghost";
+    rel.textContent = "更新说明";
+    rel.addEventListener("click", openLink(d.releaseUrl));
+
+    const close = document.createElement("button");
+    close.className = "update-banner-close";
+    close.textContent = "✕";
+    close.title = "忽略该版本";
+    close.addEventListener("click", () => {
+      banner.classList.add("hidden");
+      try { localStorage.setItem("slate-update-dismissed", d.latest); } catch {}
+    });
+
+    banner.append(txt, dl, rel, close);
+    banner.classList.remove("hidden");
+  } catch (e) {
+    console.warn("检查更新失败:", e);
+  }
+}
+
 // ── 初始化 ──────────────────────────────────
 
 async function init() {
@@ -654,7 +705,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260808-30");
+      const { openProject } = await import("./services/project.js?v=20260808-33");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }
@@ -662,6 +713,9 @@ async function init() {
     const browseRes = await browseFiles("");
     if (browseRes.code === 0) setProjectFileTree(browseRes.data);
   }
+
+  // 启动时自动检查更新（不阻塞初始化，失败静默）
+  checkAppUpdate();
 
   console.log("[SLATE] v3 初始化完成");
 }

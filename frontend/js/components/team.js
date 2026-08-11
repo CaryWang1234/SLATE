@@ -3,13 +3,13 @@
  * 轻量模型初步讨论 → 重型模型最终决策
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260808-30";
-import { streamChat } from "../services/api.js?v=20260808-30";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260808-30";
-import { renderMarkdown } from "../services/markdown.js?v=20260808-30";
-import { loadWorkflows, getWorkflow, runWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260808-30";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260808-30";
-import { getExpertsCached } from "./experts.js?v=20260808-30";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260808-33";
+import { streamChat } from "../services/api.js?v=20260808-33";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260808-33";
+import { renderMarkdown } from "../services/markdown.js?v=20260808-33";
+import { loadWorkflows, getWorkflow, runWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260808-33";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260808-33";
+import { getExpertsCached } from "./experts.js?v=20260808-33";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());

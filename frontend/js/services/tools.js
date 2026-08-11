@@ -5,11 +5,17 @@
  *   ◈◈◈tool_name
  *   {"param1":"value1"}
  *   ◈◆◆
+ *
+ * 例外：file_create / file_append 使用原样格式（内容不经 JSON 转义，根治转义损坏与参数丢失）：
+ *   ◈◈◈file_create
+ *   相对路径（第一行）
+ *   文件内容原样（第二行起）
+ *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260808-30";
-import { post } from "../services/api.js?v=20260808-30";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260808-30";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260808-33";
+import { post } from "../services/api.js?v=20260808-33";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260808-33";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -263,7 +269,7 @@ const TOOLS = {
 
   file_edit: {
     name: "编辑文件",
-    description: "基于 diff 精确编辑项目文件。只改指定内容，未提及的部分绝不触碰。用户可「接受」「拒绝」或「复制」diff。",
+    description: "基于 diff 精确编辑项目文件。只改指定内容，未提及的部分绝不触碰。用户可「接受」「拒绝」或「复制」diff。参数名是 file_path（不是 path）。",
     params: {
       file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录）", required: true },
       edits: { type: "array", description: '编辑列表，每项含 old_text 和 new_text，如 [{"old_text":"原内容","new_text":"新内容"}]', required: true },
@@ -367,16 +373,17 @@ const TOOLS = {
   },
 
   file_create: {
-    name: "创建文件",
-    description: "在项目中创建新文件。文件内容先以 diff 预览，用户确认后才写入。",
+    name: "创建新文件",
+    description: "在项目中创建新文件。文件内容先以 diff 预览，用户确认后才写入。专用格式：第一行写相对路径，第二行起原样写文件内容（不用 JSON、不转义）。",
     params: {
       file_path: { type: "string", description: "新文件相对路径（相对于项目根目录），如 src/utils/helper.js", required: true },
-      content: { type: "string", description: "文件完整内容", required: true },
+      content: { type: "string", description: "文件完整内容（原样写入，不经 JSON 转义）", required: true },
     },
+    rawContent: true,
     async execute({ file_path, content, _truncated }) {
       if (!state.project) return "未打开项目";
-      if (!file_path) return "缺少 file_path";
-      if (content === undefined || content === null) return "缺少 content";
+      if (!file_path) return "缺少 file_path：请按专用格式重发——◈◈◈file_create 后第一行写相对路径（如 src/utils/helper.js），第二行起原样写文件内容，不要 JSON 包裹。";
+      if (content === undefined || content === null) return "缺少 content：第一行路径之后应原样输出完整文件内容（不用 JSON、不转义、不加代码围栏）。";
       const truncated = Boolean(_truncated);
 
       const target = normalizeProjectRelativePath(file_path);
@@ -460,12 +467,13 @@ const TOOLS = {
     description: "向已存在文件的末尾追加内容。用于分段写入超长文件：先 file_create 写入前半部分，再用一次或多次 file_append 补齐剩余部分。",
     params: {
       file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录），文件必须已存在", required: true },
-      content: { type: "string", description: "要追加到文件末尾的内容（从上次写入结束的精确位置接续，不要重复已有内容）", required: true },
+      content: { type: "string", description: "要追加到文件末尾的内容（原样写入，不经 JSON 转义；从上次写入结束的精确位置接续，不要重复已有内容）", required: true },
     },
+    rawContent: true,
     async execute({ file_path, content, _truncated }) {
       if (!state.project) return "未打开项目";
-      if (!file_path) return "缺少 file_path";
-      if (content === undefined || content === null) return "缺少 content";
+      if (!file_path) return "缺少 file_path：请按专用格式重发——◈◈◈file_append 后第一行写相对路径，第二行起原样写要追加的内容，不要 JSON 包裹。";
+      if (content === undefined || content === null) return "缺少 content：第一行路径之后应原样输出要追加的内容（不用 JSON、不转义、不加代码围栏）。";
       const truncated = Boolean(_truncated);
 
       const target = normalizeProjectRelativePath(file_path);
@@ -602,6 +610,57 @@ const TOOLS = {
 
 const TOOL_RE = /◈◈◈\s*(\w+)\s*\r?\n([\s\S]*?)(?:◈◆◆|◆◆)/g;
 
+// file_create / file_append 走原样围栏协议：内容不经 JSON 转义，根治大内容转义损坏与 file_path 丢失
+const FILE_RAW_TOOLS = new Set(["file_create", "file_append"]);
+
+/** 参数名别名归一：模型常把 file_path 写成 path / file 等，映射回 file_path 而不是报错 */
+function normalizeFilePathAlias(params) {
+  if (params && !params.file_path) {
+    for (const alias of ["path", "file", "filepath", "file_name", "filename", "relative_path", "target_path", "target"]) {
+      if (params[alias]) {
+        params.file_path = params[alias];
+        break;
+      }
+    }
+  }
+  return params;
+}
+
+/**
+ * 解析 file_create / file_append 的参数块，支持两种协议：
+ * 新协议（推荐）：第一行是相对路径，其余全部是原样文件内容——无 JSON、无转义，
+ *   模型写大文件时不再需要转义换行/引号，从根本上消除 JSON 解析失败导致的丢参。
+ * 旧协议（兼容）：块内容以 { 开头时仍按 JSON 解析，失败退回 salvage 抢救 + 别名映射。
+ */
+function parseFileWriteParams(body) {
+  const text = String(body || "").replace(/^\uFEFF/, "");
+  if (text.trimStart().startsWith("{")) {
+    let params;
+    try {
+      params = JSON.parse(text.trim());
+    } catch {
+      params = salvageTruncatedParams(text);
+    }
+    return normalizeFilePathAlias(params);
+  }
+  const lines = text.split(/\r?\n/);
+  while (lines.length && !lines[0].trim()) lines.shift(); // 跳过前导空行
+  const filePath = (lines.shift() || "").trim();
+  // 容忍模型在路径与内容之间加一行分隔符（◈──◈ / --- / === 之类），跳过
+  if (lines.length && /^[◈─—\-=:*]{2,}\s*$/.test(lines[0].trim())) lines.shift();
+  // 防御：模型偶尔无视规则把内容包进 ``` 代码围栏，剥掉外层围栏还原真实内容
+  // （末尾可能带协议性空行，需在最后一个非空行上判断闭合围栏）
+  let lastIdx = lines.length - 1;
+  while (lastIdx >= 0 && !lines[lastIdx].trim()) lastIdx--;
+  if (lastIdx >= 1 && /^```/.test(lines[0].trim()) && /^```\s*$/.test(lines[lastIdx].trim())) {
+    lines.shift();
+    lines.splice(lastIdx - 1, 1);
+  }
+  // 末尾单个换行属于协议本身（◈◆◆ 独占一行前的分隔），不属于文件内容
+  const content = lines.join("\n").replace(/\n$/, "");
+  return { file_path: filePath, content };
+}
+
 /**
  * 从 start 位置（必须是 "）读取一个 JSON 字符串，正确处理转义。
  * 返回 { value, end, complete }。未闭合时 complete=false，
@@ -709,11 +768,20 @@ function detectToolCalls(text) {
   const re = new RegExp(TOOL_RE.source, "g");
   while ((match = re.exec(text)) !== null) {
     lastEnd = re.lastIndex;
-    try {
-      calls.push({ name: match[1], params: JSON.parse(match[2] || "{}") });
-    } catch {
-      calls.push({ name: match[1], params: {} });
+    const name = match[1];
+    if (FILE_RAW_TOOLS.has(name)) {
+      calls.push({ name, params: parseFileWriteParams(match[2]) });
+      continue;
     }
+    let params;
+    try {
+      params = JSON.parse(match[2] || "{}");
+    } catch {
+      // 闭合块但 JSON 损坏：用 salvage 尽力抢救参数，而不是直接丢弃（否则 file_path 等必丢）
+      params = salvageTruncatedParams(match[2] || "");
+    }
+    if (name === "file_edit") params = normalizeFilePathAlias(params);
+    calls.push({ name, params });
   }
 
   // 处理末尾被截断的工具调用块（缺少闭合标记 ◈◆◆，通常是输出达到 max_tokens 上限）
@@ -724,10 +792,15 @@ function detectToolCalls(text) {
     const name = openMatch[1];
     const rawBody = openMatch[2];
     let params;
-    try {
-      params = JSON.parse(rawBody.trim());
-    } catch {
-      params = salvageTruncatedParams(rawBody);
+    if (FILE_RAW_TOOLS.has(name)) {
+      params = parseFileWriteParams(rawBody);
+    } else {
+      try {
+        params = JSON.parse(rawBody.trim());
+      } catch {
+        params = salvageTruncatedParams(rawBody);
+      }
+      if (name === "file_edit") params = normalizeFilePathAlias(params);
     }
     params._truncated = true;
     calls.push({ name, params });
@@ -840,6 +913,14 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
 
   for (const [key, tool] of Object.entries(TOOLS)) {
     s += `### ${key} — ${tool.description}\n`;
+    if (tool.rawContent) {
+      s += "专用格式（不是 JSON！内容原样直写，零转义）：\n";
+      s += `◈◈◈${key}\n`;
+      s += "相对路径（第一行，如 src/utils/helper.js）\n";
+      s += "文件内容（第二行起原样直写，不要 JSON、不要代码围栏、不要任何转义）\n";
+      s += "◈◆◆\n\n";
+      continue;
+    }
     const pEntries = Object.entries(tool.params || {});
     if (pEntries.length > 0) {
       s += "参数 (JSON):\n";
@@ -868,11 +949,11 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
   // file_create 专项指导
   s += "\n[文件创建规则 — file_create 工具]\n";
   s += "当用户要求创建新文件时，你必须使用 file_create 工具。\n";
-  s += "- file_path: 相对于项目根目录的路径（文件不能已存在）\n";
-  s += "- file_path 只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
+  s += "专用格式（重要，不是 JSON）：◈◈◈file_create 后第一行写相对路径，第二行起原样直写文件完整内容，最后 ◈◆◆ 闭合。\n";
+  s += "内容区严禁 JSON 包裹、严禁转义换行/引号、严禁代码围栏（```）——像平常写代码一样直接写。\n";
+  s += "- 路径只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
   s += "- 如果用户只要求输出文件但没有指定位置，默认放在 outputs/ 下，并使用清晰的文件名\n";
-  s += "- content: 文件的完整内容\n";
-  s += "- content 必须输出完整内容，绝不允许用“…其余省略”“// 同上”等方式缩写\n";
+  s += "- 内容必须输出完整，绝不允许用“…其余省略”“// 同上”等方式缩写\n";
   s += "- 超长文件（预计超过 300 行）必须分段写入：先用 file_create 写入前半部分（在完整行边界截断），再用一次或多次 file_append 从断点精确接续补齐剩余部分；单次调用宁小勿大，避免输出被截断\n";
   s += "- 如果收到“输出被截断”相关的工具结果反馈，不要重复已写入的内容，立即用 file_append 从断点接续补齐\n";
   s += "- 如果文件已存在，应使用 file_edit 工具而非 file_create\n";
@@ -881,9 +962,9 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
 
   // file_append 专项指导
   s += "\n[文件追加规则 — file_append 工具]\n";
-  s += "向已存在文件末尾追加内容，用于分段写入超长文件。\n";
-  s += "- file_path 必须已存在（先 file_create 再 file_append）\n";
-  s += "- content 从上次写入结束的精确位置接续，绝不重复已有内容\n";
+  s += "向已存在文件末尾追加内容，用于分段写入超长文件。格式与 file_create 相同：第一行路径，第二行起原样直写内容，不用 JSON。\n";
+  s += "- 路径对应的文件必须已存在（先 file_create 再 file_append）\n";
+  s += "- 内容从上次写入结束的精确位置接续，绝不重复已有内容\n";
   s += "- 输出被截断时，系统会要求你用 file_append 补齐；每次追加控制在 300 行以内\n";
 
   return s;

@@ -18,6 +18,7 @@ hiddenimports = [
     'backend.routers.proxy',
     'backend.routers.settings',
     'backend.routers.skills',
+    'backend.routers.update',
     'backend.routers.workflows',
     'backend.skills.css_color',
     'backend.skills.doc_write',
