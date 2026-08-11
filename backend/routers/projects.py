@@ -334,6 +334,40 @@ async def create_file(req: CreateFileRequest):
         return {"code": 1, "message": f"创建失败: {e}"}
 
 
+# ── 追加内容到已有文件（超长文件分段写入 / 截断续写兜底） ─────
+
+
+class AppendFileRequest(BaseModel):
+    file_path: str
+    content: str
+
+
+@router.post("/append-file")
+async def append_file(req: AppendFileRequest):
+    """向已有文件末尾追加内容（用户点击「接受」时调用）"""
+    if not _current_project:
+        return {"code": 1, "message": "未打开项目"}
+
+    project_dir = Path(_current_project["path"])
+    target = Path(req.file_path)
+
+    # 安全检查：确保文件在项目范围内
+    try:
+        target.resolve().relative_to(project_dir.resolve())
+    except ValueError:
+        return {"code": 1, "message": "文件路径超出项目范围"}
+
+    if not target.exists():
+        return {"code": 1, "message": "文件不存在，请先用 file_create 创建"}
+
+    try:
+        with open(target, "a", encoding="utf-8", newline="") as f:
+            f.write(req.content)
+        return {"code": 0, "data": {"file": str(target.relative_to(project_dir))}, "message": "ok"}
+    except Exception as e:
+        return {"code": 1, "message": f"追加失败: {e}"}
+
+
 # ── Better Project Understanding：项目扫描 ─────
 
 class ScanRequest(BaseModel):

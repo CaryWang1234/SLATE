@@ -1,23 +1,23 @@
-/**
+﻿/**
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-24";
-import { get, put } from "./services/api.js?v=20260808-24";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260808-24";
-import { initChat } from "./components/chat.js?v=20260808-24";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260808-24";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-24";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260808-24";
-import { initTeamPanel } from "./components/team.js?v=20260808-24";
-import { initProjectBar } from "./components/project_bar.js?v=20260808-24";
-import { initMemoryPanel } from "./components/memory.js?v=20260808-24";
-import { initExpertsPanel } from "./components/experts.js?v=20260808-24";
-import { initSchedule } from "./components/schedule.js?v=20260808-24";
-import { initRiskGuard } from "./services/riskguard.js?v=20260808-24";
-import { initUnderstandPanel } from "./components/understand.js?v=20260808-24";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-24";
-import { setProject, setProjectFileTree } from "./store.js?v=20260808-24";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-30";
+import { get, put } from "./services/api.js?v=20260808-30";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260808-30";
+import { initChat } from "./components/chat.js?v=20260808-30";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260808-30";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-30";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260808-30";
+import { initTeamPanel } from "./components/team.js?v=20260808-30";
+import { initProjectBar } from "./components/project_bar.js?v=20260808-30";
+import { initMemoryPanel } from "./components/memory.js?v=20260808-30";
+import { initExpertsPanel } from "./components/experts.js?v=20260808-30";
+import { initSchedule } from "./components/schedule.js?v=20260808-30";
+import { initRiskGuard } from "./services/riskguard.js?v=20260808-30";
+import { initUnderstandPanel } from "./components/understand.js?v=20260808-30";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-30";
+import { setProject, setProjectFileTree } from "./store.js?v=20260808-30";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -506,7 +506,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260808-24");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260808-30");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -654,7 +654,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260808-24");
+      const { openProject } = await import("./services/project.js?v=20260808-30");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

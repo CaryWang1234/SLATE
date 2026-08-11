@@ -1,13 +1,13 @@
-/**
+﻿/**
  * SLATE 专家包管理组件：列表 / 新建 / 导入导出 zip / 编辑 persona·rules / knowledge·skills 文件管理
  * 对话模式通过 #expert-select 注入；团队模式通过成员卡 expertId 注入
  */
 
-import { state, setActiveExpertId } from "../store.js?v=20260808-24";
+import { state, setActiveExpertId } from "../store.js?v=20260808-30";
 import {
   loadExperts, getExpert, createExpert, saveExpert, deleteExpert,
   importExpertZip, expertExportUrl, uploadExpertFile, deleteExpertFile,
-} from "../services/experts.js?v=20260808-24";
+} from "../services/experts.js?v=20260808-30";
 
 let modal, expertListEl, detailEmpty, detailForm;
 let nameInput, descInput, personaInput, rulesInput;
@@ -24,7 +24,7 @@ function fmtSize(n) {
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260808-24");
+    const { toast: showToast } = await import("../app.js?v=20260808-30");
     showToast(msg);
   } catch {
     console.warn(msg);

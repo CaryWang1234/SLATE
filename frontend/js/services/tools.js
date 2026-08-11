@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SLATE AI 工具系统：让 AI 直接操作黑板、MCP 工具、提示词工厂
  *
  * 工具调用格式（AI 输出）：
@@ -7,9 +7,9 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260808-24";
-import { post } from "../services/api.js?v=20260808-24";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260808-24";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260808-30";
+import { post } from "../services/api.js?v=20260808-30";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260808-30";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -143,7 +143,7 @@ const TOOLS = {
 
   skill_run: {
     name: "执行 MCP 工具",
-    description: "调用 MCP 内置工具。可用：file_tree(目录树), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文纯文本，mode=html时返回原始HTML)。也可传入 SKILL.md 技能名读取其定义内容。",
+    description: "调用 MCP 内置工具。可用：file_tree(目录树), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray或6位色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文纯文本，mode=html时返回原始HTML)。也可传入 SKILL.md 技能名读取其定义内容。",
     params: {
       skill: { type: "string", description: "MCP 工具或技能名称", required: true },
       params: { type: "object", description: "工具参数" },
@@ -455,6 +455,75 @@ const TOOLS = {
     },
   },
 
+  file_append: {
+    name: "追加文件内容",
+    description: "向已存在文件的末尾追加内容。用于分段写入超长文件：先 file_create 写入前半部分，再用一次或多次 file_append 补齐剩余部分。",
+    params: {
+      file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录），文件必须已存在", required: true },
+      content: { type: "string", description: "要追加到文件末尾的内容（从上次写入结束的精确位置接续，不要重复已有内容）", required: true },
+    },
+    async execute({ file_path, content, _truncated }) {
+      if (!state.project) return "未打开项目";
+      if (!file_path) return "缺少 file_path";
+      if (content === undefined || content === null) return "缺少 content";
+      const truncated = Boolean(_truncated);
+
+      const target = normalizeProjectRelativePath(file_path);
+      if (target.error) {
+        return {
+          _type: "file_append",
+          file: "",
+          file_path_rel: String(file_path || ""),
+          file_name: String(file_path || "").replace(/\\/g, "/").split("/").pop() || "",
+          content,
+          stats: { lines: String(content).split("\n").length, chars: String(content).length },
+          errors: [target.error],
+          truncated,
+        };
+      }
+      let res;
+      try {
+        res = await post("/projects/append-file", {
+          file_path: target.abs,
+          content,
+        });
+      } catch (e) {
+        return {
+          _type: "file_append",
+          file: target.abs,
+          file_path_rel: target.relative,
+          file_name: target.fileName,
+          content,
+          stats: { lines: content.split("\n").length, chars: content.length },
+          errors: ["网络请求失败: " + e.message],
+          truncated,
+        };
+      }
+      if (res.code !== 0) {
+        return {
+          _type: "file_append",
+          file: target.abs,
+          file_path_rel: target.relative,
+          file_name: target.fileName,
+          content,
+          stats: { lines: content.split("\n").length, chars: content.length },
+          errors: [res.message || "未知错误"],
+          truncated,
+        };
+      }
+      return {
+        _type: "file_append",
+        file: target.abs,
+        file_path_rel: target.relative,
+        file_name: target.fileName,
+        content,
+        stats: { lines: content.split("\n").length, chars: content.length },
+        errors: [],
+        truncated,
+      };
+    },
+  },
+
   chat_context: {
     name: "查看对话上下文",
     description: "查看当前对话的统计信息",
@@ -474,7 +543,7 @@ const TOOLS = {
 
   todo_manage: {
     name: "任务清单",
-    description: "为当前任务创建并推进 TODOLIST。面临大任务（多步骤、多文件、复杂修改）时必须先 action=init 拆解计划；执行中每完成一项立即 action=update 标记 done，受阻标记 blocked。任务结束前所有项必须为 done 或 blocked。status 取值: pending/in_progress/done/blocked",
+    description: "为当前任务创建并推进 TODOLIST。面临大任务（多步骤、多文件、复杂修改）时必须先 action=init 拆解计划；执行中有意识地主动同步进度：每完成一项或一批事项立即 action=update 批量标记 done，受阻标记 blocked，不要等全部做完才一次性更新。任务结束前所有项必须为 done 或 blocked。status 取值: pending/in_progress/done/blocked",
     params: {
       action: { type: "string", description: "init(创建或整体替换清单) / add(追加事项) / update(更新状态或描述) / remove(删除事项) / clear(清空)", required: true },
       items: { type: "array", description: 'init/add: [{"content":"事项描述"}]；update: [{"id":"t1","status":"done"}]（可带 content 改描述）；remove: [{"id":"t1"}]' },
@@ -524,7 +593,7 @@ const TOOLS = {
       return `TODOLIST 已更新（${done}/${list.length} 完成）：\n${lines.join("\n")}` +
         (done === list.length
           ? "\n全部完成，进入验证与汇报阶段。"
-          : "\n请继续推进未完成事项，每完成一项立即调用 todo_manage 更新状态。");
+          : "\n请继续统筹推进未完成事项（能并行的多项一起处理），每完成一批立即调用 todo_manage 批量更新状态，保持清单实时准确。");
     },
   },
 };
@@ -703,7 +772,15 @@ async function executeTool(name, params) {
         const targetPath = output.file_path_rel || output.file_name || output.file || "";
         summary = `[工具 file_create] 新文件: ${output.file_name}（${targetPath}），${s.lines} 行，${s.chars} 字符。`;
         if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
+        if (output.truncated) summary += " 注意：本次内容因输出截断可能不完整；若用户接受预览，请立即用 file_append 从断点补齐剩余内容。";
         summary += " 预览已展示给用户，尚未写入磁盘，等待用户确认。";
+      } else if (output._type === "file_append") {
+        const s = output.stats;
+        const targetPath = output.file_path_rel || output.file_name || output.file || "";
+        summary = `[工具 file_append] 文件: ${output.file_name}（${targetPath}），本次追加 ${s.lines} 行、${s.chars} 字符。`;
+        if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
+        if (output.truncated) summary += " 注意：本次追加内容因输出截断可能不完整，请继续用 file_append 补齐剩余内容。";
+        summary += " 追加预览已展示给用户，尚未写入磁盘，等待用户确认。";
       }
       return { success: true, output: summary, _structured: output };
     }
@@ -716,6 +793,17 @@ async function executeTool(name, params) {
 async function executeToolCalls(calls) {
   const results = [];
   for (const call of calls) {
+    // 截断守卫：输出达到长度上限导致工具调用块未闭合、参数不完整。
+    // file_create/file_append 截断时已输出的 content 仍是有效前缀，允许执行预览并靠后续 file_append 补齐；
+    // 其余工具（尤其 file_edit 的部分编辑）执行残缺参数很危险，拒绝执行并反馈模型拆分重试。
+    if (call.params?._truncated && call.name !== "file_append" && call.name !== "file_create") {
+      results.push({
+        ...call,
+        success: false,
+        output: `[工具 ${call.name}] 未执行：该工具调用因输出长度达到上限被截断，参数不完整。请拆分后重试：超长文件先用 file_create 写入前半部分，再用 file_append 分一次或多次补齐剩余内容；单次调用的内容量宁小勿大。`,
+      });
+      continue;
+    }
     const result = await executeTool(call.name, call.params);
     results.push({ ...call, ...result });
   }
@@ -785,10 +873,18 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
   s += "- 如果用户只要求输出文件但没有指定位置，默认放在 outputs/ 下，并使用清晰的文件名\n";
   s += "- content: 文件的完整内容\n";
   s += "- content 必须输出完整内容，绝不允许用“…其余省略”“// 同上”等方式缩写\n";
-  s += "- 超长文件（预计超过 300 行）应拆分为多次 file_create/file_edit 调用，不要单次硬塞\n";
+  s += "- 超长文件（预计超过 300 行）必须分段写入：先用 file_create 写入前半部分（在完整行边界截断），再用一次或多次 file_append 从断点精确接续补齐剩余部分；单次调用宁小勿大，避免输出被截断\n";
+  s += "- 如果收到“输出被截断”相关的工具结果反馈，不要重复已写入的内容，立即用 file_append 从断点接续补齐\n";
   s += "- 如果文件已存在，应使用 file_edit 工具而非 file_create\n";
   s += "- 用户会看到内容预览，并可以选择「接受」「拒绝」或「复制」\n";
   s += "- 创建完成后，等待用户确认\n";
+
+  // file_append 专项指导
+  s += "\n[文件追加规则 — file_append 工具]\n";
+  s += "向已存在文件末尾追加内容，用于分段写入超长文件。\n";
+  s += "- file_path 必须已存在（先 file_create 再 file_append）\n";
+  s += "- content 从上次写入结束的精确位置接续，绝不重复已有内容\n";
+  s += "- 输出被截断时，系统会要求你用 file_append 补齐；每次追加控制在 300 行以内\n";
 
   return s;
 }

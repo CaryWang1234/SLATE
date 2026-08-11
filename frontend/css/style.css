@@ -44,7 +44,7 @@
   --bg: #0A0A0A;
   --bg-alt: #131313;
   --bg-input: #181818;
-  --text: #e9cea1ff;
+  --text: #E8DCC8;
   --text-secondary: #9b8c73;
   --text-muted: #5C5347;
   --text-faint: #2E2922;
@@ -52,7 +52,7 @@
   --border-hover: #c6b18a;
   --accent-bg: #C9A96E;
   --accent-fg: #0A0A0A;
-  --gold: #dcb468;
+  --gold: #ceb381;
   --gold-dim: rgba(201, 169, 110, 0.10);
   --code-bg: #151515;
   --code-fg: #D4C8B0;
@@ -264,6 +264,12 @@ select:focus {
 }
 
 .icon-btn:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+/* 功能开启中的高亮（Harness / 磨墨等） */
+.icon-btn.active {
   color: var(--gold);
   border-color: var(--gold);
 }
@@ -2869,6 +2875,34 @@ textarea::-webkit-scrollbar-thumb {
   font-weight: 600;
 }
 
+/* 上下文量进度条 */
+.usage-ctx {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.usage-ctx-track {
+  width: 64px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+  flex: none;
+}
+
+.usage-ctx-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--gold);
+  transition: width 0.3s ease;
+}
+
+.usage-ctx-fill.usage-ctx-danger {
+  background: #c44;
+}
+
 /* 用量条悬浮弹窗：总 token + 趣味等价换算 */
 .usage-popup {
   position: fixed;
@@ -5340,4 +5374,99 @@ img.file-type-icon {
   max-height: 420px;
   overflow-y: auto;
   padding: 4px 2px;
+}
+
+/* ── 磨墨模式：墨痕气泡 + 墨迹面板 + 墨稿动作 ─────────────── */
+
+/* 磨墨会话中的消息：墨渍虚线描边，与普通对话区分 */
+.msg-grind.msg-assistant {
+  border: 1px dashed var(--gold);
+}
+
+.msg-grind.msg-user {
+  outline: 1px dashed var(--gold);
+  outline-offset: 2px;
+}
+
+/* 右侧墨迹面板：与 todo-panel 同宽同布局 */
+.grind-panel {
+  width: 280px;
+  flex-shrink: 0;
+  font-size: 12px;
+  background: var(--bg-alt);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.grind-panel.hidden {
+  display: none;
+}
+
+.grind-panel-header {
+  padding: 8px 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--gold);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.grind-panel-idea {
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.grind-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.grind-panel-hint {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.grind-panel-stats {
+  color: var(--gold);
+  font-weight: 600;
+  padding-bottom: 2px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.grind-item {
+  line-height: 1.6;
+}
+
+.grind-item.resolved {
+  color: var(--gold);
+}
+
+.grind-item.unknown {
+  color: var(--text-muted);
+}
+
+.grind-item.draft {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 墨稿下方三个动作：送入 Harness / 投到白板 / 存为模板 */
+.grind-draft-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
 }

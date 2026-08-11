@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260808-24">
+  <link rel="stylesheet" href="./css/style.css?v=20260808-30">
 </head>
 <body>
 
@@ -59,6 +59,7 @@
             </div>
             <div class="panel-actions">
               <button id="btn-brainstorm" class="icon-btn" title="头脑风暴模式">💡</button>
+              <button id="btn-grind" class="icon-btn" title="磨墨模式：把粗糙想法研磨成结构化任务书（也可输入 /grind 想法）">🖌</button>
               <button id="btn-harness" class="icon-btn" title="Harness 自主执行：模型自主多轮调用工具直至任务完成">⚡</button>
               <button id="btn-schedule" class="icon-btn" title="定时任务">⏰</button>
               <button id="btn-compress" class="icon-btn" title="手动压缩上下文">⟲</button>
@@ -85,6 +86,8 @@
               <div id="chat-messages" class="chat-scroll"></div>
               <!-- TODOLIST 任务清单（Harness，右侧栏） -->
               <div id="todo-panel" class="todo-panel hidden"></div>
+              <!-- 磨墨模式：墨迹面板（✔ 已定 / ✘ 未知） -->
+              <div id="grind-panel" class="grind-panel hidden"></div>
             </div>
             <!-- 文件附件预览区 -->
             <div id="file-preview-area" class="file-preview-area hidden"></div>
@@ -746,7 +749,7 @@
   <!-- ═══ Toast 容器 ═══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260808-24"></script>
+  <script type="module" src="./js/app.js?v=20260808-30"></script>
 
 </body>
 </html>

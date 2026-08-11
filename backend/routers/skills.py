@@ -27,6 +27,8 @@ BUILTIN_SKILLS: dict[str, str] = {
     "html_render": "生成纯黑白 HTML 骨架",
     "css_color": "基于描述生成 CSS 配色方案（支持暖色/冷色/自然/深色等多种风格）",
     "doc_write": "生成 Markdown 格式技术文档或需求说明",
+    "ppt_create": "生成 .pptx 演示文稿（标题页+内容页，支持主题大纲与自定义配色）",
+    "word_create": "生成 .docx Word 文档（标题层级、段落、列表排版）",
     "file_edit": "基于 diff 精确编辑文件（只改指定内容）",
     "file_create": "创建新文件（预览后确认写入）",
     "text_summarize": "文本摘要与关键词提取",

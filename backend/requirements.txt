@@ -5,3 +5,5 @@ python-multipart
 aiofiles
 aiosqlite
 ddgs
+python-pptx
+python-docx

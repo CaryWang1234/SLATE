@@ -1,10 +1,10 @@
-/**
+﻿/**
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除）
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260808-24";
-import { get, post, del, upload } from "../services/api.js?v=20260808-24";
-import { guardSkillParams } from "../services/riskguard.js?v=20260808-24";
+import { state, subscribe, setSkills } from "../store.js?v=20260808-30";
+import { get, post, del, upload } from "../services/api.js?v=20260808-30";
+import { guardSkillParams } from "../services/riskguard.js?v=20260808-30";
 
 let skillList, btnUpload, btnImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -45,6 +45,17 @@ const SKILL_PARAM_DEFS = {
     { key: "doc_type", label: "文档类型", type: "text", placeholder: "technical / requirement / api / readme / changelog" },
     { key: "sections", label: "章节（逗号分隔）", type: "text", placeholder: "概述,安装,配置,API" },
     { key: "content_hint", label: "内容提示", type: "textarea", placeholder: "关键信息或要点" },
+  ],
+  ppt_create: [
+    { key: "title", label: "演示文稿标题", type: "text", placeholder: "Q3 项目汇报" },
+    { key: "subtitle", label: "副标题", type: "text", placeholder: "进展 · 风险 · 计划" },
+    { key: "outline", label: "大纲章节（逗号分隔）", type: "text", placeholder: "背景,方案,实施计划,总结" },
+    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / wine / gray 或 6 位色值" },
+  ],
+  word_create: [
+    { key: "title", label: "文档标题", type: "text", placeholder: "项目方案书" },
+    { key: "author", label: "作者", type: "text", placeholder: "SLATE" },
+    { key: "content", label: "正文（支持 # 标题 / - 列表标记）", type: "textarea", placeholder: "# 概述\n项目背景说明\n## 目标\n- 目标一" },
   ],
   file_edit: [
     { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/app.js" },
