@@ -13,9 +13,9 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260812-40";
-import { post } from "../services/api.js?v=20260812-40";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260812-40";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260813-42";
+import { post } from "../services/api.js?v=20260813-42";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260813-42";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");

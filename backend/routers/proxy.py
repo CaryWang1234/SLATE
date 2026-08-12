@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import httpx
@@ -109,6 +110,48 @@ def _build_openai_request(body: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _parse_data_url(url: str) -> tuple[str, str] | None:
+    """解析 data:MIME;base64,DATA 格式，返回 (mime, data)，非法时返回 None。"""
+    m = re.match(r"^data:([^;]+);base64,(.+)$", url, re.DOTALL)
+    if not m:
+        return None
+    return m.group(1), m.group(2)
+
+
+def _to_anthropic_content(content: Any) -> Any:
+    """将 OpenAI 多模态内容数组转为 Anthropic 格式；纯文本透传。"""
+    if isinstance(content, str):
+        return content
+    parts: list[dict[str, Any]] = []
+    for part in content or []:
+        ptype = part.get("type")
+        if ptype == "text":
+            parts.append({"type": "text", "text": part.get("text", "")})
+        elif ptype == "image_url":
+            parsed = _parse_data_url(part.get("image_url", {}).get("url", ""))
+            if parsed:
+                mime, data = parsed
+                parts.append({"type": "image", "source": {"type": "base64", "media_type": mime, "data": data}})
+    return parts or [{"type": "text", "text": ""}]
+
+
+def _to_gemini_parts(content: Any) -> list[dict[str, Any]]:
+    """将 OpenAI 多模态内容数组转为 Gemini parts；纯文本包装为单 text part。"""
+    if isinstance(content, str):
+        return [{"text": content}]
+    parts: list[dict[str, Any]] = []
+    for part in content or []:
+        ptype = part.get("type")
+        if ptype == "text":
+            parts.append({"text": part.get("text", "")})
+        elif ptype == "image_url":
+            parsed = _parse_data_url(part.get("image_url", {}).get("url", ""))
+            if parsed:
+                mime, data = parsed
+                parts.append({"inline_data": {"mime_type": mime, "data": data}})
+    return parts or [{"text": ""}]
+
+
 def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
     """构建 Anthropic 格式请求体。"""
     messages = body.get("messages", [])
@@ -116,9 +159,9 @@ def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
     chat_messages = []
     for msg in messages:
         if msg["role"] == "system":
-            system_msg = msg["content"]
+            system_msg = msg["content"] if isinstance(msg["content"], str) else _to_anthropic_content(msg["content"])
         else:
-            chat_messages.append({"role": msg["role"], "content": msg["content"]})
+            chat_messages.append({"role": msg["role"], "content": _to_anthropic_content(msg["content"])})
 
     payload: dict[str, Any] = {
         "model": body["model"],
@@ -233,7 +276,7 @@ async def proxy_chat(request: Request) -> Any:
         contents = []
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
-            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+            contents.append({"role": role, "parts": _to_gemini_parts(msg["content"])})
         payload: dict[str, Any] = {"contents": contents}
         if body.get("temperature"):
             payload["generationConfig"] = {"temperature": body["temperature"]}

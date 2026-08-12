@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示词
  */
 
-import { state } from "../store.js?v=20260812-40";
-import { getToolsSystemPrompt } from "./tools.js?v=20260812-40";
+import { state } from "../store.js?v=20260813-42";
+import { getToolsSystemPrompt } from "./tools.js?v=20260813-42";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -140,9 +140,20 @@ function buildMessages(userMessages, constitution) {
 
   messages.push({ role: "system", content: systemContent });
 
-  // 用户消息
+  // 用户消息（带图片附件时装配为多模态内容，让模型真正“看见”图片）
   for (const msg of userMessages) {
-    messages.push({ role: msg.role, content: msg.content });
+    const images = (Array.isArray(msg.images) ? msg.images : []).filter(src => typeof src === "string" && src.startsWith("data:image"));
+    if (msg.role === "user" && images.length) {
+      messages.push({
+        role: "user",
+        content: [
+          { type: "text", text: msg.content },
+          ...images.map(src => ({ type: "image_url", image_url: { url: src } })),
+        ],
+      });
+    } else {
+      messages.push({ role: msg.role, content: msg.content });
+    }
   }
 
   return messages;

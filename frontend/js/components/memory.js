@@ -10,9 +10,9 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260812-40";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260812-40";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260812-40";
+} from "../store.js?v=20260813-42";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260813-42";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260813-42";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -105,12 +105,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260812-40");
+    const { toast } = await import("../app.js?v=20260813-42");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260812-40");
+  const { toast } = await import("../app.js?v=20260813-42");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -300,7 +300,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260812-40");
+      const { toast } = await import("../app.js?v=20260813-42");
       toast(`已自动提炼 ${added} 条记忆${profileUpdated ? "，并更新画像" : ""}`);
     }
     return { added, profileUpdated };
@@ -409,7 +409,7 @@ async function addKnowledgeDialog() {
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260812-40");
+    const { toast } = await import("../app.js?v=20260813-42");
     toast("知识已添加");
     await loadKnowledgeDocs();
   }
@@ -563,7 +563,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260812-40").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260813-42").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗？", { danger: true, okText: "重置" })) {

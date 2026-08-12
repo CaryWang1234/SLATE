@@ -25,6 +25,11 @@ TEXT_EXTENSIONS = {
 # 支持的图片扩展名
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg"}
 
+# 需后端库解析的文档类扩展名（docx/xlsx/pdf）
+DOC_EXTENSIONS = {".docx"}
+SHEET_EXTENSIONS = {".xlsx"}
+PDF_EXTENSIONS = {".pdf"}
+
 # 最大文件大小 (10MB)
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -54,6 +59,14 @@ async def upload_file(file: UploadFile) -> dict[str, Any]:
     # 图片文件
     if ext in IMAGE_EXTENSIONS:
         return _parse_image_file(filename, ext, content)
+
+    # 文档类：后端库解析（浏览器无法直接读取）
+    if ext in DOC_EXTENSIONS:
+        return _parse_docx(filename, content)
+    if ext in SHEET_EXTENSIONS:
+        return _parse_xlsx(filename, content)
+    if ext in PDF_EXTENSIONS:
+        return _parse_pdf(filename, content)
 
     # 其他文件：尝试作为文本读取
     try:
@@ -144,6 +157,109 @@ def _parse_image_file(filename: str, ext: str, content: bytes) -> dict[str, Any]
             "mime_type": mime_type,
             "base64": b64,
             "size": len(content),
+        },
+        "message": "ok",
+    }
+
+
+def _parse_docx(filename: str, content: bytes) -> dict[str, Any]:
+    """解析 Word 文档：提取段落与表格文本。"""
+    try:
+        import docx
+    except ImportError:
+        return {"code": -1, "data": None, "message": "缺少 python-docx 依赖，无法解析 Word 文档"}
+
+    doc = docx.Document(io.BytesIO(content))
+    parts: list[str] = []
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if text:
+            parts.append(text)
+    for table in doc.tables:
+        for row in table.rows:
+            cells = [cell.text.strip().replace("\n", " ") for cell in row.cells]
+            parts.append(" | ".join(cells))
+
+    full = "\n".join(parts)
+    return {
+        "code": 0,
+        "data": {
+            "filename": filename,
+            "type": "text",
+            "content": full[:50000],
+            "size": len(content),
+            "truncated": len(full) > 50000,
+        },
+        "message": "ok",
+    }
+
+
+def _parse_xlsx(filename: str, content: bytes) -> dict[str, Any]:
+    """解析 Excel 工作簿：前 5 个工作表、每表最多 200 行，转为制表符分隔文本。"""
+    try:
+        import openpyxl
+    except ImportError:
+        return {"code": -1, "data": None, "message": "缺少 openpyxl 依赖，无法解析 Excel 文件"}
+
+    wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    parts: list[str] = []
+    try:
+        for ws in wb.worksheets[:5]:
+            parts.append(f"[工作表: {ws.title}]")
+            for row in ws.iter_rows(values_only=True, max_row=200):
+                parts.append("\t".join("" if v is None else str(v) for v in row))
+    finally:
+        wb.close()
+
+    full = "\n".join(parts)
+    return {
+        "code": 0,
+        "data": {
+            "filename": filename,
+            "type": "text",
+            "content": full[:50000],
+            "size": len(content),
+            "truncated": len(full) > 50000,
+        },
+        "message": "ok",
+    }
+
+
+def _parse_pdf(filename: str, content: bytes) -> dict[str, Any]:
+    """解析 PDF：提取文本层（最多 50 页），扫描件无文本层时提示。"""
+    try:
+        import pdfplumber
+    except ImportError:
+        return {"code": -1, "data": None, "message": "缺少 pdfplumber 依赖，无法解析 PDF 文件"}
+
+    parts: list[str] = []
+    with pdfplumber.open(io.BytesIO(content)) as pdf:
+        for page in pdf.pages[:50]:
+            text = page.extract_text() or ""
+            if text.strip():
+                parts.append(text)
+
+    full = "\n".join(parts)
+    if not full.strip():
+        return {
+            "code": 0,
+            "data": {
+                "filename": filename,
+                "type": "text",
+                "content": "（该 PDF 未提取到文本层，可能为扫描件/纯图片 PDF）",
+                "size": len(content),
+                "truncated": False,
+            },
+            "message": "ok",
+        }
+    return {
+        "code": 0,
+        "data": {
+            "filename": filename,
+            "type": "text",
+            "content": full[:50000],
+            "size": len(content),
+            "truncated": len(full) > 50000,
         },
         "message": "ok",
     }

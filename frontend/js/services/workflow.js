@@ -4,9 +4,9 @@
  * - 执行完成后通过 /knowledge/docs 复用现有知识库写入逻辑
  */
 
-import { get, post } from "./api.js?v=20260812-40";
-import { state, getModelKey } from "../store.js?v=20260812-40";
-import { guardSkillParams } from "./riskguard.js?v=20260812-40";
+import { get, post } from "./api.js?v=20260813-42";
+import { state, getModelKey } from "../store.js?v=20260813-42";
+import { guardSkillParams } from "./riskguard.js?v=20260813-42";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 

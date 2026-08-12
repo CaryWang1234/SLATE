@@ -8,6 +8,8 @@ aiosqlite
 ddgs
 python-pptx
 python-docx
+openpyxl
+pdfplumber
 
 # Desktop wrapper
 pywebview

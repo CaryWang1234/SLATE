@@ -37,6 +37,9 @@ hiddenimports = [
     'backend.skills.web_fetch',
     'backend.skills.web_search',
     'backend.skills.word_create',
+    # 多模态文件解析依赖（files.py 内函数级延迟导入，需显式声明）
+    'openpyxl',
+    'pdfplumber',
     'pptx',
     'pptx.oxml',
     'docx',
