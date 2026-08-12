@@ -13,9 +13,9 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260808-33";
-import { post } from "../services/api.js?v=20260808-33";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260808-33";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260812-40";
+import { post } from "../services/api.js?v=20260812-40";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260812-40";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -269,7 +269,7 @@ const TOOLS = {
 
   file_edit: {
     name: "编辑文件",
-    description: "基于 diff 精确编辑项目文件。只改指定内容，未提及的部分绝不触碰。用户可「接受」「拒绝」或「复制」diff。参数名是 file_path（不是 path）。",
+    description: "基于 diff 精确编辑项目文件。只改指定内容，未提及的部分绝不触碰。默认自动应用写入（用户在设置关闭自动确认时改为预览后手动接受）。参数名是 file_path（不是 path）。",
     params: {
       file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录）", required: true },
       edits: { type: "array", description: '编辑列表，每项含 old_text 和 new_text，如 [{"old_text":"原内容","new_text":"新内容"}]', required: true },
@@ -358,7 +358,7 @@ const TOOLS = {
       }
 
       // 返回结构化数据，chat.js 会检测 _type 渲染 diff UI
-      return {
+      const structured = {
         _type: "file_edit",
         file: data.file,
         file_path_rel: target.relative,
@@ -369,12 +369,24 @@ const TOOLS = {
         errors: data.errors || [],
         applied: data.applied || [],
       };
+
+      // 自动确认：预览无错误时直接写入（部分编辑未命中时保留手动确认，避免半套写入）
+      if (fileAutoApplyEnabled() && structured.file && structured.new_content && structured.errors.length === 0) {
+        try {
+          const applyRes = await post("/projects/apply-edit", { file_path: structured.file, content: structured.new_content });
+          if (applyRes.code === 0) structured.applied = "auto";
+          else structured.errors = [`自动应用失败：${applyRes.message || "未知错误"}，可手动点「接受」重试`];
+        } catch (e) {
+          structured.errors = [`自动应用失败：${e.message}，可手动点「接受」重试`];
+        }
+      }
+      return structured;
     },
   },
 
   file_create: {
     name: "创建新文件",
-    description: "在项目中创建新文件。文件内容先以 diff 预览，用户确认后才写入。专用格式：第一行写相对路径，第二行起原样写文件内容（不用 JSON、不转义）。",
+    description: "在项目中创建新文件。默认自动写入（用户在设置关闭自动确认时改为 diff 预览后手动确认）。专用格式：第一行写相对路径，第二行起原样写文件内容（不用 JSON、不转义）。",
     params: {
       file_path: { type: "string", description: "新文件相对路径（相对于项目根目录），如 src/utils/helper.js", required: true },
       content: { type: "string", description: "文件完整内容（原样写入，不经 JSON 转义）", required: true },
@@ -448,7 +460,7 @@ const TOOLS = {
         };
       }
 
-      return {
+      const structured = {
         _type: "file_create",
         file: data.file,
         file_path_rel: target.relative,
@@ -459,6 +471,18 @@ const TOOLS = {
         errors: data.errors || [],
         truncated,
       };
+
+      // 自动确认：预览无错误时直接创建（截断内容也先写入，由后续 file_append 补齐）
+      if (fileAutoApplyEnabled() && structured.file && structured.errors.length === 0) {
+        try {
+          const applyRes = await post("/projects/create-file", { file_path: structured.file, content: structured.content });
+          if (applyRes.code === 0) structured.applied = "auto";
+          else structured.errors = [`自动创建失败：${applyRes.message || "未知错误"}，可手动点「创建」重试`];
+        } catch (e) {
+          structured.errors = [`自动创建失败：${e.message}，可手动点「创建」重试`];
+        }
+      }
+      return structured;
     },
   },
 
@@ -519,6 +543,7 @@ const TOOLS = {
           truncated,
         };
       }
+      // 追加在调用时已直接写入磁盘（无预览端点）；applied 标记防止 UI 重复追加
       return {
         _type: "file_append",
         file: target.abs,
@@ -528,6 +553,7 @@ const TOOLS = {
         stats: { lines: content.split("\n").length, chars: content.length },
         errors: [],
         truncated,
+        applied: "auto",
       };
     },
   },
@@ -612,6 +638,11 @@ const TOOL_RE = /◈◈◈\s*(\w+)\s*\r?\n([\s\S]*?)(?:◈◆◆|◆◆)/g;
 
 // file_create / file_append 走原样围栏协议：内容不经 JSON 转义，根治大内容转义损坏与 file_path 丢失
 const FILE_RAW_TOOLS = new Set(["file_create", "file_append"]);
+
+/** 自动确认开关（设置页可调，默认开）：开启时文件创建/修改直接落盘，不再等用户手动点「接受」 */
+function fileAutoApplyEnabled() {
+  return state.fileOutput?.autoApply !== false;
+}
 
 /** 参数名别名归一：模型常把 file_path 写成 path / file 等，映射回 file_path 而不是报错 */
 function normalizeFilePathAlias(params) {

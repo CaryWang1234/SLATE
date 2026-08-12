@@ -10,8 +10,9 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260808-33";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260808-33";
+} from "../store.js?v=20260812-40";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260812-40";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260812-40";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -29,6 +30,9 @@ const CATEGORY_LABELS = {
   general: "通用",
   other: "其他",
 };
+
+/** 分类下拉选项（应用内对话框用，替代手敲枚举值） */
+const CATEGORY_OPTIONS = Object.entries(CATEGORY_LABELS).map(([value, label]) => ({ value, label: `${label}（${value}）` }));
 
 // ── 记忆列表渲染 ─────────────────────────────────────────────────────────────
 
@@ -54,8 +58,8 @@ function renderMemoryList() {
     const content = document.createElement("div");
     content.className = "memory-item-content";
     content.textContent = mem.content;
-    content.addEventListener("dblclick", () => {
-      const newText = prompt("编辑记忆内容：", mem.content);
+    content.addEventListener("dblclick", async () => {
+      const newText = await dlgPrompt("编辑记忆内容：", { title: "编辑记忆", value: mem.content, textarea: true });
       if (newText !== null && newText.trim()) {
         updateMemory(mem.id, { content: newText.trim() });
         patch(`/chat/memories/${mem.id}`, { content: newText.trim() }).catch(() => {});
@@ -70,9 +74,10 @@ function renderMemoryList() {
     const editBtn = document.createElement("button");
     editBtn.textContent = "✎";
     editBtn.title = "编辑分类";
-    editBtn.addEventListener("click", () => {
-      const cats = Object.keys(CATEGORY_LABELS).join(", ");
-      const newCat = prompt(`编辑分类（可选: ${cats}）：`, mem.category);
+    editBtn.addEventListener("click", async () => {
+      const known = CATEGORY_OPTIONS.some(o => o.value === mem.category);
+      const options = known ? CATEGORY_OPTIONS : [{ value: mem.category, label: mem.category }, ...CATEGORY_OPTIONS];
+      const newCat = await dlgPrompt("编辑分类：", { title: "编辑分类", options, value: mem.category });
       if (newCat !== null && newCat.trim()) {
         updateMemory(mem.id, { category: newCat.trim() });
         patch(`/chat/memories/${mem.id}`, { category: newCat.trim() }).catch(() => {});
@@ -100,12 +105,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260808-33");
+  const { toast } = await import("../app.js?v=20260812-40");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -295,7 +300,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260808-33");
+      const { toast } = await import("../app.js?v=20260812-40");
       toast(`已自动提炼 ${added} 条记忆${profileUpdated ? "，并更新画像" : ""}`);
     }
     return { added, profileUpdated };
@@ -309,12 +314,11 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
 
 // ── 手动添加记忆 ─────────────────────────────────────────────────────────────
 
-function showAddMemoryDialog() {
-  const content = prompt("请输入记忆内容：");
+async function showAddMemoryDialog() {
+  const content = await dlgPrompt("请输入记忆内容：", { title: "添加记忆", textarea: true });
   if (!content || !content.trim()) return;
 
-  const cats = Object.keys(CATEGORY_LABELS).join(", ");
-  const category = prompt(`选择分类（可选: ${cats}）：`, "general") || "general";
+  const category = (await dlgPrompt("选择分类：", { title: "添加记忆", options: CATEGORY_OPTIONS, value: "general" })) || "general";
 
   const mem = { category: category.trim(), content: content.trim() };
   const saved = addMemory(mem);
@@ -356,7 +360,7 @@ function renderKnowledgeList(items = []) {
     delBtn.textContent = "×";
     delBtn.title = "删除";
     delBtn.addEventListener("click", async () => {
-      if (!confirm(`删除知识「${item.title || item.id}」？`)) return;
+      if (!await dlgConfirm(`删除知识「${item.title || item.id}」？`, { danger: true, okText: "删除" })) return;
       await del(`/knowledge/docs/${item.doc_id || item.id}`);
       await loadKnowledgeDocs();
     });
@@ -394,9 +398,9 @@ async function searchKnowledge() {
 }
 
 async function addKnowledgeDialog() {
-  const title = prompt("知识标题：");
+  const title = await dlgPrompt("知识标题：", { title: "添加知识" });
   if (title === null) return;
-  const content = prompt("知识内容：");
+  const content = await dlgPrompt("知识内容：", { title: "添加知识", textarea: true, rows: 8 });
   if (!content || !content.trim()) return;
   const res = await post("/knowledge/docs", {
     title: title.trim() || "未命名知识",
@@ -405,7 +409,7 @@ async function addKnowledgeDialog() {
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast("知识已添加");
     await loadKnowledgeDocs();
   }
@@ -559,10 +563,10 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260808-33").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260812-40").then(({ toast }) => toast("资料已保存"));
   });
-  if (btnResetProfile) btnResetProfile.addEventListener("click", () => {
-    if (confirm("确定要重置用户资料吗？")) {
+  if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
+    if (await dlgConfirm("确定要重置用户资料吗？", { danger: true, okText: "重置" })) {
       resetUserProfile();
       loadProfileToForm();
     }
@@ -577,8 +581,8 @@ function initMemoryPanel() {
 
   // 素材的添加按钮
   const btnAddSnippet = document.getElementById("btn-add-snippet");
-  if (btnAddSnippet) btnAddSnippet.addEventListener("click", () => {
-    const text = prompt("粘贴或输入提示词素材：");
+  if (btnAddSnippet) btnAddSnippet.addEventListener("click", async () => {
+    const text = await dlgPrompt("粘贴或输入提示词素材：", { title: "添加素材", textarea: true, rows: 6 });
     if (text && text.trim()) {
       const snip = { text: text.trim(), source: "手动添加" };
       addPromptSnippet(snip);

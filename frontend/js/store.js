@@ -65,11 +65,12 @@ const state = {
   // 提示词素材
   promptSnippets: [],
 
-  // 自动推进审阅
+  // 自动推进审阅（短回复停顿 + 长回复只陈述计划不行动）
   autoReview: {
     enabled: true,
     modelId: "",
     minChars: 120,
+    reviewLongStall: true, // 长回复停顿也送审（默认开）
   },
 
   // 输出控制：单次输出上限与“输出文件不限量”开关
@@ -78,10 +79,15 @@ const state = {
     unlimitedFileOutput: true,
   },
 
+  // 文件写入：自动确认创建/修改（默认开；关闭后回到预览手动接受）
+  fileOutput: {
+    autoApply: true,
+  },
+
   // Harness 自主执行：模型自主多轮调用工具直至任务完成
   harness: {
     enabled: false,
-    maxRounds: 20,
+    maxRounds: 50,
   },
 
   knowledgeSettings: {
@@ -125,6 +131,7 @@ function buildPersistentData() {
     conversationTodos: state.conversationTodos,
     autoReview: state.autoReview,
     outputSettings: state.outputSettings,
+    fileOutput: state.fileOutput,
     harness: state.harness,
     knowledgeSettings: state.knowledgeSettings,
     activeExpertId: state.activeExpertId,
@@ -148,6 +155,7 @@ function getSharedPersistentData(data = buildPersistentData()) {
     currentModelId: data.currentModelId || null,
     autoReview: data.autoReview || {},
     outputSettings: data.outputSettings || {},
+    fileOutput: data.fileOutput || {},
     knowledgeSettings: data.knowledgeSettings || {},
   };
 }
@@ -186,10 +194,16 @@ function loadPersistent() {
       ...state.outputSettings,
       ...(data.outputSettings || {}),
     };
+    state.fileOutput = {
+      ...state.fileOutput,
+      ...(data.fileOutput || {}),
+    };
     state.harness = {
       ...state.harness,
       ...(data.harness || {}),
     };
+    // 旧版本持久化的 maxRounds=20 统一提升到 50 轮上限
+    if ((state.harness.maxRounds || 0) < 50) state.harness.maxRounds = 50;
     state.knowledgeSettings = {
       ...state.knowledgeSettings,
       ...(data.knowledgeSettings || {}),
@@ -222,6 +236,10 @@ async function loadSharedPersistent() {
     state.outputSettings = {
       ...state.outputSettings,
       ...(data.outputSettings || {}),
+    };
+    state.fileOutput = {
+      ...state.fileOutput,
+      ...(data.fileOutput || {}),
     };
     state.knowledgeSettings = {
       ...state.knowledgeSettings,

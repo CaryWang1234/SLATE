@@ -2,8 +2,9 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260808-33";
-import { streamChat } from "../services/api.js?v=20260808-33";
+import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260812-40";
+import { streamChat } from "../services/api.js?v=20260812-40";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260812-40";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -65,9 +66,9 @@ function renderCard(card) {
   deleteBtn.className = "board-card-delete";
   deleteBtn.textContent = "×";
   deleteBtn.title = "删除卡片";
-  deleteBtn.addEventListener("click", (e) => {
+  deleteBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
-    if (confirm(`删除卡片"${card.title}"？`)) {
+    if (await dlgConfirm(`删除卡片"${card.title}"？`, { danger: true, okText: "删除" })) {
       const cards = state.boardCards.filter(c => c.id !== card.id);
       setBoardCards(cards);
     }
@@ -400,7 +401,7 @@ function closeCardModal() {
 function saveCard() {
   const title = cardInputTitle.value.trim();
   if (!title) {
-    alert("请输入标题");
+    dlgToast("请输入标题");
     return;
   }
 
@@ -431,9 +432,9 @@ function saveCard() {
   closeCardModal();
 }
 
-function deleteCard() {
+async function deleteCard() {
   if (!editingCardId) return;
-  if (!confirm("确认删除此卡片？")) return;
+  if (!await dlgConfirm("确认删除此卡片？", { danger: true, okText: "删除" })) return;
 
   const cards = state.boardCards.filter(c => c.id !== editingCardId);
   setBoardCards(cards);
@@ -559,19 +560,19 @@ function toggleMermaid() {
 
 async function aiOrganize() {
   if (state.boardCards.length === 0) {
-    alert("黑板是空的，请先添加卡片");
+    dlgToast("黑板是空的，请先添加卡片");
     return;
   }
 
   const modelId = state.currentModel?.id;
   if (!modelId) {
-    alert("请先选择模型");
+    dlgToast("请先选择模型");
     return;
   }
 
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    alert("请先配置模型 API Key");
+    dlgToast("请先配置模型 API Key");
     return;
   }
 
@@ -612,13 +613,13 @@ ${cardsInfo}
     // 解析 JSON
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      alert("AI 返回格式错误，请重试");
+      dlgToast("AI 返回格式错误，请重试");
       return;
     }
 
     const newCards = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(newCards)) {
-      alert("AI 返回格式错误，请重试");
+      dlgToast("AI 返回格式错误，请重试");
       return;
     }
 
@@ -629,9 +630,9 @@ ${cardsInfo}
     });
 
     setBoardCards(updatedCards);
-    alert("AI 整理完成！");
+    dlgToast("AI 整理完成！");
   } catch (e) {
-    alert(`AI 整理失败：${e.message}`);
+    dlgToast(`AI 整理失败：${e.message}`);
   }
 }
 
@@ -697,8 +698,8 @@ function initWhiteboard() {
   });
 
   // 清空黑板
-  document.getElementById("btn-clear-board").addEventListener("click", () => {
-    if (confirm("确认清空黑板？")) setBoardCards([]);
+  document.getElementById("btn-clear-board").addEventListener("click", async () => {
+    if (await dlgConfirm("确认清空黑板？", { danger: true, okText: "清空" })) setBoardCards([]);
   });
 
   // 模态框按钮

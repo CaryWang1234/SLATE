@@ -15,14 +15,18 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/update", tags=["update"])
 
 # 与 SLATE_InnoSetup.iss 的 MyAppVersion 保持同步
-APP_VERSION = "0.2.7"
+APP_VERSION = "0.2.8"
 
 REPO = "CaryWang1234/SLATE"
 API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 # 安装包命名规则：SLATE-Setup-{版本}.exe（与 build_installer.bat 产物一致）
 DOWNLOAD_URL = "https://github.com/{repo}/releases/download/{tag}/SLATE-Setup-{ver}.exe"
 RELEASE_PAGE = "https://github.com/{repo}/releases/tag/{tag}"
-ALLOWED_PREFIX = f"https://github.com/{REPO}/"
+# 允许用系统浏览器打开的链接前缀：本仓库 GitHub 页 + 官网
+ALLOWED_PREFIXES = (
+    f"https://github.com/{REPO}",
+    "https://carywang1234.github.io/SLATE",
+)
 
 
 def _parse_version(tag: str) -> tuple[int, ...]:
@@ -81,13 +85,13 @@ class OpenUrlRequest(BaseModel):
 
 @router.post("/open-url")
 async def open_url(req: OpenUrlRequest):
-    """用系统浏览器打开 Release 链接（webview 内 window.open 不可靠）。
+    """用系统浏览器打开项目链接（webview 内 window.open 不可靠）。
 
-    白名单限制：仅允许本仓库的 github.com 链接，防止被当作通用跳板。
+    白名单限制：仅允许本仓库 GitHub 页与官网链接，防止被当作通用跳板。
     """
     url = (req.url or "").strip()
-    if not url.startswith(ALLOWED_PREFIX):
-        return {"code": 1, "message": "仅允许打开本项目的 Release 链接"}
+    if not any(url.startswith(p) for p in ALLOWED_PREFIXES):
+        return {"code": 1, "message": "仅允许打开本项目的 GitHub / 官网链接"}
     try:
         webbrowser.open(url)
         return {"code": 0, "data": None, "message": "ok"}

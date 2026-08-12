@@ -75,7 +75,7 @@
           <div class="pane">
             <div class="pane-label">对话</div>
             <div class="chat-bubble me"><div class="skel w80"></div><div class="skel w60"></div></div>
-            <div class="tool-chip">⚡ Harness · 第 3/20 轮</div>
+            <div class="tool-chip">⚡ Harness · 第 3/50 轮</div>
             <div class="chat-bubble ai"><div class="skel"></div><div class="skel w80"></div></div>
             <div class="chat-bubble me"><div class="skel w60"></div></div>
             <div class="chat-bubble ai"><div class="skel w80"></div><div class="skel w40"></div></div>
@@ -90,7 +90,7 @@
           </div>
           <div class="pane">
             <div class="pane-label">提示词工厂 · 能力</div>
-            <div class="harness-bar">⚡ 自主执行中 · 可随时停止</div>
+            <div class="harness-bar">⚡ 自主执行中 · 停止不退出</div>
             <div class="tool-chip">🛠 file_edit</div>
             <div class="tool-chip">🧩 @my-skill</div>
             <div class="tool-chip">🎓 @创意写作导师</div>
@@ -157,8 +157,8 @@
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">⚡</div>
           <div class="feature-name">Harness 自主执行</div>
-          <div class="feature-desc">模型自主规划、多轮调用工具直至任务完成，按"目标→计划→执行→验证→汇报→追溯"六阶段推进，大任务自动建立 TODOLIST 统筹批量销账；金色进度条实时可见，随时可停止。</div>
-          <div class="feature-plain">像派活给靠谱实习生——说清目标，他自己干完、自己检查、交报告。</div>
+          <div class="feature-desc">模型自主规划、最多 50 轮调用工具直至任务完成，按“目标→计划→执行→验证→汇报→追溯”六阶段推进，大任务自动建立 TODOLIST 统筹批量销账；停止仅中断当轮不退出，仅手动停止 / 轮数用完 / 清单了结才结束，模型侧异常自动恢复推进。</div>
+          <div class="feature-plain">像派活给靠谱实习生——说清目标，他自己干完、自己检查、交报告；中途喊一嗓子也不会撂挑子不干。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🖌️</div>
@@ -227,6 +227,12 @@
           <div class="feature-plain">先让 AI 把项目"岗前培训"一遍：是什么、怎么分、守什么规矩，写得明明白白。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🗂️</div>
+          <div class="feature-name">对话与数据管理</div>
+          <div class="feature-desc">历史全文搜索直达会话，会话导出 Markdown / 改名 / 批量管理，消息可编辑删除；全部数据一键备份为 JSON、导入即恢复；存储用量分项可见，数据库压缩与缓存清理一键完成。</div>
+          <div class="feature-plain">聊天记录能搜、能导、能改；家当一键打包带走，硬盘占用说得清清楚楚。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🏭</div>
           <div class="feature-name">提示词工厂</div>
           <div class="feature-desc">宪法摘要 → 上下文片段 → 任务描述 → 约束 → 交付要求，按固定工序一键整合为可交付 Prompt，结构完整、可直接投喂任何 Coding Agent。</div>
@@ -251,17 +257,18 @@
           <p>开启 Harness 后，模型按"目标 → 计划 → 执行 → 验证 → 汇报 → 追溯"六阶段自主推进，大任务先建 TODOLIST 统筹批量销账，未完成不许收尾——无需人工逐步喂指令。</p>
           <div class="highlight-plain">Harness 就是"放手模式"。你布置任务后可以起身倒杯咖啡，回来验收结果；中途想喊停，一键刹车。</div>
           <ul>
-            <li>工具调用轮数提升至 10–50 轮，长任务不断线</li>
-            <li>金色进度条实时显示执行轮次与清单进度</li>
+            <li>工具调用轮数默认 50 轮，长任务不断线，模型每轮可见当前轮次与剩余预算</li>
+            <li>仅三种情况退出：手动停止 / 轮数用完 / TODOLIST 全部了结，停止不退出 Harness</li>
+            <li>模型侧失败、零输出、重复调用均自动拦截并恢复推进，循环不中断</li>
+            <li>金色进度条实时显示执行轮次与清单进度，清单未了结自动催办</li>
             <li>输出截断四层防线：6 轮断点续写 + 截断守卫 + file_append 分段补齐，超长文件一定写完整</li>
-            <li>清单未了结自动催办，防止模型"半途收工"</li>
           </ul>
         </div>
         <div class="code-box reveal from-right">
           <div class="code-box-bar"><i></i><i></i><i></i></div>
           <pre><span class="c-muted"># 开启 ⚡ 后发送任务</span>
 <span class="c-prompt">你 ▸</span> <span class="c-text">整理本项目全部 API 并生成文档</span>
-<span class="c-muted">Harness 自主执行 · 第 3/20 轮 · 清单 2/5</span>
+<span class="c-muted">Harness 自主执行 · 第 3/50 轮 · 清单 2/5</span>
 <span class="c-prompt">砚 ▸</span> <span class="c-text">✓ 完结报告：已生成 docs/api.md …</span></pre>
         </div>
       </div>
@@ -554,6 +561,7 @@
       "三档扫描项目：AI 先读懂项目，再动手干活",
       "灵感 → 卡片 → 逻辑链 → 可执行方案",
       "工作流流水线：需求 → 拆解 → 编码 → 审查 → 总结",
+      "全部数据一键备份，历史可搜、可导、可恢复",
       "你的数据，始终留在你的电脑上",
     ];
     if (REDUCED) {

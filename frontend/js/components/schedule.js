@@ -3,8 +3,9 @@
  * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话。
  */
 
-import { state } from "../store.js?v=20260808-33";
-import { get, post, del, patch } from "../services/api.js?v=20260808-33";
+import { state } from "../store.js?v=20260812-40";
+import { get, post, del, patch } from "../services/api.js?v=20260812-40";
+import { dlgConfirm } from "../services/dialog.js?v=20260812-40";
 
 let modal, listEl;
 let pollTimer = null;
@@ -24,7 +25,7 @@ function formatTs(ts) {
 
 async function toast(msg) {
   try {
-    const app = await import("../app.js?v=20260808-33");
+    const app = await import("../app.js?v=20260812-40");
     app.toast(msg);
   } catch {}
 }
@@ -134,7 +135,7 @@ async function renderList() {
     btnDel.textContent = "✕";
     btnDel.title = "删除任务";
     btnDel.addEventListener("click", async () => {
-      if (!confirm(`删除定时任务「${t.name}」？`)) return;
+      if (!await dlgConfirm(`删除定时任务「${t.name}」？`, { danger: true, okText: "删除" })) return;
       await del(`/schedule/tasks/${t.id}`);
       renderList();
     });

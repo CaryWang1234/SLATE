@@ -250,6 +250,168 @@ async def delete_conversation(conv_id: str) -> dict[str, Any]:
     return {"code": 0, "data": None, "message": "ok"}
 
 
+@router.patch("/conversations/{conv_id}")
+async def rename_conversation(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """重命名会话标题（历史管理用）。"""
+    title = str(body.get("title", "")).strip()
+    if not title:
+        return {"code": 1, "message": "标题不能为空"}
+    title = title[:60]
+    conn = _get_db()
+    conn.execute("UPDATE conversations SET title = ? WHERE id = ?", (title, conv_id))
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": {"id": conv_id, "title": title}, "message": "ok"}
+
+
+@router.post("/conversations/batch-delete")
+async def batch_delete_conversations(body: dict[str, Any]) -> dict[str, Any]:
+    """批量删除会话及其消息；clear_all 为真时清空全部会话。"""
+    conn = _get_db()
+    if body.get("clear_all"):
+        cur = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()
+        deleted = cur[0]
+        conn.execute("DELETE FROM messages")
+        conn.execute("DELETE FROM conversations")
+    else:
+        ids = [i for i in (body.get("ids") or []) if isinstance(i, str) and i]
+        if not ids:
+            conn.close()
+            return {"code": 0, "data": {"deleted": 0}, "message": "ok"}
+        placeholders = ", ".join("?" * len(ids))
+        conn.execute(f"DELETE FROM messages WHERE conversation_id IN ({placeholders})", ids)
+        cur = conn.execute(f"DELETE FROM conversations WHERE id IN ({placeholders})", ids)
+        deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": {"deleted": deleted}, "message": "ok"}
+
+
+@router.delete("/messages/{msg_id}")
+async def delete_message(msg_id: str) -> dict[str, Any]:
+    """删除单条消息并同步会话消息计数。"""
+    conn = _get_db()
+    row = conn.execute("SELECT conversation_id FROM messages WHERE id = ?", (msg_id,)).fetchone()
+    if row:
+        conn.execute("DELETE FROM messages WHERE id = ?", (msg_id,))
+        conn.execute(
+            "UPDATE conversations SET message_count = MAX(message_count - 1, 0) WHERE id = ?",
+            (row["conversation_id"],),
+        )
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": None, "message": "ok"}
+
+
+@router.get("/search")
+async def search_messages(q: str = "", limit: int = 30) -> dict[str, Any]:
+    """全文搜索消息内容，返回命中片段与所属会话（历史侧栏内容搜索用）。"""
+    keyword = (q or "").strip()
+    if not keyword:
+        return {"code": 0, "data": [], "message": "ok"}
+    limit = max(1, min(100, limit))
+    conn = _get_db()
+    rows = conn.execute(
+        "SELECT m.id AS message_id, m.conversation_id, m.role, m.content, m.created_at, "
+        "c.title AS conversation_title "
+        "FROM messages m JOIN conversations c ON c.id = m.conversation_id "
+        "WHERE m.content LIKE ? ORDER BY m.created_at DESC LIMIT ?",
+        (f"%{keyword}%", limit),
+    ).fetchall()
+    conn.close()
+    hits = []
+    for r in rows:
+        content = r["content"] or ""
+        pos = content.lower().find(keyword.lower())
+        start = max(0, pos - 30)
+        snippet = content[start:start + 90].replace("\n", " ")
+        if start > 0:
+            snippet = "…" + snippet
+        hits.append({
+            "message_id": r["message_id"],
+            "conversation_id": r["conversation_id"],
+            "conversation_title": r["conversation_title"] or r["conversation_id"],
+            "role": r["role"],
+            "snippet": snippet,
+            "created_at": r["created_at"],
+        })
+    return {"code": 0, "data": hits, "message": "ok"}
+
+
+@router.get("/export")
+async def export_all() -> dict[str, Any]:
+    """导出全部对话、消息、记忆与提示词素材（数据备份用）。"""
+    conn = _get_db()
+    conversations = [dict(r) for r in conn.execute("SELECT * FROM conversations").fetchall()]
+    messages = [dict(r) for r in conn.execute("SELECT * FROM messages").fetchall()]
+    memories = [dict(r) for r in conn.execute("SELECT * FROM memories").fetchall()]
+    snippets = [dict(r) for r in conn.execute("SELECT * FROM prompt_snippets").fetchall()]
+    conn.close()
+    return {
+        "code": 0,
+        "data": {
+            "conversations": conversations,
+            "messages": messages,
+            "memories": memories,
+            "snippets": snippets,
+        },
+        "message": "ok",
+    }
+
+
+@router.post("/import")
+async def import_all(body: dict[str, Any]) -> dict[str, Any]:
+    """导入备份数据：按 id 合并（已存在的跳过，不覆盖现有内容）。"""
+    data = body.get("backend") if isinstance(body.get("backend"), dict) else body
+    conversations = data.get("conversations") or []
+    messages = data.get("messages") or []
+    memories = data.get("memories") or []
+    snippets = data.get("snippets") or []
+    conn = _get_db()
+    stats = {"conversations": 0, "messages": 0, "memories": 0, "snippets": 0}
+    for c in conversations:
+        if not c.get("id"):
+            continue
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO conversations (id, title, created_at, updated_at, total_tokens, "
+            "prompt_tokens, completion_tokens, message_count, context_tokens, project) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (c["id"], c.get("title", ""), c.get("created_at") or time.time(), c.get("updated_at") or time.time(),
+             c.get("total_tokens", 0), c.get("prompt_tokens", 0), c.get("completion_tokens", 0),
+             c.get("message_count", 0), c.get("context_tokens", 0), c.get("project", "")),
+        )
+        stats["conversations"] += cur.rowcount
+    for m in messages:
+        if not m.get("id") or not m.get("conversation_id"):
+            continue
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO messages (id, conversation_id, role, content, model, metadata, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (m["id"], m["conversation_id"], m.get("role", "user"), m.get("content", ""),
+             m.get("model", ""), m.get("metadata", ""), m.get("created_at") or time.time()),
+        )
+        stats["messages"] += cur.rowcount
+    for mem in memories:
+        if not mem.get("id"):
+            continue
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO memories (id, category, content, created_at) VALUES (?, ?, ?, ?)",
+            (mem["id"], mem.get("category", "general"), mem.get("content", ""), mem.get("created_at") or time.time()),
+        )
+        stats["memories"] += cur.rowcount
+    for s in snippets:
+        if not s.get("id"):
+            continue
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO prompt_snippets (id, text, source, created_at) VALUES (?, ?, ?, ?)",
+            (s["id"], s.get("text", ""), s.get("source", ""), s.get("created_at") or time.time()),
+        )
+        stats["snippets"] += cur.rowcount
+    conn.commit()
+    conn.close()
+    return {"code": 0, "data": stats, "message": "ok"}
+
+
 @router.patch("/conversations/{conv_id}/usage")
 async def update_usage(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
     """更新对话的用量统计。"""

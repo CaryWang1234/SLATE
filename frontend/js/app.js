@@ -2,22 +2,23 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260808-33";
-import { get, post, put } from "./services/api.js?v=20260808-33";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260808-33";
-import { initChat } from "./components/chat.js?v=20260808-33";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260808-33";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260808-33";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260808-33";
-import { initTeamPanel } from "./components/team.js?v=20260808-33";
-import { initProjectBar } from "./components/project_bar.js?v=20260808-33";
-import { initMemoryPanel } from "./components/memory.js?v=20260808-33";
-import { initExpertsPanel } from "./components/experts.js?v=20260808-33";
-import { initSchedule } from "./components/schedule.js?v=20260808-33";
-import { initRiskGuard } from "./services/riskguard.js?v=20260808-33";
-import { initUnderstandPanel } from "./components/understand.js?v=20260808-33";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260808-33";
-import { setProject, setProjectFileTree } from "./store.js?v=20260808-33";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260812-40";
+import { get, post, put } from "./services/api.js?v=20260812-40";
+import { dlgConfirm } from "./services/dialog.js?v=20260812-40";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260812-40";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260812-40";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260812-40";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260812-40";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260812-40";
+import { initTeamPanel } from "./components/team.js?v=20260812-40";
+import { initProjectBar } from "./components/project_bar.js?v=20260812-40";
+import { initMemoryPanel } from "./components/memory.js?v=20260812-40";
+import { initExpertsPanel } from "./components/experts.js?v=20260812-40";
+import { initSchedule } from "./components/schedule.js?v=20260812-40";
+import { initRiskGuard } from "./services/riskguard.js?v=20260812-40";
+import { initUnderstandPanel } from "./components/understand.js?v=20260812-40";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260812-40";
+import { setProject, setProjectFileTree } from "./store.js?v=20260812-40";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -283,8 +284,8 @@ function renderCustomModelManagement() {
     deleteBtn.className = "icon-btn custom-model-delete";
     deleteBtn.textContent = "×";
     deleteBtn.title = "删除";
-    deleteBtn.addEventListener("click", () => {
-      if (!confirm(`删除自定义模型「${model.name}」？`)) return;
+    deleteBtn.addEventListener("click", async () => {
+      if (!await dlgConfirm(`删除自定义模型「${model.name}」？`, { danger: true, okText: "删除" })) return;
       removeCustomModel(model.id);
       if (state.autoReview?.modelId === model.id) {
         state.autoReview.modelId = "";
@@ -377,7 +378,9 @@ function openSettings(options = {}) {
   document.getElementById("setting-max-tokens").value = 64000;
   document.getElementById("setting-output-max-tokens").value = state.outputSettings?.maxTokens || 16384;
   document.getElementById("setting-output-unlimited").checked = state.outputSettings?.unlimitedFileOutput !== false;
+  document.getElementById("setting-file-auto-apply").checked = state.fileOutput?.autoApply !== false;
   document.getElementById("setting-auto-review-enabled").checked = state.autoReview?.enabled !== false;
+  document.getElementById("setting-auto-review-long-stall").checked = state.autoReview?.reviewLongStall !== false;
   document.getElementById("setting-auto-review-min-chars").value = state.autoReview?.minChars || 120;
   populateAutoReviewModelSelect();
   if (state.constitution) {
@@ -386,6 +389,7 @@ function openSettings(options = {}) {
   renderCustomModelManagement();
   renderKeyManagement();
   renderUsageSummary();
+  renderAbout();
   switchPanel("settings");
   if (options.focusModelId) {
     requestAnimationFrame(() => {
@@ -404,6 +408,303 @@ function openSettings(options = {}) {
 }
 
 function closeSettings() { switchPanel("chat"); }
+
+// ── 设置页：左侧锚点导航（点击滚动 + 滚动高亮） ──────────────
+
+function initSettingsNav() {
+  const page = document.querySelector(".settings-page");
+  const nav = document.getElementById("settings-nav");
+  if (!page || !nav) return;
+  const items = [...nav.querySelectorAll(".settings-nav-item")];
+  if (!items.length) return;
+
+  items.forEach(item => {
+    item.addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById(item.dataset.target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  // 高亮规则：取顶边已越过容器顶部 24px 线的最后一个区块
+  const onScroll = () => {
+    const top = page.getBoundingClientRect().top;
+    let activeId = items[0].dataset.target;
+    for (const item of items) {
+      const block = document.getElementById(item.dataset.target);
+      if (block && block.getBoundingClientRect().top - top <= 24) activeId = item.dataset.target;
+    }
+    items.forEach(item => item.classList.toggle("active", item.dataset.target === activeId));
+  };
+  page.addEventListener("scroll", onScroll, { passive: true });
+}
+
+// ── 设置页：关于与更新检查 ──────────────
+
+let aboutVersionShown = false;
+
+/** 展示当前版本号（首次打开设置页时拉取，失败保留占位符） */
+async function renderAbout() {
+  const verEl = document.getElementById("about-version");
+  if (!verEl || aboutVersionShown) return;
+  try {
+    const res = await get("/update/check");
+    const d = res?.code === 0 ? res.data : null;
+    if (d?.current) {
+      verEl.textContent = `v${d.current}`;
+      aboutVersionShown = true;
+    }
+  } catch {}
+}
+
+// ── 首次启动引导 ──────────────────────
+
+function initOnboarding() {
+  const modal = document.getElementById("onboarding-modal");
+  if (!modal) return;
+  const close = () => {
+    modal.classList.add("hidden");
+    localStorage.setItem("slate_onboarded", "1");
+  };
+  document.getElementById("btn-onboarding-done")?.addEventListener("click", close);
+  modal.querySelector(".modal-close")?.addEventListener("click", close);
+  modal.querySelector(".modal-backdrop")?.addEventListener("click", close);
+  // 设置·关于里可重新查看
+  document.getElementById("btn-view-onboarding")?.addEventListener("click", () => {
+    modal.classList.remove("hidden");
+  });
+  if (!localStorage.getItem("slate_onboarded")) modal.classList.remove("hidden");
+}
+
+// ── 数据备份与恢复 ────────────────────
+
+function initBackupRestore() {
+  const statusEl = document.getElementById("backup-status");
+
+  document.getElementById("btn-backup-export")?.addEventListener("click", async () => {
+    try {
+      const res = await get("/chat/export");
+      if (res.code !== 0) throw new Error(res.message || "导出失败");
+      let local = null;
+      try { local = JSON.parse(localStorage.getItem("slate_state") || "null"); } catch {}
+      const payload = {
+        app: "SLATE",
+        kind: "full-backup",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        backend: res.data,
+        local,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `SLATE-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 500);
+      const d = res.data || {};
+      if (statusEl) {
+        statusEl.textContent = `已导出：${d.conversations?.length || 0} 会话 / ${d.messages?.length || 0} 条消息 / ${d.memories?.length || 0} 条记忆 / ${d.snippets?.length || 0} 条素材`;
+      }
+      toast("备份已下载");
+    } catch (e) {
+      toast(`导出备份失败: ${e.message}`);
+    }
+  });
+
+  const fileInput = document.getElementById("backup-file-input");
+  document.getElementById("btn-backup-import")?.addEventListener("click", () => fileInput?.click());
+  fileInput?.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = "";
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      const backend = payload.backend || payload;
+      if (!Array.isArray(backend.conversations) && !Array.isArray(backend.messages)) {
+        throw new Error("无法识别的备份文件");
+      }
+      if (!await dlgConfirm("导入备份？已存在的数据会跳过，不会覆盖现有内容。导入后页面将重载。", { okText: "导入" })) return;
+      const res = await post("/chat/import", { backend });
+      if (res.code !== 0) throw new Error(res.message || "导入失败");
+      if (payload.local && typeof payload.local === "object") {
+        try { localStorage.setItem("slate_state", JSON.stringify(payload.local)); } catch {}
+      }
+      const s = res.data || {};
+      if (statusEl) {
+        statusEl.textContent = `已导入：${s.conversations || 0} 会话 / ${s.messages || 0} 条消息 / ${s.memories || 0} 条记忆 / ${s.snippets || 0} 条素材（已存在的跳过）`;
+      }
+      toast("恢复完成，正在重载以应用本地设置…");
+      setTimeout(() => location.reload(), 1200);
+    } catch (e) {
+      toast(`恢复失败: ${e.message}`);
+    }
+  });
+}
+
+// ── 关于区项目链接 ────────────────────
+
+const WEBSITE_URL = "https://carywang1234.github.io/SLATE/docs/index.html";
+const GITHUB_URL = "https://github.com/CaryWang1234/SLATE";
+
+async function openProjectLink(url) {
+  try {
+    const res = await post("/update/open-url", { url });
+    if (res.code !== 0) toast(res.message || "打开链接失败");
+  } catch (e) {
+    toast("打开链接失败");
+  }
+}
+
+function initAboutLinks() {
+  document.getElementById("btn-open-website")?.addEventListener("click", () => openProjectLink(WEBSITE_URL));
+  document.getElementById("btn-open-github")?.addEventListener("click", () => openProjectLink(GITHUB_URL));
+}
+
+// ── 存储空间管理 ──────────────────────
+
+function fmtBytes(n) {
+  if (!n || n <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return `${n >= 100 || i === 0 ? Math.round(n) : n.toFixed(1)} ${units[i]}`;
+}
+
+async function runStorageCleanup(target, btn) {
+  const statusEl = document.getElementById("storage-status");
+  btn.disabled = true;
+  try {
+    const res = await post("/settings/storage/cleanup", { target });
+    if (res.code !== 0) { toast(res.message || "清理失败"); return; }
+    const freed = res.data?.freed || 0;
+    if (statusEl) statusEl.textContent = freed > 0 ? `已释放 ${fmtBytes(freed)}` : "无可释放空间（文件可能正被占用，关闭应用后重试）";
+    toast(freed > 0 ? `已释放 ${fmtBytes(freed)}` : "清理完成");
+    if (target === "history") {
+      // 清空历史后同步侧栏列表
+      try { await refreshConversationList(); } catch (e) {}
+    }
+    await renderStorageUsage();
+  } catch (e) {
+    toast(`清理失败: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function renderStorageUsage() {
+  const box = document.getElementById("storage-usage");
+  if (!box) return;
+  try {
+    const res = await get("/settings/storage");
+    if (res.code !== 0) throw new Error(res.message || "获取失败");
+    const { total, items } = res.data;
+    box.innerHTML = "";
+
+    const totalRow = document.createElement("div");
+    totalRow.className = "storage-total";
+    totalRow.textContent = `总占用 ${fmtBytes(total)}`;
+    box.appendChild(totalRow);
+
+    for (const it of items) {
+      const row = document.createElement("div");
+      row.className = "storage-row";
+      const label = document.createElement("span");
+      label.className = "storage-label";
+      label.textContent = it.label;
+      const size = document.createElement("span");
+      size.className = "storage-size";
+      size.textContent = fmtBytes(it.size);
+      row.append(label, size);
+
+      if (it.key === "chat") {
+        const vacuumBtn = document.createElement("button");
+        vacuumBtn.className = "send-btn send-btn-sm";
+        vacuumBtn.textContent = "压缩";
+        vacuumBtn.title = "压缩数据库文件，释放已删除数据占用的空间";
+        vacuumBtn.addEventListener("click", () => runStorageCleanup("vacuum", vacuumBtn));
+        row.appendChild(vacuumBtn);
+
+        const clearBtn = document.createElement("button");
+        clearBtn.className = "send-btn send-btn-sm btn-danger";
+        clearBtn.textContent = "清空对话";
+        clearBtn.title = "删除全部历史会话与消息";
+        clearBtn.addEventListener("click", async () => {
+          if (!await dlgConfirm("清空全部对话历史？此操作不可恢复，建议先在「数据备份」里导出备份。", { danger: true, okText: "清空" })) return;
+          await runStorageCleanup("history", clearBtn);
+        });
+        row.appendChild(clearBtn);
+      } else if (it.key === "webview") {
+        const cleanBtn = document.createElement("button");
+        cleanBtn.className = "send-btn send-btn-sm";
+        cleanBtn.textContent = "清理缓存";
+        cleanBtn.title = "清理内置浏览器缓存；运行中被占用的文件将在重启后彻底释放";
+        cleanBtn.addEventListener("click", () => runStorageCleanup("webview", cleanBtn));
+        row.appendChild(cleanBtn);
+      }
+      box.appendChild(row);
+    }
+  } catch (e) {
+    box.innerHTML = `<span class="setting-hint">获取存储信息失败：${e.message}</span>`;
+  }
+}
+
+function initStorageManage() {
+  renderStorageUsage();
+  // 打开设置页时刷新一次用量
+  document.getElementById("btn-settings")?.addEventListener("click", () => setTimeout(renderStorageUsage, 300));
+}
+
+/** 手动检查更新：结果内嵌展示，下载/说明走后端白名单打开系统浏览器 */
+async function checkUpdateNow(btn) {
+  const info = document.getElementById("about-update-info");
+  if (!info) return;
+  btn.disabled = true;
+  btn.textContent = "检查中…";
+  info.classList.remove("hidden");
+  info.textContent = "正在查询最新 Release…";
+  try {
+    const res = await get("/update/check");
+    const d = res?.code === 0 ? res.data : null;
+    info.innerHTML = "";
+    if (!d?.checked) {
+      info.textContent = "检查更新失败：网络不可用，请稍后重试。";
+      return;
+    }
+    if (d.current) document.getElementById("about-version").textContent = `v${d.current}`;
+    if (!d.hasUpdate) {
+      info.textContent = `已是最新版本（v${d.current}）。`;
+      return;
+    }
+    const line = document.createElement("div");
+    line.textContent = `✨ 发现新版本 v${d.latest}（当前 v${d.current}）`;
+    info.appendChild(line);
+    if (d.notes) {
+      const notes = document.createElement("div");
+      notes.style.color = "var(--text-muted)";
+      notes.textContent = d.notes.slice(0, 200);
+      info.appendChild(notes);
+    }
+    const actions = document.createElement("div");
+    actions.className = "about-update-actions";
+    const dlBtn = document.createElement("button");
+    dlBtn.className = "send-btn send-btn-sm";
+    dlBtn.textContent = "⬇ 下载更新";
+    dlBtn.addEventListener("click", () => post("/update/open-url", { url: d.downloadUrl }));
+    const relBtn = document.createElement("button");
+    relBtn.className = "icon-btn";
+    relBtn.textContent = "更新说明";
+    relBtn.addEventListener("click", () => post("/update/open-url", { url: d.releaseUrl }));
+    actions.appendChild(dlBtn);
+    actions.appendChild(relBtn);
+    info.appendChild(actions);
+  } catch (e) {
+    info.textContent = `检查更新失败：${e.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "检查更新";
+  }
+}
 
 // ── 设置页：用量统计（全部对话累计） ──────────────
 
@@ -478,6 +779,7 @@ function applyAutoReviewSettings() {
     enabled: document.getElementById("setting-auto-review-enabled").checked,
     modelId: document.getElementById("setting-auto-review-model").value || "",
     minChars: Math.max(20, Math.min(800, parseInt(document.getElementById("setting-auto-review-min-chars").value) || 120)),
+    reviewLongStall: document.getElementById("setting-auto-review-long-stall")?.checked !== false,
   };
   savePersistent();
 }
@@ -486,6 +788,7 @@ function initAutoReviewPersistence() {
   document.getElementById("setting-auto-review-enabled")?.addEventListener("change", applyAutoReviewSettings);
   document.getElementById("setting-auto-review-model")?.addEventListener("change", applyAutoReviewSettings);
   document.getElementById("setting-auto-review-min-chars")?.addEventListener("change", applyAutoReviewSettings);
+  document.getElementById("setting-auto-review-long-stall")?.addEventListener("change", applyAutoReviewSettings);
 }
 
 async function saveSettings() {
@@ -495,10 +798,14 @@ async function saveSettings() {
     maxTokens: Math.max(1024, Math.min(65536, parseInt(document.getElementById("setting-output-max-tokens").value) || 16384)),
     unlimitedFileOutput: document.getElementById("setting-output-unlimited").checked,
   };
+  state.fileOutput = {
+    autoApply: document.getElementById("setting-file-auto-apply").checked,
+  };
   state.autoReview = {
     enabled: document.getElementById("setting-auto-review-enabled").checked,
     modelId: document.getElementById("setting-auto-review-model").value || "",
     minChars: Math.max(20, Math.min(800, parseInt(document.getElementById("setting-auto-review-min-chars").value) || 120)),
+    reviewLongStall: document.getElementById("setting-auto-review-long-stall")?.checked !== false,
   };
 
   const constText = document.getElementById("setting-constitution").value.trim();
@@ -506,7 +813,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260808-33");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260812-40");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -697,6 +1004,14 @@ async function init() {
   initAutoReviewPersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
+  // 设置页导航与关于块
+  safeInit("设置导航", initSettingsNav);
+  document.getElementById("btn-check-update")?.addEventListener("click", (e) => checkUpdateNow(e.currentTarget));
+  safeInit("首次启动引导", initOnboarding);
+  safeInit("数据备份恢复", initBackupRestore);
+  safeInit("关于区链接", initAboutLinks);
+  safeInit("存储空间管理", initStorageManage);
+
   await loadModels();
 
   // 自动恢复上次打开的项目
@@ -705,7 +1020,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260808-33");
+      const { openProject } = await import("./services/project.js?v=20260812-40");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260808-33">
+  <link rel="stylesheet" href="./css/style.css?v=20260812-40">
 </head>
 <body>
 
@@ -82,6 +82,10 @@
             <div id="conv-sidebar" class="conv-sidebar">
               <div class="conv-sidebar-header">
                 <span class="conv-sidebar-title">历史</span>
+                <button id="btn-conv-manage" class="icon-btn conv-manage-btn" title="批量管理历史会话">✦ 管理</button>
+              </div>
+              <div class="conv-search-wrap">
+                <input id="conv-search" class="conv-search" type="text" placeholder="🔍 搜索历史…" autocomplete="off">
               </div>
               <div id="conv-list"></div>
             </div>
@@ -287,6 +291,17 @@
         </div>
       </div>
       <div class="settings-page">
+        <!-- 左侧锚点导航（滚动高亮，见 app.js initSettingsNav） -->
+        <nav class="settings-nav" id="settings-nav">
+          <a class="settings-nav-item active" data-target="settings-models">模型配置</a>
+          <a class="settings-nav-item" data-target="settings-usage">用量统计</a>
+          <a class="settings-nav-item" data-target="settings-context">上下文与项目</a>
+          <a class="settings-nav-item" data-target="settings-auto-review">自动推进</a>
+          <a class="settings-nav-item" data-target="settings-skills">MCP / 技能</a>
+          <a class="settings-nav-item" data-target="settings-data">数据备份</a>
+          <a class="settings-nav-item" data-target="settings-about">关于</a>
+        </nav>
+        <div class="settings-main">
         <section class="settings-block" id="settings-models">
           <div class="settings-block-head">
             <div>
@@ -366,6 +381,10 @@
             <input id="setting-output-unlimited" type="checkbox" checked>
             <span>输出文件时不限制输出长度（提升到 65536，防止大文件被截断）</span>
           </label>
+          <label class="setting-check">
+            <input id="setting-file-auto-apply" type="checkbox" checked>
+            <span>自动确认文件创建/修改（写入无需手动点「接受」；关闭后恢复预览确认）</span>
+          </label>
           <div class="setting-group">
             <label class="setting-label">项目宪法</label>
             <textarea id="setting-constitution" class="setting-input setting-textarea" rows="8"></textarea>
@@ -376,12 +395,16 @@
           <div class="settings-block-head">
             <div>
               <h2>自动推进</h2>
-              <p>当回复过短且疑似停住时，让审阅模型补出工具或技能调用。</p>
+              <p>回复疑似停顿时（过短只表态，或只陈述计划不动手），让审阅模型补出工具或技能调用。</p>
             </div>
           </div>
           <label class="setting-check">
             <input id="setting-auto-review-enabled" type="checkbox">
-            <span>启用短回复自动审阅</span>
+            <span>启用自动推进审阅</span>
+          </label>
+          <label class="setting-check">
+            <input id="setting-auto-review-long-stall" type="checkbox" checked>
+            <span>长回复停顿也审查（回复不短但通篇只描述下一步计划、未调用工具）</span>
           </label>
           <div class="setting-group">
             <label class="setting-label">审阅模型</label>
@@ -408,6 +431,59 @@
             </div>
           </div>
         </section>
+
+        <section class="settings-block" id="settings-data">
+          <div class="settings-block-head">
+            <div>
+              <h2>数据备份与恢复</h2>
+              <p>一键导出全部数据（对话、记忆、素材与本地设置），换机或重装后可完整恢复。</p>
+            </div>
+          </div>
+          <div class="about-row">
+            <label class="setting-label" style="margin-bottom:0;">备份</label>
+            <span class="setting-hint">导出为单个 JSON 文件，包含后端数据库与本地设置。</span>
+            <button id="btn-backup-export" class="send-btn send-btn-sm" type="button">⬇ 下载备份</button>
+          </div>
+          <div class="about-row">
+            <label class="setting-label" style="margin-bottom:0;">恢复</label>
+            <span class="setting-hint">按 id 合并导入，已存在的数据不会被覆盖。</span>
+            <button id="btn-backup-import" class="send-btn send-btn-sm" type="button">⤣ 导入备份</button>
+            <input type="file" id="backup-file-input" accept=".json,application/json" hidden>
+          </div>
+          <div id="backup-status" class="setting-hint"></div>
+          <div class="settings-block-head" style="margin-top:18px;">
+            <div>
+              <h2>存储空间</h2>
+              <p>查看各部分占用，按需压缩数据库或清理缓存。</p>
+            </div>
+          </div>
+          <div id="storage-usage" class="storage-usage">
+            <span class="setting-hint">加载中…</span>
+          </div>
+          <div id="storage-status" class="setting-hint"></div>
+        </section>
+
+        <section class="settings-block" id="settings-about">
+          <div class="settings-block-head">
+            <div>
+              <h2>关于 SLATE</h2>
+              <p>版本信息与更新检查。</p>
+            </div>
+          </div>
+          <div class="about-row">
+            <label class="setting-label" style="margin-bottom:0;">当前版本</label>
+            <span id="about-version" class="about-version">—</span>
+            <button id="btn-check-update" class="send-btn send-btn-sm" type="button">检查更新</button>
+            <button id="btn-view-onboarding" class="send-btn send-btn-sm" type="button" title="重新查看首次启动引导">新手引导</button>
+          </div>
+          <div class="about-row">
+            <label class="setting-label" style="margin-bottom:0;">项目链接</label>
+            <button id="btn-open-website" class="send-btn send-btn-sm" type="button" title="在系统浏览器打开官网">🌐 官网</button>
+            <button id="btn-open-github" class="send-btn send-btn-sm" type="button" title="在系统浏览器打开 GitHub 仓库">⭐ GitHub</button>
+          </div>
+          <div id="about-update-info" class="about-update-info hidden"></div>
+        </section>
+        </div>
       </div>
     </section>
 
@@ -749,10 +825,94 @@
     </div>
   </div>
 
+  <!-- ═══ 历史会话批量管理弹窗 ═══ -->
+  <div id="conv-manage-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content conv-manage-content">
+      <div class="modal-header">
+        <span>管理历史会话</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="conv-manage-toolbar">
+          <label class="conv-manage-checkall">
+            <input type="checkbox" id="conv-manage-checkall">
+            <span>全选</span>
+          </label>
+          <span id="conv-manage-count" class="setting-hint"></span>
+          <button id="btn-conv-delete-selected" class="send-btn send-btn-sm" type="button">删除选中</button>
+          <button id="btn-conv-clear-all" class="send-btn send-btn-sm btn-danger" type="button">清空全部</button>
+        </div>
+        <div id="conv-manage-list" class="conv-manage-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 首次启动引导（新手速览，可在设置·关于里重新查看） ═══ -->
+  <div id="onboarding-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content onboarding-content">
+      <div class="modal-header">
+        <span>欢迎使用 SLATE · 砚</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="onboarding-intro">本地 AI 协作调度台：把灵感研磨成方案，再交给模型自主执行。以下是六个最常用的入口：</p>
+        <div class="onboarding-grid">
+          <div class="onboarding-card">
+            <span class="onboarding-icon">💬</span>
+            <div class="onboarding-card-body">
+              <b>多模型对话</b>
+              <p>顶栏切换模型，@ 提及文件或技能，Enter 发送。历史侧栏支持搜索与导出。</p>
+            </div>
+          </div>
+          <div class="onboarding-card">
+            <span class="onboarding-icon">⚡</span>
+            <div class="onboarding-card-body">
+              <b>Harness 自主执行</b>
+              <p>输入区 ⚡ 按钮开启：模型自主多轮调用工具直至任务完成，大任务自动建 TODOLIST。</p>
+            </div>
+          </div>
+          <div class="onboarding-card">
+            <span class="onboarding-icon">🖌</span>
+            <div class="onboarding-card-body">
+              <b>磨墨模式</b>
+              <p>输入 /grind 想法：AI 三段式追问，把粗糙想法研磨成结构化任务书，一键送入 Harness。</p>
+            </div>
+          </div>
+          <div class="onboarding-card">
+            <span class="onboarding-icon">🛠</span>
+            <div class="onboarding-card-body">
+              <b>内置工具</b>
+              <p>文件读写编辑、终端沙箱、联网搜索、PPT/Word 生成等 17 个 MCP 工具，高危命令需审批。</p>
+            </div>
+          </div>
+          <div class="onboarding-card">
+            <span class="onboarding-icon">🧠</span>
+            <div class="onboarding-card-body">
+              <b>记忆与知识库</b>
+              <p>🧠 按钮管理长期记忆与用户画像；左侧项目栏可扫描生成项目导览与规则手册。</p>
+            </div>
+          </div>
+          <div class="onboarding-card">
+            <span class="onboarding-icon">🏭</span>
+            <div class="onboarding-card-body">
+              <b>更多面板</b>
+              <p>顶栏黑板（卡片式逻辑链）、工厂（提示词生产）、设置（模型/上下文/备份）。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-onboarding-done" class="send-btn">开始使用</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ Toast 容器 ═══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260808-33"></script>
+  <script type="module" src="./js/app.js?v=20260812-40"></script>
 
 </body>
 </html>

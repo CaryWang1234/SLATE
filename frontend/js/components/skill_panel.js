@@ -2,9 +2,10 @@
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除）
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260808-33";
-import { get, post, del, upload } from "../services/api.js?v=20260808-33";
-import { guardSkillParams } from "../services/riskguard.js?v=20260808-33";
+import { state, subscribe, setSkills } from "../store.js?v=20260812-40";
+import { get, post, del, upload } from "../services/api.js?v=20260812-40";
+import { guardSkillParams } from "../services/riskguard.js?v=20260812-40";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260812-40";
 
 let skillList, btnUpload, btnImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -183,7 +184,7 @@ function createSkillItem(name, desc, kind) {
 }
 
 async function handleDeleteSkill(name) {
-  if (!confirm(`确定删除技能 ${name}？`)) return;
+  if (!await dlgConfirm(`确定删除技能 ${name}？`, { danger: true, okText: "删除" })) return;
   try {
     const res = await del(`/skills/${encodeURIComponent(name)}`);
     showToast(res.code === 0 ? `已删除技能 ${name}` : `删除失败: ${res.message}`);
@@ -290,10 +291,10 @@ async function executeSkill() {
 
 // ── 上传自定义技能 ───────────────────────────
 
-function handleUploadSkill() {
-  const name = prompt("技能名称（英文，如 my-skill）：");
-  if (!name) return;
-  const desc = prompt("技能描述：") || name;
+async function handleUploadSkill() {
+  const name = await dlgPrompt("技能名称（英文，如 my-skill）：", { title: "新建技能", placeholder: "my-skill" });
+  if (!name || !name.trim()) return;
+  const desc = (await dlgPrompt("技能描述：", { title: "新建技能", value: name.trim(), textarea: true })) || name.trim();
 
   // 创建文件选择器
   const input = document.createElement("input");
@@ -307,11 +308,11 @@ function handleUploadSkill() {
     for (const file of input.files) {
       formData.append("files", file);
     }
-    formData.append("skill_name", name);
-    formData.append("skill_desc", desc);
+    formData.append("skill_name", name.trim());
+    formData.append("skill_desc", desc.trim());
 
     try {
-      const res = await upload(`/skills/upload?skill_name=${encodeURIComponent(name)}&skill_desc=${encodeURIComponent(desc)}`, formData);
+      const res = await upload(`/skills/upload?skill_name=${encodeURIComponent(name.trim())}&skill_desc=${encodeURIComponent(desc.trim())}`, formData);
       if (res.code === 0) {
         showToast(`技能 ${name} 上传成功`);
         refreshSkills();
@@ -329,9 +330,9 @@ function handleUploadSkill() {
 // ── 导入 SKILL.md 技能（本地路径） ────────────────
 
 async function handleImportSkill() {
-  const path = prompt("输入本地路径（包含 SKILL.md 的目录，或单个 .md 文件）：");
+  const path = await dlgPrompt("输入本地路径（包含 SKILL.md 的目录，或单个 .md 文件）：", { title: "导入技能", placeholder: "D:\\skills\\my-skill" });
   if (!path || !path.trim()) return;
-  const name = prompt("技能名称（留空则自动取目录/文件名）：") || "";
+  const name = (await dlgPrompt("技能名称（留空则自动取目录/文件名）：", { title: "导入技能" })) || "";
 
   try {
     const res = await post("/skills/import", { path: path.trim(), name });

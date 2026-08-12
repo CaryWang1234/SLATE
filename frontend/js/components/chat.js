@@ -2,17 +2,18 @@
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输出
  */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260808-33";
-import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260808-33";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260808-33";
-import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail } from "../services/tools.js?v=20260808-33";
-import { renderMarkdown } from "../services/markdown.js?v=20260808-33";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260808-33";
-import { getExpertsCached } from "./experts.js?v=20260808-33";
-import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260808-33";
-import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260808-33";
-import { fileTypeIcon } from "../services/file_icons.js?v=20260808-33";
-import * as grindSvc from "../services/grind.js?v=20260808-33";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260812-40";
+import { get, post, del, patch, streamChat, upload } from "../services/api.js?v=20260812-40";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260812-40";
+import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail } from "../services/tools.js?v=20260812-40";
+import { renderMarkdown } from "../services/markdown.js?v=20260812-40";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile } from "./memory.js?v=20260812-40";
+import { getExpertsCached } from "./experts.js?v=20260812-40";
+import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260812-40";
+import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260812-40";
+import { fileTypeIcon } from "../services/file_icons.js?v=20260812-40";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260812-40";
+import * as grindSvc from "../services/grind.js?v=20260812-40";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -54,7 +55,7 @@ function autoScroll(force = false) {
 let harnessStatusEl = null;
 let btnHarness = null;
 
-const HARNESS_PREFIX = "[Harness 自主执行模式 · 六阶段闭环]\n请自主完成以下任务，不要向我提问，严格按六阶段推进：\n① 目标：开篇用一句话明确本次任务的目标与验收标准；\n② 计划：面临大任务（多步骤 / 多文件 / 复杂修改）必须先调用 todo_manage(action=init) 建立 TODOLIST，拆解为可执行、可验证的步骤；简单任务可跳过；\n③ 执行：统筹清单全局推进，能并行的多项一起处理，不要机械地一项一项磨；每完成一项或一批事项，立即调用 todo_manage(action=update) 批量更新状态，让清单随时反映真实进度；受阻项标记 blocked 并说明原因；需要信息或操作时直接调用 MCP 工具；\n④ 验证：每步完成后自行验证结果（重新读取文件 / 执行命令 / 核对输出），失败则修复后重新验证；\n⑤ 汇报：全部完成后输出完结报告，逐条核对 TODOLIST（done / blocked+原因），未全部了结不得宣称任务完成；\n⑥ 追溯：用 1-3 句总结本次任务的关键决策、踩坑与可复用经验。\n\n任务：";
+const HARNESS_PREFIX = "[Harness 自主执行模式 · 六阶段闭环]\n请自主完成以下任务，不要向我提问，严格按六阶段推进：\n① 目标：开篇用一句话明确本次任务的目标与验收标准；\n② 计划：面临大任务（多步骤 / 多文件 / 复杂修改）必须先调用 todo_manage(action=init) 建立 TODOLIST，拆解为可执行、可验证的步骤；简单任务可跳过；\n③ 执行：统筹清单全局推进，能并行的多项一起处理，不要机械地一项一项磨；每完成一项或一批事项，立即调用 todo_manage(action=update) 批量更新状态，让清单随时反映真实进度；受阻项标记 blocked 并说明原因；需要信息或操作时直接调用 MCP 工具；\n④ 验证：每步完成后自行验证结果（重新读取文件 / 执行命令 / 核对输出），失败则修复后重新验证；\n⑤ 汇报：全部完成后输出完结报告，逐条核对 TODOLIST（done / blocked+原因），未全部了结不得宣称任务完成；\n⑥ 追溯：用 1-3 句总结本次任务的关键决策、踩坑与可复用经验。\n注意：系统会在每轮工具结果开头标注当前轮次（[Harness · 第 x/N 轮]），请留意剩余轮数预算，临近上限时优先收尾并输出汇报与追溯。\n\n任务：";
 
 function setHarnessProgress(text) {
   if (!harnessStatusEl) return;
@@ -65,6 +66,15 @@ function setHarnessProgress(text) {
   }
   harnessStatusEl.textContent = "⚡ " + text;
   harnessStatusEl.classList.remove("hidden");
+}
+
+// Harness 待机指示：停止/轮次结束后保持「仍开启」提示，仅在手动关闭 ⚡ 时清除
+function showHarnessIdle(note = "") {
+  if (state.harness?.enabled !== true) {
+    setHarnessProgress(null);
+    return;
+  }
+  setHarnessProgress(note || "Harness 已开启 · 待命自主执行（点右上 ⚡ 手动退出）");
 }
 
 // ── TODOLIST 实时面板（消息区右侧栏，按对话隔离） ─────────────
@@ -371,7 +381,56 @@ function buildWelcomeEl() {
   return el;
 }
 
-// ── 消息渲染 ────────────────────────────────
+// 消息内联编辑：内容区临时替换为 textarea，保存后写回后端并重渲染
+function startInlineEdit(msgEl, contentEl, msg) {
+  if (msgEl.querySelector(".msg-edit-textarea")) return;
+  const original = msg.display ?? msg.content ?? "";
+  const ta = document.createElement("textarea");
+  ta.className = "msg-edit-textarea";
+  ta.value = original;
+  ta.rows = Math.min(14, Math.max(3, String(original).split("\n").length));
+
+  const bar = document.createElement("div");
+  bar.className = "msg-edit-bar";
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "msg-edit-save";
+  saveBtn.textContent = "保存";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "msg-edit-cancel";
+  cancelBtn.textContent = "取消";
+  bar.append(saveBtn, cancelBtn);
+
+  const restore = () => {
+    ta.remove();
+    bar.remove();
+    contentEl.style.display = "";
+  };
+
+  saveBtn.addEventListener("click", async () => {
+    const val = ta.value.trim();
+    if (!val || val === original) { restore(); return; }
+    msg.content = val;
+    if (msg.display !== undefined) msg.display = val;
+    if (msg.id) {
+      try { await patch(`/chat/messages/${msg.id}`, { content: val }); } catch (e) {}
+    }
+    contentEl.innerHTML = renderMarkdown(msg.display ?? msg.content);
+    contentEl.querySelectorAll("pre code").forEach((block) => {
+      if (window.hljs) hljs.highlightElement(block);
+    });
+    attachCodeCopyButtons(contentEl);
+    restore();
+    dlgToast("消息已更新");
+  });
+  cancelBtn.addEventListener("click", restore);
+
+  contentEl.style.display = "none";
+  contentEl.insertAdjacentElement("afterend", ta);
+  ta.insertAdjacentElement("afterend", bar);
+  ta.focus();
+}
+
+// ── 消息渲染 ──────────────────────────────
 
 function renderMessage(msg, index) {
   msg = normalizeMessageForRender(msg);
@@ -447,6 +506,29 @@ function renderMessage(msg, index) {
       regenBtn.title = "重新生成";
       regenBtn.addEventListener("click", () => regenerateMessage(msg, div));
       actions.appendChild(regenBtn);
+    }
+
+    // 编辑/删除（仅已持久化到后端的消息）
+    if (msg.id) {
+      const editBtn = document.createElement("button");
+      editBtn.className = "msg-action-btn";
+      editBtn.textContent = "✎";
+      editBtn.title = "编辑内容";
+      editBtn.addEventListener("click", () => startInlineEdit(div, content, msg));
+      actions.appendChild(editBtn);
+
+      const delMsgBtn = document.createElement("button");
+      delMsgBtn.className = "msg-action-btn msg-action-danger";
+      delMsgBtn.textContent = "🗑";
+      delMsgBtn.title = "删除此消息";
+      delMsgBtn.addEventListener("click", async () => {
+        if (!await dlgConfirm("删除这条消息？删除后不可恢复。", { danger: true, okText: "删除" })) return;
+        try { await del(`/chat/messages/${msg.id}`); } catch (e) {}
+        const next = state.messages.filter(m => m !== msg);
+        setMessages(next);
+        dlgToast("已删除消息");
+      });
+      actions.appendChild(delMsgBtn);
     }
 
     div.appendChild(actions);
@@ -566,21 +648,16 @@ function shouldHideToolOutput(call) {
 
 function formatToolResultForModel(call, result) {
   const structured = result?._structured;
-  if (structured?._type === "file_edit") {
+  if (structured && ["file_edit", "file_create", "file_append"].includes(structured._type)) {
     const path = structured.file_path_rel || structured.file_name || structured.file || call?.params?.file_path || "";
     const errors = structured.errors?.length ? `\nWarnings: ${structured.errors.join("; ")}` : "";
-    return `[工具 file_edit 结果]: ${result.output}\nTarget path: ${path}\nStatus: preview only; not written to disk until the user accepts.${errors}`;
-  }
-  if (structured?._type === "file_create") {
-    const path = structured.file_path_rel || structured.file_name || structured.file || call?.params?.file_path || "";
-    const errors = structured.errors?.length ? `\nWarnings: ${structured.errors.join("; ")}` : "";
-    return `[工具 file_create 结果]: ${result.output}\nTarget path: ${path}\nStatus: preview only; not written to disk until the user accepts.${errors}`;
-  }
-  if (structured?._type === "file_append") {
-    const path = structured.file_path_rel || structured.file_name || structured.file || call?.params?.file_path || "";
-    const errors = structured.errors?.length ? `\nWarnings: ${structured.errors.join("; ")}` : "";
-    const truncNote = structured.truncated ? "\nNote: this append was itself truncated; continue with another file_append from the new breakpoint." : "";
-    return `[工具 file_append 结果]: ${result.output}\nTarget path: ${path}\nStatus: preview only; not written to disk until the user accepts.${errors}${truncNote}`;
+    const truncNote = structured._type === "file_append" && structured.truncated
+      ? "\nNote: this append was itself truncated; continue with another file_append from the new breakpoint."
+      : "";
+    const status = structured.applied === "auto"
+      ? "Status: written to disk (auto-confirmed by user setting; no manual acceptance needed; verify via project_read_file if necessary)."
+      : "Status: preview only; not written to disk until the user accepts.";
+    return `[工具 ${structured._type} 结果]: ${result.output}\nTarget path: ${path}\n${status}${errors}${truncNote}`;
   }
   return `[工具 ${call.name} 结果]: ${result.output}`;
 }
@@ -706,6 +783,8 @@ function stopGeneration() {
   if (!isGenerating) return;
   activeGenerationController?.abort();
   updateSendState();
+  // 停止仅中断本次生成：Harness 开关保持不动，只有手动点 ⚡ 才退出
+  showHarnessIdle("本次执行已停止 · Harness 保持开启，下一条消息继续自主执行");
 }
 
 function clearInputQueue() {
@@ -747,6 +826,28 @@ function isShortReviewCandidate(content) {
   return clean.length > 0 && clean.length <= minChars;
 }
 
+// 长回复停顿：回复不短，但通篇在描述“接下来要做什么”却没有实际调用工具
+function looksLikeLongStall(content) {
+  const cfg = state.autoReview || {};
+  if (cfg.enabled === false || cfg.reviewLongStall === false) return false;
+  if (!content || detectToolCalls(content).length > 0) return false;
+  if (/^⚠/.test(String(content).trim())) return false;
+  const text = String(content).replace(/```[\s\S]*?```/g, " ");
+  const minChars = Math.max(20, Math.min(800, parseInt(cfg.minChars) || 120));
+  if (text.trim().length <= minChars) return false; // 短回复走原有短回复通道
+  if (text.length > 4000) return false; // 超长回复通常是完整答复，不审查以控制成本
+  const offerOrQuestion = /(需要我|要我|是否需要|要不要|你需要|如果你需要|我可以(?:直接)?(?:动手|继续|帮你|给出)|是否要|吗[？?]?|呢[？?]?)/;
+  if (offerOrQuestion.test(text)) return false;
+  if (/(全部完成|全部搞定|已完成所有|都已处理)/.test(text)) return false;
+  const intent = /(我(?:先|再|来|会|开始|继续|现在)?\s?(?:去|动手)?\s?(?:查看|看看|看一下|浏览|读取|检查|了解|确认|分析|修改|创建|写入|生成|执行|整理|继续|开始)|下一步|下面我将|接下来我|现在我将|我将(?:先|会|直接)?|让我|I'll(?:\s+(?:check|inspect|look|read|modify|create|start|continue))?|I\s+(?:need|am going)\s+to)/i;
+  return intent.test(text);
+}
+
+// 自动推进审查候选：短回复（原有）或长回复停顿（新增）
+function isReviewCandidate(content) {
+  return isShortReviewCandidate(content) || looksLikeLongStall(content);
+}
+
 function looksLikeContinuationStall(content) {
   if (!isShortReviewCandidate(content)) return false;
   const text = String(content || "").replace(/```[\s\S]*?```/g, " ").trim();
@@ -773,10 +874,10 @@ function buildAutoReviewMessages(lastContent, mainModelId) {
 [自动推进审查模式]
 你现在不是主回复模型，而是 SLATE 的审查模型。你和主模型共用以上完整上下文：项目宪法、长期记忆、知识库片段、隐藏工具结果、历史对话和工具说明都已经包含在内。
 
-你的唯一任务：审查主模型刚才的短回复是否因为“想查看/读取/检查/了解/生成文件/调用技能”但没有实际调用工具而卡住。
+你的唯一任务：审查主模型刚才的回复是否“停顿”了——即想查看/读取/检查/了解/修改/生成文件或调用技能，但没有实际调用工具。回复可能很短（只表态不行动），也可能很长（铺陈了一大段分析和计划却迟迟不动手）。
 
 输出规则：
-- 如果短回复是正常确认、向用户提问、等待用户选择、说明已完成、闲聊回应，或没有必要读取/操作环境，输出空字符串。
+- 如果回复是正常确认、向用户提问、等待用户选择、说明已完成、闲聊回应，或没有必要读取/操作环境，输出空字符串。
 - 如果需要推进，只输出一个或多个工具调用块，不要解释，不要寒暄，不要输出 Markdown。
 - 优先选择最小必要动作：知道路径就读文件，只知道名称就找文件，不知道目标就浏览项目根目录；需要内置技能时使用 skill_run。
 - 不要替主模型回答用户，不要总结工具结果，只负责补出应该执行的工具/技能调用。`;
@@ -788,13 +889,13 @@ function buildAutoReviewMessages(lastContent, mainModelId) {
   messages.push({ role: "assistant", content: lastContent });
   messages.push({
     role: "user",
-    content: "请审查上一条主模型短回复是否需要自动补工具/技能调用。只输出工具调用块或空字符串。",
+    content: "请审查上一条主模型回复是否需要自动补工具/技能调用。只输出工具调用块或空字符串。",
   });
   return messages;
 }
 
-async function reviewShortReplyForToolCalls(lastContent, modelId, apiKey, baseUrl, signal = null) {
-  if (!isShortReviewCandidate(lastContent)) return [];
+async function reviewStalledReplyForToolCalls(lastContent, modelId, apiKey, baseUrl, signal = null) {
+  if (!isReviewCandidate(lastContent)) return [];
   if (signal?.aborted) return [];
   const reviewerId = state.autoReview?.modelId || modelId;
   const reviewerModel = findModelById(reviewerId) || state.currentModel || { id: modelId, base_url: baseUrl };
@@ -868,15 +969,15 @@ async function autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params) {
   return msgEl;
 }
 
-async function autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl, signal = null) {
+async function autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal = null) {
   const lastMsg = state.messages[state.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return msgEl;
   if (signal?.aborted) return msgEl;
   if (lastMsg.autoReviewed) return msgEl;
-  if (!isShortReviewCandidate(lastMsg.content)) return msgEl;
+  if (!isReviewCandidate(lastMsg.content)) return msgEl;
 
   lastMsg.autoReviewed = true;
-  const calls = await reviewShortReplyForToolCalls(lastMsg.content, modelId, apiKey, baseUrl, signal);
+  const calls = await reviewStalledReplyForToolCalls(lastMsg.content, modelId, apiKey, baseUrl, signal);
   if (calls.length > 0) {
     appendSyntheticToolCalls(msgEl, calls);
   } else if (looksLikeContinuationStall(lastMsg.content)) {
@@ -890,16 +991,39 @@ async function autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl, signal = 
 
 // ── 工具调用渲染 ─────────────────────────────
 
+// 工具卡片的中文标签（含图标），未收录的回退到原始名
+const TOOL_LABELS = {
+  file_create: "✨ 创建文件",
+  file_edit: "✎ 编辑文件",
+  file_append: "⇣ 追加文件",
+  skill_run: "⚙ 技能",
+  project_info: "🏷 项目信息",
+  project_files: "🗂 文件树",
+  project_read_file: "📄 读取文件",
+  project_find_file: "🔍 查找文件",
+  board_add: "🗒 添加卡片",
+  board_read: "🗒 读取黑板",
+  board_clear: "🗒 清空黑板",
+  knowledge_search: "📚 知识检索",
+  knowledge_add: "📚 知识添加",
+  prompt_gen: "🧩 提示词生成",
+  chat_context: "💬 对话上下文",
+};
+
 function getToolCallLabel(call) {
-  const skillName = call?.name === "skill_run" ? call.params?.skill : "";
-  return skillName ? `Skill · ${skillName}` : `Tool · ${call?.name || "unknown"}`;
+  if (call?.name === "skill_run") {
+    const skillName = call.params?.skill;
+    return skillName ? `⚙ 技能 · ${skillName}` : "⚙ 技能";
+  }
+  return TOOL_LABELS[call?.name] || `工具 · ${call?.name || "unknown"}`;
 }
 
 function getToolCallStatus(result) {
   if (result?.success === false) return "失败";
-  if (result?._structured?._type === "file_edit") return "diff 预览";
-  if (result?._structured?._type === "file_create") return "文件预览";
-  if (result?._structured?._type === "file_append") return "追加预览";
+  const s = result?._structured;
+  if (s?._type === "file_edit") return s.applied === "auto" ? "已应用" : "diff 预览";
+  if (s?._type === "file_create") return s.applied === "auto" ? "已创建" : "文件预览";
+  if (s?._type === "file_append") return s.applied === "auto" ? "已追加" : "追加预览";
   return "已执行";
 }
 
@@ -942,7 +1066,10 @@ function renderToolCallCard(call, result) {
   label.className = "tool-call-name";
   label.textContent = getToolCallLabel(call);
   const status = document.createElement("span");
-  status.className = result?.success === false ? "tool-call-status-pill failed" : "tool-call-status-pill";
+  const applied = ["file_edit", "file_create", "file_append"].includes(result?._structured?._type) && result._structured.applied === "auto";
+  status.className = result?.success === false
+    ? "tool-call-status-pill failed"
+    : applied ? "tool-call-status-pill applied" : "tool-call-status-pill";
   status.textContent = getToolCallStatus(result);
   header.appendChild(label);
   header.appendChild(status);
@@ -958,6 +1085,9 @@ function renderToolCallCard(call, result) {
       const brief = { file_path: call.params.file_path, edits_count: Array.isArray(call.params.edits) ? call.params.edits.length : 0 };
       input.textContent = JSON.stringify(brief, null, 2);
     } else if (call.name === "file_create" && call.params.content) {
+      const brief = { file_path: call.params.file_path, lines: (call.params.content || "").split("\n").length };
+      input.textContent = JSON.stringify(brief, null, 2);
+    } else if (call.name === "file_append" && call.params.content !== undefined) {
       const brief = { file_path: call.params.file_path, lines: (call.params.content || "").split("\n").length };
       input.textContent = JSON.stringify(brief, null, 2);
     } else if (call.name === "skill_run") {
@@ -1087,6 +1217,19 @@ function renderFileEditDiff(data) {
 
   if (!data.file) btnAccept.disabled = true;
 
+  // 已自动应用：展示已落盘状态，不再提供接受/拒绝（拒绝也无法回滚已写入的内容）
+  if (data.applied === "auto") {
+    btnAccept.textContent = "✓ 已自动应用";
+    btnAccept.classList.add("done");
+    btnAccept.disabled = true;
+    btnReject.remove();
+    wrap.classList.add("file-edit-resolved");
+    actions.appendChild(btnAccept);
+    actions.appendChild(btnCopy);
+    wrap.appendChild(actions);
+    return wrap;
+  }
+
   actions.appendChild(btnAccept);
   actions.appendChild(btnReject);
   actions.appendChild(btnCopy);
@@ -1128,7 +1271,7 @@ function renderFileCreateDiff(data) {
   if (data.truncated) {
     const warn = document.createElement("div");
     warn.className = "file-edit-errors";
-    warn.textContent = "⚠ 模型输出长度达到上限，文件内容可能在末尾被截断。请核对完整性后再创建，必要时让模型续写补全。";
+    warn.textContent = "⚠ 模型输出长度达到上限，文件内容可能在末尾被截断。自动写入后模型会用 file_append 补齐剩余部分，可手动核对完整性。";
     wrap.appendChild(warn);
   }
 
@@ -1211,6 +1354,20 @@ function renderFileCreateDiff(data) {
 
   if (!data.file) btnAccept.disabled = true;
 
+  // 已自动应用：展示已落盘状态，保留复制/下载，不再提供创建/放弃
+  if (data.applied === "auto") {
+    btnAccept.textContent = data.truncated ? "✓ 已自动创建（内容截断，等待续写补齐）" : "✓ 已自动创建";
+    btnAccept.classList.add("done");
+    btnAccept.disabled = true;
+    btnReject.remove();
+    wrap.classList.add("file-edit-resolved");
+    actions.appendChild(btnAccept);
+    actions.appendChild(btnCopy);
+    actions.appendChild(btnDownload);
+    wrap.appendChild(actions);
+    return wrap;
+  }
+
   actions.appendChild(btnAccept);
   actions.appendChild(btnReject);
   actions.appendChild(btnCopy);
@@ -1248,11 +1405,11 @@ function renderFileAppendPreview(data) {
     wrap.appendChild(errDiv);
   }
 
-  // 本次追加内容本身又被截断：提醒用户接受后仍需后续补齐
+  // 本次追加内容本身又被截断：提示后续会自动补齐
   if (data.truncated) {
     const warn = document.createElement("div");
     warn.className = "file-edit-errors";
-    warn.textContent = "⚠ 本次追加内容因输出长度上限被截断。接受后模型会继续用 file_append 补齐剩余部分。";
+    warn.textContent = "⚠ 本次追加内容因输出长度上限被截断。模型会继续用 file_append 补齐剩余部分。";
     wrap.appendChild(warn);
   }
 
@@ -1269,36 +1426,12 @@ function renderFileAppendPreview(data) {
   const actions = document.createElement("div");
   actions.className = "file-edit-actions";
 
-  const btnAccept = document.createElement("button");
-  btnAccept.className = "file-edit-btn file-edit-btn-accept";
-  btnAccept.textContent = "✓ 追加";
-  btnAccept.addEventListener("click", async () => {
-    btnAccept.disabled = true; btnReject.disabled = true; btnCopy.disabled = true;
-    try {
-      const res = await post("/projects/append-file", { file_path: data.file, content: data.content });
-      if (res.code === 0) {
-        btnAccept.textContent = "✓ 已追加";
-        btnAccept.classList.add("done");
-        wrap.classList.add("file-edit-resolved");
-      } else {
-        btnAccept.textContent = res.message ? `✗ ${res.message}` : "✗ 失败";
-        btnAccept.classList.add("failed");
-        btnAccept.disabled = false; btnReject.disabled = false; btnCopy.disabled = false;
-      }
-    } catch (e) {
-      btnAccept.textContent = "✗ 失败";
-      btnAccept.disabled = false; btnReject.disabled = false; btnCopy.disabled = false;
-    }
-  });
-
-  const btnReject = document.createElement("button");
-  btnReject.className = "file-edit-btn file-edit-btn-reject";
-  btnReject.textContent = "✗ 放弃";
-  btnReject.addEventListener("click", () => {
-    btnAccept.disabled = true; btnReject.disabled = true; btnCopy.disabled = true;
-    btnReject.textContent = "✓ 已放弃";
-    wrap.classList.add("file-edit-rejected");
-  });
+  // file_append 在工具调用时已直接写入磁盘（无预览端点）：
+  // 卡片只展示已落盘状态与复制按钮——早期版本此处有「追加」按钮，再点会重复追加同一内容，已移除
+  const btnDone = document.createElement("button");
+  btnDone.className = "file-edit-btn file-edit-btn-accept done";
+  btnDone.textContent = data.truncated ? "✓ 已追加（本段截断，等待后续补齐）" : "✓ 已追加";
+  btnDone.disabled = true;
 
   const btnCopy = document.createElement("button");
   btnCopy.className = "file-edit-btn file-edit-btn-copy";
@@ -1311,10 +1444,8 @@ function renderFileAppendPreview(data) {
     } catch (e) {}
   });
 
-  if (!data.file) btnAccept.disabled = true;
-
-  actions.appendChild(btnAccept);
-  actions.appendChild(btnReject);
+  wrap.classList.add("file-edit-resolved");
+  actions.appendChild(btnDone);
   actions.appendChild(btnCopy);
   wrap.appendChild(actions);
 
@@ -1370,7 +1501,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     if (signal?.aborted || !stuck) break;
     const contPrompt = buildContinuePrompt(content);
     try {
-      const { toast } = await import("../app.js?v=20260808-33");
+      const { toast } = await import("../app.js?v=20260812-40");
       toast(`输出达到长度上限，自动续写中（${round}/${MAX_CONTINUE_ROUNDS}）…`);
     } catch {}
 
@@ -1404,7 +1535,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
   // 轮数耗尽仍未闭合：提示用户，后续由工具循环的截断守卫接管（拒执行并要求拆分重试）
   if (!signal?.aborted && hasTruncatedTail(content)) {
     try {
-      const { toast } = await import("../app.js?v=20260808-33");
+      const { toast } = await import("../app.js?v=20260812-40");
       toast("输出仍不完整，已要求模型拆分重试", 3200);
     } catch {}
   }
@@ -1414,27 +1545,30 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
 
 async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperature: 0.7, max_tokens: getOutputMaxTokens() }, signal = null, maxRounds = 5) {
   const harnessOn = state.harness?.enabled === true;
-  const MAX_TODO_NUDGES = 2; // TODOLIST 闭环催办上限，防止无限循环
+  // Harness 循环仅三种退出：手动停止 / 轮数用完 / TODO 全部了结；模型侧异常不再中断循环
   let todoNudges = 0;
   let prevCallsSig = ""; // 上一轮工具调用指纹，用于拦截原地打转的相同调用
   let dupRounds = 0;
+  let exitReason = "";
   for (let round = 0; round < maxRounds; round++) {
-    if (signal?.aborted) break;
+    if (signal?.aborted) { exitReason = "已手动停止"; break; }
     const lastMsg = state.messages[state.messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") break;
 
     const calls = detectToolCalls(lastMsg.content);
     let nudged = false;
+    // 上一轮生成异常：失败报错或零输出（Harness 下不退出，催其重新生成继续推进）
+    const replyFailed = !(lastMsg.content || "").trim() || /^⚠ (续写失败|请求失败)/.test(lastMsg.content);
 
     // 相同调用去重：本轮调用与上一轮完全一致时不重复执行（避免无效副作用与空转耗尽轮数）
     if (calls.length > 0) {
       const sig = JSON.stringify(calls.map(c => [c.name, c.params]));
       if (sig === prevCallsSig) {
         dupRounds++;
-        if (dupRounds >= 2) break; // 连续三轮发出相同调用：判定卡死，结束循环交给用户
+        if (dupRounds >= 2 && !harnessOn) break; // 非 Harness：连续三轮相同调用判定卡死；Harness 下仅拦截并催其换思路，不退出
         addMessage({
           role: "user",
-          content: "[系统] 你本轮发出的工具调用与上一轮完全相同，已拦截未重复执行。若上轮结果不符合预期，请换思路（拆分任务、改用其他工具、或先用 project_read_file 查看现状）；若任务已推进，直接继续剩余工作或输出结论。",
+          content: `[系统] 第 ${round + 1}/${maxRounds} 轮：你本轮发出的工具调用与上一轮完全相同，已拦截未重复执行。${dupRounds >= 2 ? "已连续多轮相同调用，必须换思路。" : ""}若上轮结果不符合预期，请换思路（拆分任务、改用其他工具、或先用 project_read_file 查看现状）；若任务已推进，直接继续剩余工作或输出结论。`,
           model: "[dedup]",
           hidden: true,
         });
@@ -1446,23 +1580,35 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     }
 
     if (calls.length === 0) {
-      // Harness 闭环强制：模型想收尾但 TODOLIST 仍有未完成项 → 注入系统催办继续推进
-      if (harnessOn && todoNudges < MAX_TODO_NUDGES && round < maxRounds - 1) {
-        const pending = getConversationTodos(state.currentConversationId)
-          .filter(t => t.status !== "done" && t.status !== "blocked");
-        if (pending.length > 0) {
-          todoNudges++;
-          setHarnessProgress(`Harness 闭环校验 · 清单剩余 ${pending.length} 项，自动催办（${todoNudges}/${MAX_TODO_NUDGES}）`);
+      const pending = getConversationTodos(state.currentConversationId)
+        .filter(t => t.status !== "done" && t.status !== "blocked");
+      if (harnessOn && round < maxRounds - 1) {
+        if (replyFailed) {
+          // 模型侧失败/零输出：不退出循环，注入提示让其忽略异常继续推进
           addMessage({
             role: "user",
-            content: `[系统校验] 任务尚未完成，TODOLIST 仍有 ${pending.length} 项未了结：\n${pending.map(t => `- [${t.id}] ${t.content}`).join("\n")}\n请统筹批量推进剩余事项（能一起完成的多项不要拆开磨），每完成一批立即调用 todo_manage 批量更新状态，让清单实时反映进度，全部了结后再输出汇报与追溯。`,
+            content: `[系统] 第 ${round + 1}/${maxRounds} 轮：上一轮生成异常（失败或无输出），Harness 仍在执行，请忽略异常内容，直接继续推进任务。`,
+            model: "[retry]",
+            hidden: true,
+          });
+          nudged = true;
+        } else if (pending.length > 0) {
+          // Harness 闭环强制：模型想收尾但 TODOLIST 仍有未完成项 → 注入系统催办继续推进（无次数上限，轮数兜底）
+          todoNudges++;
+          setHarnessProgress(`Harness 闭环校验 · 清单剩余 ${pending.length} 项，自动催办（第 ${todoNudges} 次）`);
+          addMessage({
+            role: "user",
+            content: `[系统校验] 第 ${round + 1}/${maxRounds} 轮：任务尚未完成，TODOLIST 仍有 ${pending.length} 项未了结：\n${pending.map(t => `- [${t.id}] ${t.content}`).join("\n")}\n请统筹批量推进剩余事项（能一起完成的多项不要拆开磨），每完成一批立即调用 todo_manage 批量更新状态，让清单实时反映进度，全部了结后再输出汇报与追溯。`,
             model: "[todo_enforce]",
             hidden: true,
           });
           nudged = true;
         }
       }
-      if (!nudged) break;
+      if (!nudged) {
+        if (harnessOn) exitReason = pending.length === 0 ? "TODO 清单已了结，任务完成" : "模型收尾退出";
+        break;
+      }
     }
 
     if (harnessOn) {
@@ -1488,7 +1634,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
       markActivity();
       const results = await executeToolCalls(calls);
       markActivity();
-      if (signal?.aborted) break;
+      if (signal?.aborted) { exitReason = "已手动停止"; break; }
 
       // 渲染工具卡片
       lastMsg.toolResults = [
@@ -1509,7 +1655,9 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
       autoScroll();
 
       // Keep tool results in model context without rendering them as chat bubbles.
-      const toolResultText = results.map((r, i) => formatToolResultForModel(calls[i], r)).join("\n\n");
+      // Harness 下每轮结果开头标注轮次，让模型感知当前进度与剩余轮数预算
+      const roundTag = harnessOn ? `[Harness · 第 ${round + 1}/${maxRounds} 轮]\n` : "";
+      const toolResultText = roundTag + results.map((r, i) => formatToolResultForModel(calls[i], r)).join("\n\n");
       addMessage({ role: "user", content: toolResultText, model: "[tool_results]", hidden: true });
     }
 
@@ -1528,7 +1676,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
 
     // 流式续写
     await refreshKnowledgeContext(state.messages.slice(-6).map(m => m.content || "").join("\n"));
-    if (signal?.aborted) break;
+    if (signal?.aborted) { exitReason = "已手动停止"; break; }
     const history = state.messages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
     history._modelId = modelId;
     const messages = buildMessages(history, state.constitution);
@@ -1561,11 +1709,12 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
       if (saved.code === 0 && saved.data?.id) followUp.id = saved.data.id;
     }
 
-    if (signal?.aborted) break;
+    if (signal?.aborted) { exitReason = "已手动停止"; break; }
     msgEl = await autoAdvanceIfStalled(followEl, modelId, apiKey, baseUrl, params);
-    msgEl = await autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl, signal);
+    msgEl = await autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal);
   }
-  if (maxRounds > 5) setHarnessProgress(null);
+  if (harnessOn && !exitReason && !(signal?.aborted)) exitReason = `已达 ${maxRounds} 轮上限`;
+  if (maxRounds > 5) showHarnessIdle(exitReason ? `${exitReason} · Harness 保持开启，下一条消息继续自主执行（点 ⚡ 手动退出）` : "");
 }
 
 // ── 发送消息 ────────────────────────────────
@@ -1574,7 +1723,7 @@ async function sendMessage(queuedPayload = null) {
   if (isGenerating) {
     if (queuedPayload) inputQueue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260808-33");
+      const { toast } = await import("../app.js?v=20260812-40");
       toast(`已加入输入队列（${inputQueue.length}）`);
     }
     updateSendState();
@@ -1761,14 +1910,14 @@ async function sendMessage(queuedPayload = null) {
 
   if (!signal.aborted) {
     msgEl = await autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params);
-    msgEl = await autoReviewIfShortReply(msgEl, modelId, apiKey, baseUrl, signal);
+    msgEl = await autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal);
   }
 
-  // 工具调用循环（默认 5 轮；Harness 模式提升到 maxRounds）
-  const toolRounds = harnessOn ? Math.max(10, Math.min(50, state.harness?.maxRounds || 20)) : 5;
-  if (harnessOn) setHarnessProgress(`自主执行已启动 · 最多 ${toolRounds} 轮工具调用，可随时点发送键停止`);
+  // 工具调用循环（默认 5 轮；Harness 模式提升到 maxRounds，上限 50 轮）
+  const toolRounds = harnessOn ? Math.max(10, Math.min(50, state.harness?.maxRounds || 50)) : 5;
+  if (harnessOn) setHarnessProgress(`自主执行已启动 · 最多 ${toolRounds} 轮 · 仅手动停止 / 轮数用完 / 清单了结才退出`);
   if (!signal.aborted) await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal, toolRounds);
-  if (harnessOn) setHarnessProgress(null);
+  else if (harnessOn) showHarnessIdle(); // 启动前即被停止：runToolLoop 未运行，保持待机指示
 
   // 后台检查上下文压缩
   if (!signal.aborted) {
@@ -1784,8 +1933,8 @@ async function sendMessage(queuedPayload = null) {
 
   } catch (err) {
     console.error("发送失败:", err);
-    const { toast } = await import("../app.js?v=20260808-33");
-    toast(isAbortError(err) ? "已停止输出" : `发送失败: ${err.message}`);
+    const { toast } = await import("../app.js?v=20260812-40");
+    toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输出 · Harness 保持开启" : "已停止输出") : `发送失败: ${err.message}`);
   } finally {
   isGenerating = false;
   activeGenerationController = null;
@@ -1828,7 +1977,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast(`上下文已压缩：${compress_count} 条消息 → 摘要`);
   } catch (e) {
     console.warn("上下文压缩检查失败:", e);
@@ -1879,7 +2028,7 @@ async function handleGrindReply(content, msgEl) {
     renderGrindPanel();
     updateSendState();
     appendDraftActions(msgEl, draft);
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast("墨稿已成：可送入 Harness / 投到白板 / 存为模板");
     return;
   }
@@ -1984,24 +2133,24 @@ function appendDraftActions(msgEl, draft) {
   };
 
   bar.appendChild(mkBtn("⚡ 送入 Harness", "把墨稿作为 Harness 任务自主执行", async () => {
-    state.harness = state.harness || { enabled: false, maxRounds: 20 };
+    state.harness = state.harness || { enabled: false, maxRounds: 50 };
     state.harness.enabled = true;
     btnHarness?.classList.add("active");
     savePersistent();
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast("墨稿已送入 Harness，自主执行中…");
     await sendMessage({ text: grindSvc.draftToHarnessTask(draft), files: [] });
   }));
 
   bar.appendChild(mkBtn("▣ 投到白板", "作为白板卡片保存", async () => {
     addBoardCard(grindSvc.draftToBoardCard(draft));
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast("已投到白板");
   }));
 
   bar.appendChild(mkBtn("✂ 存为模板", "存入知识库作为可复用任务书模板", async () => {
     const ok = await grindSvc.saveDraftAsTemplate(draft);
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast(ok ? "已存为磨墨模板（知识中心可见）" : "保存失败");
   }));
 
@@ -2011,7 +2160,7 @@ function appendDraftActions(msgEl, draft) {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260808-33").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260812-40").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -2035,7 +2184,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -2068,7 +2217,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(`上下文已压缩：${res.data.compress_count || 0} 条消息 → 摘要`);
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -2119,6 +2268,37 @@ function renderConvList(conversations) {
 
     item.appendChild(titleWrap);
 
+    const actionsWrap = document.createElement("div");
+    actionsWrap.className = "conv-item-actions";
+
+    const renameBtn = document.createElement("button");
+    renameBtn.className = "conv-item-del conv-item-rename";
+    renameBtn.textContent = "✎";
+    renameBtn.title = "重命名";
+    renameBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const newTitle = await dlgPrompt("输入新的会话标题：", { title: "重命名会话", value: conv.title || "", okText: "保存" });
+      if (!newTitle || !newTitle.trim()) return;
+      const res = await patch(`/chat/conversations/${conv.id}`, { title: newTitle.trim() });
+      if (res.code === 0) {
+        dlgToast("已重命名");
+        await refreshConversationList();
+      } else {
+        dlgToast(res.message || "重命名失败");
+      }
+    });
+    actionsWrap.appendChild(renameBtn);
+
+    const exportBtn = document.createElement("button");
+    exportBtn.className = "conv-item-del conv-item-export";
+    exportBtn.textContent = "⬇";
+    exportBtn.title = "导出为 Markdown";
+    exportBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      exportConversationMd(conv);
+    });
+    actionsWrap.appendChild(exportBtn);
+
     const delBtn = document.createElement("button");
     delBtn.className = "conv-item-del";
     delBtn.textContent = "×";
@@ -2132,11 +2312,197 @@ function renderConvList(conversations) {
       }
       await refreshConversationList();
     });
-    item.appendChild(delBtn);
+    actionsWrap.appendChild(delBtn);
+    item.appendChild(actionsWrap);
 
     item.addEventListener("click", () => switchConversation(conv.id));
     convList.appendChild(item);
   }
+}
+
+// 导出单个会话为 Markdown 文件
+async function exportConversationMd(conv) {
+  const res = await get(`/chat/conversations/${conv.id}/messages`);
+  if (res.code !== 0) { dlgToast("导出失败"); return; }
+  const msgs = (res.data || []).filter(m => m.role === "user" || m.role === "assistant");
+  if (msgs.length === 0) { dlgToast("该会话没有可导出的消息"); return; }
+  const title = conv.title || conv.id;
+  const lines = [
+    `# ${title}`,
+    "",
+    `> 导出自 SLATE · ${new Date().toLocaleString()}`,
+    "",
+  ];
+  for (const m of msgs) {
+    const who = m.role === "user" ? "🧑 用户" : `🤖 助手${m.model ? " · " + m.model : ""}`;
+    lines.push(`## ${who}`, "", String(m.content || "").trim(), "");
+  }
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const safeTitle = title.replace(/[\\/:*?"<>|]/g, "_").slice(0, 40);
+  const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `SLATE-${safeTitle}-${dateStr}.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 500);
+  dlgToast("已导出 Markdown");
+}
+
+// ── 历史侧栏搜索：标题即时过滤 + 内容全文检索 ──────────
+let convSearchTimer = null;
+
+function initConvSearch() {
+  const input = document.getElementById("conv-search");
+  if (!input || !convList) return;
+  const resultsBox = document.createElement("div");
+  resultsBox.className = "conv-search-results hidden";
+  convList.insertAdjacentElement("beforebegin", resultsBox);
+
+  input.addEventListener("input", () => {
+    clearTimeout(convSearchTimer);
+    const q = input.value.trim();
+    convSearchTimer = setTimeout(async () => {
+      // 标题过滤（即时）
+      const lower = q.toLowerCase();
+      renderConvList(state.conversations.filter(c => !lower || (c.title || "").toLowerCase().includes(lower)));
+      // 内容搜索（≥2 字符才请求后端）
+      if (q.length >= 2) {
+        try {
+          const res = await get(`/chat/search?q=${encodeURIComponent(q)}&limit=12`);
+          renderConvSearchResults(resultsBox, res.code === 0 ? res.data : [], q);
+        } catch (e) { renderConvSearchResults(resultsBox, [], q); }
+      } else {
+        renderConvSearchResults(resultsBox, [], q);
+      }
+    }, 300);
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { input.value = ""; input.dispatchEvent(new Event("input")); }
+  });
+}
+
+function renderConvSearchResults(box, hits, q) {
+  if (!box) return;
+  box.innerHTML = "";
+  if (!hits.length) { box.classList.add("hidden"); return; }
+  const header = document.createElement("div");
+  header.className = "conv-search-hits-title";
+  header.textContent = `内容命中 · ${hits.length} 条`;
+  box.appendChild(header);
+  for (const h of hits) {
+    const item = document.createElement("div");
+    item.className = "conv-search-hit";
+    const t = document.createElement("div");
+    t.className = "conv-search-hit-title";
+    t.textContent = h.conversation_title;
+    const s = document.createElement("div");
+    s.className = "conv-search-hit-snippet";
+    s.textContent = h.snippet;
+    item.append(t, s);
+    item.addEventListener("click", async () => {
+      await switchConversation(h.conversation_id);
+      dlgToast(`已跳转到「${h.conversation_title}」`);
+    });
+    box.appendChild(item);
+  }
+  box.classList.remove("hidden");
+}
+
+// ── 历史会话批量管理 ──────────────────
+let convManageChecks = new Map(); // conv.id -> checkbox
+
+function initConvManage() {
+  const modal = document.getElementById("conv-manage-modal");
+  if (!modal) return;
+  const close = () => modal.classList.add("hidden");
+  modal.querySelector(".modal-close")?.addEventListener("click", close);
+  modal.querySelector(".modal-backdrop")?.addEventListener("click", close);
+
+  document.getElementById("btn-conv-manage")?.addEventListener("click", () => openConvManage());
+
+  document.getElementById("conv-manage-checkall")?.addEventListener("change", (e) => {
+    for (const cb of convManageChecks.values()) cb.checked = e.target.checked;
+    updateConvManageCount();
+  });
+
+  document.getElementById("btn-conv-delete-selected")?.addEventListener("click", async () => {
+    const ids = [...convManageChecks.entries()].filter(([, cb]) => cb.checked).map(([id]) => id);
+    if (ids.length === 0) { dlgToast("请先勾选要删除的会话"); return; }
+    if (!await dlgConfirm(`删除选中的 ${ids.length} 个会话？删除后不可恢复。`, { danger: true, okText: "删除" })) return;
+    await post("/chat/conversations/batch-delete", { ids });
+    if (ids.includes(state.currentConversationId)) {
+      state.currentConversationId = null;
+      setMessages([]);
+    }
+    await refreshConversationList();
+    renderConvManageList();
+    dlgToast(`已删除 ${ids.length} 个会话`);
+  });
+
+  document.getElementById("btn-conv-clear-all")?.addEventListener("click", async () => {
+    if (!await dlgConfirm("清空全部历史会话？此操作不可恢复，建议先备份数据。", { danger: true, okText: "清空" })) return;
+    await post("/chat/conversations/batch-delete", { clear_all: true });
+    state.currentConversationId = null;
+    setMessages([]);
+    await refreshConversationList();
+    renderConvManageList();
+    dlgToast("已清空全部会话");
+  });
+}
+
+function openConvManage() {
+  const modal = document.getElementById("conv-manage-modal");
+  if (!modal) return;
+  renderConvManageList();
+  modal.classList.remove("hidden");
+}
+
+function renderConvManageList() {
+  const list = document.getElementById("conv-manage-list");
+  if (!list) return;
+  convManageChecks = new Map();
+  list.innerHTML = "";
+  const checkall = document.getElementById("conv-manage-checkall");
+  if (checkall) checkall.checked = false;
+
+  const conversations = state.conversations || [];
+  if (conversations.length === 0) {
+    list.innerHTML = '<div class="setting-hint" style="padding:16px;text-align:center;">暂无历史会话</div>';
+    updateConvManageCount();
+    return;
+  }
+  for (const conv of conversations) {
+    const row = document.createElement("label");
+    row.className = "conv-manage-row";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.addEventListener("change", updateConvManageCount);
+    convManageChecks.set(conv.id, cb);
+    const info = document.createElement("div");
+    info.className = "conv-manage-info";
+    const title = document.createElement("div");
+    title.className = "conv-manage-title";
+    title.textContent = conv.title || conv.id;
+    const meta = document.createElement("div");
+    meta.className = "conv-manage-meta";
+    const msgCount = conv.message_count || 0;
+    const tokens = conv.total_tokens || 0;
+    const dateStr = conv.updated_at ? new Date(conv.updated_at * 1000).toLocaleDateString() : "";
+    meta.textContent = `${msgCount}条 · ~${tokens >= 1000 ? (tokens / 1000).toFixed(1) + "K" : tokens} tok${dateStr ? " · " + dateStr : ""}${conv.project ? " · 📁 " + conv.project : ""}`;
+    info.append(title, meta);
+    row.append(cb, info);
+    list.appendChild(row);
+  }
+  updateConvManageCount();
+}
+
+function updateConvManageCount() {
+  const countEl = document.getElementById("conv-manage-count");
+  if (!countEl) return;
+  const checked = [...convManageChecks.values()].filter(cb => cb.checked).length;
+  countEl.textContent = `共 ${convManageChecks.size} 个会话，已选 ${checked} 个`;
 }
 
 async function switchConversation(convId) {
@@ -2302,7 +2668,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260808-33");
+      const { toast } = await import("../app.js?v=20260812-40");
       toast(`文件过大，已跳过: ${file.name}`);
       continue;
     }
@@ -2341,7 +2707,7 @@ async function handleFiles(fileList) {
  */
 async function regenerateMessage(msg, msgEl) {
   if (isGenerating) {
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast("正在生成中，请稍候");
     return;
   }
@@ -2349,7 +2715,7 @@ async function regenerateMessage(msg, msgEl) {
   if (idx < 0) return;
   const after = state.messages.slice(idx + 1).filter(m => !m.hidden && m.role !== "system");
   if (after.length > 0) {
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast("只能重新生成最后一条助手回复");
     return;
   }
@@ -2357,7 +2723,7 @@ async function regenerateMessage(msg, msgEl) {
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast("请先在设置中配置该模型的 API Key");
     return;
   }
@@ -2367,7 +2733,7 @@ async function regenerateMessage(msg, msgEl) {
     .filter(m => !m.hidden && m.role !== "system")
     .map(m => ({ role: m.role, content: m.content }));
   if (!history.some(m => m.role === "user")) {
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast("没有可重新生成的上下文");
     return;
   }
@@ -2444,6 +2810,8 @@ function initChat() {
   usageBar?.addEventListener("mouseenter", showUsagePopup);
   usageBar?.addEventListener("mouseleave", hideUsagePopup);
   convSidebar = document.getElementById("conv-sidebar");
+  initConvSearch();
+  initConvManage();
   filePreviewArea = document.getElementById("file-preview-area");
   btnAttachFile = document.getElementById("btn-attach-file");
   fileInput = document.getElementById("file-input");
@@ -2466,7 +2834,7 @@ function initChat() {
     markActivity(); // 防止重复触发
     try { activeGenerationController?.abort(); } catch {}
     try {
-      const { toast } = await import("../app.js?v=20260808-33");
+      const { toast } = await import("../app.js?v=20260812-40");
       toast("连接长时间无响应，已自动中断，可重试");
     } catch {}
   }, 15000);
@@ -2490,16 +2858,18 @@ function initChat() {
   btnHarness = document.getElementById("btn-harness");
   btnHarness?.classList.toggle("active", state.harness?.enabled === true);
   btnHarness?.addEventListener("click", async () => {
-    state.harness = state.harness || { enabled: false, maxRounds: 20 };
+    state.harness = state.harness || { enabled: false, maxRounds: 50 };
     state.harness.enabled = !state.harness.enabled;
     btnHarness.classList.toggle("active", state.harness.enabled);
     savePersistent();
-    const { toast } = await import("../app.js?v=20260808-33");
+    const { toast } = await import("../app.js?v=20260812-40");
     toast(state.harness.enabled ? "Harness 已开启：目标→计划→执行→验证→汇报→追溯 六阶段自主闭环，大任务自动建立 TODOLIST" : "Harness 已关闭");
+    showHarnessIdle();
   });
   harnessStatusEl = document.createElement("div");
   harnessStatusEl.className = "harness-status hidden";
   document.getElementById("chat-input-area")?.insertAdjacentElement("beforebegin", harnessStatusEl);
+  showHarnessIdle();
   todoPanelEl = document.getElementById("todo-panel");
   convProjectEl = document.createElement("div");
   convProjectEl.className = "conv-project-badge";
@@ -2531,18 +2901,18 @@ function initChat() {
     const id = expertSelect.value;
     if (!id) {
       setActiveExpertId("");
-      const { toast } = await import("../app.js?v=20260808-33");
+      const { toast } = await import("../app.js?v=20260812-40");
       toast("已退出专家模式");
       return;
     }
     try {
-      const { getExpert } = await import("../services/experts.js?v=20260808-33");
+      const { getExpert } = await import("../services/experts.js?v=20260812-40");
       const detail = await getExpert(id, { force: true });
       setActiveExpertId(id, detail);
-      const { toast } = await import("../app.js?v=20260808-33");
+      const { toast } = await import("../app.js?v=20260812-40");
       toast(`已启用专家包：${detail.name || id}`);
     } catch (e) {
-      const { toast } = await import("../app.js?v=20260808-33");
+      const { toast } = await import("../app.js?v=20260812-40");
       toast(`专家包加载失败: ${e.message}`);
       expertSelect.value = state.activeExpertId || "";
     }
@@ -2631,4 +3001,4 @@ function initChat() {
   updateSendState();
 }
 
-export { initChat, sendMessage, renderMarkdown };
+export { initChat, sendMessage, renderMarkdown, refreshConversationList };
