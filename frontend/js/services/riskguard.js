@@ -5,8 +5,9 @@
  * - 用户批准 → 注入 approved 参数放行；拒绝 → 返回拒绝结果给模型
  */
 
-import { state, getModelKey } from "../store.js?v=20260813-45";
-import { post } from "./api.js?v=20260813-45";
+import { state, getModelKey } from "../store.js?v=20260813-46";
+import { post } from "./api.js?v=20260813-46";
+import { t } from "./i18n.js?v=20260813-46";
 
 // 高危命令规则（写死）：命中任一条即要求批准
 const HIGH_RISK_PATTERNS = [
@@ -76,9 +77,9 @@ async function explainCommand(command) {
       ],
     });
     const text = res?.data?.choices?.[0]?.message?.content?.trim();
-    return text || "（模型未返回说明）";
+    return text || t("（模型未返回说明）");
   } catch (e) {
-    return `（说明生成失败: ${e.message}）`;
+    return t("（说明生成失败: {msg}）", { msg: e.message });
   }
 }
 
@@ -108,8 +109,8 @@ function requestHighRiskApproval(command, reason) {
     }
     pendingResolve = resolve;
     cmdEl.textContent = command;
-    reasonEl.textContent = `触发规则：${reason}`;
-    explainEl.textContent = "正在用模型分析命令目的…";
+    reasonEl.textContent = t("触发规则：{reason}", { reason: t(reason) });
+    explainEl.textContent = t("正在用模型分析命令目的…");
     modal.classList.remove("hidden");
     explainCommand(command).then(text => {
       if (pendingResolve === resolve) explainEl.textContent = text;

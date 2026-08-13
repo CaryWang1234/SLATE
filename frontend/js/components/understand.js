@@ -4,10 +4,11 @@
  * 三档深度：简略 / 平衡 / 详细（扫描预算与输出长度随档位变化）
  */
 
-import { state, setProject, getModelKey } from "../store.js?v=20260813-45";
-import { post, streamChat } from "../services/api.js?v=20260813-45";
-import { updateProjectConfig } from "../services/project.js?v=20260813-45";
-import { renderMarkdown } from "../services/markdown.js?v=20260813-45";
+import { state, setProject, getModelKey } from "../store.js?v=20260813-46";
+import { post, streamChat } from "../services/api.js?v=20260813-46";
+import { updateProjectConfig } from "../services/project.js?v=20260813-46";
+import { renderMarkdown } from "../services/markdown.js?v=20260813-46";
+import { t } from "../services/i18n.js?v=20260813-46";
 
 const LEVELS = {
   brief: { label: "简略", tree: "目录深度 2 层", files: "精读 6 个关键文件", out: "输出约 900 字" },
@@ -35,7 +36,7 @@ function showView(name) {
 function openUnderstandModal() {
   bindUnderstandModal();
   if (!state.project) {
-    import("../app.js?v=20260813-45").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
+    import("../app.js?v=20260813-46").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
     return;
   }
   currentResult = state.project.config?.understanding || null;
@@ -102,7 +103,7 @@ async function startUnderstanding() {
   const model = state.currentModel;
   const apiKey = model?.id ? getModelKey(model.id) : "";
   if (!model?.id || !apiKey) {
-    import("../app.js?v=20260813-45").then(({ toast }) => toast("请先选择模型并配置 API Key")).catch(() => {});
+    import("../app.js?v=20260813-46").then(({ toast }) => toast("请先选择模型并配置 API Key")).catch(() => {});
     return;
   }
 
@@ -115,11 +116,11 @@ async function startUnderstanding() {
   try {
     // ① 扫描项目
     setStepStatus(0, "running");
-    appendLog(`开始扫描项目（档位：${LEVELS[currentLevel].label}）…`);
+    appendLog(t("开始扫描项目（档位：{level}）…", { level: LEVELS[currentLevel].label }));
     const scanRes = await post("/projects/understand/scan", { level: currentLevel });
     if (scanRes.code !== 0) throw new Error(scanRes.message || "扫描失败");
     const scan = scanRes.data;
-    appendLog(`扫描完成：${scan.total_files} 个文件，精读 ${scan.heads.length} 个${scan.truncated ? "（目录树已截断）" : ""}`);
+    appendLog(t("扫描完成：{n} 个文件，精读 {h} 个", { n: scan.total_files, h: scan.heads.length }) + (scan.truncated ? t("（目录树已截断）") : ""));
     setStepStatus(0, "done");
 
     const scanContext = buildScanContext(scan);
@@ -128,14 +129,14 @@ async function startUnderstanding() {
     setStepStatus(1, "running");
     appendLog("正在生成导览·百科…");
     const tour = await generateDoc(model.id, apiKey, buildTourPrompt(scan.project, currentLevel), scanContext);
-    appendLog(`导览·百科完成（${tour.length} 字符）`);
+    appendLog(t("导览·百科完成（{n} 字符）", { n: tour.length }));
     setStepStatus(1, "done");
 
     // ③ 生成规则手册
     setStepStatus(2, "running");
     appendLog("正在生成规则手册…");
     const rules = await generateDoc(model.id, apiKey, buildRulesPrompt(scan.project, currentLevel), scanContext);
-    appendLog(`规则手册完成（${rules.length} 字符）`);
+    appendLog(t("规则手册完成（{n} 字符）", { n: rules.length }));
     setStepStatus(2, "done");
 
     // ④ 保存到项目配置（合并式写入）
@@ -153,12 +154,12 @@ async function startUnderstanding() {
       setProject(saveRes.data);
       appendLog("已保存到 .slate/config.json");
     } else {
-      appendLog(`保存失败（仍可复制结果）: ${saveRes.message}`);
+      appendLog(t("保存失败（仍可复制结果）: {msg}", { msg: saveRes.message }));
     }
 
     renderResult();
     showView("result");
-    import("../app.js?v=20260813-45").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
+    import("../app.js?v=20260813-46").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
   } catch (e) {
     if (e.name === "AbortError") {
       appendLog("已取消");
@@ -168,8 +169,8 @@ async function startUnderstanding() {
       for (let i = 0; i < steps.length; i++) {
         if (steps[i].classList.contains("running")) setStepStatus(i, "error");
       }
-      appendLog(`✕ 失败: ${e.message}`);
-      import("../app.js?v=20260813-45").then(({ toast }) => toast(`项目理解生成失败: ${e.message}`)).catch(() => {});
+      appendLog(t("✕ 失败: {msg}", { msg: e.message }));
+      import("../app.js?v=20260813-46").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
     }
   } finally {
     running = false;
@@ -256,7 +257,7 @@ function renderResult() {
   if (!resultView || !currentResult) return;
   const levelLabel = LEVELS[currentResult.level]?.label || currentResult.level || "—";
   const time = currentResult.generated_at ? new Date(currentResult.generated_at).toLocaleString() : "";
-  if (resultMeta) resultMeta.textContent = `档位：${levelLabel} · 生成于 ${time}`;
+  if (resultMeta) resultMeta.textContent = t("档位：{level} · 生成于 {date}", { level: t(levelLabel), date: time });
   renderResultTabs();
   renderResultBody();
 }
@@ -281,9 +282,9 @@ async function copyCurrentResult() {
   const text = activeTab === "tour" ? currentResult.tour : currentResult.rules;
   try {
     await navigator.clipboard.writeText(text || "");
-    import("../app.js?v=20260813-45").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
+    import("../app.js?v=20260813-46").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
   } catch {
-    import("../app.js?v=20260813-45").then(({ toast }) => toast("复制失败")).catch(() => {});
+    import("../app.js?v=20260813-46").then(({ toast }) => toast("复制失败")).catch(() => {});
   }
 }
 

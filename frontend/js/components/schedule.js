@@ -3,17 +3,18 @@
  * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话。
  */
 
-import { state } from "../store.js?v=20260813-45";
-import { get, post, del, patch } from "../services/api.js?v=20260813-45";
-import { dlgConfirm } from "../services/dialog.js?v=20260813-45";
+import { state } from "../store.js?v=20260813-46";
+import { get, post, del, patch } from "../services/api.js?v=20260813-46";
+import { dlgConfirm } from "../services/dialog.js?v=20260813-46";
+import { t as tr } from "../services/i18n.js?v=20260813-46"; // 任务变量也叫 t，此处别名避免遮蔽
 
 let modal, listEl;
 let pollTimer = null;
 
 function scheduleSummary(t) {
-  if (t.mode === "once") return `单次 · ${t.time || ""}`;
-  if (t.mode === "interval") return `每 ${t.every_minutes || 60} 分钟`;
-  return `每天 · ${t.time || "09:00"}`;
+  if (t.mode === "once") return tr("单次 · {time}", { time: t.time || "" });
+  if (t.mode === "interval") return tr("每 {n} 分钟", { n: t.every_minutes || 60 });
+  return tr("每天 · {time}", { time: t.time || "09:00" });
 }
 
 function formatTs(ts) {
@@ -25,7 +26,7 @@ function formatTs(ts) {
 
 async function toast(msg) {
   try {
-    const app = await import("../app.js?v=20260813-45");
+    const app = await import("../app.js?v=20260813-46");
     app.toast(msg);
   } catch {}
 }
@@ -95,7 +96,7 @@ async function renderList() {
     const meta = document.createElement("div");
     meta.className = "schedule-item-meta";
     const status = t.last_status
-      ? (t.last_status === "ok" ? `✓ 上次运行 ${formatTs(t.last_run)}` : `✗ ${t.last_status}`)
+      ? (t.last_status === "ok" ? tr("✓ 上次运行 {time}", { time: formatTs(t.last_run) }) : `✗ ${t.last_status}`)
       : "尚未运行";
     meta.textContent = `${scheduleSummary(t)} · ${t.model_id} · ${status}`;
     info.appendChild(name);
@@ -135,7 +136,7 @@ async function renderList() {
     btnDel.textContent = "✕";
     btnDel.title = "删除任务";
     btnDel.addEventListener("click", async () => {
-      if (!await dlgConfirm(`删除定时任务「${t.name}」？`, { danger: true, okText: "删除" })) return;
+      if (!await dlgConfirm(tr("删除定时任务「{name}」？", { name: t.name }), { danger: true, okText: "删除" })) return;
       await del(`/schedule/tasks/${t.id}`);
       renderList();
     });
@@ -179,7 +180,7 @@ async function addTask() {
     toast("定时任务已添加");
     renderList();
   } catch (e) {
-    toast("添加失败: " + e.message);
+    toast(tr("添加失败: {msg}", { msg: e.message }));
   }
 }
 

@@ -13,6 +13,7 @@ hiddenimports = [
     'backend.routers.experts',
     'backend.routers.files',
     'backend.routers.grind',
+    'backend.routers.i18n',
     'backend.routers.knowledge',
     'backend.routers.lan',
     'backend.routers.projects',

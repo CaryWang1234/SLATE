@@ -13,9 +13,10 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260813-45";
-import { post } from "../services/api.js?v=20260813-45";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260813-45";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260813-46";
+import { post } from "../services/api.js?v=20260813-46";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260813-46";
+import { t } from "./i18n.js?v=20260813-46";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -375,9 +376,9 @@ const TOOLS = {
         try {
           const applyRes = await post("/projects/apply-edit", { file_path: structured.file, content: structured.new_content });
           if (applyRes.code === 0) structured.applied = "auto";
-          else structured.errors = [`自动应用失败：${applyRes.message || "未知错误"}，可手动点「接受」重试`];
+          else structured.errors = [t("自动应用失败：{msg}，可手动点「接受」重试", { msg: applyRes.message || t("未知错误") })];
         } catch (e) {
-          structured.errors = [`自动应用失败：${e.message}，可手动点「接受」重试`];
+          structured.errors = [t("自动应用失败：{msg}，可手动点「接受」重试", { msg: e.message })];
         }
       }
       return structured;
@@ -477,9 +478,9 @@ const TOOLS = {
         try {
           const applyRes = await post("/projects/create-file", { file_path: structured.file, content: structured.content });
           if (applyRes.code === 0) structured.applied = "auto";
-          else structured.errors = [`自动创建失败：${applyRes.message || "未知错误"}，可手动点「创建」重试`];
+          else structured.errors = [t("自动创建失败：{msg}，可手动点「创建」重试", { msg: applyRes.message || t("未知错误") })];
         } catch (e) {
-          structured.errors = [`自动创建失败：${e.message}，可手动点「创建」重试`];
+          structured.errors = [t("自动创建失败：{msg}，可手动点「创建」重试", { msg: e.message })];
         }
       }
       return structured;

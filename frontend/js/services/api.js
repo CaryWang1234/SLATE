@@ -2,7 +2,8 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260813-45";
+import { API_BASE } from "../store.js?v=20260813-46";
+import { t } from "./i18n.js?v=20260813-46";
 
 // ── 超时与重试常量（参考主流 Agent：idle watchdog + 零内容自动重试） ──
 const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（含 MCP 工具）总超时
@@ -29,7 +30,7 @@ async function request(path, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
     resp = await fetch(url, { ...config, signal: controller.signal });
   } catch (err) {
     clearTimeout(timer);
-    if (controller.signal.aborted) throw new Error(`请求超时（${Math.round(timeoutMs / 1000)}s），可重试`);
+    if (controller.signal.aborted) throw new Error(t("请求超时（{s}s），可重试", { s: Math.round(timeoutMs / 1000) }));
     throw err;
   }
   clearTimeout(timer);
@@ -153,7 +154,7 @@ async function* streamChat(payload) {
         await new Promise(r => setTimeout(r, 700 * attempt));
         continue;
       }
-      if (idleAborted) throw new Error(`流式响应 ${STREAM_IDLE_TIMEOUT_MS / 1000} 秒无响应，已自动中断连接`);
+      if (idleAborted) throw new Error(t("流式响应 {n} 秒无响应，已自动中断连接", { n: STREAM_IDLE_TIMEOUT_MS / 1000 }));
       throw err;
     } finally {
       clearTimeout(idleTimer);

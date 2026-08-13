@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLATE（砚）· 本地 AI 协作调度台</title>
+  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Harness 自主执行、磨墨模式、MCP 工具、专家包、AI 团队辩论与 DAG 工作流、白板式逻辑链、项目理解三档扫描，将灵感转化为结构化方案。开源免费，安装即用。">
+  <link rel="icon" type="image/png" href="../icon.png">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+  <!-- ═══ 页面滚动进度条 ═══ -->
+  <div class="scroll-progress" aria-hidden="true"><span id="progress-bar"></span></div>
+
+  <!-- ═══ 导航 ═══ -->
+  <nav class="nav" id="nav">
+    <div class="container nav-inner">
+      <a class="nav-brand" href="#top">
+        <img src="../icon.png" alt="SLATE">
+        <span>SLATE · 砚</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">功能</a>
+        <a href="#highlights">亮点</a>
+        <a href="#scenes">场景</a>
+        <a href="#tools">工具箱</a>
+        <a href="#stack">技术栈</a>
+        <a href="#start">快速开始</a>
+      </div>
+      <div class="nav-right">
+        <a class="nav-lang" href="../index.html">EN</a>
+        <button class="theme-toggle" id="theme-toggle" title="切换主题">☾</button>
+        <a class="nav-github" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══ Hero ═══ -->
+  <header class="hero" id="top">
+    <div class="hero-grid" id="hero-grid" aria-hidden="true"></div>
+    <div class="container">
+      <img class="hero-logo" src="../icon.png" alt="SLATE Logo">
+      <h1 class="hero-title">SLATE<span class="ink">（砚）</span></h1>
+      <p class="hero-sub">本地 AI 协作调度台 · 将灵感转化为结构化方案</p>
+      <p class="hero-en">Local AI collaboration studio — turn sparks into structured plans.</p>
+      <p class="hero-type" id="hero-type"></p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ 下载安装包</a>
+        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">查看源码 →</a>
+      </div>
+      <div class="hero-badges">
+        <span class="badge">MIT License</span>
+        <span class="badge">Python 3.13+</span>
+        <span class="badge">零 npm · 零构建</span>
+        <span class="badge">本地优先</span>
+        <span class="badge">双主题</span>
+      </div>
+      <p class="section-note" style="margin: 30px auto 0;">
+        一句话解释：SLATE 是一个<strong>装在你自己电脑上的 AI 工作台</strong>——你只管提需求，它负责拆任务、调工具、出结果，全部数据留在本地。
+      </p>
+    </div>
+  </header>
+
+  <!-- ═══ 界面预览：CSS 模拟三栏 ═══ -->
+  <section class="preview">
+    <div class="container">
+      <div class="window reveal slow" data-stagger-group>
+        <div class="window-bar">
+          <span class="window-dot"></span>
+          <span class="window-dot"></span>
+          <span class="window-dot gold"></span>
+          <span class="window-title">SLATE — 对话 · 黑板 · 提示词工厂</span>
+        </div>
+        <div class="window-body">
+          <div class="pane">
+            <div class="pane-label">对话</div>
+            <div class="chat-bubble me"><div class="skel w80"></div><div class="skel w60"></div></div>
+            <div class="tool-chip">⚡ Harness · 第 3/50 轮</div>
+            <div class="chat-bubble ai"><div class="skel"></div><div class="skel w80"></div></div>
+            <div class="chat-bubble me"><div class="skel w60"></div></div>
+            <div class="chat-bubble ai"><div class="skel w80"></div><div class="skel w40"></div></div>
+          </div>
+          <div class="pane">
+            <div class="pane-label">黑板 · 逻辑链</div>
+            <div class="board-card"><div class="skel w60"></div><div class="skel"></div></div>
+            <div class="board-arrow">↓</div>
+            <div class="board-card"><div class="skel w80"></div><div class="skel w60"></div></div>
+            <div class="board-arrow">↓</div>
+            <div class="board-card"><div class="skel w40"></div><div class="skel"></div></div>
+          </div>
+          <div class="pane">
+            <div class="pane-label">提示词工厂 · 能力</div>
+            <div class="harness-bar">⚡ 自主执行中 · 停止不退出</div>
+            <div class="tool-chip">🛠 file_edit</div>
+            <div class="tool-chip">🧩 @my-skill</div>
+            <div class="tool-chip">🎓 @创意写作导师</div>
+            <div class="tool-chip">🔀 工作流 · 节点 3/5</div>
+            <div class="skel"></div>
+            <div class="skel w80"></div>
+            <div class="skel w60"></div>
+          </div>
+        </div>
+      </div>
+      <p class="preview-caption reveal">三栏工作台：对话（左）· 黑板（中）· 提示词工厂与能力（右）——像一张书桌：左边谈事、中间推演、右边动手。</p>
+    </div>
+  </section>
+
+  <!-- ═══ 数据看板：数字滚动计数 ═══ -->
+  <section class="stats">
+    <div class="container">
+      <div class="stats-grid">
+        <div class="reveal" data-stagger>
+          <div class="stat-num" data-count="21">0</div>
+          <div class="stat-label">个内置 MCP 工具</div>
+          <div class="stat-hint">文件、终端、PPT / Word、图表 / 二维码、联网检索随叫随到</div>
+        </div>
+        <div class="reveal" data-stagger>
+          <div class="stat-num"><span data-count="10">0</span>+</div>
+          <div class="stat-label">家主流模型开箱支持</div>
+          <div class="stat-hint">国内外大厂 + 本地模型</div>
+        </div>
+        <div class="reveal" data-stagger>
+          <div class="stat-num" data-count="50">0</div>
+          <div class="stat-label">轮自主执行上限</div>
+          <div class="stat-hint">Harness 模式长任务不断线</div>
+        </div>
+        <div class="reveal" data-stagger>
+          <div class="stat-num"><span data-count="4">0</span> 层</div>
+          <div class="stat-label">防卡死超时防线</div>
+          <div class="stat-hint">慢可以，卡死不行</div>
+        </div>
+        <div class="reveal" data-stagger>
+          <div class="stat-num" data-count="0">0</div>
+          <div class="stat-label">npm 依赖 · 零构建</div>
+          <div class="stat-hint">源码即产品，改完即生效</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 功能全景 ═══ -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="reveal">
+        <div class="section-tag">Features</div>
+        <h2 class="section-title">功能全景</h2>
+        <p class="section-desc">SLATE 有两条路可走：要么让它自己动手——直接驱动内置工具完成任务；要么让它出谋划策——生成高质量 Prompt 交给外部 Coding Agent（Claude Code、Codex、Cursor 等）执行。两条路，都走得通。</p>
+      </div>
+
+      <div class="features-grid" data-stagger-group>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🗣️</div>
+          <div class="feature-name">多模型统一接入</div>
+          <div class="feature-desc">GPT / Claude / Gemini、DeepSeek / Kimi / Qwen / GLM 等国内外主流模型，支持自定义 OpenAI 兼容端点与本地模型（Ollama / LM Studio）。同一个界面里随时切换，不同任务用不同的"脑"。</div>
+          <div class="feature-plain">一个遥控器管所有 AI，哪家便宜、哪家擅长就换哪家。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">⚡</div>
+          <div class="feature-name">Harness 自主执行</div>
+          <div class="feature-desc">模型自主规划、最多 50 轮调用工具直至任务完成，按“目标→计划→执行→验证→汇报→追溯”六阶段推进，大任务自动建立 TODOLIST 统筹批量销账；停止仅中断当轮不退出，仅手动停止 / 轮数用完 / 清单了结才结束，模型侧异常自动恢复推进。</div>
+          <div class="feature-plain">像派活给靠谱实习生——说清目标，他自己干完、自己检查、交报告；中途喊一嗓子也不会撂挑子不干。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🖌️</div>
+          <div class="feature-name">磨墨模式</div>
+          <div class="feature-desc">输入 /grind 加一句粗糙想法，AI 按"接墨→磨墨→收墨"三段式追问（上限 7 轮），把想法研磨成含目标、交付物、验收标准的结构化任务书；墨迹面板实时标记已定与未知，成稿一键送入 Harness 执行、投到白板推演或存为模板。</div>
+          <div class="feature-plain">把"我有个模糊的想法"放进砚台里磨一磨，出来的就是一份清清楚楚的任务书。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🛠️</div>
+          <div class="feature-name">21 个内置 MCP 工具</div>
+          <div class="feature-desc">文件读写编辑追加、终端沙箱、PPT / Word 文档生成、SVG 图表与二维码、仓库统计、正则测试、文本摘要、联网搜索与网页抓取等，聊天时 @提及即用，模型按需自主调用并展示执行结果，图表/二维码等图片产出直接内联预览。</div>
+          <div class="feature-plain">MCP 就是"AI 的标准插座"——给 AI 接上工具，它不但会说，还会动手做。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🛡️</div>
+          <div class="feature-name">高危命令审批</div>
+          <div class="feature-desc">终端命令经写死规则前后端双层拦截：rm / format 等 23 类高危操作必须经你确认，灾难级命令无条件禁止，批准弹窗由 AI 解释命令目的。</div>
+          <div class="feature-plain">AI 想按"删除"键之前，得先让你看清它要删什么、为什么删。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🧩</div>
+          <div class="feature-name">自定义 Skill 系统</div>
+          <div class="feature-desc">SKILL.md 即插即用，上传或导入即可扩展新能力，聊天中 @ 提及自动注入上下文，不用重复交代背景与规矩。</div>
+          <div class="feature-plain">Skill 是写给 AI 的"岗位说明书"，一个 Markdown 文件就能教会它一项新本事。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🎓</div>
+          <div class="feature-name">专家包</div>
+          <div class="feature-desc">persona.md + rules.md + knowledge/ + skills/ 五件套，一个 zip 打包一位专属专家。对话下拉、团队成员卡、@提及三路注入，导入即用，随时分享。</div>
+          <div class="feature-plain">相当于给 AI 办"入职"：岗位说明书和参考资料一并交给它，它就按这个人设专业干活。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">👥</div>
+          <div class="feature-name">AI 团队多轮辩论</div>
+          <div class="feature-desc">多角色提案 / 支持 / 反驳 / 决策，轻量模型负责讨论、重型模型负责拍板，自动摘要节约 token——集思广益，但账单不吓人。</div>
+          <div class="feature-plain">让几个 AI 先开会吵一架，再给你一个共识结论，重要决定不靠拍脑袋。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🔀</div>
+          <div class="feature-name">团队工作流 DAG</div>
+          <div class="feature-desc">需求 → 拆解 → 编码 → 审查 → 总结，团队按预定义的 DAG 流水线自动推进：上游产出逐层传给下游，每个节点的状态、输入、输出实时可见，跑完产物自动归档进知识库。</div>
+          <div class="feature-plain">给 AI 团队搭一条流水线：每个工位只管干自己的活，一路交接到底，成品自动入库。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">⏰</div>
+          <div class="feature-name">定时对话任务</div>
+          <div class="feature-desc">单次 / 每日定点 / 固定间隔三种调度，到点自动执行预设提示词，结果归档进独立会话。日报提醒、定时巡检、周期性整理，交给它就行。</div>
+          <div class="feature-plain">给 AI 上个闹钟——到点自己干活，干完把结果放进专门的文件夹。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🧠</div>
+          <div class="feature-name">白板式逻辑链</div>
+          <div class="feature-desc">灵感卡片化，拖拽布局、箭头连线标识依赖与数据流，Mermaid 渲染流程图与思维导图——脑子里的线团，摊开在桌面上理清楚。</div>
+          <div class="feature-plain">一块贴满便利贴的白板，把"我有个想法"变成"这是实现路径"。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">💾</div>
+          <div class="feature-name">长期记忆 & 知识库</div>
+          <div class="feature-desc">自动沉淀对话要点，跨会话召回，AI 越用越懂你；本地知识片段按需检索注入，你的资料成为它的参考书。</div>
+          <div class="feature-plain">AI 不再"金鱼记忆"——上次说过的事，这次不用从头交代。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">📖</div>
+          <div class="feature-name">Better Project Understanding</div>
+          <div class="feature-desc">简略 / 平衡 / 详细三档力度扫描整个项目，按优先级精读关键文件，自动生成导览·百科与规则手册两份文档并持久化——AI 先读懂项目，再动手干活。</div>
+          <div class="feature-plain">先让 AI 把项目"岗前培训"一遍：是什么、怎么分、守什么规矩，写得明明白白。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🗂️</div>
+          <div class="feature-name">对话与数据管理</div>
+          <div class="feature-desc">历史全文搜索直达会话，会话导出 Markdown / 改名 / 批量管理，消息可编辑删除；全部数据一键备份为 JSON、导入即恢复；存储用量分项可见，数据库压缩与缓存清理一键完成。</div>
+          <div class="feature-plain">聊天记录能搜、能导、能改；家当一键打包带走，硬盘占用说得清清楚楚。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🏭</div>
+          <div class="feature-name">提示词工厂</div>
+          <div class="feature-desc">宪法摘要 → 上下文片段 → 任务描述 → 约束 → 交付要求，按固定工序一键整合为可交付 Prompt，结构完整、可直接投喂任何 Coding Agent。</div>
+          <div class="feature-plain">把"帮我做个东西"加工成一份条理清楚的甲方需求书，再交给 AI 去执行，少返工。</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">📡</div>
+          <div class="feature-name">局域网遥控</div>
+          <div class="feature-desc">应用启动即在 8001 端口开放局域网访问，手机 / 平板浏览器打开即是完整同一界面；设置页与顶栏 📡 按钮醒目展示访问网址与二维码，扫码即连。</div>
+          <div class="feature-plain">把 SLATE 变成家里的“公共电台”——手机扫个码，沙发上也能指挥 AI 干活。</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 三大亮点 ═══ -->
+  <section class="section" id="highlights">
+    <div class="container">
+      <div class="reveal">
+        <div class="section-tag">Highlights</div>
+        <h2 class="section-title">为长任务而生的工程细节</h2>
+        <p class="section-desc">大多数 AI 工具"聊得来"，却"干不完"——任务一长就断、就忘、就卡。SLATE 的工程重心恰恰在这里：让长任务跑得完、进度看得见、中途断不了。</p>
+      </div>
+
+      <div class="highlight">
+        <div class="highlight-text reveal from-left">
+          <h3>⚡ Harness：让模型自己干完</h3>
+          <p>开启 Harness 后，模型按"目标 → 计划 → 执行 → 验证 → 汇报 → 追溯"六阶段自主推进，大任务先建 TODOLIST 统筹批量销账，未完成不许收尾——无需人工逐步喂指令。</p>
+          <div class="highlight-plain">Harness 就是"放手模式"。你布置任务后可以起身倒杯咖啡，回来验收结果；中途想喊停，一键刹车。</div>
+          <ul>
+            <li>工具调用轮数默认 50 轮，长任务不断线，模型每轮可见当前轮次与剩余预算</li>
+            <li>仅三种情况退出：手动停止 / 轮数用完 / TODOLIST 全部了结，停止不退出 Harness</li>
+            <li>模型侧失败、零输出、重复调用均自动拦截并恢复推进，循环不中断</li>
+            <li>金色进度条实时显示执行轮次与清单进度，清单未了结自动催办</li>
+            <li>输出截断四层防线：6 轮断点续写 + 截断守卫 + file_append 分段补齐，超长文件一定写完整</li>
+          </ul>
+        </div>
+        <div class="code-box reveal from-right">
+          <div class="code-box-bar"><i></i><i></i><i></i></div>
+          <pre><span class="c-muted"># 开启 ⚡ 后发送任务</span>
+<span class="c-prompt">你 ▸</span> <span class="c-text">整理本项目全部 API 并生成文档</span>
+<span class="c-muted">Harness 自主执行 · 第 3/50 轮 · 清单 2/5</span>
+<span class="c-prompt">砚 ▸</span> <span class="c-text">✓ 完结报告：已生成 docs/api.md …</span></pre>
+        </div>
+      </div>
+
+      <div class="highlight">
+        <div class="highlight-text reveal from-right">
+          <h3>🛡️ 永不卡死的四层防线</h3>
+          <p>长任务最怕转圈转到天荒地老。SLATE 布下四道防线，从连接层一路兜底到界面——任何一层出问题，后面的层都会接住。</p>
+          <div class="highlight-plain">就像电路里的断路器，跳闸会自动保护，还能一键复位——不会让你对着死界面干等。</div>
+          <ul>
+            <li>流式 idle 看门狗：90 秒无数据主动断开</li>
+            <li>零内容自动退避重试</li>
+            <li>请求 / MCP 工具 180 秒超时</li>
+            <li>UI 兜底看门狗强制恢复界面</li>
+          </ul>
+        </div>
+        <div class="code-box reveal from-left">
+          <div class="code-box-bar"><i></i><i></i><i></i></div>
+          <pre><span class="c-muted">// frontend/js/services/api.js</span>
+<span class="c-text">STREAM_IDLE_TIMEOUT_MS = 90000</span>
+<span class="c-text">STREAM_MAX_RETRIES     = 2</span>
+<span class="c-text">REQUEST_TIMEOUT_MS     = 180000</span>
+<span class="c-muted">// 慢 ≠ 死：持续有数据永不干扰</span></pre>
+        </div>
+      </div>
+
+      <div class="highlight">
+        <div class="highlight-text reveal from-left">
+          <h3>🧩 能力即文件</h3>
+          <p>21 个内置 MCP 工具开箱即用，自定义能力只需一个 SKILL.md 文件——不写代码、不装插件、不重启，放进 data/skills 目录即刻生效。</p>
+          <div class="highlight-plain">给 AI 加新本事，就像往书架上放一本说明书，不用拆墙也不用布线。</div>
+          <ul>
+            <li>file_tree / file_edit / terminal / repo_stats …</li>
+            <li>上传 SKILL.md 即刻扩展新技能</li>
+            <li>聊天输入 @ 提及，上下文自动注入</li>
+          </ul>
+        </div>
+        <div class="code-box reveal from-right">
+          <div class="code-box-bar"><i></i><i></i><i></i></div>
+          <pre><span class="c-muted"># data/skills/my-skill/SKILL.md</span>
+<span class="c-text">---</span>
+<span class="c-text">name: my-skill</span>
+<span class="c-text">description: 我的自定义能力</span>
+<span class="c-text">---</span>
+<span class="c-muted"># 具体指令内容…</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 适合谁 · 使用场景 ═══ -->
+  <section class="section" id="scenes">
+    <div class="container">
+      <div class="reveal">
+        <div class="section-tag">Use Cases</div>
+        <h2 class="section-title">装完 SLATE，你能得到什么</h2>
+        <p class="section-desc">不需要会写代码，也不需要理解任何术语。只要你能把需求用中文说清楚，下面这些场景装完就能用起来。</p>
+      </div>
+      <div class="scenes-grid" data-stagger-group>
+        <div class="scene-card reveal" data-stagger>
+          <div class="scene-icon">📂</div>
+          <h3>个人知识管家</h3>
+          <p>把读书笔记、会议纪要、资料片段交给知识库沉淀，想用时一句话召回。长期记忆跨会话生效，越用越懂你的表达习惯。</p>
+        </div>
+        <div class="scene-card reveal" data-stagger>
+          <div class="scene-icon">📝</div>
+          <h3>写作与文案搭子</h3>
+          <p>从提纲到成稿多轮打磨；AI 团队辩论帮你挑出最有说服力的版本；提示词工厂让成稿风格稳定可复现。</p>
+        </div>
+        <div class="scene-card reveal" data-stagger>
+          <div class="scene-icon">🧪</div>
+          <h3>轻量开发助手</h3>
+          <p>读代码、改文件、跑命令、生成文档、PPT 与图表，这些都由 21 个内置工具在沙箱里完成；不想让它动手，也能只出一份高质量 Prompt 交给专业 Coding Agent。</p>
+        </div>
+        <div class="scene-card reveal" data-stagger>
+          <div class="scene-icon">💡</div>
+          <h3>想法推演板</h3>
+          <p>新项目、新方案先在白板上摊开：卡片列需求、箭头连依赖、Mermaid 出流程图，把模糊的灵感推演成可执行的路径。</p>
+        </div>
+        <div class="scene-card reveal" data-stagger>
+          <div class="scene-icon">⏳</div>
+          <h3>自动化小秘书</h3>
+          <p>每天早上自动汇总资讯、每周定时整理文件、定点执行例行检查——定时任务到点就跑，结果自动归档，无需人工值守。</p>
+        </div>
+        <div class="scene-card reveal" data-stagger>
+          <div class="scene-icon">🔒</div>
+          <h3>隐私敏感场景</h3>
+          <p>数据全部存在本机：对话历史在本地 SQLite，状态在本地 JSON。支持本地模型（Ollama / LM Studio），可以做到内容完全不离开你的电脑。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 工具箱 ═══ -->
+  <section class="section" id="tools">
+    <div class="container">
+      <div class="reveal">
+        <div class="section-tag">Built-in Tools</div>
+        <h2 class="section-title">21 个内置 MCP 工具</h2>
+        <p class="section-desc">MCP（Model Context Protocol）可以理解为"AI 的标准插座"：工具按统一接口接入，模型在对话中自主决定何时使用。以下工具全部以 Python 实现于 backend/skills/，开箱即用。</p>
+        <p class="section-note">用法只有一句：聊天时 <strong>@工具名</strong> 提及，或直接描述需求，模型会自己挑工具干活，并把执行结果展示给你。</p>
+      </div>
+      <div class="tools-grid" data-stagger-group>
+        <div class="tool-item reveal" data-stagger><code>file_tree</code><span>项目目录浏览，先看清全貌再动手</span></div>
+        <div class="tool-item reveal" data-stagger><code>file_peek</code><span>文件读取预览，只看不改也安心</span></div>
+        <div class="tool-item reveal" data-stagger><code>file_create</code><span>文件创建，从零起草</span></div>
+        <div class="tool-item reveal" data-stagger><code>file_edit</code><span>差异预览式编辑，改哪看得见</span></div>
+        <div class="tool-item reveal" data-stagger><code>file_append</code><span>文件末尾追加，超长文件分段写入</span></div>
+        <div class="tool-item reveal" data-stagger><code>terminal</code><span>受限沙箱命令，高危操作需审批</span></div>
+        <div class="tool-item reveal" data-stagger><code>html_render</code><span>HTML 骨架生成，页面起步快</span></div>
+        <div class="tool-item reveal" data-stagger><code>css_color</code><span>CSS 调色，配色不再凭感觉</span></div>
+        <div class="tool-item reveal" data-stagger><code>doc_write</code><span>文档编写，结构化输出</span></div>
+        <div class="tool-item reveal" data-stagger><code>ppt_create</code><span>.pptx 演示文稿，大纲直达幻灯片</span></div>
+        <div class="tool-item reveal" data-stagger><code>word_create</code><span>.docx Word 文档，标题列表排版</span></div>
+        <div class="tool-item reveal" data-stagger><code>text_summarize</code><span>文本摘要，长文三秒读薄</span></div>
+        <div class="tool-item reveal" data-stagger><code>json_tool</code><span>JSON 处理，格式化与校验</span></div>
+        <div class="tool-item reveal" data-stagger><code>regex_test</code><span>正则测试，即写即验</span></div>
+        <div class="tool-item reveal" data-stagger><code>repo_stats</code><span>仓库统计，代码体量一目了然</span></div>
+        <div class="tool-item reveal" data-stagger><code>todo_scan</code><span>TODO 扫描，欠账无处遁形</span></div>
+        <div class="tool-item reveal" data-stagger><code>web_search</code><span>联网搜索，实时信息免 Key</span></div>
+        <div class="tool-item reveal" data-stagger><code>web_fetch</code><span>网页内容获取，指定链接精读</span></div>
+        <div class="tool-item reveal" data-stagger><code>chart_create</code><span>SVG 图表生成，柱状/条形/折线/饼图内联预览</span></div>
+        <div class="tool-item reveal" data-stagger><code>qrcode_create</code><span>二维码生成，文本链接秒变可扫 SVG</span></div>
+        <div class="tool-item reveal" data-stagger><code>python_api_extract</code><span>Python 库 API 文档提取，签名/方法/属性一键成档</span></div>
+        <div class="tool-item reveal" data-stagger><code>html_bundle</code><span>便携网页打包，html/css/js 合并单文件分发</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 技术栈 ═══ -->
+  <section class="section" id="stack">
+    <div class="container">
+      <div class="reveal">
+        <div class="section-tag">Tech Stack</div>
+        <h2 class="section-title">原生技术，零构建</h2>
+        <p class="section-desc">前端即文件，改完即生效；没有 npm，没有打包器，没有框架税。对开发者来说，它是一份可以逐行读完的源码；对普通用户来说，这意味着更少的依赖、更快的启动、更少的出错环节。</p>
+        <p class="section-note">顺带解释一个常见词：<strong>Token</strong> 是 AI 计费与记忆的"字数单位"——上下文越长越费钱，也越容易忘。SLATE 的智能上下文压缩会把旧对话浓缩成摘要，相当于给聊天记录做"笔记归档"，省 token 又不丢要点。</p>
+      </div>
+
+      <table class="stack-table reveal slow">
+        <tr><th>层级</th><th>选型</th><th>这意味着什么</th></tr>
+        <tr><td>前端</td><td>原生 HTML + CSS + JavaScript（ES Modules，零构建）</td><td>打开文件就能改，改完刷新即生效</td></tr>
+        <tr><td>后端</td><td>Python 3.13+ · FastAPI · Uvicorn · httpx</td><td>轻量服务，一条命令启动</td></tr>
+        <tr><td>存储</td><td>SQLite（对话历史）· JSON（状态 / 定时任务 / 宪法）</td><td>无外部数据库，数据全在你硬盘上</td></tr>
+        <tr><td>渲染</td><td>Highlight.js · Mermaid.js（CDN）</td><td>代码高亮与流程图开箱即用</td></tr>
+        <tr><td>桌面</td><td>webview2 壳 + PyInstaller 打包 + Inno Setup 安装器</td><td>Windows 双击安装，像普通软件一样用</td></tr>
+      </table>
+
+      <div class="principles" data-stagger-group>
+        <div class="principle reveal" data-stagger>
+          <h4>纯黑白灰基底</h4>
+          <p>无蓝紫渐变、无夸张圆角、无阴影毛玻璃。金色只做点缀——像砚台上的一抹金漆，安静而有分量。</p>
+        </div>
+        <div class="principle reveal" data-stagger>
+          <h4>本地优先</h4>
+          <p>数据全部存本地，API Key 仅用于 LLM 调用。你的对话、记忆、文件不经过任何第三方服务器中转。</p>
+        </div>
+        <div class="principle reveal" data-stagger>
+          <h4>Token 节约</h4>
+          <p>智能压缩、分级调用、静默处理。让每一个字都花在刀刃上——少花钱，多办事。</p>
+        </div>
+        <div class="principle reveal" data-stagger>
+          <h4>永不卡死</h4>
+          <p>四层超时防线，流式与工具调用全程兜底。慢可以等，但绝不允许无限转圈。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 快速开始 ═══ -->
+  <section class="section" id="start">
+    <div class="container">
+      <div class="reveal">
+        <div class="section-tag">Quick Start</div>
+        <h2 class="section-title">三步开始研磨</h2>
+        <p class="section-desc">不写代码的朋友只看第一步：下载安装包，双击安装，和日常软件一样打开就用。想读源码或二次开发的伙伴，三步都看一遍。</p>
+      </div>
+
+      <div class="start-steps" data-stagger-group>
+        <div class="step reveal" data-stagger>
+          <div class="step-num">01</div>
+          <h4>获取 SLATE</h4>
+          <p>前往 Releases 下载 Windows 安装包开箱即用；或克隆源码自行探索：</p>
+          <code>git clone https://github.com/CaryWang1234/SLATE.git</code>
+        </div>
+        <div class="step reveal" data-stagger>
+          <div class="step-num">02</div>
+          <h4>启动</h4>
+          <p>源码运行需要 Python 3.13+，两条命令即可启动本地服务：</p>
+          <code>pip install -r requirements.txt<br>start.bat &nbsp;# 或 ./start.sh</code>
+        </div>
+        <div class="step reveal" data-stagger>
+          <div class="step-num">03</div>
+          <h4>配置模型</h4>
+          <p>在设置中填入所需模型的 API Key（各家模型官网申请，按量计费，日常用量成本极低），然后访问：</p>
+          <code>http://127.0.0.1:8000</code>
+        </div>
+      </div>
+      <p class="section-note reveal">安装后你会得到：一个带双主题的三栏工作台、全部内置工具、定时任务调度器，以及一份全部存在本地、随时可查的使用数据。卸载干净，不留残余。</p>
+    </div>
+  </section>
+
+  <!-- ═══ CTA ═══ -->
+  <section class="cta">
+    <div class="container reveal">
+      <h2>研磨灵感，落笔成章。</h2>
+      <p>SLATE 不追逐"更大更强"的参数竞赛，只专注一件事：让 AI 在你的桌面上，安静、可靠地把活干完。开源免费 · MIT 协议 · 欢迎 Star 与贡献。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">★ Star on GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ 下载最新版本</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Footer ═══ -->
+  <footer class="footer">
+    <div class="container">
+      <p class="ink-line">SLATE（砚）—— 研磨灵感，落笔成章。</p>
+      <p>
+        <a href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">Releases</a> ·
+        <a href="https://github.com/CaryWang1234/SLATE/issues" target="_blank" rel="noopener">Issues</a>
+      </p>
+      <p style="margin-top: 8px;">Released under the MIT License · © 2026 Cary</p>
+    </div>
+  </footer>
+
+  <script>
+    const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // ── 双主题切换（呼应 SLATE 亮/暗主题） ──
+    const themeBtn = document.getElementById("theme-toggle");
+    const applyTheme = (t) => {
+      document.body.dataset.theme = t;
+      themeBtn.textContent = t === "light" ? "☀" : "☾";
+      try { localStorage.setItem("slate-site-theme", t); } catch {}
+    };
+    let saved = "dark";
+    try { saved = localStorage.getItem("slate-site-theme") || "dark"; } catch {}
+    applyTheme(saved);
+    themeBtn.addEventListener("click", () => {
+      applyTheme(document.body.dataset.theme === "light" ? "dark" : "light");
+    });
+
+    // ── 错落入场：同组元素按序号写入递增延迟 ──
+    document.querySelectorAll("[data-stagger-group]").forEach((group) => {
+      const items = group.querySelectorAll("[data-stagger], .reveal");
+      items.forEach((el, i) => {
+        el.style.setProperty("--rd", (i * 0.07).toFixed(2) + "s");
+      });
+    });
+
+    // ── 滚动入场动画（IntersectionObserver） ──
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("in");
+          observer.unobserve(entry.target);
+        }
+      }
+    }, { threshold: 0.12 });
+    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+
+    // ── 数字滚动计数 ──
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+    function animateCount(el) {
+      const target = parseInt(el.dataset.count, 10) || 0;
+      if (REDUCED || target === 0) { el.textContent = target; return; }
+      const dur = 1400, t0 = performance.now();
+      const tick = (now) => {
+        const p = Math.min((now - t0) / dur, 1);
+        el.textContent = Math.round(easeOutCubic(p) * target);
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+    const countObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          animateCount(entry.target);
+          countObserver.unobserve(entry.target);
+        }
+      }
+    }, { threshold: 0.4 });
+    document.querySelectorAll("[data-count]").forEach((el) => countObserver.observe(el));
+
+    // ── Hero 打字机 ──
+    const typeEl = document.getElementById("hero-type");
+    const phrases = [
+      "把「帮我整理项目文档」变成一份真正交付的报告",
+      "磨墨模式：一句粗糙想法，磨成结构化任务书",
+      "21 个内置工具，@ 一下就开始干活",
+      "专家包 @提及，AI 秒变你的专属专家",
+      "三档扫描项目：AI 先读懂项目，再动手干活",
+      "灵感 → 卡片 → 逻辑链 → 可执行方案",
+      "工作流流水线：需求 → 拆解 → 编码 → 审查 → 总结",
+      "全部数据一键备份，历史可搜、可导、可恢复",
+      "你的数据，始终留在你的电脑上",
+    ];
+    if (REDUCED) {
+      typeEl.textContent = phrases[0];
+    } else {
+      let pi = 0, ci = 0, deleting = false;
+      const step = () => {
+        const phrase = phrases[pi];
+        if (!deleting) {
+          ci++;
+          typeEl.textContent = phrase.slice(0, ci);
+          if (ci === phrase.length) { deleting = true; setTimeout(step, 2200); return; }
+          setTimeout(step, 85);
+        } else {
+          ci--;
+          typeEl.textContent = phrase.slice(0, ci);
+          if (ci === 0) { deleting = false; pi = (pi + 1) % phrases.length; setTimeout(step, 400); return; }
+          setTimeout(step, 30);
+        }
+      };
+      setTimeout(step, 600);
+    }
+
+    // ── Hero 网格视差 + 滚动进度条 + 导航阴影（合并到一个 rAF 循环） ──
+    const heroGrid = document.getElementById("hero-grid");
+    const progressBar = document.getElementById("progress-bar");
+    const nav = document.getElementById("nav");
+    let ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        if (!REDUCED && heroGrid) heroGrid.style.transform = `translateY(${y * 0.35}px)`;
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        if (progressBar) progressBar.style.width = (max > 0 ? (y / max) * 100 : 0) + "%";
+        if (nav) nav.classList.toggle("scrolled", y > 12);
+        ticking = false;
+      });
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  </script>
+
+</body>
+</html>

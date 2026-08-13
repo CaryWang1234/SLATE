@@ -3,6 +3,8 @@
  * 供聊天用量条悬浮弹窗与设置页用量统计共用
  */
 
+import { t } from "./i18n.js?v=20260813-46";
+
 // 等价物阶梯（token 数为约值）：中文按 1 字 ≈ 1 token 粗估
 // base 为不带量词的名称，拼接格式统一为 "一{unit}{base}" / "{count} {unit}{base}"
 const EQUIV_LADDER = [
@@ -31,11 +33,11 @@ function tokenEquivalence(n) {
     if (n >= item.tokens) ref = item;
     else break;
   }
-  if (!ref) return "不到一首《静夜思》";
+  if (!ref) return t("不到一首《静夜思》");
   const ratio = n / ref.tokens;
-  if (ratio < 1.5) return `约相当于一${ref.unit}${ref.base}`;
+  if (ratio < 1.5) return t("约相当于一{unit}{name}", { unit: t(ref.unit), name: t(ref.base) });
   const count = ratio >= 10 ? Math.round(ratio) : Number(ratio.toFixed(1));
-  return `约相当于 ${count} ${ref.unit}${ref.base}`;
+  return t("约相当于 {n} {unit}{name}", { n: count, unit: t(ref.unit), name: t(ref.base) });
 }
 
 export { fmtTokens, tokenEquivalence };

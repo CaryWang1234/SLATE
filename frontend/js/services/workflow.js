@@ -4,9 +4,10 @@
  * - 执行完成后通过 /knowledge/docs 复用现有知识库写入逻辑
  */
 
-import { get, post } from "./api.js?v=20260813-45";
-import { state, getModelKey } from "../store.js?v=20260813-45";
-import { guardSkillParams } from "./riskguard.js?v=20260813-45";
+import { get, post } from "./api.js?v=20260813-46";
+import { state, getModelKey } from "../store.js?v=20260813-46";
+import { guardSkillParams } from "./riskguard.js?v=20260813-46";
+import { t } from "./i18n.js?v=20260813-46";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 
@@ -63,7 +64,7 @@ function topoSort(wf) {
   }
   if (order.length < preds.size) {
     const cyclic = [...preds.keys()].filter(id => !order.includes(id));
-    return { order: [], error: `DAG 存在环，涉及节点: ${cyclic.join(", ")}` };
+    return { order: [], error: t("DAG 存在环，涉及节点: {nodes}", { nodes: cyclic.join(", ") }) };
   }
   return { order, error: null };
 }
@@ -165,7 +166,7 @@ async function runWorkflow(wf, userInput, members, hooks = {}) {
     );
     if (blockedBy.length > 0) {
       rec.status = STATUS.SKIPPED;
-      rec.error = `上游节点未成功（${blockedBy.map(id => records[id].name).join("、")}），自动跳过`;
+      rec.error = t("上游节点未成功（{names}），自动跳过", { names: blockedBy.map(id => records[id].name).join("、") });
       hooks.onNode?.(rec);
       continue;
     }
@@ -188,18 +189,18 @@ async function runWorkflow(wf, userInput, members, hooks = {}) {
         for (const [key, raw] of Object.entries(node.inputs || {})) params[key] = vars[key] ?? raw;
         // 高危命令审批：命中写死规则时弹框请求批准
         if (!(await guardSkillParams(node.skill, params))) {
-          throw new Error(`高危命令被用户拒绝执行: ${params.command || node.skill}`);
+          throw new Error(t("高危命令被用户拒绝执行: {cmd}", { cmd: params.command || node.skill }));
         }
         const res = await post("/skills/execute", { skill: node.skill, params });
-        if (res.code !== 0) throw new Error(res.message || `技能 ${node.skill} 执行失败`);
+        if (res.code !== 0) throw new Error(res.message || t("技能 {name} 执行失败", { name: node.skill }));
         output = typeof res.data === "string" ? res.data : JSON.stringify(res.data, null, 2);
       } else {
         // LLM 节点：role/model 绑定解析 + API Key 校验
         const binding = resolveBinding(node, members);
         rec.modelLabel = binding.modelLabel || binding.modelId;
-        if (!binding.modelId) throw new Error("节点未绑定可用模型（role/model 均为空且无当前模型）");
+        if (!binding.modelId) throw new Error(t("节点未绑定可用模型（role/model 均为空且无当前模型）"));
         const apiKey = getModelKey(binding.modelId);
-        if (!apiKey) throw new Error(`模型 ${rec.modelLabel} 未配置 API Key，请先在设置页配置`);
+        if (!apiKey) throw new Error(t("模型 {name} 未配置 API Key，请先在设置页配置", { name: rec.modelLabel }));
 
         const systemPrompt = binding.persona || "你是 SLATE 工作流的执行成员：认真完成分配的任务，紧扣任务要求作答，只输出结果本身，不要寒暄与前言。";
         const userPrompt = fillTemplate(node.prompt || "", vars);
@@ -274,7 +275,7 @@ async function saveRunToKnowledge(wf, result) {
       finished_at: result.finishedAt,
     },
   });
-  if (res.code !== 0) throw new Error(res.message || "写入知识库失败");
+  if (res.code !== 0) throw new Error(res.message || t("写入知识库失败"));
   return res.data?.id;
 }
 

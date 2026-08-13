@@ -6211,3 +6211,9 @@ img.file-type-icon {
 .storage-row button {
   flex-shrink: 0;
 }
+
+/* ── i18n：英文模式翻译前遮蔽，避免中文一闪而过 ── */
+
+html.i18n-pending body {
+  opacity: 0;
+}

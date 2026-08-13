@@ -4,9 +4,9 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define MyAppName "SLATE 砚"
-#define MyAppVersion "0.2.8"
+#define MyAppVersion "0.3.0"
 ; 构建号（yyyyMMddHHmm），每次发布构建时更新
-#define MyAppBuild "202608122100"
+#define MyAppBuild "202608131400"
 #define MyAppPublisher "SLATE"
 #define MyAppURL "https://github.com/CaryWang1234/SLATE"
 #define MyAppExeName "SLATE.exe"
@@ -100,6 +100,49 @@ Type: files; Name: "{app}\desktop_backend.log"
 Type: files; Name: "{app}\*.log"
 
 [Code]
+// ── 应用界面语言选择（安装时选择，写入 data/language.txt，应用运行时只读） ──
+var
+  LangPage: TInputOptionWizardPage;
+  LangZhIndex: Integer;
+  LangEnIndex: Integer;
+
+procedure InitializeWizard;
+begin
+  LangPage := CreateInputOptionPage(wpSelectTasks,
+    '应用语言 / Application Language',
+    '选择 SLATE 的界面语言 / Choose the interface language of SLATE',
+    '安装完成后可通过重装更改。' + #13#10 +
+    'This can be changed by reinstalling.',
+    True, False);
+  LangZhIndex := LangPage.Add('简体中文 (Chinese)');
+  LangEnIndex := LangPage.Add('English (英文)');
+  // 默认跟随系统语言：非简体中文环境默认英文
+  if GetUILanguage and $3FF = $04 then
+    LangPage.Values[LangZhIndex] := True
+  else
+    LangPage.Values[LangEnIndex] := True;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  lang: String;
+  langFile: String;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    langFile := ExpandConstant('{app}\data\language.txt');
+    // 静默升级时保留用户已有语言选择；交互式安装始终按页面选择写入
+    if WizardSilent and FileExists(langFile) then
+      Exit;
+    if LangPage.Values[LangEnIndex] then
+      lang := 'en'
+    else
+      lang := 'zh';
+    ForceDirectories(ExpandConstant('{app}\data'));
+    SaveStringToFile(langFile, lang, False);
+  end;
+end;
+
 // 检测 WebView2 运行时是否已安装（pywebview 依赖）
 function IsWebView2Installed: Boolean;
 var

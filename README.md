@@ -2,11 +2,11 @@
 
 <img src="frontend/icon.png" width="96" alt="SLATE" />
 
-# SLATE（砚）
+# SLATE
 
-**本地 AI 协作调度台 · 将灵感转化为结构化方案**
+**Local AI Collaboration Studio — Turn Sparks of Ideas into Structured Plans**
 
-*Local AI collaboration studio — turn sparks of ideas into structured plans.*
+*SLATE（砚）— Grind inspiration into polished deliverables.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-1a1a1a.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/Website-carywang1234.github.io%2FSLATE-1a1a1a.svg)](https://carywang1234.github.io/SLATE/docs/index.html)
@@ -14,146 +14,149 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows-1a1a1a.svg)]()
 [![Build](https://img.shields.io/badge/Build-Zero%20npm%20%2F%20Zero%20Bundler-1a1a1a.svg)]()
 
+**English** · [中文](README-zh.md)
+
 </div>
 
 ---
 
-SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、上下文管理与项目灵感整理。
+SLATE is a **lightweight local AI collaboration tool** focused on prompt engineering, context management, and project ideation.
 
-它内置多模型对话、MCP 工具调用、Harness 自主执行、磨墨模式、AI 团队辩论与白板式逻辑链，既能直接驱动内置工具完成任务，也能生成高质量 Prompt 交给外部 Coding Agent（Claude Code、Codex、Cursor 等）执行。
+It features multi-model chat, MCP tool calling, Harness autonomous execution, Grind Mode, AI team debates, and a whiteboard-style logic chain. It can either drive built-in tools to complete tasks directly, or generate high-quality prompts for external Coding Agents (Claude Code, Codex, Cursor, etc.).
 
-**零 npm 依赖，零构建工具，原生技术栈，本地优先。**
-
----
-
-## ✨ 亮点一览
-
-- 🗣️ **多模型统一接入** —— 国内外主流 LLM + 自定义 OpenAI 兼容端点 + 本地模型（Ollama / LM Studio）
-- ⚡ **Harness 自主执行** —— 六阶段闭环自主推进，默认 50 轮不断线，大任务自动建 TODOLIST 统筹批量销账；停止不退出，仅手动停止 / 轮数用完 / 清单了结才结束
-- 🖌️ **磨墨模式** —— `/grind` 一句粗糙想法，AI 三段式追问研磨成结构化任务书，一键送入 Harness
-- 🗂️ **对话与数据管理** —— 历史全文搜索、会话导出 / 改名 / 批量管理、消息编辑删除，一键备份恢复全部数据，存储用量可视可清理
-- 🛠️ **21 个内置 MCP 工具** —— 文件读写编辑追加、终端沙箱、PPT / Word 文档生成、SVG 图表与二维码、Python API 文档提取、便携网页打包、联网搜索与网页抓取等
-- 🧩 **自定义 Skill 系统** —— `SKILL.md` 即插即用，聊天中 `@` 提及即注入上下文
-- 🎓 **专家包（Expert Pack）** —— 人格 + 规则 + 知识 + 技能五件套，zip 导入导出，对话 / 团队 / @提及三路注入
-- 📖 **Better Project Understanding** —— 简略 / 平衡 / 详细三档扫描项目，自动生成导览·百科与规则手册
-- 📡 **局域网遥控** —— 应用启动即在 8001 端口开放局域网访问，手机 / 平板浏览器扫码即用同一界面；设置页与顶栏 📡 按钮醒目展示访问网址与二维码
-- 🛡️ **高危命令审批** —— 写死规则前后端双层拦截，批准前由模型解释命令目的，灾难级命令无条件禁止
-- 👥 **AI 团队多轮辩论** —— 多角色提案 / 反驳 / 决策，轻重模型分工节约 token，另有 DAG 工作流流水线
-- ⏰ **定时对话任务** —— 到点自动执行预设提示词，结果归档为独立会话
-- 🧠 **白板式逻辑链** —— 卡片 + 连线整理思路，Mermaid 渲染 flowchart / mindmap
-- 💾 **长期记忆 & 知识库** —— 自动沉淀对话要点，跨会话召回
-- 🗜️ **上下文智能压缩** —— 超阈值自动摘要，输出截断四层防线自动续写补全，四层超时防线防卡死
-- 🏭 **提示词工厂** —— 宪法 + 上下文 + 约束一键整合为可交付 Prompt
+**Zero npm dependencies. Zero build tools. Native tech stack. Local-first.**
 
 ---
 
-## 🧩 功能全景
+## ✨ Highlights
 
-### 多模型对话
+- 🗣️ **Unified Multi-Model Access** — Major LLMs worldwide + custom OpenAI-compatible endpoints + local models (Ollama / LM Studio)
+- ⚡ **Harness Autonomous Execution** — Six-phase closed-loop with 50 rounds by default; auto-generates TODOLIST for large tasks; stop doesn't quit — only manual stop / rounds exhausted / checklist done ends the session
+- 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Harness
+- 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
+- 🛠️ **21 Built-in MCP Tools** — File read/write/edit/append, terminal sandbox, PPT/Word generation, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping
+- 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
+- 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
+- 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
+- 📡 **LAN Remote Control** — Opens port 8001 on launch; scan QR from phone/tablet browser for the full interface
+- 🛡️ **High-Risk Command Approval** — Dual-layer frontend+backend interception with hardcoded rules; AI explains command purpose before approval; catastrophic commands unconditionally blocked
+- 👥 **AI Team Multi-Round Debate** — Multi-role propose/oppose/decide with light/heavy model division; plus DAG workflow pipeline
+- ⏰ **Scheduled Chat Tasks** — Auto-execute preset prompts on schedule, results archived as separate sessions
+- 🧠 **Whiteboard Logic Chain** — Card + connector brainstorming, Mermaid-rendered flowcharts & mindmaps
+- 💾 **Long-Term Memory & Knowledge Base** — Auto-distill chat highlights, cross-session recall
+- 🗜️ **Smart Context Compression** — Auto-summarize over threshold, four-layer truncation defense with auto-continuation, four-layer timeout prevention
+- 🏭 **Prompt Factory** — Constitution + context + constraints integrated into a deliverable prompt
+- 🌍 **Multilingual UI** — Choose Simplified Chinese or English at install time; full interface and toast localization
 
-- 预设模型：GPT / Claude / Gemini、DeepSeek / Kimi / Qwen / GLM / Doubao / MiniMax / ERNIE 等
-- 支持自定义模型（任意 OpenAI 兼容 API）与本地模型
-- 侧边栏一键切换，API Key 本地加密存储
-- 流式输出、代码块一键复制、智能滚动跟随、重新生成最后回复
+---
 
-### Harness 自主执行
+## 🧩 Feature Landscape
 
-- 开启后模型按“目标 → 计划 → 执行 → 验证 → 汇报 → 追溯”六阶段闭环自主推进
-- 大任务自动建立 TODOLIST（消息区右侧栏实时展示），统筹全局批量推进，每完成一项或一批立即同步进度，未全部了结不得宣称完成
-- 工具调用轮数默认 50 轮；仅三种情况退出——手动停止 / 轮数用完 / 清单全部了结，模型侧失败、零输出、重复调用均自动恢复推进不中断
-- 每轮工具结果标注当前轮次（第 x/N 轮），模型感知剩余轮数预算自主把握节奏；停止仅中断当轮，Harness 保持开启待命
-- 输出截断四层防线：6 轮断点锚点续写 + 截断守卫 + `file_append` 分段补齐 + 提示词预防，超长文件一定写完整
+### Multi-Model Chat
 
-### 磨墨模式
+- Preset models: GPT / Claude / Gemini, DeepSeek / Kimi / Qwen / GLM / Doubao / MiniMax / ERNIE, etc.
+- Custom models (any OpenAI-compatible API) and local models supported
+- One-click sidebar switching, API Keys encrypted locally
+- Streaming output, code block copy, smart scroll follow, regenerate last reply
 
-- 输入 `/grind 想法` 或点击侧边栏 🖌 按钮，把粗糙想法研磨成结构化任务书（墨稿）
-- AI 按「接墨 → 磨墨 → 收墨」三段式追问（上限 7 轮），侧边栏墨迹面板实时标记 ✔ 已定 / ✘ 未知与完成进度
-- 墨稿含目标 / 受众 / 交付物 / 验收标准 / 边界 / 建议路径 / 遗留问题，附三键：送入 Harness 执行 / 投到白板推演 / 存为模板复用
-- 磨墨会话按会话持久化，刷新与切换会话自动恢复
+### Harness Autonomous Execution
 
-### MCP 工具 & Skill 系统
+- Six-phase loop: Goal → Plan → Execute → Verify → Report → Trace
+- Auto-generates TODOLIST for large tasks (live sidebar display), batch progress tracking, no sign-off until all items resolved
+- 50 tool-call rounds by default; exits only on: manual stop / rounds exhausted / checklist done — model failures, zero output, and repeated calls auto-recover
+- Each round shows current round number (x/N), model self-paces based on remaining budget
+- Four-layer truncation defense: 6-round anchor continuation + truncation guard + `file_append` segmented write + prompt prevention
 
-内置工具（`backend/skills/`）：
+### Grind Mode
 
-| 工具 | 说明 |
-|------|------|
-| `file_tree` / `file_peek` | 项目目录浏览 / 文件读取 |
-| `file_create` / `file_edit` | 文件创建 / 差异预览式编辑 |
-| `file_append` | 文件末尾追加，超长文件分段写入与截断补齐 |
-| `terminal` | 受限沙箱命令执行 |
-| `html_render` / `css_color` | HTML 骨架生成 / CSS 调色 |
-| `doc_write` / `text_summarize` | Markdown 文档编写 / 文本摘要 |
-| `ppt_create` / `word_create` | .pptx 演示文稿 / .docx Word 文档生成 |
-| `json_tool` / `regex_test` | JSON 处理 / 正则测试 |
-| `repo_stats` / `todo_scan` | 仓库统计 / TODO 扫描 |
-| `web_search` / `web_fetch` | 联网搜索（免 Key）/ 网页内容获取 |
-| `chart_create` / `qrcode_create` | SVG 图表生成（柱状/条形/折线/饼图）/ 二维码生成，产出内联预览 |
-| `python_api_extract` / `html_bundle` | Python 库公共 API 文档提取（JSON/Markdown）/ 网页 css/js 内联单文件打包 |
+- Type `/grind <idea>` or click the 🖌 sidebar button to refine rough ideas into a structured task brief
+- Three-phase questioning: Receive → Grind → Collect (up to 7 rounds), sidebar ink panel marks ✔ resolved / ✘ unknown in real-time
+- Brief includes goals / audience / deliverables / acceptance criteria / boundaries / suggested path / open questions; three actions: send to Harness / push to whiteboard / save as template
+- Grind sessions persist and auto-restore on refresh or switch
 
-自定义 Skill：上传或导入 `SKILL.md` 即可扩展新能力；聊天输入框 `@` 提及 MCP 工具、Skill 或专家包，发送时自动注入对应上下文。
+### MCP Tools & Skill System
 
-### 专家包（Expert Pack）
+Built-in tools (`backend/skills/`):
 
-- 五件套结构：`persona.md`（人格）+ `rules.md`（规则）+ `knowledge/`（知识文件）+ `skills/`（技能文档）+ `data.json`
-- zip 导入导出，可分享、可分发；内置样例包「创意写作导师」
-- 三路注入：对话输入区下拉（全程生效）、团队成员卡（按角色配置）、聊天 `@` 提及（单条消息注入人格 + 规则 + 知识文件内容）
+| Tool | Description |
+|------|-------------|
+| `file_tree` / `file_peek` | Browse project structure / Read files |
+| `file_create` / `file_edit` | Create files / Diff-preview editing |
+| `file_append` | Append to files, segmented writes for long content |
+| `terminal` | Sandboxed command execution |
+| `html_render` / `css_color` | HTML skeleton generation / CSS color tuning |
+| `doc_write` / `text_summarize` | Markdown writing / Text summarization |
+| `ppt_create` / `word_create` | .pptx presentations / .docx Word documents |
+| `json_tool` / `regex_test` | JSON processing / Regex testing |
+| `repo_stats` / `todo_scan` | Repository stats / TODO scanning |
+| `web_search` / `web_fetch` | Web search (no key needed) / Page content retrieval |
+| `chart_create` / `qrcode_create` | SVG charts (bar/line/pie) / QR codes, inline preview |
+| `python_api_extract` / `html_bundle` | Python library API extraction / Web page bundling |
+
+Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention in chat to auto-inject context.
+
+### Expert Packs
+
+- Five-piece structure: `persona.md` + `rules.md` + `knowledge/` + `skills/` + `data.json`
+- Zip import/export, shareable; includes sample pack "Creative Writing Mentor"
+- Three injection paths: chat dropdown (session-wide), team member cards (role-configured), @mention (single-message injection)
 
 ### Better Project Understanding
 
-- 三档扫描预算：简略 / 平衡 / 详细，按优先级精读 README、依赖清单与核心文件
-- 自动生成两份文档：导览·百科（项目全貌与模块解读）、规则手册（有证据的开发规则）
-- 结果持久化到项目 `.slate/config.json`，重开即查
+- Three scan budgets: brief / balanced / detailed, priority-reading of README, dependency manifests, and core files
+- Auto-generates two documents: project guide & encyclopedia, and rulebook (evidence-based dev rules)
+- Results persisted to `.slate/config.json`, instant access on reopen
 
-### 定时任务
+### Scheduled Tasks
 
-- 支持单次 / 每日定点 / 固定间隔三种调度方式
-- 后端 asyncio 调度器到点直调模型，结果归档到 `[定时]` 前缀会话
-- 前端可视化管理：增删、启停、立即运行、执行状态回显
+- Three scheduling modes: one-time / daily at time / fixed interval
+- Backend asyncio scheduler calls model directly, results archived to `[Scheduled]` prefixed sessions
+- Frontend visual management: add/remove, enable/disable, run now, execution status display
 
-### 对话与数据管理
+### Chat & Data Management
 
-- 历史侧栏全文内容搜索，命中即显上下文摘录，点击直达对应会话
-- 会话重命名、导出为 Markdown、批量管理删除；消息支持单条编辑 / 删除
-- 一键备份：全部数据（对话 / 记忆 / 素材 / 设置）导出为 JSON，导入即恢复
-- 存储空间管理：用量分项明细、数据库压缩、清空对话、WebView 缓存清理
-- 首次启动新手引导，快速认识三栏工作台
-- 启动自动检查更新，发现 GitHub Releases 新版本即提示升级
+- Full-text content search in history sidebar, context excerpts on match, click to jump to session
+- Rename sessions, export as Markdown, batch manage/delete; messages support individual edit/delete
+- One-click backup: all data (chats/memories/assets/settings) exported as JSON, import to restore
+- Storage management: itemized usage, database compression, clear chats, WebView cache cleanup
+- First-launch onboarding guide
+- Auto-check for updates on startup, prompts upgrade when new GitHub Release found
 
-### AI 团队协作
+### AI Team Collaboration
 
-- 多模型 / 多角色多轮辩论：提案 → 支持 / 反对 / 反驳 → 决策
-- 轻量模型负责讨论、重型模型负责最终决策
-- 自动生成讨论摘要（≤500 tokens），用户可介入投票
-- **团队工作流 DAG**：需求 → 拆解 → 编码 → 审查 → 总结流水线自动推进，上下游产出逐层传递，节点状态实时可见，产物自动归档知识库
+- Multi-model / multi-role debate rounds: propose → support/oppose/rebut → decide
+- Light models for discussion, heavy models for final decisions
+- Auto-generated discussion summaries (≤500 tokens), user can intervene with votes
+- **Team Workflow DAG**: Requirements → Decompose → Code → Review → Summarize pipeline with upstream/downstream artifact passing, real-time node status, auto-archive to knowledge base
 
-### 白板式逻辑链
+### Whiteboard Logic Chain
 
-- 灵感 / 功能 / 想法卡片化，拖拽布局、箭头连线标识依赖与数据流
-- Mermaid.js 渲染 flowchart / mindmap
+- Idea/feature/thought cards, drag-to-layout, arrow connectors for dependencies and data flow
+- Mermaid.js rendered flowcharts & mindmaps
 
-### 更多
+### More
 
-- 📦 **多模态输入**：docx / csv / markdown / html / 图片等，后端解析零 token 浪费
-- 💾 **长期记忆**：自动提炼对话要点，跨会话持久化
-- 📚 **知识库**：本地知识片段检索与注入
-- 🛡️ **终端安全**：高危命令写死规则判定，前端审批弹窗 + 后端独立拦截双层防御，灾难级命令（`rm -rf /`、`format` 等）无条件禁止
-- 🗜️ **上下文压缩**：token 超阈值自动摘要，支持手动压缩
-- 🏭 **提示词工厂**：宪法摘要 → 上下文片段 → 任务描述 → 约束 → 交付要求
-- 🎨 **双主题 UI**：亮 / 暗色一键切换
+- 📦 **Multimodal Input**: docx / csv / markdown / html / images, backend parsing with zero token waste
+- 💾 **Long-Term Memory**: Auto-distill chat highlights, cross-session persistence
+- 📚 **Knowledge Base**: Local knowledge snippet retrieval and injection
+- 🛡️ **Terminal Security**: Hardcoded high-risk command rules, frontend approval + backend interception dual defense, catastrophic commands (`rm -rf /`, `format`, etc.) unconditionally blocked
+- 🗜️ **Context Compression**: Auto-summarize over token threshold, manual compression supported
+- 🏭 **Prompt Factory**: Constitution summary → context snippets → task description → constraints → delivery requirements
+- 🎨 **Dual Theme UI**: Light / Dark one-click switch
 
 ---
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 方式一：Windows 安装包（推荐）
+### Option 1: Windows Installer (Recommended)
 
-1. 前往 [Releases](https://github.com/CaryWang1234/SLATE/releases) 下载 `SLATE-Setup-x.x.x.exe`
-2. 安装并启动，开箱即用
-3. 在设置中配置所需模型的 API Key
+1. Download `SLATE-Setup-x.x.x.exe` from [Releases](https://github.com/CaryWang1234/SLATE/releases)
+2. During installation, choose your interface language (Simplified Chinese / English), then launch
+3. Configure your model API Keys in Settings
 
-### 方式二：从源码运行
+### Option 2: Run from Source
 
-**前置要求：** Python 3.13+
+**Prerequisites:** Python 3.13+
 
 ```bash
 git clone https://github.com/CaryWang1234/SLATE.git
@@ -161,111 +164,116 @@ cd SLATE
 pip install -r requirements.txt
 ```
 
-**Windows：**
+**Windows:**
 
 ```bash
 start.bat
 ```
 
-**Linux / macOS：**
+**Linux / macOS:**
 
 ```bash
 chmod +x start.sh
 ./start.sh
 ```
 
-启动后访问 `http://127.0.0.1:8000`
+Then visit `http://127.0.0.1:8000`
 
-### 自行打包桌面版
+### Build Desktop Package Yourself
 
 ```bash
-build_desktop.bat      # PyInstaller 打包为单文件桌面应用
-build_installer.bat    # Inno Setup 编译 Windows 安装包（需预装 ISCC）
+build_desktop.bat      # PyInstaller single-file desktop app
+build_installer.bat    # Inno Setup Windows installer (requires ISCC)
 ```
 
 ---
 
-## 🛠️ 技术栈
+## 🛠️ Tech Stack
 
-| 层级 | 选型 |
-|------|------|
-| 前端 | 原生 HTML + CSS + JavaScript（ES Modules，零构建） |
-| 后端 | Python 3.13+ · FastAPI · Uvicorn · httpx |
-| 存储 | SQLite（对话历史）· JSON（状态 / 定时任务 / 宪法） |
-| 渲染 | Highlight.js · Mermaid.js（CDN） |
-| 桌面 | webview2 壳 + PyInstaller 打包 + Inno Setup 安装器 |
+| Layer | Choice |
+|-------|--------|
+| Frontend | Vanilla HTML + CSS + JavaScript (ES Modules, zero build) |
+| Backend | Python 3.13+ · FastAPI · Uvicorn · httpx |
+| Storage | SQLite (chat history) · JSON (state / schedules / constitution) |
+| Rendering | Highlight.js · Mermaid.js (CDN) |
+| Desktop | webview2 shell + PyInstaller + Inno Setup installer |
 
 ---
 
-## 📁 目录结构
+## 📁 Directory Structure
 
 ```
 SLATE/
-├── desktop.py                  # 桌面端入口（webview 壳，PyInstaller 打包目标）
-├── start.bat / start.sh        # 源码一键启动（Windows / Unix）
-├── build_desktop.bat           # PyInstaller 打包脚本
-├── SLATE.spec                  # PyInstaller 配置
-├── SLATE_InnoSetup.iss         # Inno Setup 安装包脚本
-├── QODER.md                    # 项目开发规格书
+├── desktop.py                  # Desktop entry (webview shell, PyInstaller target)
+├── start.bat / start.sh        # Source one-click launch (Windows / Unix)
+├── build_desktop.bat           # PyInstaller build script
+├── SLATE.spec                  # PyInstaller config
+├── SLATE_InnoSetup.iss         # Inno Setup installer script
+├── README.md / README-zh.md    # Project docs (English / Chinese)
+├── QODER.md                    # Development specification
 ├── backend/
-│   ├── main.py                 # FastAPI 入口（静态服务 + 路由注册 + 调度器启动）
+│   ├── main.py                 # FastAPI entry (static serving + route registration + scheduler)
 │   ├── routers/
-│   │   ├── proxy.py            # LLM API 代理（多厂商流式转发 + 分段超时）
-│   │   ├── chat.py             # 对话历史 / 上下文压缩
-│   │   ├── scheduler.py        # 定时任务调度器
-│   │   ├── knowledge.py        # 知识库检索
-│   │   ├── projects.py         # 项目管理 / Better Project Understanding 扫描
-│   │   ├── experts.py          # 专家包增删改查 / zip 导入导出
-│   │   ├── skills.py           # 技能调用
-│   │   ├── settings.py         # 设置 / 跨设备同步 / 存储空间管理
-│   │   ├── constitution.py     # 项目宪法
-│   │   ├── grind.py            # 磨墨模式会话状态机
-│   │   ├── update.py           # 启动更新检查（GitHub Releases）
-│   │   ├── workflows.py        # 团队工作流 DAG 定义
-│   │   └── files.py            # 多模态文件解析
-│   └── skills/                 # 21 个内置 MCP 工具实现（含高危命令双层拦截）
+│   │   ├── proxy.py            # LLM API proxy (multi-vendor streaming + segmented timeout)
+│   │   ├── chat.py             # Chat history / context compression
+│   │   ├── scheduler.py        # Scheduled task dispatcher
+│   │   ├── knowledge.py        # Knowledge base retrieval
+│   │   ├── projects.py         # Project management / Better Project Understanding
+│   │   ├── experts.py          # Expert pack CRUD / zip import/export
+│   │   ├── skills.py           # Skill invocation
+│   │   ├── settings.py         # Settings / cross-device sync / storage management
+│   │   ├── constitution.py     # Project constitution
+│   │   ├── grind.py            # Grind Mode session state machine
+│   │   ├── i18n.py             # UI language config (install-time choice, read-only at runtime)
+│   │   ├── update.py           # Startup update check (GitHub Releases)
+│   │   ├── workflows.py        # Team workflow DAG definition
+│   │   └── files.py            # Multimodal file parsing
+│   └── skills/                 # 21 built-in MCP tool implementations (incl. high-risk command dual interception)
 ├── frontend/
-│   ├── index.html              # 三栏布局入口（对话 / 黑板 / 工厂+能力）
-│   ├── css/style.css           # 全局样式（双主题）
+│   ├── index.html              # Three-column layout entry (Chat / Whiteboard / Factory+Capabilities)
+│   ├── css/style.css           # Global styles (dual theme)
 │   └── js/
-│       ├── app.js              # 主控初始化
-│       ├── store.js            # 全局状态管理
-│       ├── components/         # 聊天 / 白板 / 团队 / 技能 / 记忆 / 定时等
-│       └── services/           # api / adapter / tools / markdown / project / grind
-├── installer/                  # 安装包产物
-└── data/                       # 运行数据（SQLite / 宪法 / 定时任务 / 自定义 Skill / 专家包 / 磨墨会话）
+│       ├── app.js              # Main controller initialization
+│       ├── store.js            # Global state management
+│       ├── components/         # Chat / Whiteboard / Team / Skills / Memory / Schedule etc.
+│       └── services/           # api / adapter / tools / markdown / i18n / grind
+├── docs/                       # Website Landing Page (GitHub Pages)
+│   ├── index.html              # English version
+│   └── zh/index.html           # Chinese version
+├── installer/                  # Installer artifacts
+└── data/                       # Runtime data (SQLite / constitution / schedules / custom Skills / expert packs / grind sessions)
 ```
 
 ---
 
-## 🧭 设计原则
+## 🧭 Design Principles
 
-- **纯黑白灰基底**：无蓝紫渐变、无圆角大礼包、无阴影毛玻璃
-- **原生技术**：零 npm / Node.js，零构建工具，前端即文件、改完即生效
-- **本地优先**：所有数据存本地，API Key 仅用于 LLM 调用
-- **Token 节约**：智能压缩、分级调用、静默处理
-- **永不卡死**：idle 看门狗 + 零内容自动重试 + 请求超时 + UI 兜底四层防线
+- **Pure black-white-gray base**: No blue-purple gradients, no excessive rounding, no shadow/frosted glass
+- **Native tech**: Zero npm / Node.js, zero build tools, frontend is files — edit and it takes effect
+- **Local-first**: All data stored locally, API Keys used only for LLM calls
+- **Token economy**: Smart compression, tiered calls, silent processing
+- **Never stuck**: Idle watchdog + zero-content auto-retry + request timeout + UI fallback — four layers of defense
 
 ---
 
-## 🤝 参与贡献
+## 🤝 Contributing
 
-欢迎提交 Issue 与 Pull Request：
+Issues and Pull Requests welcome:
 
-1. Fork 本仓库并创建特性分支：`git checkout -b feat/your-feature`
-2. 提交前请保持现有代码风格（原生 JS、无新构建依赖）
-3. 提交 PR 并描述改动动机与测试方式
+1. Fork this repo and create a feature branch: `git checkout -b feat/your-feature`
+2. Please maintain existing code style (vanilla JS, no new build dependencies)
+3. Submit PR describing the motivation and how to test
 
 ---
 
 ## 📄 License
 
-本项目基于 [MIT License](LICENSE) 开源。
+This project is open-sourced under the [MIT License](LICENSE).
 
 ---
 
 <div align="center">
 
-*SLATE（砚）—— 研磨灵感，落笔成章。*
+*SLATE — Grind inspiration into polished deliverables.*
 
 </div>

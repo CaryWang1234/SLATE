@@ -2,10 +2,11 @@
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除）
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260813-45";
-import { get, post, del, upload } from "../services/api.js?v=20260813-45";
-import { guardSkillParams } from "../services/riskguard.js?v=20260813-45";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260813-45";
+import { state, subscribe, setSkills } from "../store.js?v=20260813-46";
+import { get, post, del, upload } from "../services/api.js?v=20260813-46";
+import { guardSkillParams } from "../services/riskguard.js?v=20260813-46";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260813-46";
+import { t } from "../services/i18n.js?v=20260813-46";
 
 let skillList, btnUpload, btnImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -203,13 +204,13 @@ function createSkillItem(name, desc, kind) {
 }
 
 async function handleDeleteSkill(name) {
-  if (!await dlgConfirm(`确定删除技能 ${name}？`, { danger: true, okText: "删除" })) return;
+  if (!await dlgConfirm(t("确定删除技能 {name}？", { name }), { danger: true, okText: "删除" })) return;
   try {
     const res = await del(`/skills/${encodeURIComponent(name)}`);
-    showToast(res.code === 0 ? `已删除技能 ${name}` : `删除失败: ${res.message}`);
+    showToast(res.code === 0 ? t("已删除技能 {name}", { name }) : t("删除失败: {msg}", { msg: res.message }));
     if (res.code === 0) refreshSkills();
   } catch (e) {
-    showToast(`删除失败: ${e.message}`);
+    showToast(t("删除失败: {msg}", { msg: e.message }));
   }
 }
 
@@ -219,7 +220,7 @@ let currentSkillName = "";
 
 function openSkillModal(name) {
   currentSkillName = name;
-  skillModalTitle.textContent = `执行 MCP 工具: ${name}`;
+  skillModalTitle.textContent = t("执行 MCP 工具: {name}", { name });
   skillParams.innerHTML = "";
   skillResult.classList.add("hidden");
   skillResult.textContent = "";
@@ -252,7 +253,7 @@ function openSkillModal(name) {
 // ── SKILL.md 技能查看器（只读展示定义内容） ─────────────
 
 async function openSkillViewer(name) {
-  skillModalTitle.textContent = `技能: ${name}`;
+  skillModalTitle.textContent = t("技能: {name}", { name });
   skillParams.innerHTML = "";
   btnRunSkill.classList.add("hidden");
   skillResult.classList.remove("hidden");
@@ -264,10 +265,10 @@ async function openSkillViewer(name) {
     if (res.code === 0 && res.data?.content) {
       skillResult.textContent = res.data.content;
     } else {
-      skillResult.textContent = `读取失败: ${res.message || "未知错误"}`;
+      skillResult.textContent = t("读取失败: {msg}", { msg: res.message || t("未知错误") });
     }
   } catch (e) {
-    skillResult.textContent = `请求失败: ${e.message}`;
+    skillResult.textContent = t("请求失败: {msg}", { msg: e.message });
   }
 }
 
@@ -312,16 +313,16 @@ async function executeSkill() {
           link.target = "_blank";
           link.rel = "noopener";
           link.className = "skill-result-doc-link";
-          link.textContent = `\n📄 查看输出文档：${name}`;
+          link.textContent = "\n📄 " + t("查看输出文档：{name}", { name });
           skillResult.appendChild(link);
         }
       }
     } else {
-      skillResult.textContent = `错误: ${res.message}`;
+      skillResult.textContent = t("错误: {msg}", { msg: res.message });
     }
   } catch (e) {
     skillResult.classList.remove("hidden");
-    skillResult.textContent = `请求失败: ${e.message}`;
+    skillResult.textContent = t("请求失败: {msg}", { msg: e.message });
   }
 
   btnRunSkill.disabled = false;
@@ -353,13 +354,13 @@ async function handleUploadSkill() {
     try {
       const res = await upload(`/skills/upload?skill_name=${encodeURIComponent(name.trim())}&skill_desc=${encodeURIComponent(desc.trim())}`, formData);
       if (res.code === 0) {
-        showToast(`技能 ${name} 上传成功`);
+        showToast(t("技能 {name} 上传成功", { name }));
         refreshSkills();
       } else {
-        showToast(`上传失败: ${res.message}`);
+        showToast(t("上传失败: {msg}", { msg: res.message }));
       }
     } catch (e) {
-      showToast(`上传失败: ${e.message}`);
+      showToast(t("上传失败: {msg}", { msg: e.message }));
     }
   });
 
@@ -376,13 +377,13 @@ async function handleImportSkill() {
   try {
     const res = await post("/skills/import", { path: path.trim(), name });
     if (res.code === 0) {
-      showToast(`技能 ${res.data.skill} 导入成功（${res.data.files} 个文件）`);
+      showToast(t("技能 {name} 导入成功（{n} 个文件）", { name: res.data.skill, n: res.data.files }));
       refreshSkills();
     } else {
-      showToast(`导入失败: ${res.message}`);
+      showToast(t("导入失败: {msg}", { msg: res.message }));
     }
   } catch (e) {
-    showToast(`导入失败: ${e.message}`);
+    showToast(t("导入失败: {msg}", { msg: e.message }));
   }
 }
 

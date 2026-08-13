@@ -2,9 +2,10 @@
  * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交付 Prompt。
  */
 
-import { state, subscribe, addPromptSnippet } from "../store.js?v=20260813-45";
-import { get, post } from "../services/api.js?v=20260813-45";
-import { browseFiles } from "../services/project.js?v=20260813-45";
+import { state, subscribe, addPromptSnippet } from "../store.js?v=20260813-46";
+import { get, post } from "../services/api.js?v=20260813-46";
+import { browseFiles } from "../services/project.js?v=20260813-46";
+import { t } from "../services/i18n.js?v=20260813-46";
 
 const FACTORY_PRESETS = {
   codex: {
@@ -137,17 +138,17 @@ function renderShell() {
 
         <label class="factory-field factory-field-main">
           <span class="factory-label">任务描述</span>
-          <textarea id="factory-task" class="factory-input factory-task-input" placeholder="写清楚你要 Agent 做什么、为什么做、怎样算完成。" rows="7"></textarea>
+          <textarea id="factory-task" class="factory-input factory-task-input" placeholder="${t("写清楚你要 Agent 做什么、为什么做、怎样算完成。")}" rows="7"></textarea>
         </label>
 
         <div class="factory-grid">
           <label class="factory-field">
             <span class="factory-label">相关上下文</span>
-            <textarea id="factory-context" class="factory-input" placeholder="粘贴文件路径、报错、接口约定、关键代码片段。" rows="7"></textarea>
+            <textarea id="factory-context" class="factory-input" placeholder="${t("粘贴文件路径、报错、接口约定、关键代码片段。")}" rows="7"></textarea>
           </label>
           <label class="factory-field">
             <span class="factory-label">约束条件</span>
-            <textarea id="factory-constraints" class="factory-input" placeholder="不能改什么、必须保留什么、需要遵守哪些风格或流程。" rows="7"></textarea>
+            <textarea id="factory-constraints" class="factory-input" placeholder="${t("不能改什么、必须保留什么、需要遵守哪些风格或流程。")}" rows="7"></textarea>
           </label>
         </div>
 
@@ -301,7 +302,7 @@ async function insertSelectedFiles() {
       return;
     }
     appendToTextarea(fields.context, chunks.join("\n\n"));
-    showToast(`已插入 ${chunks.length} 个文件`);
+    showToast(t("已插入 {n} 个文件", { n: chunks.length }));
   } finally {
     buttons.insertFiles.disabled = false;
     buttons.insertFiles.textContent = oldText;

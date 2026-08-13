@@ -6,6 +6,8 @@ where ISCC.exe >nul 2>&1
 if %errorlevel% neq 0 (
   if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set ISCC=C:\Program Files (x86)\Inno Setup 6\ISCC.exe
   if exist "C:\Program Files\Inno Setup 6\ISCC.exe" set ISCC=C:\Program Files\Inno Setup 6\ISCC.exe
+  if exist "C:\Program Files (x86)\Inno Setup 7\ISCC.exe" set ISCC=C:\Program Files (x86)\Inno Setup 7\ISCC.exe
+  if exist "C:\Program Files\Inno Setup 7\ISCC.exe" set ISCC=C:\Program Files\Inno Setup 7\ISCC.exe
 )
 
 if not exist "dist\SLATE\SLATE.exe" (
@@ -24,5 +26,5 @@ if %errorlevel% neq 0 (
   exit /b 1
 )
 
-echo [SLATE] Done: installer\SLATE-Setup-20260803-1.exe
+echo [SLATE] Done: installer\SLATE-Setup-{version}.exe
 pause

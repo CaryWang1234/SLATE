@@ -3,12 +3,13 @@
  * 对话模式通过 #expert-select 注入；团队模式通过成员卡 expertId 注入
  */
 
-import { state, setActiveExpertId } from "../store.js?v=20260813-45";
+import { state, setActiveExpertId } from "../store.js?v=20260813-46";
 import {
   loadExperts, getExpert, createExpert, saveExpert, deleteExpert,
   importExpertZip, expertExportUrl, uploadExpertFile, deleteExpertFile,
-} from "../services/experts.js?v=20260813-45";
-import { dlgConfirm } from "../services/dialog.js?v=20260813-45";
+} from "../services/experts.js?v=20260813-46";
+import { dlgConfirm } from "../services/dialog.js?v=20260813-46";
+import { t } from "../services/i18n.js?v=20260813-46";
 
 let modal, expertListEl, detailEmpty, detailForm;
 let nameInput, descInput, personaInput, rulesInput;
@@ -25,7 +26,7 @@ function fmtSize(n) {
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260813-45");
+    const { toast: showToast } = await import("../app.js?v=20260813-46");
     showToast(msg);
   } catch {
     console.warn(msg);
@@ -51,7 +52,7 @@ async function refreshList(keepSelection = true) {
     expertsCache = await loadExperts();
   } catch (e) {
     expertsCache = [];
-    await toast(`专家包加载失败: ${e.message}`);
+    await toast(t("专家包加载失败: {msg}", { msg: e.message }));
   }
   renderList();
   refreshExpertSelects();
@@ -83,7 +84,7 @@ function renderList() {
     meta.className = "exp-item-meta";
     const bits = [];
     if (item.description) bits.push(item.description);
-    bits.push(`知识 ${item.knowledge_count} · 技能 ${item.skills_count}`);
+    bits.push(t("知识 {k} · 技能 {s}", { k: item.knowledge_count, s: item.skills_count }));
     meta.textContent = bits.join(" | ");
     el.appendChild(meta);
 
@@ -117,7 +118,7 @@ async function selectExpert(id) {
     renderList();
     switchTab("persona");
   } catch (e) {
-    await toast(`专家包打开失败: ${e.message}`);
+    await toast(t("专家包打开失败: {msg}", { msg: e.message }));
   }
 }
 
@@ -166,7 +167,7 @@ function renderFileList(folder) {
         renderFileList(folder);
         refreshList();
       } catch (e) {
-        await toast(`删除失败: ${e.message}`);
+        await toast(t("删除失败: {msg}", { msg: e.message }));
       }
     });
     row.appendChild(del);
@@ -180,7 +181,7 @@ async function handleFileUpload(folder, fileList) {
     try {
       await uploadExpertFile(currentId, folder, file);
     } catch (e) {
-      await toast(`上传失败: ${file.name}（${e.message}）`);
+      await toast(t("上传失败: {name}（{msg}）", { name: file.name, msg: e.message }));
     }
   }
   currentDetail = await getExpert(currentId, { force: true });
@@ -196,7 +197,7 @@ async function handleNew() {
     await refreshList();
     await selectExpert(id);
   } catch (e) {
-    await toast(`新建失败: ${e.message}`);
+    await toast(t("新建失败: {msg}", { msg: e.message }));
   }
 }
 
@@ -207,7 +208,7 @@ async function handleImport(file) {
     await selectExpert(id);
     await toast("专家包导入成功");
   } catch (e) {
-    await toast(`导入失败: ${e.message}`);
+    await toast(t("导入失败: {msg}", { msg: e.message }));
   }
 }
 
@@ -228,7 +229,7 @@ async function handleSave() {
     }
     await toast("专家包已保存");
   } catch (e) {
-    await toast(`保存失败: ${e.message}`);
+    await toast(t("保存失败: {msg}", { msg: e.message }));
   }
 }
 
@@ -245,7 +246,7 @@ function handleExport() {
 async function handleDelete() {
   if (!currentId) return;
   const name = currentDetail?.name || currentId;
-  if (!await dlgConfirm(`确定删除专家包「${name}」？该操作不可恢复。`, { danger: true, okText: "删除" })) return;
+  if (!await dlgConfirm(t("确定删除专家包「{name}」？该操作不可恢复。", { name }), { danger: true, okText: "删除" })) return;
   const id = currentId;
   try {
     await deleteExpert(id);
@@ -254,7 +255,7 @@ async function handleDelete() {
     await refreshList();
     await toast("专家包已删除");
   } catch (e) {
-    await toast(`删除失败: ${e.message}`);
+    await toast(t("删除失败: {msg}", { msg: e.message }));
   }
 }
 

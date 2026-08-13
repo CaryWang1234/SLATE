@@ -3,13 +3,14 @@
  * 轻量模型初步讨论 → 重型模型最终决策
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260813-45";
-import { streamChat } from "../services/api.js?v=20260813-45";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260813-45";
-import { renderMarkdown } from "../services/markdown.js?v=20260813-45";
-import { loadWorkflows, getWorkflow, runWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260813-45";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260813-45";
-import { getExpertsCached } from "./experts.js?v=20260813-45";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260813-46";
+import { streamChat } from "../services/api.js?v=20260813-46";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260813-46";
+import { renderMarkdown } from "../services/markdown.js?v=20260813-46";
+import { loadWorkflows, getWorkflow, runWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260813-46";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260813-46";
+import { getExpertsCached } from "./experts.js?v=20260813-46";
+import { t } from "../services/i18n.js?v=20260813-46";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -59,13 +60,13 @@ function renderTeamUsage(usage = currentTeamUsage) {
   teamUsageBar.innerHTML = `
     <span class="usage-model">团队讨论</span>
     <span class="usage-sep">|</span>
-    <span class="usage-stat">轮次 ${usage.messageCount || 0}</span>
+    <span class="usage-stat">${t("轮次 {n}", { n: usage.messageCount || 0 })}</span>
     <span class="usage-sep">|</span>
-    <span class="usage-stat">输入 ${fmtTok(usage.promptTokens || 0)}</span>
+    <span class="usage-stat">${t("输入 {n}", { n: fmtTok(usage.promptTokens || 0) })}</span>
     <span class="usage-sep">|</span>
-    <span class="usage-stat">输出 ${fmtTok(usage.completionTokens || 0)}</span>
+    <span class="usage-stat">${t("输出 {n}", { n: fmtTok(usage.completionTokens || 0) })}</span>
     <span class="usage-sep">|</span>
-    <span class="usage-stat">总计 ${fmtTok(usage.totalTokens || 0)}</span>
+    <span class="usage-stat">${t("总计 {n}", { n: fmtTok(usage.totalTokens || 0) })}</span>
   `;
 }
 
@@ -106,7 +107,7 @@ function renderTeamHistory() {
     meta.className = "team-history-meta";
     const time = session.createdAt ? new Date(session.createdAt).toLocaleString() : "";
     const turnCount = session.entries?.length ?? session.responses?.length ?? 0;
-    meta.textContent = `${time} · ${turnCount} 条发言 · ~${fmtTok(session.usage?.totalTokens || 0)} tok`;
+    meta.textContent = time + t(" · {n} 条发言 · ~{tok} tok", { n: turnCount, tok: fmtTok(session.usage?.totalTokens || 0) });
     item.appendChild(meta);
 
     item.addEventListener("click", () => loadTeamSession(session.id));
@@ -274,7 +275,7 @@ function buildTranscript(entries) {
 function addRoundHeader(round) {
   const el = document.createElement("div");
   el.className = "debate-round-header";
-  el.textContent = `—— 第 ${round} 轮 ——`;
+  el.textContent = t("—— 第 {n} 轮 ——", { n: round });
   teamOutput.appendChild(el);
 }
 
@@ -327,7 +328,7 @@ function finalizeEntry(entry, action, target, text) {
   entry.badge.className = `debate-action-badge action-${action}`;
   entry.badge.textContent = DEBATE_ACTIONS[action];
   if (target) {
-    entry.replyRef.textContent = `↳ 回应 ${target}`;
+    entry.replyRef.textContent = t("↳ 回应 {name}", { name: target });
     entry.replyRef.classList.remove("hidden");
   }
   entry.content.textContent = text;
@@ -368,7 +369,7 @@ async function startDiscussion() {
 
   const topicEl = document.createElement("div");
   topicEl.className = "team-topic";
-  topicEl.textContent = `议题: ${topic}`;
+  topicEl.textContent = t("议题: {topic}", { topic });
   teamOutput.appendChild(topicEl);
 
   // 注入黑板上下文
@@ -431,7 +432,7 @@ async function startDiscussion() {
           teamOutput.scrollTop = teamOutput.scrollHeight;
         }
       } catch (e) {
-        fullText = `⚠ 请求失败: ${e.message}`;
+        fullText = t("⚠ 请求失败: {msg}", { msg: e.message });
       }
 
       // 处理工具调用
@@ -510,7 +511,7 @@ async function forceVerdict(topic, boardContext, entries) {
       teamOutput.scrollTop = teamOutput.scrollHeight;
     }
   } catch (e) {
-    fullText = `⚠ 请求失败: ${e.message}`;
+    fullText = t("⚠ 请求失败: {msg}", { msg: e.message });
   }
 
   fullText = stripToolCalls(fullText);
@@ -535,15 +536,15 @@ function renderDebateSummary(topic, entries, verdict) {
   const actionCount = {};
   for (const e of entries) actionCount[e.action] = (actionCount[e.action] || 0) + 1;
   const countText = Object.entries(actionCount)
-    .map(([k, n]) => `${DEBATE_ACTIONS[k] || k} ${n}`).join(" · ");
+    .map(([k, n]) => `${t(DEBATE_ACTIONS[k] || k)} ${n}`).join(" · ");
 
-  let summary = `**议题**: ${topic}\n\n`;
-  summary += `**参与成员**: ${names.join("、")}\n\n`;
-  summary += `**发言统计**: 共 ${entries.length} 条（${countText}）\n\n`;
+  let summary = t("**议题**: {topic}", { topic }) + "\n\n";
+  summary += t("**参与成员**: {names}", { names: names.join("、") }) + "\n\n";
+  summary += t("**发言统计**: 共 {n} 条（{counts}）", { n: entries.length, counts: countText }) + "\n\n";
   if (verdict) {
-    summary += `**最终方案**（${verdict.member.name}）:\n${verdict.text}`;
+    summary += t("**最终方案**（{name}）:", { name: verdict.member.name }) + "\n" + verdict.text;
   } else {
-    summary += "**结果**: 未达成明确决策";
+    summary += t("**结果**: 未达成明确决策");
   }
 
   summaryEl.querySelector(".team-summary-content").innerHTML = renderSimpleMarkdown(summary);
@@ -558,7 +559,7 @@ function renderLoadedSession(session) {
 
   const topicEl = document.createElement("div");
   topicEl.className = "team-topic";
-  topicEl.textContent = `议题: ${session.topic || "未命名讨论"}`;
+  topicEl.textContent = t("议题: {topic}", { topic: session.topic || t("未命名讨论") });
   teamOutput.appendChild(topicEl);
 
   if (Array.isArray(session.entries)) {
@@ -707,12 +708,12 @@ async function refreshWorkflowList() {
     for (const wf of wfList) {
       const opt = document.createElement("option");
       opt.value = wf.id;
-      opt.textContent = wf.valid ? `${wf.name}（${wf.node_count} 节点）` : `⚠ ${wf.name}（定义非法）`;
+      opt.textContent = wf.valid ? wf.name + t("（{n} 节点）", { n: wf.node_count }) : "⚠ " + wf.name + t("（定义非法）");
       wfSelect.appendChild(opt);
     }
     renderWfDesc();
   } catch (e) {
-    wfDesc.textContent = `工作流列表加载失败: ${e.message}`;
+    wfDesc.textContent = t("工作流列表加载失败: {msg}", { msg: e.message });
   }
 }
 
@@ -720,8 +721,8 @@ function renderWfDesc() {
   const wf = wfList.find(w => w.id === wfSelect.value);
   if (!wf) { wfDesc.textContent = ""; return; }
   wfDesc.textContent = wf.valid
-    ? `${wf.description || ""}（节点 ${wf.node_count} · 依赖边 ${wf.edge_count}）`
-    : `⚠ 该工作流定义非法：${wf.error}`;
+    ? (wf.description || "") + t("（节点 {n} · 依赖边 {m}）", { n: wf.node_count, m: wf.edge_count })
+    : t("⚠ 该工作流定义非法：{msg}", { msg: wf.error });
 }
 
 function makeWfIo(label, text) {
@@ -812,7 +813,7 @@ async function runSelectedWorkflow() {
   const selected = wfList.find(w => w.id === wfSelect.value);
   if (!selected) return;
   if (!selected.valid) {
-    wfRunStatus.textContent = `该工作流定义非法，无法执行：${selected.error}`;
+    wfRunStatus.textContent = t("该工作流定义非法，无法执行：{msg}", { msg: selected.error });
     return;
   }
 
@@ -827,7 +828,7 @@ async function runSelectedWorkflow() {
 
     const total = (wf.nodes || []).length;
     let doneCount = 0;
-    wfRunStatus.textContent = `运行中（0/${total}）…`;
+    wfRunStatus.textContent = t("运行中（0/{n}）…", { n: total });
 
     const result = await runWorkflow(wf, userInput, teamMembers, {
       onNode: (rec) => {
@@ -835,7 +836,7 @@ async function runSelectedWorkflow() {
         if (["success", "failed", "skipped"].includes(rec.status)) {
           doneCount += 1;
           wfRunStatus.textContent = doneCount < total
-            ? `运行中（${doneCount}/${total}）…`
+            ? t("运行中（{done}/{n}）…", { done: doneCount, n: total })
             : "工作流已结束，正在将产物写入知识库…";
         }
       },
@@ -844,14 +845,14 @@ async function runSelectedWorkflow() {
     const okCount = result.order.filter(id => result.records[id].status === "success").length;
     try {
       const docId = await saveRunToKnowledge(wf, result);
-      wfResultBar.innerHTML = `<span class="wf-result-ok">✓ ${okCount}/${total} 节点成功 · 产物已写入知识库（${docId}），可在记忆面板查看</span>`;
+      wfResultBar.innerHTML = `<span class="wf-result-ok">${t("✓ {ok}/{n} 节点成功 · 产物已写入知识库（{title}），可在记忆面板查看", { ok: okCount, n: total, title: docId })}</span>`;
     } catch (e) {
-      wfResultBar.innerHTML = `<span class="wf-result-error">节点成功 ${okCount}/${total}，但写入知识库失败: ${e.message}</span>`;
+      wfResultBar.innerHTML = `<span class="wf-result-error">${t("节点成功 {ok}/{n}，但写入知识库失败: {msg}", { ok: okCount, n: total, msg: e.message })}</span>`;
     }
     wfRunStatus.textContent = "";
   } catch (e) {
     wfRunStatus.textContent = "";
-    wfResultBar.innerHTML = `<span class="wf-result-error">✗ 工作流执行失败: ${e.message}</span>`;
+    wfResultBar.innerHTML = `<span class="wf-result-error">${t("✗ 工作流执行失败: {msg}", { msg: e.message })}</span>`;
   } finally {
     wfRunning = false;
     btnWfRun.disabled = false;
@@ -881,7 +882,7 @@ function initTeamPanel() {
   btnAddMember.addEventListener("click", () => {
     teamMembers.push({
       id: `member-${Date.now()}`,
-      name: `成员${teamMembers.length + 1}`,
+      name: t("成员{n}", { n: teamMembers.length + 1 }),
       modelId: "gpt-5.6-terra",
       persona: "你是团队成员。简洁发表观点（1-3句）。",
       role: "member",

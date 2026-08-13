@@ -10,9 +10,10 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260813-45";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260813-45";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260813-45";
+} from "../store.js?v=20260813-46";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260813-46";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260813-46";
+import { t } from "../services/i18n.js?v=20260813-46";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -105,12 +106,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260813-45");
+    const { toast } = await import("../app.js?v=20260813-46");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260813-45");
+  const { toast } = await import("../app.js?v=20260813-46");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -127,7 +128,7 @@ async function extractMemoriesFromConversation() {
     });
 
     if (res.code !== 0) {
-      toast("提取失败: " + (res.message || "未知错误"));
+      toast(t("提取失败: {msg}", { msg: res.message || t("未知错误") }));
       return;
     }
 
@@ -172,10 +173,10 @@ async function extractMemoriesFromConversation() {
       }
     }
 
-    toast(`成功提取 ${addedCount} 条记忆`);
+    toast(t("成功提取 {n} 条记忆", { n: addedCount }));
   } catch (e) {
     console.error("提取记忆失败:", e);
-    toast("提取失败: " + e.message);
+    toast(t("提取失败: {msg}", { msg: e.message }));
   }
 }
 
@@ -300,8 +301,8 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260813-45");
-      toast(`已自动提炼 ${added} 条记忆${profileUpdated ? "，并更新画像" : ""}`);
+      const { toast } = await import("../app.js?v=20260813-46");
+      toast(t("已自动提炼 {n} 条记忆", { n: added }) + (profileUpdated ? t("，并更新画像") : ""));
     }
     return { added, profileUpdated };
   } catch (e) {
@@ -345,7 +346,7 @@ function renderKnowledgeList(items = []) {
     title.textContent = item.title || "未命名知识";
     const meta = document.createElement("span");
     meta.className = "knowledge-item-meta";
-    meta.textContent = `${item.kind || "note"}${item.chunk_count ? ` · ${item.chunk_count} 片段` : ""}${item.score ? ` · ${(item.score * 100).toFixed(0)}%` : ""}`;
+    meta.textContent = (item.kind || "note") + (item.chunk_count ? t(" · {n} 片段", { n: item.chunk_count }) : "") + (item.score ? ` · ${(item.score * 100).toFixed(0)}%` : "");
     head.appendChild(title);
     head.appendChild(meta);
 
@@ -360,7 +361,7 @@ function renderKnowledgeList(items = []) {
     delBtn.textContent = "×";
     delBtn.title = "删除";
     delBtn.addEventListener("click", async () => {
-      if (!await dlgConfirm(`删除知识「${item.title || item.id}」？`, { danger: true, okText: "删除" })) return;
+      if (!await dlgConfirm(t("删除知识「{title}」？", { title: item.title || item.id }), { danger: true, okText: "删除" })) return;
       await del(`/knowledge/docs/${item.doc_id || item.id}`);
       await loadKnowledgeDocs();
     });
@@ -409,7 +410,7 @@ async function addKnowledgeDialog() {
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260813-45");
+    const { toast } = await import("../app.js?v=20260813-46");
     toast("知识已添加");
     await loadKnowledgeDocs();
   }
@@ -479,7 +480,7 @@ function renderSnippetList() {
     meta.className = "snippet-item-meta";
 
     const source = document.createElement("span");
-    source.textContent = snip.source ? `来源: ${snip.source}` : new Date(snip.createdAt).toLocaleDateString();
+    source.textContent = snip.source ? t("来源: {src}", { src: snip.source }) : new Date(snip.createdAt).toLocaleDateString();
     meta.appendChild(source);
 
     const actions = document.createElement("div");
@@ -563,7 +564,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260813-45").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260813-46").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗？", { danger: true, okText: "重置" })) {
