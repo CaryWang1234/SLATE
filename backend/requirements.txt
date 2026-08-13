@@ -7,3 +7,6 @@ aiosqlite
 ddgs
 python-pptx
 python-docx
+openpyxl
+pdfplumber
+qrcode

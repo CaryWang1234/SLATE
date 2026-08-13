@@ -2,10 +2,10 @@
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除）
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260813-42";
-import { get, post, del, upload } from "../services/api.js?v=20260813-42";
-import { guardSkillParams } from "../services/riskguard.js?v=20260813-42";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260813-42";
+import { state, subscribe, setSkills } from "../store.js?v=20260813-45";
+import { get, post, del, upload } from "../services/api.js?v=20260813-45";
+import { guardSkillParams } from "../services/riskguard.js?v=20260813-45";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260813-45";
 
 let skillList, btnUpload, btnImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -101,6 +101,25 @@ const SKILL_PARAM_DEFS = {
     { key: "url", label: "网页 URL", type: "text", placeholder: "https://example.com/article" },
     { key: "mode", label: "模式", type: "text", placeholder: "text / html" },
     { key: "max_chars", label: "截断长度（≤30000）", type: "number", placeholder: "8000" },
+  ],
+  chart_create: [
+    { key: "data", label: "数据（JSON 或 标签:值）", type: "textarea", placeholder: "Q1:120, Q2:90, Q3:150" },
+    { key: "type", label: "图表类型", type: "text", placeholder: "bar / hbar / line / pie" },
+    { key: "title", label: "图表标题", type: "text", placeholder: "季度销售额" },
+    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / warm / gray 或逗号分隔色值" },
+  ],
+  qrcode_create: [
+    { key: "text", label: "二维码内容（文本/URL）", type: "textarea", placeholder: "https://github.com/CaryWang1234/SLATE" },
+    { key: "size", label: "模块像素大小", type: "number", placeholder: "8" },
+  ],
+  python_api_extract: [
+    { key: "target", label: "目标（包名或 .py 文件/目录路径）", type: "text", placeholder: "requests 或 C:/path/to/mylib" },
+    { key: "depth", label: "递归深度（-1 不限）", type: "number", placeholder: "1" },
+    { key: "format", label: "输出格式", type: "text", placeholder: "json / markdown" },
+  ],
+  html_bundle: [
+    { key: "src", label: "源 html 文件路径", type: "text", placeholder: "C:/path/to/page/index.html" },
+    { key: "out", label: "输出路径（可选）", type: "text", placeholder: "缺省为源同目录 <原名>.bundled.html" },
   ],
 };
 
@@ -277,6 +296,26 @@ async function executeSkill() {
     skillResult.classList.remove("hidden");
     if (res.code === 0) {
       skillResult.textContent = JSON.stringify(res.data, null, 2);
+      // 多模态输出：图片内联预览，文档附查看链接
+      if (res.data?.preview_url) {
+        const url = res.data.preview_url;
+        const name = (res.data.file_path || url).split(/[\\/]/).pop();
+        const isImage = /\.(svg|png|jpe?g|webp|gif)$/i.test(name);
+        if (isImage) {
+          const img = document.createElement("img");
+          img.src = url;
+          img.className = "skill-result-image";
+          skillResult.appendChild(img);
+        } else {
+          const link = document.createElement("a");
+          link.href = url;
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.className = "skill-result-doc-link";
+          link.textContent = `\n📄 查看输出文档：${name}`;
+          skillResult.appendChild(link);
+        }
+      }
     } else {
       skillResult.textContent = `错误: ${res.message}`;
     }

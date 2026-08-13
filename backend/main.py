@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import chat, constitution, experts, files, grind, knowledge, proxy, projects, scheduler, settings, skills, update, workflows
+from backend.routers import chat, constitution, experts, files, grind, knowledge, lan, proxy, projects, scheduler, settings, skills, update, workflows
 
 PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 
@@ -49,12 +49,19 @@ app.include_router(knowledge.router, prefix="/api")
 app.include_router(experts.router, prefix="/api")
 app.include_router(scheduler.router, prefix="/api")
 app.include_router(workflows.router, prefix="/api")
+app.include_router(lan.router, prefix="/api")
 
 
 @app.on_event("startup")
 async def _start_schedule_loop():
     """启动定时任务后台循环。"""
     scheduler.start_scheduler()
+
+
+@app.on_event("startup")
+async def _start_lan_remote():
+    """启动局域网遥控副服务（0.0.0.0:8001，共享本 app）。"""
+    lan.start_lan_server(app)
 
 # 挂载前端静态文件
 frontend_dir = PROJECT_ROOT / "frontend"

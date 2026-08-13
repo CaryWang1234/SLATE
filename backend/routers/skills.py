@@ -38,6 +38,10 @@ BUILTIN_SKILLS: dict[str, str] = {
     "todo_scan": "扫描项目中的 TODO/FIXME/待办标记",
     "web_search": "网络搜索/网页抓取，获取实时信息（免 Key，DuckDuckGo）",
     "web_fetch": "获取指定网页内容：提取标题/描述/正文纯文本，支持返回原始 HTML（免 Key 直连）",
+    "chart_create": "生成 SVG 图表（柱状/条形/折线/饼图），零依赖纯 Python，返回文件路径与预览链接",
+    "qrcode_create": "生成 SVG 二维码（文本或 URL），返回文件路径与预览链接",
+    "python_api_extract": "提取 Python 库/模块的公共 API 文档（函数签名、类方法、属性），输出 JSON/Markdown",
+    "html_bundle": "将 html 及相对路径的 css/js 内联合并为单个 html 文件（便携分发）",
 }
 
 

@@ -2,23 +2,23 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260813-42";
-import { get, post, put } from "./services/api.js?v=20260813-42";
-import { dlgConfirm } from "./services/dialog.js?v=20260813-42";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260813-42";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260813-42";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260813-42";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260813-42";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260813-42";
-import { initTeamPanel } from "./components/team.js?v=20260813-42";
-import { initProjectBar } from "./components/project_bar.js?v=20260813-42";
-import { initMemoryPanel } from "./components/memory.js?v=20260813-42";
-import { initExpertsPanel } from "./components/experts.js?v=20260813-42";
-import { initSchedule } from "./components/schedule.js?v=20260813-42";
-import { initRiskGuard } from "./services/riskguard.js?v=20260813-42";
-import { initUnderstandPanel } from "./components/understand.js?v=20260813-42";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260813-42";
-import { setProject, setProjectFileTree } from "./store.js?v=20260813-42";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260813-45";
+import { get, post, put } from "./services/api.js?v=20260813-45";
+import { dlgConfirm } from "./services/dialog.js?v=20260813-45";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260813-45";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260813-45";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260813-45";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260813-45";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260813-45";
+import { initTeamPanel } from "./components/team.js?v=20260813-45";
+import { initProjectBar } from "./components/project_bar.js?v=20260813-45";
+import { initMemoryPanel } from "./components/memory.js?v=20260813-45";
+import { initExpertsPanel } from "./components/experts.js?v=20260813-45";
+import { initSchedule } from "./components/schedule.js?v=20260813-45";
+import { initRiskGuard } from "./services/riskguard.js?v=20260813-45";
+import { initUnderstandPanel } from "./components/understand.js?v=20260813-45";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260813-45";
+import { setProject, setProjectFileTree } from "./store.js?v=20260813-45";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -390,6 +390,7 @@ function openSettings(options = {}) {
   renderKeyManagement();
   renderUsageSummary();
   renderAbout();
+  renderLanInfo();
   switchPanel("settings");
   if (options.focusModelId) {
     requestAnimationFrame(() => {
@@ -403,6 +404,10 @@ function openSettings(options = {}) {
       const input = document.getElementById("setting-constitution");
       input?.focus();
       input?.scrollIntoView({ block: "center" });
+    });
+  } else if (options.focusLan) {
+    requestAnimationFrame(() => {
+      document.getElementById("settings-lan")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 }
@@ -454,6 +459,50 @@ async function renderAbout() {
       aboutVersionShown = true;
     }
   } catch {}
+}
+
+// ── 设置页：局域网遥控（地址获取 + 复制 + 二维码） ──────────────
+
+/** 拉取局域网遥控地址并渲染醒目展示（每次打开设置页刷新，IP 变化可及时反映） */
+async function renderLanInfo() {
+  const box = document.getElementById("lan-info");
+  if (!box) return;
+  box.innerHTML = '<div class="lan-info-loading">正在获取遥控地址…</div>';
+  let data = null;
+  try {
+    const res = await get("/lan/info");
+    if (res?.code === 0) data = res.data;
+  } catch {}
+  if (!data || !data.enabled) {
+    box.innerHTML = `<div class="lan-info-error">遥控服务未启动${data?.error ? `：${data.error}` : "，请重启应用"}</div>`;
+    return;
+  }
+  const url = data.urls[0];
+  box.innerHTML = `
+    <div class="lan-url-row">
+      <code class="lan-url" id="lan-url-text">${url}</code>
+      <button id="btn-lan-copy" class="send-btn send-btn-sm" type="button">复制地址</button>
+    </div>
+    <div class="lan-qr-row">
+      <img class="lan-qr" src="/api/lan/qrcode?t=${Date.now()}" alt="遥控地址二维码">
+      <div class="lan-qr-tip">手机扫码直接打开<br>（需连入同一局域网）</div>
+    </div>
+    <p class="lan-tip">⚠ 遥控未设密码：同一局域网内的任何人都能完整操作本应用（含终端命令），请勿在不受信任的网络中使用。</p>
+  `;
+  document.getElementById("btn-lan-copy")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("遥控地址已复制");
+    } catch {
+      const el = document.getElementById("lan-url-text");
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      toast("自动复制失败，已为你选中地址");
+    }
+  });
 }
 
 // ── 首次启动引导 ──────────────────────
@@ -813,7 +862,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260813-42");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260813-45");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1005,6 +1054,9 @@ async function init() {
   // 设置弹窗
   document.getElementById("btn-settings").addEventListener("click", openSettings);
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
+  // 顶栏 📡：直达设置页“局域网遥控”区块（明显的网址获取入口）
+  document.getElementById("btn-lan")?.addEventListener("click", () => openSettings({ focusLan: true }));
+  document.getElementById("btn-lan-refresh")?.addEventListener("click", renderLanInfo);
   initAutoReviewPersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
@@ -1024,7 +1076,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260813-42");
+      const { openProject } = await import("./services/project.js?v=20260813-45");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

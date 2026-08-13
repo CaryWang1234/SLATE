@@ -6,12 +6,25 @@ import base64
 import csv
 import io
 import json
+import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/files", tags=["files"])
+
+# 工具多模态输出（chart/qrcode 等）落盘目录，与 skills 保持一致
+DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
+OUTPUTS_DIR = DATA_DIR / "outputs"
+
+# 允许预览的输出文件类型 → MIME
+OUTPUT_SERVE_TYPES = {
+    ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
+    ".md": "text/markdown; charset=utf-8", ".json": "application/json; charset=utf-8",
+}
 
 # 支持的文本文件扩展名
 TEXT_EXTENSIONS = {
@@ -263,3 +276,17 @@ def _parse_pdf(filename: str, content: bytes) -> dict[str, Any]:
         },
         "message": "ok",
     }
+
+
+@router.get("/output")
+async def get_output_file(name: str) -> FileResponse:
+    """提供 outputs 目录下工具产出图片的预览访问（仅限文件名，防路径穿越）。"""
+    if not name or name != Path(name).name or "/" in name or "\\" in name or ".." in name:
+        raise HTTPException(status_code=400, detail="非法文件名")
+    ext = Path(name).suffix.lower()
+    if ext not in OUTPUT_SERVE_TYPES:
+        raise HTTPException(status_code=400, detail="不支持的文件类型")
+    path = OUTPUTS_DIR / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    return FileResponse(str(path), media_type=OUTPUT_SERVE_TYPES[ext])

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260813-42">
+  <link rel="stylesheet" href="./css/style.css?v=20260813-45">
 </head>
 <body>
 
@@ -30,6 +30,7 @@
         <option value="">选择模型…</option>
       </select>
       <button id="btn-manage-keys" class="icon-btn" title="管理模型密钥">🔑</button>
+      <button id="btn-lan" class="icon-btn" title="局域网遥控地址">📡</button>
       <button id="btn-theme" class="theme-btn" title="切换主题">◐</button>
       <button id="btn-settings" class="icon-btn" title="设置">⚙</button>
     </div>
@@ -299,6 +300,7 @@
           <a class="settings-nav-item" data-target="settings-auto-review">自动推进</a>
           <a class="settings-nav-item" data-target="settings-skills">MCP / 技能</a>
           <a class="settings-nav-item" data-target="settings-data">数据备份</a>
+          <a class="settings-nav-item" data-target="settings-lan">局域网遥控</a>
           <a class="settings-nav-item" data-target="settings-about">关于</a>
         </nav>
         <div class="settings-main">
@@ -461,6 +463,19 @@
             <span class="setting-hint">加载中…</span>
           </div>
           <div id="storage-status" class="setting-hint"></div>
+        </section>
+
+        <section class="settings-block" id="settings-lan">
+          <div class="settings-block-head">
+            <div>
+              <h2>局域网遥控</h2>
+              <p>同一局域网内的手机 / 平板 / 其他电脑，用浏览器打开下面的地址即可遥控 SLATE，界面与主应用一致。</p>
+            </div>
+            <button id="btn-lan-refresh" class="icon-btn" type="button" title="刷新地址">⟳</button>
+          </div>
+          <div id="lan-info" class="lan-info">
+            <div class="lan-info-loading">正在获取遥控地址…</div>
+          </div>
         </section>
 
         <section class="settings-block" id="settings-about">
@@ -912,7 +927,7 @@
   <!-- ═══ Toast 容器 ═══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260813-42"></script>
+  <script type="module" src="./js/app.js?v=20260813-45"></script>
 
 </body>
 </html>

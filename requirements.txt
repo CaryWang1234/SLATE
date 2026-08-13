@@ -10,6 +10,7 @@ python-pptx
 python-docx
 openpyxl
 pdfplumber
+qrcode
 
 # Desktop wrapper
 pywebview
