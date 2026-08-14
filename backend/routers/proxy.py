@@ -1,9 +1,18 @@
-"""LLM API 代理路由：转发请求到各模型提供商，支持流式输出。"""
+"""LLM API 代理路由：转发请求到各模型提供商，支持流式输出。
+
+优化要点（参考 Agent 工程四层理论）：
+- Context Engineering: 渐进式加载，按需构建请求体
+- Harness Engineering: 共享连接池，统一超时与重试策略
+- Loop Engineering: 请求追踪 ID，可观测性日志
+- Graph Engineering: 多 provider 路由，统一接口抽象
+"""
 
 from __future__ import annotations
 
 import json
+import logging
 import re
+import uuid
 from typing import Any
 
 import httpx
@@ -11,10 +20,36 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/proxy", tags=["proxy"])
+logger = logging.getLogger(__name__)
 
 # 分段超时：connect 快失败，read 为两包数据间隔上限（流式长思考模型不误杀）
 STREAM_TIMEOUT = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=10.0)
 REQUEST_TIMEOUT = httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=10.0)
+
+# ── 共享 httpx 客户端池（连接复用，避免每次请求重建 TCP 连接） ─────────
+# Harness Engineering: 构建稳定的执行环境，减少连接开销
+_http_clients: dict[str, httpx.AsyncClient] = {}
+
+
+def _get_client(base_url: str) -> httpx.AsyncClient:
+    """获取或创建共享的 httpx 客户端（按 base_url 分组，复用连接池）。"""
+    if base_url not in _http_clients:
+        _http_clients[base_url] = httpx.AsyncClient(
+            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+            timeout=REQUEST_TIMEOUT,
+        )
+    return _http_clients[base_url]
+
+
+def _get_stream_client(base_url: str) -> httpx.AsyncClient:
+    """获取或创建流式专用客户端（更长 read 超时）。"""
+    key = f"{base_url}__stream"
+    if key not in _http_clients:
+        _http_clients[key] = httpx.AsyncClient(
+            limits=httpx.Limits(max_connections=50, max_keepalive_connections=10),
+            timeout=STREAM_TIMEOUT,
+        )
+    return _http_clients[key]
 
 # ── 模型注册表（2026-08 时效性校验） ──────────────────────────
 
@@ -215,18 +250,18 @@ def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, Any]):
-    """流式转发 OpenAI 兼容 API（自管理 client 生命周期）。"""
-    async with httpx.AsyncClient() as client:
-        async with client.stream("POST", url, json=payload, headers=headers, timeout=STREAM_TIMEOUT) as resp:
-            async for line in resp.aiter_lines():
-                if line:
-                    yield f"{line}\n\n"
+    """流式转发 OpenAI 兼容 API（共享客户端连接池）。"""
+    client = _get_stream_client(url.rsplit("/", 2)[0])  # 提取 base_url
+    async with client.stream("POST", url, json=payload, headers=headers) as resp:
+        async for line in resp.aiter_lines():
+            if line:
+                yield f"{line}\n\n"
 
 
 async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str, Any]):
     """流式调用 Responses API，将事件转换为前端已适配的 Chat Completions SSE 格式。"""
-    async with httpx.AsyncClient() as client:
-        async with client.stream("POST", url, json=payload, headers=headers, timeout=STREAM_TIMEOUT) as resp:
+    client = _get_stream_client(url.rsplit("/", 2)[0])
+    async with client.stream("POST", url, json=payload, headers=headers) as resp:
             async for line in resp.aiter_lines():
                 if not line.startswith("data:"):
                     continue
@@ -265,9 +300,9 @@ async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str
 
 
 async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str, Any]):
-    """流式转发 Anthropic API，转换为 OpenAI 兼容 SSE 格式（自管理 client）。"""
-    async with httpx.AsyncClient() as client:
-        async with client.stream("POST", url, json=payload, headers=headers, timeout=STREAM_TIMEOUT) as resp:
+    """流式转发 Anthropic API，转换为 OpenAI 兼容 SSE 格式（共享客户端）。"""
+    client = _get_stream_client(url.rsplit("/", 2)[0])
+    async with client.stream("POST", url, json=payload, headers=headers) as resp:
             buffer = ""
             async for line in resp.aiter_lines():
                 buffer += line + "\n"
@@ -302,15 +337,23 @@ async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str
 
 @router.post("/chat")
 async def proxy_chat(request: Request) -> Any:
-    """代理聊天请求到对应 LLM API。"""
+    """代理聊天请求到对应 LLM API。
+    
+    Loop Engineering: 每次请求分配唯一 trace_id，用于追踪和日志。
+    """
     body = await request.json()
     model_id = body.get("model", "")
     api_key = body.get("api_key", "")
     custom_base_url = body.get("base_url")
     is_stream = body.get("stream", False)
+    
+    # 生成请求追踪 ID（Loop Engineering: 可观测性）
+    trace_id = str(uuid.uuid4())[:8]
+    logger.info(f"[{trace_id}] 请求开始: model={model_id}, stream={is_stream}")
 
     model_cfg = _find_model(model_id, custom_base_url)
     if not model_cfg:
+        logger.warning(f"[{trace_id}] 未知模型: {model_id}")
         return {"code": -1, "data": None, "message": f"未知模型: {model_id}"}
 
     provider = model_cfg["provider"]
@@ -327,17 +370,19 @@ async def proxy_chat(request: Request) -> Any:
         payload = _build_anthropic_request(body)
 
         if is_stream:
+            logger.info(f"[{trace_id}] Anthropic 流式请求: {url}")
             return StreamingResponse(
                 _stream_anthropic(url, headers, payload),
                 media_type="text/event-stream",
             )
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT)
+        client = _get_client(base_url)
+        resp = await client.post(url, json=payload, headers=headers)
         data = resp.json()
         content = ""
         if "content" in data and data["content"]:
             content = data["content"][0].get("text", "")
+        logger.info(f"[{trace_id}] Anthropic 完成: {len(content)} 字符")
         return {
             "code": 0,
             "data": {
@@ -360,13 +405,14 @@ async def proxy_chat(request: Request) -> Any:
         if body.get("temperature"):
             payload["generationConfig"] = {"temperature": body["temperature"]}
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT)
+        client = _get_client(base_url)
+        resp = await client.post(url, json=payload, headers=headers)
         data = resp.json()
         text = ""
         if "candidates" in data and data["candidates"]:
             parts = data["candidates"][0].get("content", {}).get("parts", [])
             text = "".join(p.get("text", "") for p in parts)
+        logger.info(f"[{trace_id}] Google 完成: {len(text)} 字符")
         return {
             "code": 0,
             "data": {
@@ -390,13 +436,14 @@ async def proxy_chat(request: Request) -> Any:
         payload = _build_responses_request(body)
 
         if is_stream:
+            logger.info(f"[{trace_id}] Responses API 流式请求: {url}")
             return StreamingResponse(
                 _stream_responses(url, headers, payload),
                 media_type="text/event-stream",
             )
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT)
+        client = _get_client(base_url)
+        resp = await client.post(url, json=payload, headers=headers)
         data = resp.json()
         # 将 Responses API 响应转换为 Chat Completions 格式
         text = ""
@@ -405,6 +452,7 @@ async def proxy_chat(request: Request) -> Any:
                 for content in item.get("content", []):
                     if content.get("type") == "output_text":
                         text += content.get("text", "")
+        logger.info(f"[{trace_id}] Responses API 完成: {len(text)} 字符")
         return {
             "code": 0,
             "data": {
@@ -419,12 +467,14 @@ async def proxy_chat(request: Request) -> Any:
     payload = _build_openai_request(body)
 
     if is_stream:
+        logger.info(f"[{trace_id}] OpenAI 兼容流式请求: {url}")
         return StreamingResponse(
             _stream_openai(url, headers, payload),
             media_type="text/event-stream",
         )
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT)
+    client = _get_client(base_url)
+    resp = await client.post(url, json=payload, headers=headers)
     data = resp.json()
+    logger.info(f"[{trace_id}] OpenAI 兼容完成")
     return {"code": 0, "data": data, "message": "ok"}

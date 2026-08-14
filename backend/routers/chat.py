@@ -1,4 +1,11 @@
-"""聊天路由：对话历史管理，上下文压缩，记忆/画像/素材。"""
+"""聊天路由：对话历史管理，上下文压缩，记忆/画像/素材。
+
+优化要点（参考 Agent 工程四层理论）：
+- Context Engineering: 高效查询，渐进式加载
+- Harness Engineering: 数据库索引，连接池管理
+- Loop Engineering: 异步后台任务，非阻塞操作
+- Graph Engineering: 知识图谱关联，记忆分类
+"""
 
 from __future__ import annotations
 
@@ -64,6 +71,13 @@ def _get_db() -> sqlite3.Connection:
     msg_cols = [r[1] for r in conn.execute("PRAGMA table_info(messages)").fetchall()]
     if "metadata" not in msg_cols:
         conn.execute("ALTER TABLE messages ADD COLUMN metadata TEXT DEFAULT ''")
+    
+    # 性能优化：为高频查询字段创建索引（Harness Engineering: 减少查询延迟）
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_conv_id ON messages(conversation_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_role ON messages(role)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at DESC)")
+    
     conn.execute("""
         CREATE TABLE IF NOT EXISTS memories (
             id TEXT PRIMARY KEY,
@@ -72,6 +86,10 @@ def _get_db() -> sqlite3.Connection:
             created_at REAL
         )
     """)
+    # 记忆查询索引（Context Engineering: 快速检索长期记忆）
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at DESC)")
+    
     conn.execute("""
         CREATE TABLE IF NOT EXISTS prompt_snippets (
             id TEXT PRIMARY KEY,
@@ -80,6 +98,8 @@ def _get_db() -> sqlite3.Connection:
             created_at REAL
         )
     """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_snippets_created_at ON prompt_snippets(created_at DESC)")
+    
     conn.commit()
     return conn
 
