@@ -21,11 +21,11 @@ REQUEST_TIMEOUT = httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=10.0)
 MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
     "international": [
         {"id": "gpt-5.6-sol", "name": "GPT-5.6 Sol", "provider": "openai",
-         "base_url": "https://api.openai.com/v1", "context_window": 1050000},
+         "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True},
         {"id": "gpt-5.6-terra", "name": "GPT-5.6 Terra", "provider": "openai",
-         "base_url": "https://api.openai.com/v1", "context_window": 1050000},
+         "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True},
         {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna", "provider": "openai",
-         "base_url": "https://api.openai.com/v1", "context_window": 1050000},
+         "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True},
         {"id": "claude-fable-5", "name": "Claude Fable 5", "provider": "anthropic",
          "base_url": "https://api.anthropic.com", "context_window": 1000000},
         {"id": "claude-opus-5", "name": "Claude Opus 5", "provider": "anthropic",
@@ -45,17 +45,17 @@ MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         {"id": "deepseek-reasoner", "name": "DeepSeek-R1", "provider": "openai",
          "base_url": "https://api.deepseek.com/v1", "context_window": 65536},
         {"id": "deepseek-v4-flash", "name": "DeepSeek-V4-Flash", "provider": "openai",
-         "base_url": "https://api.deepseek.com/v1", "context_window": 131072},
+         "base_url": "https://api.deepseek.com/v1", "context_window": 131072, "supports_responses": True},
         {"id": "kimi-k3", "name": "Kimi K3", "provider": "openai",
          "base_url": "https://api.moonshot.cn/v1", "context_window": 1048576},
         {"id": "kimi-k2.7-code", "name": "Kimi K2.7 Code", "provider": "openai",
          "base_url": "https://api.moonshot.cn/v1", "context_window": 262144},
         {"id": "qwen3.8-max", "name": "Qwen3.8-Max", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
         {"id": "qwen3.7-max", "name": "Qwen3.7-Max", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
         {"id": "qwen3.7-plus", "name": "Qwen3.7-Plus", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
         {"id": "glm-5.2", "name": "GLM-5.2", "provider": "openai",
          "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 131072},
         {"id": "doubao-pro-256k", "name": "Doubao-Pro 256K", "provider": "openai",
@@ -107,6 +107,44 @@ def _build_openai_request(body: dict[str, Any]) -> dict[str, Any]:
         payload["temperature"] = temperature
     if max_tokens := body.get("max_tokens"):
         payload["max_tokens"] = max_tokens
+    return payload
+
+
+def _build_responses_request(body: dict[str, Any]) -> dict[str, Any]:
+    """构建 OpenAI Responses API 格式的请求体。
+
+    Responses API 是 Chat Completions 的演进版：
+    - system 消息提取为顶层 instructions 字段
+    - 其余消息放入 input 数组（保持 chat 格式兼容）
+    - max_tokens → max_output_tokens
+    """
+    messages = body.get("messages", [])
+    instructions_parts = []
+    input_messages = []
+    for msg in messages:
+        if msg.get("role") == "system":
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                instructions_parts.append(content)
+            elif isinstance(content, list):
+                # 多模态 system 消息，提取文本部分
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "text":
+                        instructions_parts.append(part.get("text", ""))
+        else:
+            input_messages.append(msg)
+
+    payload: dict[str, Any] = {
+        "model": body["model"],
+        "input": input_messages,
+        "stream": body.get("stream", False),
+    }
+    if instructions_parts:
+        payload["instructions"] = "\n\n".join(instructions_parts)
+    if max_tokens := body.get("max_tokens"):
+        payload["max_output_tokens"] = max_tokens
+    if temperature := body.get("temperature"):
+        payload["temperature"] = temperature
     return payload
 
 
@@ -183,6 +221,47 @@ async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, A
             async for line in resp.aiter_lines():
                 if line:
                     yield f"{line}\n\n"
+
+
+async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str, Any]):
+    """流式调用 Responses API，将事件转换为前端已适配的 Chat Completions SSE 格式。"""
+    async with httpx.AsyncClient() as client:
+        async with client.stream("POST", url, json=payload, headers=headers, timeout=STREAM_TIMEOUT) as resp:
+            async for line in resp.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                data_str = line[5:].strip()
+                if data_str == "[DONE]":
+                    yield "data: [DONE]\n\n"
+                    continue
+                try:
+                    data = json.loads(data_str)
+                except json.JSONDecodeError:
+                    continue
+
+                # Responses API 流式事件解析
+                obj_type = data.get("type", "")
+
+                # 文本增量：response.output_text.delta
+                if obj_type == "response.output_text.delta":
+                    delta = data.get("delta", "")
+                    if delta:
+                        chunk = {"choices": [{"delta": {"content": delta}, "index": 0}]}
+                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+
+                # 完成信号
+                elif obj_type in ("response.completed", "response.output_item.done"):
+                    status = data.get("response", {}).get("status", "completed")
+                    if status == "completed":
+                        chunk = {"choices": [{"delta": {}, "finish_reason": "stop", "index": 0}]}
+                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
+
+                # 兼容旧格式：某些 provider 直接在 data 内嵌 delta 字段
+                elif "delta" in data and isinstance(data["delta"], str):
+                    chunk = {"choices": [{"delta": {"content": data["delta"]}, "index": 0}]}
+                    yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
 
 async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str, Any]):
@@ -302,6 +381,40 @@ async def proxy_chat(request: Request) -> Any:
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
+
+    # Responses API 模式：模型支持且前端请求启用时使用
+    use_responses = body.get("use_responses", False) and model_cfg.get("supports_responses", False)
+
+    if use_responses:
+        url = f"{base_url}/responses"
+        payload = _build_responses_request(body)
+
+        if is_stream:
+            return StreamingResponse(
+                _stream_responses(url, headers, payload),
+                media_type="text/event-stream",
+            )
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT)
+        data = resp.json()
+        # 将 Responses API 响应转换为 Chat Completions 格式
+        text = ""
+        for item in data.get("output", []):
+            if item.get("type") == "message":
+                for content in item.get("content", []):
+                    if content.get("type") == "output_text":
+                        text += content.get("text", "")
+        return {
+            "code": 0,
+            "data": {
+                "choices": [{"message": {"role": "assistant", "content": text}}],
+                "usage": data.get("usage", {}),
+            },
+            "message": "ok",
+        }
+
+    # 默认：Chat Completions API
     url = f"{base_url}/chat/completions"
     payload = _build_openai_request(body)
 

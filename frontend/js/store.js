@@ -99,6 +99,9 @@ const state = {
   // 专家包：当前对话激活的专家（注入 persona + rules）
   activeExpertId: "",
   activeExpert: null,
+
+  // Responses API 模式（可选，仅部分模型支持）
+  useResponses: false,
 };
 
 // ── 订阅者 ──────────────────────────────────
@@ -135,6 +138,7 @@ function buildPersistentData() {
     harness: state.harness,
     knowledgeSettings: state.knowledgeSettings,
     activeExpertId: state.activeExpertId,
+    useResponses: state.useResponses,
   };
 }
 
@@ -209,6 +213,7 @@ function loadPersistent() {
       ...(data.knowledgeSettings || {}),
     };
     state.activeExpertId = data.activeExpertId || "";
+    state.useResponses = data.useResponses || false;
   } catch (e) {}
 }
 

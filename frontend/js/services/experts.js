@@ -1,23 +1,23 @@
 /**
- * SLATE 专家包服务：zip 导入/导出、增删改查、文件管理
+ * SLATE 专家包服务：zip 导入/导出、增删改查、文件管�?
  * 专家包结构：persona.md + rules.md + data.json + knowledge/ + skills/
  */
 
-import { get, post, put, del, upload } from "./api.js?v=20260814-47";
+import { get, post, put, del, upload } from "./api.js?v=20260814-48";
 
-/** 专家详情缓存（expertId → detail），供对话/团队注入时免重复请求 */
+/** 专家详情缓存（expertId �?detail），供对�?团队注入时免重复请求 */
 const expertCache = new Map();
 
 async function loadExperts() {
   const res = await get("/experts");
-  if (res.code !== 0) throw new Error(res.message || "专家包列表加载失败");
+  if (res.code !== 0) throw new Error(res.message || "专家包列表加载失�?);
   return res.data || [];
 }
 
 async function getExpert(id, { force = false } = {}) {
   if (!force && expertCache.has(id)) return expertCache.get(id);
   const res = await get(`/experts/${id}`);
-  if (res.code !== 0) throw new Error(res.message || "专家包加载失败");
+  if (res.code !== 0) throw new Error(res.message || "专家包加载失�?);
   expertCache.set(id, res.data);
   return res.data;
 }
@@ -48,7 +48,7 @@ async function importExpertZip(file) {
   return res.data.id;
 }
 
-/** 导出 zip 的下载地址（浏览器直接下载） */
+/** 导出 zip 的下载地址（浏览器直接下载�?*/
 function expertExportUrl(id) {
   const origin = window.location.port === "8000" || window.location.protocol === "file:"
     ? `${window.location.protocol}//${window.location.hostname}:8000`
@@ -78,12 +78,12 @@ async function readExpertFile(id, folder, name) {
 }
 
 /**
- * 构建专家注入提示词（persona + rules + 知识文件清单）
- * detail 为 getExpert 返回的完整结构
+ * 构建专家注入提示词（persona + rules + 知识文件清单�?
+ * detail �?getExpert 返回的完整结�?
  */
 function buildExpertPrompt(detail) {
   if (!detail) return "";
-  const parts = [`[专家包 · ${detail.name || "未命名"}]`];
+  const parts = [`[专家�?· ${detail.name || "未命�?}]`];
   if (detail.persona?.trim()) {
     parts.push("[专家人格]");
     parts.push(detail.persona.trim());
@@ -94,7 +94,7 @@ function buildExpertPrompt(detail) {
   }
   const knowledgeNames = (detail.knowledge || []).map(f => f.name).slice(0, 20);
   if (knowledgeNames.length) {
-    parts.push(`[专家知识文件] ${knowledgeNames.join("、")}`);
+    parts.push(`[专家知识文件] ${knowledgeNames.join("�?)}`);
   }
   return parts.length > 1 ? "\n\n" + parts.join("\n") : "";
 }

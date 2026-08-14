@@ -1,15 +1,15 @@
 /**
  * SLATE 专家包管理组件：列表 / 新建 / 导入导出 zip / 编辑 persona·rules / knowledge·skills 文件管理
- * 对话模式通过 #expert-select 注入；团队模式通过成员卡 expertId 注入
+ * 对话模式通过 #expert-select 注入；团队模式通过成员�?expertId 注入
  */
 
-import { state, setActiveExpertId } from "../store.js?v=20260814-47";
+import { state, setActiveExpertId } from "../store.js?v=20260814-48";
 import {
   loadExperts, getExpert, createExpert, saveExpert, deleteExpert,
   importExpertZip, expertExportUrl, uploadExpertFile, deleteExpertFile,
-} from "../services/experts.js?v=20260814-47";
-import { dlgConfirm } from "../services/dialog.js?v=20260814-47";
-import { t } from "../services/i18n.js?v=20260814-47";
+} from "../services/experts.js?v=20260814-48";
+import { dlgConfirm } from "../services/dialog.js?v=20260814-48";
+import { t } from "../services/i18n.js?v=20260814-48";
 
 let modal, expertListEl, detailEmpty, detailForm;
 let nameInput, descInput, personaInput, rulesInput;
@@ -26,14 +26,14 @@ function fmtSize(n) {
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260814-47");
+    const { toast: showToast } = await import("../app.js?v=20260814-48");
     showToast(msg);
   } catch {
     console.warn(msg);
   }
 }
 
-// ── 弹窗开关 ────────────────────────────────
+// ── 弹窗开�?────────────────────────────────
 
 function openExpertModal() {
   if (!modal) return;
@@ -52,12 +52,12 @@ async function refreshList(keepSelection = true) {
     expertsCache = await loadExperts();
   } catch (e) {
     expertsCache = [];
-    await toast(t("专家包加载失败: {msg}", { msg: e.message }));
+    await toast(t("专家包加载失�? {msg}", { msg: e.message }));
   }
   renderList();
   refreshExpertSelects();
   if (keepSelection && currentId && expertsCache.some(x => x.id === currentId)) {
-    // 保持当前选中（保存后刷新场景）
+    // 保持当前选中（保存后刷新场景�?
   } else if (!keepSelection) {
     showEmpty();
   }
@@ -67,7 +67,7 @@ function renderList() {
   if (!expertListEl) return;
   expertListEl.innerHTML = "";
   if (expertsCache.length === 0) {
-    expertListEl.innerHTML = '<div class="exp-list-empty">暂无专家包</div>';
+    expertListEl.innerHTML = '<div class="exp-list-empty">暂无专家�?/div>';
     return;
   }
   for (const item of expertsCache) {
@@ -84,7 +84,7 @@ function renderList() {
     meta.className = "exp-item-meta";
     const bits = [];
     if (item.description) bits.push(item.description);
-    bits.push(t("知识 {k} · 技能 {s}", { k: item.knowledge_count, s: item.skills_count }));
+    bits.push(t("知识 {k} · 技�?{s}", { k: item.knowledge_count, s: item.skills_count }));
     meta.textContent = bits.join(" | ");
     el.appendChild(meta);
 
@@ -139,7 +139,7 @@ function renderFileList(folder) {
   listEl.innerHTML = "";
   const files = currentDetail[folder] || [];
   if (files.length === 0) {
-    listEl.innerHTML = '<div class="exp-file-empty">暂无文件，点击上方"+ 添加文件"</div>';
+    listEl.innerHTML = '<div class="exp-file-empty">暂无文件，点击上�?+ 添加文件"</div>';
     return;
   }
   for (const f of files) {
@@ -181,7 +181,7 @@ async function handleFileUpload(folder, fileList) {
     try {
       await uploadExpertFile(currentId, folder, file);
     } catch (e) {
-      await toast(t("上传失败: {name}（{msg}）", { name: file.name, msg: e.message }));
+      await toast(t("上传失败: {name}（{msg}�?, { name: file.name, msg: e.message }));
     }
   }
   currentDetail = await getExpert(currentId, { force: true });
@@ -193,7 +193,7 @@ async function handleFileUpload(folder, fileList) {
 
 async function handleNew() {
   try {
-    const id = await createExpert({ name: "新专家" });
+    const id = await createExpert({ name: "新专�? });
     await refreshList();
     await selectExpert(id);
   } catch (e) {
@@ -206,7 +206,7 @@ async function handleImport(file) {
     const id = await importExpertZip(file);
     await refreshList();
     await selectExpert(id);
-    await toast("专家包导入成功");
+    await toast("专家包导入成�?);
   } catch (e) {
     await toast(t("导入失败: {msg}", { msg: e.message }));
   }
@@ -216,7 +216,7 @@ async function handleSave() {
   if (!currentId) return;
   try {
     await saveExpert(currentId, {
-      name: nameInput.value.trim() || "未命名专家",
+      name: nameInput.value.trim() || "未命名专�?,
       description: descInput.value.trim(),
       persona: personaInput.value,
       rules: rulesInput.value,
@@ -246,7 +246,7 @@ function handleExport() {
 async function handleDelete() {
   if (!currentId) return;
   const name = currentDetail?.name || currentId;
-  if (!await dlgConfirm(t("确定删除专家包「{name}」？该操作不可恢复。", { name }), { danger: true, okText: "删除" })) return;
+  if (!await dlgConfirm(t("确定删除专家包「{name}」？该操作不可恢复�?, { name }), { danger: true, okText: "删除" })) return;
   const id = currentId;
   try {
     await deleteExpert(id);
@@ -266,7 +266,7 @@ function fillExpertOptions(select, selectedId) {
   select.innerHTML = "";
   const none = document.createElement("option");
   none.value = "";
-  none.textContent = "无专家";
+  none.textContent = "无专�?;
   select.appendChild(none);
   for (const item of expertsCache) {
     const opt = document.createElement("option");
@@ -277,7 +277,7 @@ function fillExpertOptions(select, selectedId) {
   }
 }
 
-/** 刷新对话输入区与团队成员卡中的所有专家下拉 */
+/** 刷新对话输入区与团队成员卡中的所有专家下�?*/
 function refreshExpertSelects() {
   const chatSelect = document.getElementById("expert-select");
   if (chatSelect) fillExpertOptions(chatSelect, state.activeExpertId);
@@ -290,7 +290,7 @@ function getExpertsCached() {
   return expertsCache;
 }
 
-// ── 初始化 ──────────────────────────────────
+// ── 初始�?──────────────────────────────────
 
 function initExpertsPanel() {
   modal = document.getElementById("expert-modal");

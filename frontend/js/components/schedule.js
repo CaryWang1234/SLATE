@@ -1,19 +1,19 @@
 /**
- * SLATE 定时任务组件：创建/管理定时对话任务。
- * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话。
+ * SLATE 定时任务组件：创�?管理定时对话任务�?
+ * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话�?
  */
 
-import { state } from "../store.js?v=20260814-47";
-import { get, post, del, patch } from "../services/api.js?v=20260814-47";
-import { dlgConfirm } from "../services/dialog.js?v=20260814-47";
-import { t as tr } from "../services/i18n.js?v=20260814-47"; // 任务变量也叫 t，此处别名避免遮蔽
+import { state } from "../store.js?v=20260814-48";
+import { get, post, del, patch } from "../services/api.js?v=20260814-48";
+import { dlgConfirm } from "../services/dialog.js?v=20260814-48";
+import { t as tr } from "../services/i18n.js?v=20260814-48"; // 任务变量也叫 t，此处别名避免遮�?
 
 let modal, listEl;
 let pollTimer = null;
 
 function scheduleSummary(t) {
   if (t.mode === "once") return tr("单次 · {time}", { time: t.time || "" });
-  if (t.mode === "interval") return tr("每 {n} 分钟", { n: t.every_minutes || 60 });
+  if (t.mode === "interval") return tr("�?{n} 分钟", { n: t.every_minutes || 60 });
   return tr("每天 · {time}", { time: t.time || "09:00" });
 }
 
@@ -26,7 +26,7 @@ function formatTs(ts) {
 
 async function toast(msg) {
   try {
-    const app = await import("../app.js?v=20260814-47");
+    const app = await import("../app.js?v=20260814-48");
     app.toast(msg);
   } catch {}
 }
@@ -39,7 +39,7 @@ function fillModelOptions() {
     ["国产模型", state.modelRegistry?.domestic],
     ["国际模型", state.modelRegistry?.international],
     ["本地模型", state.modelRegistry?.local],
-    ["自定义模型", state.customModels],
+    ["自定义模�?, state.customModels],
   ];
   for (const [label, models] of groups) {
     if (!Array.isArray(models) || !models.length) continue;
@@ -80,7 +80,7 @@ async function renderList() {
   if (!tasks.length) {
     const empty = document.createElement("div");
     empty.className = "schedule-empty";
-    empty.textContent = "暂无定时任务，先在上方添加一个";
+    empty.textContent = "暂无定时任务，先在上方添加一�?;
     listEl.appendChild(empty);
     return;
   }
@@ -96,7 +96,7 @@ async function renderList() {
     const meta = document.createElement("div");
     meta.className = "schedule-item-meta";
     const status = t.last_status
-      ? (t.last_status === "ok" ? tr("✓ 上次运行 {time}", { time: formatTs(t.last_run) }) : `✗ ${t.last_status}`)
+      ? (t.last_status === "ok" ? tr("�?上次运行 {time}", { time: formatTs(t.last_run) }) : `�?${t.last_status}`)
       : "尚未运行";
     meta.textContent = `${scheduleSummary(t)} · ${t.model_id} · ${status}`;
     info.appendChild(name);
@@ -118,12 +118,12 @@ async function renderList() {
 
     const btnRun = document.createElement("button");
     btnRun.className = "msg-action-btn";
-    btnRun.textContent = "▶";
+    btnRun.textContent = "�?;
     btnRun.title = "立即运行";
     btnRun.addEventListener("click", async () => {
       const res = await post(`/schedule/tasks/${t.id}/run`);
       if (res.code === 0) {
-        toast("任务已触发，结果稍后归档到 [定时] 会话");
+        toast("任务已触发，结果稍后归档�?[定时] 会话");
         startPolling();
       } else {
         toast(res.message || "触发失败");
@@ -133,7 +133,7 @@ async function renderList() {
 
     const btnDel = document.createElement("button");
     btnDel.className = "msg-action-btn";
-    btnDel.textContent = "✕";
+    btnDel.textContent = "�?;
     btnDel.title = "删除任务";
     btnDel.addEventListener("click", async () => {
       if (!await dlgConfirm(tr("删除定时任务「{name}」？", { name: t.name }), { danger: true, okText: "删除" })) return;
@@ -168,7 +168,7 @@ async function addTask() {
   const time = document.getElementById("schedule-time")?.value || "09:00";
   const every_minutes = parseInt(document.getElementById("schedule-minutes")?.value) || 60;
 
-  if (!name) return toast("请填写任务名称");
+  if (!name) return toast("请填写任务名�?);
   if (!prompt) return toast("请填写提示词");
   if (!model_id) return toast("请选择模型");
 
@@ -177,7 +177,7 @@ async function addTask() {
     if (res.code !== 0) return toast(res.message || "添加失败");
     document.getElementById("schedule-name").value = "";
     document.getElementById("schedule-prompt").value = "";
-    toast("定时任务已添加");
+    toast("定时任务已添�?);
     renderList();
   } catch (e) {
     toast(tr("添加失败: {msg}", { msg: e.message }));

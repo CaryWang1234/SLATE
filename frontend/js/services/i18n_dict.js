@@ -1065,4 +1065,9 @@ export const EN_DICT = {
   "代码审查": "Code Review",
   "重构整理": "Refactor",
   "通用 Agent": "Generic Agent",
+
+  // ── Responses API 模式 ──────────────────────────────
+  "启用 Responses API 模式（仅部分模型支持，开启后将使用新版 API 格式）": "Enable Responses API mode (only some models support it; uses the new API format when enabled)",
+  "支持 Responses API 的模型：{models}": "Models supporting Responses API: {models}",
+  "当前无模型支持 Responses API": "No models currently support Responses API",
 };

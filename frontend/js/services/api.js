@@ -2,17 +2,14 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260814-47";
-import { t } from "./i18n.js?v=20260814-47";
+import { API_BASE } from "../store.js?v=20260814-48";
+import { t } from "./i18n.js?v=20260814-48";
 
-// ── 超时与重试常量（参考主流 Agent：idle watchdog + 零内容自动重试） ──
-const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（含 MCP 工具）总超时
-const STREAM_IDLE_TIMEOUT_MS = 90000;   // 流式：90 秒无任何数据视为连接已死
-const STREAM_MAX_RETRIES = 2;           // 未产出任何内容时的自动重试次数
-
+// ── 超时与重试常量（参考主�?Agent：idle watchdog + 零内容自动重试） ──
+const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（�?MCP 工具）总超�?const STREAM_IDLE_TIMEOUT_MS = 90000;   // 流式�?0 秒无任何数据视为连接已死
+const STREAM_MAX_RETRIES = 2;           // 未产出任何内容时的自动重试次�?
 /**
- * 通用 JSON 请求（带超时保护，防止工具/接口挂起导致界面永久卡死）
- */
+ * 通用 JSON 请求（带超时保护，防止工�?接口挂起导致界面永久卡死�? */
 async function request(path, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   const url = `${API_BASE}${path}`;
   const defaults = {
@@ -30,7 +27,7 @@ async function request(path, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
     resp = await fetch(url, { ...config, signal: controller.signal });
   } catch (err) {
     clearTimeout(timer);
-    if (controller.signal.aborted) throw new Error(t("请求超时（{s}s），可重试", { s: Math.round(timeoutMs / 1000) }));
+    if (controller.signal.aborted) throw new Error(t("请求超时（{s}s），可重�?, { s: Math.round(timeoutMs / 1000) }));
     throw err;
   }
   clearTimeout(timer);
@@ -66,11 +63,10 @@ function patch(path, body) {
 }
 
 /**
- * 流式聊天请求：返回 AsyncIterator<string>
- * 参考主流 Agent 的流式健壮性方案：
- * - Idle watchdog：超过 STREAM_IDLE_TIMEOUT_MS 无任何数据 → 主动中断（区分“慢”与“已死”）
- * - 零内容自动重试：连接失败/挂死且未产出任何内容时，退避重试
- * - payload.meta：可选对象，回写 finish_reason 到 meta.finishReason
+ * 流式聊天请求：返�?AsyncIterator<string>
+ * 参考主�?Agent 的流式健壮性方案：
+ * - Idle watchdog：超�?STREAM_IDLE_TIMEOUT_MS 无任何数�?�?主动中断（区分“慢”与“已死”）
+ * - 零内容自动重试：连接失败/挂死且未产出任何内容时，退避重�? * - payload.meta：可选对象，回写 finish_reason �?meta.finishReason
  */
 async function* streamChat(payload) {
   const { signal, meta, ...body } = payload || {};
@@ -108,7 +104,7 @@ async function* streamChat(payload) {
       let buffer = "";
       let done = false;
 
-      // 解析 SSE 行：收集 content 增量，回写 finish_reason，遇 [DONE] 结束
+      // 解析 SSE 行：收集 content 增量，回�?finish_reason，遇 [DONE] 结束
       const parseLines = (lines) => {
         const chunks = [];
         for (const line of lines) {
@@ -123,7 +119,7 @@ async function* streamChat(payload) {
             const content = parsed?.choices?.[0]?.delta?.content;
             if (content) chunks.push(content);
           } catch (e) {
-            // 非 JSON 行，跳过
+            // �?JSON 行，跳过
           }
         }
         return chunks;
@@ -132,8 +128,7 @@ async function* streamChat(payload) {
       while (!done) {
         const { done: streamDone, value } = await reader.read();
         if (streamDone) break;
-        receivedAny = true;   // 任何数据到达（含心跳注释）都重置看门狗
-        resetIdle();
+        receivedAny = true;   // 任何数据到达（含心跳注释）都重置看门�?        resetIdle();
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
@@ -141,16 +136,14 @@ async function* streamChat(payload) {
         for (const chunk of parseLines(lines)) yield chunk;
       }
 
-      // 流结束：flush 解码器内残留字节（跨 chunk 截断的多字节中文字符）并处理缓冲区尾部
-      if (!done) {
+      // 流结束：flush 解码器内残留字节（跨 chunk 截断的多字节中文字符）并处理缓冲区尾�?      if (!done) {
         buffer += decoder.decode();
         for (const chunk of parseLines(buffer.split("\n"))) yield chunk;
       }
       return;
     } catch (err) {
-      if (signal?.aborted) throw err;   // 用户主动停止：保持 AbortError 语义
-      // 未产出任何内容 → 自动重试（连接失败/瞬断/服务端无响应）
-      if (!receivedAny && attempt <= STREAM_MAX_RETRIES) {
+      if (signal?.aborted) throw err;   // 用户主动停止：保�?AbortError 语义
+      // 未产出任何内�?�?自动重试（连接失�?瞬断/服务端无响应�?      if (!receivedAny && attempt <= STREAM_MAX_RETRIES) {
         await new Promise(r => setTimeout(r, 700 * attempt));
         continue;
       }
@@ -164,8 +157,7 @@ async function* streamChat(payload) {
 }
 
 /**
- * 上传文件（FormData）
- */
+ * 上传文件（FormData�? */
 async function upload(path, formData) {
   const url = `${API_BASE}${path}`;
   const resp = await fetch(url, {

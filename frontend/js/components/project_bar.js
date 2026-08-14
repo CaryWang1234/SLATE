@@ -2,17 +2,17 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260814-47";
-import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260814-47";
-import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260814-47";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260814-47";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260814-48";
+import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260814-48";
+import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260814-48";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260814-48";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let fileTreeContainer, projectInfoEl, projectCloseBtn;
 let currentBrowsePath = "";
 let sidebarCollapsed = false;
 
-// ── 项目栏渲染 ────────────────────────────────
+// ── 项目栏渲�?────────────────────────────────
 
 function renderProjectBar() {
   if (!projectBar) return;
@@ -22,8 +22,8 @@ function renderProjectBar() {
 
   const toggleBtn = document.createElement("button");
   toggleBtn.className = "icon-btn";
-  toggleBtn.textContent = sidebarCollapsed ? "›" : "‹";
-  toggleBtn.title = sidebarCollapsed ? "展开项目栏" : "折叠项目栏";
+  toggleBtn.textContent = sidebarCollapsed ? "�? : "�?;
+  toggleBtn.title = sidebarCollapsed ? "展开项目�? : "折叠项目�?;
   toggleBtn.addEventListener("click", toggleProjectSidebar);
   actions.appendChild(toggleBtn);
 
@@ -48,7 +48,7 @@ function renderProjectBar() {
 
     const refreshBtn = document.createElement("button");
     refreshBtn.className = "icon-btn";
-    refreshBtn.textContent = "↻";
+    refreshBtn.textContent = "�?;
     refreshBtn.title = "刷新项目";
     refreshBtn.addEventListener("click", () => handleRefreshProject(refreshBtn));
     actions.appendChild(refreshBtn);
@@ -56,9 +56,9 @@ function renderProjectBar() {
     const understandBtn = document.createElement("button");
     understandBtn.className = "icon-btn";
     understandBtn.textContent = "📖";
-    understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册";
+    understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手�?;
     understandBtn.addEventListener("click", () => {
-      import("./understand.js?v=20260814-47")
+      import("./understand.js?v=20260814-48")
         .then(({ openUnderstandModal }) => openUnderstandModal())
         .catch(() => {});
     });
@@ -66,7 +66,7 @@ function renderProjectBar() {
 
     const configBtn = document.createElement("button");
     configBtn.className = "icon-btn";
-    configBtn.textContent = "⚙";
+    configBtn.textContent = "�?;
     configBtn.title = "项目设置";
     configBtn.addEventListener("click", openProjectSettings);
     actions.appendChild(configBtn);
@@ -80,8 +80,7 @@ function renderProjectBar() {
 
     projectBar.appendChild(actions);
 
-    // 自动浏览根目录
-    if (!state.projectFileTree?.entries) {
+    // 自动浏览根目�?    if (!state.projectFileTree?.entries) {
       refreshFileTree("");
     }
   } else {
@@ -89,14 +88,14 @@ function renderProjectBar() {
 
     const openBtn = document.createElement("button");
     openBtn.className = "project-bar-open";
-    openBtn.textContent = "📂 打开项目…";
+    openBtn.textContent = "📂 打开项目�?;
     openBtn.addEventListener("click", openProjectModal);
     projectBar.appendChild(openBtn);
     projectBar.appendChild(actions);
 
     // 清空文件树，显示占位
     if (fileTreeContainer) {
-      fileTreeContainer.innerHTML = '<div class="file-tree-empty">打开项目以浏览文件</div>';
+      fileTreeContainer.innerHTML = '<div class="file-tree-empty">打开项目以浏览文�?/div>';
     }
   }
 }
@@ -144,8 +143,7 @@ async function handleOpenProject() {
   if (res.code === 0) {
     setProject(res.data);
     projectOpenModal.classList.add("hidden");
-    // 自动浏览根目录
-    currentBrowsePath = "";
+    // 自动浏览根目�?    currentBrowsePath = "";
     await refreshFileTree("");
   } else {
     dlgToast(res.message || "打开失败", 3200);
@@ -153,7 +151,7 @@ async function handleOpenProject() {
 }
 
 async function handleCloseProject() {
-  if (!await dlgConfirm("关闭当前项目？", { okText: "关闭" })) return;
+  if (!await dlgConfirm("关闭当前项目�?, { okText: "关闭" })) return;
   await closeProject();
   setProject(null);
   setProjectFileTree([]);
@@ -178,7 +176,7 @@ async function handleRefreshProject(button) {
   }
 }
 
-// ── 文件树 ────────────────────────────────────
+// ── 文件�?────────────────────────────────────
 
 async function refreshFileTree(path) {
   const res = await browseFiles(path);
@@ -197,12 +195,11 @@ function renderFileTree() {
 
   const data = state.projectFileTree;
   if (!data || !data.entries) {
-    fileTreeContainer.innerHTML = '<div class="file-tree-empty">未浏览目录</div>';
+    fileTreeContainer.innerHTML = '<div class="file-tree-empty">未浏览目�?/div>';
     return;
   }
 
-  // 面包屑导航
-  if (currentBrowsePath && currentBrowsePath !== ".") {
+  // 面包屑导�?  if (currentBrowsePath && currentBrowsePath !== ".") {
     const breadcrumb = document.createElement("div");
     breadcrumb.className = "file-tree-breadcrumb";
     const rootLink = document.createElement("span");
@@ -235,7 +232,7 @@ function renderFileTree() {
   if (currentBrowsePath && currentBrowsePath !== ".") {
     const parentBtn = document.createElement("div");
     parentBtn.className = "file-tree-item file-tree-dir";
-    parentBtn.textContent = "⬆ ..";
+    parentBtn.textContent = "�?..";
     parentBtn.addEventListener("click", () => {
       const parts = currentBrowsePath.split(/[/\\]/).filter(Boolean);
       parts.pop();
@@ -244,8 +241,7 @@ function renderFileTree() {
     fileTreeContainer.appendChild(parentBtn);
   }
 
-  // 文件和目录
-  for (const entry of data.entries) {
+  // 文件和目�?  for (const entry of data.entries) {
     const item = document.createElement("div");
     item.className = `file-tree-item ${entry.type === "dir" ? "file-tree-dir" : "file-tree-file"}`;
 
@@ -284,8 +280,7 @@ async function openFile(path) {
   filePreviewEl.innerHTML = "";
   filePreviewEl.classList.remove("hidden");
 
-  // 标题栏
-  const header = document.createElement("div");
+  // 标题�?  const header = document.createElement("div");
   header.className = "file-preview-header";
 
   const title = document.createElement("span");
@@ -302,8 +297,8 @@ async function openFile(path) {
 
   const insertBtn = document.createElement("button");
   insertBtn.className = "icon-btn";
-  insertBtn.textContent = "↗";
-  insertBtn.title = "插入到聊天";
+  insertBtn.textContent = "�?;
+  insertBtn.title = "插入到聊�?;
   insertBtn.addEventListener("click", () => {
     const chatInput = document.getElementById("chat-input");
     if (chatInput) {
@@ -327,10 +322,9 @@ async function openFile(path) {
   header.appendChild(actions);
   filePreviewEl.appendChild(header);
 
-  // 文件内容（按扩展名语法高亮，未知类型走 highlightAuto）
-  const pre = document.createElement("pre");
+  // 文件内容（按扩展名语法高亮，未知类型�?highlightAuto�?  const pre = document.createElement("pre");
   pre.className = "file-preview-content";
-  const text = (content || "(空文件)").slice(0, 10000);
+  const text = (content || "(空文�?").slice(0, 10000);
   let highlighted = false;
   if (content && window.hljs) {
     try {
@@ -356,7 +350,7 @@ function openProjectSettings() {
   window.dispatchEvent(new CustomEvent("slate:open-settings", { detail: { focusConstitution: true } }));
 }
 
-// ── 初始化 ────────────────────────────────────
+// ── 初始�?────────────────────────────────────
 
 function initProjectBar() {
   projectBar = document.getElementById("project-bar");
@@ -386,8 +380,7 @@ function initProjectBar() {
     });
   }
 
-  // 订阅项目状态变化
-  subscribe("project", renderProjectBar);
+  // 订阅项目状态变�?  subscribe("project", renderProjectBar);
   subscribe("projectFileTree", renderFileTree);
 
   // 初始渲染
