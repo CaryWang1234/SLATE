@@ -1,11 +1,11 @@
-﻿/**
+/**
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260813-46";
-import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260813-46";
-import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260813-46";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260813-46";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260814-47";
+import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260814-47";
+import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260814-47";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260814-47";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let fileTreeContainer, projectInfoEl, projectCloseBtn;
@@ -58,7 +58,7 @@ function renderProjectBar() {
     understandBtn.textContent = "📖";
     understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册";
     understandBtn.addEventListener("click", () => {
-      import("./understand.js?v=20260813-46")
+      import("./understand.js?v=20260814-47")
         .then(({ openUnderstandModal }) => openUnderstandModal())
         .catch(() => {});
     });

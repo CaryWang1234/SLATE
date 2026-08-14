@@ -1,9 +1,9 @@
-﻿/**
+/**
  * SLATE 专家包服务：zip 导入/导出、增删改查、文件管理
  * 专家包结构：persona.md + rules.md + data.json + knowledge/ + skills/
  */
 
-import { get, post, put, del, upload } from "./api.js?v=20260813-46";
+import { get, post, put, del, upload } from "./api.js?v=20260814-47";
 
 /** 专家详情缓存（expertId → detail），供对话/团队注入时免重复请求 */
 const expertCache = new Map();

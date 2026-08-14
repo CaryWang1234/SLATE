@@ -1,9 +1,9 @@
-﻿/**
+/**
  * SLATE 磨墨模式服务：把粗糙想法研磨为结构化墨稿（任务书）。
  * 提示词注入、墨迹解析、墨稿检测与三个动作（送入 Harness / 投到白板 / 存为模板）。
  */
 
-import { get, post, del, patch } from "./api.js?v=20260813-46";
+import { get, post, del, patch } from "./api.js?v=20260814-47";
 
 const MAX_ROUNDS = 7;
 

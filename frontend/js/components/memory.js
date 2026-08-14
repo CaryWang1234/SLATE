@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 砚 记忆与素材管理
  * 长期记忆的 CRUD、AI 自动提取、用户资料编辑、素材收藏的归口
  */
@@ -10,10 +10,10 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260813-46";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260813-46";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260813-46";
-import { t } from "../services/i18n.js?v=20260813-46";
+} from "../store.js?v=20260814-47";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260814-47";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260814-47";
+import { t } from "../services/i18n.js?v=20260814-47";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -106,12 +106,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260813-46");
+    const { toast } = await import("../app.js?v=20260814-47");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260813-46");
+  const { toast } = await import("../app.js?v=20260814-47");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -301,7 +301,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260813-46");
+      const { toast } = await import("../app.js?v=20260814-47");
       toast(t("已自动提炼 {n} 条记忆", { n: added }) + (profileUpdated ? t("，并更新画像") : ""));
     }
     return { added, profileUpdated };
@@ -410,7 +410,7 @@ async function addKnowledgeDialog() {
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260813-46");
+    const { toast } = await import("../app.js?v=20260814-47");
     toast("知识已添加");
     await loadKnowledgeDocs();
   }
@@ -564,7 +564,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260813-46").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260814-47").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗？", { danger: true, okText: "重置" })) {

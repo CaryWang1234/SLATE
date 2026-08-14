@@ -3,7 +3,7 @@
  * 供聊天用量条悬浮弹窗与设置页用量统计共用
  */
 
-import { t } from "./i18n.js?v=20260813-46";
+import { t } from "./i18n.js?v=20260814-47";
 
 // 等价物阶梯（token 数为约值）：中文按 1 字 ≈ 1 token 粗估
 // base 为不带量词的名称，拼接格式统一为 "一{unit}{base}" / "{count} {unit}{base}"

@@ -1,11 +1,11 @@
-﻿/**
+/**
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260813-46";
-import { streamChat } from "../services/api.js?v=20260813-46";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260813-46";
-import { t } from "../services/i18n.js?v=20260813-46";
+import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260814-47";
+import { streamChat } from "../services/api.js?v=20260814-47";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260814-47";
+import { t } from "../services/i18n.js?v=20260814-47";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -66,7 +66,7 @@ function renderCard(card) {
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "board-card-delete";
   deleteBtn.textContent = "×";
-  deleteBtn.title = "删除卡片";
+  deleteBtn.title = t("删除卡片");
   deleteBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
     if (await dlgConfirm(t('删除卡片"{title}"？', { title: card.title }), { danger: true, okText: "删除" })) {
@@ -380,7 +380,7 @@ function setupDragDrop() {
 
 function openCardModal(card = null) {
   editingCardId = card?.id || null;
-  cardModalTitle.textContent = card ? "编辑卡片" : "添加卡片";
+  cardModalTitle.textContent = card ? t("编辑卡片") : t("添加卡片");
   cardInputTitle.value = card?.title || "";
   cardInputBody.value = card?.body || "";
   cardInputArrows.value = card?.arrows?.join(", ") || "";
@@ -402,7 +402,7 @@ function closeCardModal() {
 function saveCard() {
   const title = cardInputTitle.value.trim();
   if (!title) {
-    dlgToast("请输入标题");
+    dlgToast(t("请输入标题"));
     return;
   }
 
@@ -435,7 +435,7 @@ function saveCard() {
 
 async function deleteCard() {
   if (!editingCardId) return;
-  if (!await dlgConfirm("确认删除此卡片？", { danger: true, okText: "删除" })) return;
+  if (!await dlgConfirm(t("确认删除此卡片？"), { danger: true, okText: t("删除") })) return;
 
   const cards = state.boardCards.filter(c => c.id !== editingCardId);
   setBoardCards(cards);
@@ -484,23 +484,23 @@ function exportBoard() {
   const cards = state.boardCards || [];
   const date = new Date().toISOString().slice(0, 10);
   const lines = [
-    "# SLATE 黑板导出",
+    "# " + t("SLATE 黑板导出"),
     "",
-    `导出时间: ${new Date().toLocaleString()}`,
-    `卡片数量: ${cards.length}`,
+    `${t("导出时间")}: ${new Date().toLocaleString()}`,
+    `${t("卡片数量")}: ${cards.length}`,
     "",
-    "## 卡片",
+    `## ${t("卡片")}`,
     "",
   ];
 
   if (cards.length === 0) {
-    lines.push("暂无卡片。", "");
+    lines.push(t("暂无卡片。"), "");
   } else {
     for (const card of cards) {
-      lines.push(`### ${card.id} · ${card.title || "未命名"}`);
+      lines.push(`### ${card.id} · ${card.title || t("未命名")}`);
       if (card.body) lines.push("", card.body);
-      if (card.arrows?.length) lines.push("", `关联: ${card.arrows.join(", ")}`);
-      if (card.color && card.color !== "default") lines.push("", `颜色: ${card.color}`);
+      if (card.arrows?.length) lines.push("", `${t("关联")}: ${card.arrows.join(", ")}`);
+      if (card.color && card.color !== "default") lines.push("", `${t("颜色")}: ${card.color}`);
       lines.push("");
     }
   }
@@ -561,41 +561,51 @@ function toggleMermaid() {
 
 async function aiOrganize() {
   if (state.boardCards.length === 0) {
-    dlgToast("黑板是空的，请先添加卡片");
+    dlgToast(t("黑板是空的，请先添加卡片"));
     return;
   }
 
   const modelId = state.currentModel?.id;
   if (!modelId) {
-    dlgToast("请先选择模型");
+    dlgToast(t("请先选择模型"));
     return;
   }
 
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    dlgToast("请先配置模型 API Key");
+    dlgToast(t("请先配置模型 API Key"));
     return;
   }
 
-  // 构建提示词
-  const cardsInfo = state.boardCards.map(c =>
-    `- [${c.id}] ${c.title}${c.body ? ": " + c.body : ""}`
-  ).join("\n");
+  // 构建卡片信息（含颜色）
+  const cardsInfo = state.boardCards.map(c => {
+    let info = `- [${c.id}] ${c.title}`;
+    if (c.body) info += `: ${c.body}`;
+    if (c.color && c.color !== "default") info += ` (颜色: ${c.color})`;
+    return info;
+  }).join("\n");
 
-  const prompt = `请将以下卡片整理成合理的流程图结构，输出 JSON 数组格式，每个卡片包含 id、title、body、arrows（指向其他卡片 ID 的数组）。
+  const prompt = `你是一个结构化思维专家。请分析以下黑板卡片，进行整体重构优化。
 
 当前卡片：
 ${cardsInfo}
 
-要求：
-1. 保持原有卡片 ID 不变
-2. 根据逻辑关系添加 arrows 字段建立连接
-3. 输出纯 JSON，不要其他文字
+请完成以下工作：
+1. 优化卡片标题，使其简洁明确（不超过 10 字）
+2. 补充/精炼卡片详情（不超过 3 行）
+3. 根据逻辑关系建立 arrows 连接（指向目标卡片 ID）
+4. 按语义分配颜色：
+   - red = 问题/风险/阻塞
+   - orange = 进行中/待处理
+   - yellow = 想法/待讨论
+   - green = 已完成/通过
+   - blue = 信息/数据/资源
+   - purple = 创意/设计
+   - default = 未分类
 
-输出格式示例：
-[{"id":"c1","title":"开始","body":"","arrows":["c2"]},{"id":"c2","title":"结束","body":"","arrows":[]}]`;
+输出纯 JSON 数组，每项包含 id、title、body、arrows、color。保持原有卡片 ID 不变。
+示例：[{"id":"c1","title":"需求分析","body":"收集并整理用户需求","arrows":["c2"],"color":"blue"}]`;
 
-  // 调用 AI
   const messages = [{ role: "user", content: prompt }];
   let response = "";
 
@@ -605,7 +615,7 @@ ${cardsInfo}
       messages,
       api_key: apiKey,
       temperature: 0.3,
-      max_tokens: 2048,
+      max_tokens: 4096,
       stream: true,
     })) {
       response += chunk;
@@ -614,24 +624,33 @@ ${cardsInfo}
     // 解析 JSON
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      dlgToast("AI 返回格式错误，请重试");
+      dlgToast(t("AI 返回格式错误，请重试"));
       return;
     }
 
     const newCards = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(newCards)) {
-      dlgToast("AI 返回格式错误，请重试");
+      dlgToast(t("AI 返回格式错误，请重试"));
       return;
     }
 
-    // 更新卡片（保留原有内容，只更新 arrows）
+    const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
+
+    // 全量更新：保留原有 ID 匹配，应用 title/body/arrows/color 全部字段
     const updatedCards = state.boardCards.map(card => {
       const aiCard = newCards.find(c => c.id === card.id);
-      return aiCard ? { ...card, arrows: aiCard.arrows || [] } : card;
+      if (!aiCard) return card;
+      return {
+        ...card,
+        title: aiCard.title || card.title,
+        body: aiCard.body ?? card.body,
+        arrows: Array.isArray(aiCard.arrows) ? aiCard.arrows : (card.arrows || []),
+        color: VALID_COLORS.includes(aiCard.color) ? aiCard.color : card.color,
+      };
     });
 
     setBoardCards(updatedCards);
-    dlgToast("AI 整理完成！");
+    dlgToast(t("AI 重构完成"));
   } catch (e) {
     dlgToast(t("AI 整理失败：{msg}", { msg: e.message }));
   }
@@ -649,7 +668,7 @@ function parseCardsFromLLM(text) {
         for (const item of parsed) {
           cards.push({
             id: item.id || `c${Date.now().toString(36)}_${cards.length}`,
-            title: item.title || item.name || "未命名",
+            title: item.title || item.name || t("未命名"),
             body: item.body || item.description || "",
             arrows: item.arrows || item.depends || [],
             color: item.color || "default",
@@ -700,7 +719,7 @@ function initWhiteboard() {
 
   // 清空黑板
   document.getElementById("btn-clear-board").addEventListener("click", async () => {
-    if (await dlgConfirm("确认清空黑板？", { danger: true, okText: "清空" })) setBoardCards([]);
+    if (await dlgConfirm(t("确认清空黑板？"), { danger: true, okText: t("清空") })) setBoardCards([]);
   });
 
   // 模态框按钮

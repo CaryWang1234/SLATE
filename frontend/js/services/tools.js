@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SLATE AI 工具系统：让 AI 直接操作黑板、MCP 工具、提示词工厂
  *
  * 工具调用格式（AI 输出）：
@@ -13,10 +13,10 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260813-46";
-import { post } from "../services/api.js?v=20260813-46";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260813-46";
-import { t } from "./i18n.js?v=20260813-46";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260814-47";
+import { post } from "../services/api.js?v=20260814-47";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260814-47";
+import { t } from "./i18n.js?v=20260814-47";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -107,15 +107,23 @@ const TOOLS = {
 
   board_add: {
     name: "添加黑板卡片",
-    description: "在白板上添加一张任务/想法卡片，支持依赖关系",
+    description: "在白板上添加一张卡片，支持标题、详情、依赖关系和语义颜色。适合将想法/任务/概念可视化。",
     params: {
       title: { type: "string", description: "卡片标题", required: true },
       body: { type: "string", description: "卡片描述/详情" },
-      arrows: { type: "array", description: "依赖目标卡片 ID 列表" },
+      arrows: { type: "array", description: "依赖目标卡片 ID 列表（指向已有卡片）" },
+      color: { type: "string", description: "颜色: default/red/orange/yellow/green/blue/purple" },
     },
-    async execute({ title, body, arrows }) {
+    async execute({ title, body, arrows, color }) {
+      const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
       const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
-      const card = { id, title: title || "未命名", body: body || "", arrows: arrows || [] };
+      const card = {
+        id,
+        title: title || "未命名",
+        body: body || "",
+        arrows: arrows || [],
+        color: VALID_COLORS.includes(color) ? color : "default",
+      };
       addBoardCard(card);
       return `已添加卡片 [${id}]: ${title}`;
     },
@@ -123,17 +131,92 @@ const TOOLS = {
 
   board_read: {
     name: "读取黑板",
-    description: "获取当前黑板上所有卡片内容",
+    description: "获取当前黑板上所有卡片内容（含 ID、标题、详情、依赖、颜色）",
     params: {},
     async execute() {
       if (state.boardCards.length === 0) return "黑板为空";
       const lines = state.boardCards.map(c => {
         let s = `[${c.id}] ${c.title}`;
+        if (c.color && c.color !== "default") s += ` (${c.color})`;
         if (c.body) s += ` — ${c.body}`;
         if (c.arrows?.length) s += ` → ${c.arrows.join(", ")}`;
         return s;
       });
       return `黑板共 ${state.boardCards.length} 张卡片：\n${lines.join("\n")}`;
+    },
+  },
+
+  board_update: {
+    name: "更新黑板卡片",
+    description: "更新已有卡片的标题、详情、依赖或颜色。只改传入的字段，未传的保持不变。",
+    params: {
+      id: { type: "string", description: "目标卡片 ID", required: true },
+      title: { type: "string", description: "新标题" },
+      body: { type: "string", description: "新详情" },
+      arrows: { type: "array", description: "新依赖列表（覆盖原值）" },
+      color: { type: "string", description: "新颜色: default/red/orange/yellow/green/blue/purple" },
+    },
+    async execute({ id, title, body, arrows, color }) {
+      const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
+      const idx = state.boardCards.findIndex(c => c.id === id);
+      if (idx === -1) return `卡片 ${id} 不存在`;
+      const card = { ...state.boardCards[idx] };
+      if (title !== undefined) card.title = title;
+      if (body !== undefined) card.body = body;
+      if (arrows !== undefined) card.arrows = arrows;
+      if (color !== undefined) card.color = VALID_COLORS.includes(color) ? color : card.color;
+      const cards = [...state.boardCards];
+      cards[idx] = card;
+      setBoardCards(cards);
+      return `已更新卡片 [${id}]`;
+    },
+  },
+
+  board_batch: {
+    name: "批量操作黑板",
+    description: "一次性对黑板执行多个操作（添加/更新/删除/清空），适合整体重构黑板结构。操作按顺序执行。",
+    params: {
+      ops: { type: "array", description: '操作列表，每项: {action:"add",title,body,arrows,color} | {action:"update",id,title,body,arrows,color} | {action:"delete",id} | {action:"clear"}', required: true },
+    },
+    async execute({ ops }) {
+      if (!Array.isArray(ops) || !ops.length) return "ops 必须是非空数组";
+      const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
+      const results = [];
+      let cards = [...state.boardCards];
+
+      for (const op of ops) {
+        if (op.action === "add") {
+          const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+          cards.push({
+            id,
+            title: op.title || "未命名",
+            body: op.body || "",
+            arrows: op.arrows || [],
+            color: VALID_COLORS.includes(op.color) ? op.color : "default",
+          });
+          results.push(`+ [${id}] ${op.title || "未命名"}`);
+        } else if (op.action === "update") {
+          const idx = cards.findIndex(c => c.id === op.id);
+          if (idx === -1) { results.push(`- 跳过 ${op.id}: 不存在`); continue; }
+          const card = { ...cards[idx] };
+          if (op.title !== undefined) card.title = op.title;
+          if (op.body !== undefined) card.body = op.body;
+          if (op.arrows !== undefined) card.arrows = op.arrows;
+          if (op.color !== undefined && VALID_COLORS.includes(op.color)) card.color = op.color;
+          cards[idx] = card;
+          results.push(`~ [${op.id}]`);
+        } else if (op.action === "delete") {
+          const before = cards.length;
+          cards = cards.filter(c => c.id !== op.id);
+          results.push(cards.length < before ? `- [${op.id}]` : `跳过 ${op.id}: 不存在`);
+        } else if (op.action === "clear") {
+          cards = [];
+          results.push("清空");
+        }
+      }
+
+      setBoardCards(cards);
+      return `执行 ${ops.length} 项操作：\n${results.join("\n")}`;
     },
   },
 
@@ -964,6 +1047,28 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
   }
 
   if (minimal) return s;
+
+  // 黑板策略
+  s += "[黑板策略 — board_* 工具]\n";
+  s += "黑板是你的可视化工作区，卡片是结构化的思维单元。主动利用黑板帮助用户思考和组织信息。\n\n";
+  s += "**何时主动使用黑板：**\n";
+  s += "- 用户讨论复杂问题、多步骤任务、系统设计时，主动用 board_batch 将拆解结果投到黑板\n";
+  s += "- 用户头脑风暴时，将想法整理成卡片并按逻辑关系连接\n";
+  s += "- 任务拆解时，用卡片表示每个步骤，用 arrows 表示依赖关系\n";
+  s += "- 用户说“整理一下”“梳理一下”“画个流程图”时，直接操作黑板\n\n";
+  s += "**颜色语义（主动使用）：**\n";
+  s += "- red: 问题/风险/阻塞项\n";
+  s += "- orange: 进行中/待处理\n";
+  s += "- yellow: 想法/待讨论\n";
+  s += "- green: 已完成/通过/确认\n";
+  s += "- blue: 信息/数据/资源\n";
+  s += "- purple: 创意/设计/灵感\n\n";
+  s += "**最佳实践：**\n";
+  s += "1. 批量操作优先：用 board_batch 一次性构建完整结构，而非逐个 board_add\n";
+  s += "2. 先读后改：修改前先 board_read 了解现有结构\n";
+  s += "3. 建立连接：用 arrows 明确卡片间的依赖/数据流关系\n";
+  s += "4. 语义着色：根据卡片性质主动分配颜色，让用户一目了然\n";
+  s += "5. 保持简洁：卡片标题不超过 10 字，详情不超过 3 行\n\n";
 
   // file_edit 专项指导
   s += "[文件编辑规则 — file_edit 工具]\n";

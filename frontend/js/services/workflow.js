@@ -1,13 +1,13 @@
-﻿/**
+/**
  * SLATE 工作流引擎：DAG 拓扑执行、节点状态机、产物入库
  * - 依赖后端 /workflows 读取定义、/proxy/chat 调用模型、/skills/execute 复用技能链路
  * - 执行完成后通过 /knowledge/docs 复用现有知识库写入逻辑
  */
 
-import { get, post } from "./api.js?v=20260813-46";
-import { state, getModelKey } from "../store.js?v=20260813-46";
-import { guardSkillParams } from "./riskguard.js?v=20260813-46";
-import { t } from "./i18n.js?v=20260813-46";
+import { get, post } from "./api.js?v=20260814-47";
+import { state, getModelKey } from "../store.js?v=20260814-47";
+import { guardSkillParams } from "./riskguard.js?v=20260814-47";
+import { t } from "./i18n.js?v=20260814-47";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 
