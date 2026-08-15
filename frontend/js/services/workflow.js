@@ -1,13 +1,13 @@
 /**
- * SLATE 工作流引擎：DAG 拓扑执行、节点状态机、产物入�?
- * - 依赖后端 /workflows 读取定义�?proxy/chat 调用模型�?skills/execute 复用技能链�?
+ * SLATE 工作流引擎：DAG 拓扑执行、节点状态机、产物入�?
+ * - 依赖后端 /workflows 读取定义�?proxy/chat 调用模型�?skills/execute 复用技能链�?
  * - 执行完成后通过 /knowledge/docs 复用现有知识库写入逻辑
  */
 
-import { get, post } from "./api.js?v=20260814-48";
-import { state, getModelKey } from "../store.js?v=20260814-48";
-import { guardSkillParams } from "./riskguard.js?v=20260814-48";
-import { t } from "./i18n.js?v=20260814-48";
+import { get, post } from "./api.js?v=20260815-50";
+import { state, getModelKey } from "../store.js?v=20260815-50";
+import { guardSkillParams } from "./riskguard.js?v=20260815-50";
+import { t } from "./i18n.js?v=20260815-50";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 
@@ -15,19 +15,19 @@ const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAI
 
 async function loadWorkflows() {
   const res = await get("/workflows");
-  if (res.code !== 0) throw new Error(res.message || "工作流列表加载失�?);
+  if (res.code !== 0) throw new Error(res.message || "工作流列表加载失�?);
   return res.data || [];
 }
 
 async function getWorkflow(id) {
   const res = await get(`/workflows/${encodeURIComponent(id)}`);
-  if (res.code !== 0) throw new Error(res.message || "工作流加载失�?);
+  if (res.code !== 0) throw new Error(res.message || "工作流加载失�?);
   return res.data;
 }
 
 // ── DAG 工具 ────────────────────────────────
 
-/** 合并显式 edges �?inputs 隐式引用�?node_id），构建前置依赖�?*/
+/** 合并显式 edges �?inputs 隐式引用�?node_id），构建前置依赖�?*/
 function buildDeps(wf) {
   const ids = new Set((wf.nodes || []).map(n => n.id));
   const preds = new Map([...ids].map(id => [id, new Set()]));
@@ -71,7 +71,7 @@ function topoSort(wf) {
 
 // ── 变量解析 ────────────────────────────────
 
-/** $input �?用户输入�?node_id �?上游节点输出；其余视为字面量 */
+/** $input �?用户输入�?node_id �?上游节点输出；其余视为字面量 */
 function resolveVar(value, userInput, outputs) {
   if (typeof value !== "string") return value == null ? "" : String(value);
   if (value === "$input") return userInput;
@@ -98,7 +98,7 @@ function fillTemplate(tpl, vars) {
 
 function truncate(text, max = 300) {
   const s = String(text || "");
-  return s.length > max ? s.slice(0, max) + "�? : s;
+  return s.length > max ? s.slice(0, max) + "�? : s;
 }
 
 // ── 节点绑定解析 ────────────────────────────
@@ -130,7 +130,7 @@ function makeRunId() {
 }
 
 /**
- * �?DAG 拓扑顺序执行工作流�?
+ * �?DAG 拓扑顺序执行工作流�?
  * hooks: { onNode(record), onDone(result) }
  * record: { id, name, status, skill, outputKey, modelLabel, inputPreview, output, error, startedAt, finishedAt }
  */
@@ -160,13 +160,13 @@ async function runWorkflow(wf, userInput, members, hooks = {}) {
     const node = nodeMap.get(nodeId);
     const rec = records[nodeId];
 
-    // 上游存在失败/跳过 �?本节点跳过（明确错误信息�?
+    // 上游存在失败/跳过 �?本节点跳过（明确错误信息�?
     const blockedBy = [...preds.get(nodeId)].filter(pid =>
       records[pid].status === STATUS.FAILED || records[pid].status === STATUS.SKIPPED
     );
     if (blockedBy.length > 0) {
       rec.status = STATUS.SKIPPED;
-      rec.error = t("上游节点未成功（{names}），自动跳过", { names: blockedBy.map(id => records[id].name).join("�?) });
+      rec.error = t("上游节点未成功（{names}），自动跳过", { names: blockedBy.map(id => records[id].name).join("�?) });
       hooks.onNode?.(rec);
       continue;
     }
@@ -178,21 +178,21 @@ async function runWorkflow(wf, userInput, members, hooks = {}) {
     try {
       const vars = resolveInputs(node, userInput, outputs);
       rec.inputPreview = Object.entries(node.inputs || {})
-        .map(([key, raw]) => `{{${key}}} �?${raw}�?{truncate(vars[key], 120)}`)
+        .map(([key, raw]) => `{{${key}}} �?${raw}�?{truncate(vars[key], 120)}`)
         .join("\n");
 
       let output;
       if (node.skill) {
         // 技能节点：复用现有 /skills/execute 链路，inputs 作为工具参数
-        rec.modelLabel = `�?${node.skill}`;
+        rec.modelLabel = `�?${node.skill}`;
         const params = {};
         for (const [key, raw] of Object.entries(node.inputs || {})) params[key] = vars[key] ?? raw;
         // 高危命令审批：命中写死规则时弹框请求批准
         if (!(await guardSkillParams(node.skill, params))) {
-          throw new Error(t("高危命令被用户拒绝执�? {cmd}", { cmd: params.command || node.skill }));
+          throw new Error(t("高危命令被用户拒绝执�? {cmd}", { cmd: params.command || node.skill }));
         }
         const res = await post("/skills/execute", { skill: node.skill, params });
-        if (res.code !== 0) throw new Error(res.message || t("技�?{name} 执行失败", { name: node.skill }));
+        if (res.code !== 0) throw new Error(res.message || t("技�?{name} 执行失败", { name: node.skill }));
         output = typeof res.data === "string" ? res.data : JSON.stringify(res.data, null, 2);
       } else {
         // LLM 节点：role/model 绑定解析 + API Key 校验
@@ -200,9 +200,9 @@ async function runWorkflow(wf, userInput, members, hooks = {}) {
         rec.modelLabel = binding.modelLabel || binding.modelId;
         if (!binding.modelId) throw new Error(t("节点未绑定可用模型（role/model 均为空且无当前模型）"));
         const apiKey = getModelKey(binding.modelId);
-        if (!apiKey) throw new Error(t("模型 {name} 未配�?API Key，请先在设置页配�?, { name: rec.modelLabel }));
+        if (!apiKey) throw new Error(t("模型 {name} 未配�?API Key，请先在设置页配�?, { name: rec.modelLabel }));
 
-        const systemPrompt = binding.persona || "你是 SLATE 工作流的执行成员：认真完成分配的任务，紧扣任务要求作答，只输出结果本身，不要寒暄与前言�?;
+        const systemPrompt = binding.persona || "你是 SLATE 工作流的执行成员：认真完成分配的任务，紧扣任务要求作答，只输出结果本身，不要寒暄与前言�?;
         const userPrompt = fillTemplate(node.prompt || "", vars);
         const res = await post("/proxy/chat", {
           model: binding.modelId,
@@ -237,31 +237,31 @@ async function runWorkflow(wf, userInput, members, hooks = {}) {
   return result;
 }
 
-// ── 产物写入 knowledge（复用现�?/knowledge/docs 链路�?──
+// ── 产物写入 knowledge（复用现�?/knowledge/docs 链路�?──
 
 async function saveRunToKnowledge(wf, result) {
-  const icons = { success: "�?, failed: "�?, skipped: "�?, waiting: "�?, running: "�? };
+  const icons = { success: "�?, failed: "�?, skipped: "�?, waiting: "�?, running: "�? };
   const recs = result.order.map(id => result.records[id]);
   const okCount = recs.filter(r => r.status === STATUS.SUCCESS).length;
   const finalNodeId = [...result.order].reverse().find(id => result.records[id].status === STATUS.SUCCESS);
-  const finalOutput = finalNodeId ? result.records[finalNodeId].output : "（无成功节点产出�?;
+  const finalOutput = finalNodeId ? result.records[finalNodeId].output : "（无成功节点产出�?;
 
-  let content = `# 工作流产�?· ${wf.name}\n\n`;
-  content += `- 工作�?ID: \`${wf.id}\`\n`;
+  let content = `# 工作流产�?· ${wf.name}\n\n`;
+  content += `- 工作�?ID: \`${wf.id}\`\n`;
   content += `- 运行 ID: \`${result.runId}\`\n`;
   content += `- 运行时间: ${new Date(result.startedAt).toLocaleString()}\n`;
   content += `- 节点结果: ${okCount}/${recs.length} 成功\n\n`;
   content += `## 节点摘要\n\n`;
   for (const r of recs) {
-    content += `### ${icons[r.status] || ""} ${r.name}�?{r.outputKey}）\n`;
-    content += `绑定: ${r.modelLabel || "�?} · 状�? ${r.status}\n\n`;
+    content += `### ${icons[r.status] || ""} ${r.name}�?{r.outputKey}）\n`;
+    content += `绑定: ${r.modelLabel || "�?} · 状�? ${r.status}\n\n`;
     if (r.error) content += `> 错误: ${r.error}\n\n`;
     if (r.output) content += truncate(r.output, 800) + "\n\n";
   }
   content += `## 最终结果\n\n${finalOutput}\n`;
 
   const res = await post("/knowledge/docs", {
-    title: `工作流产�?· ${wf.name}`,
+    title: `工作流产�?· ${wf.name}`,
     source: "workflow",
     kind: "workflow",
     content,
@@ -275,7 +275,7 @@ async function saveRunToKnowledge(wf, result) {
       finished_at: result.finishedAt,
     },
   });
-  if (res.code !== 0) throw new Error(res.message || t("写入知识库失�?));
+  if (res.code !== 0) throw new Error(res.message || t("写入知识库失�?));
   return res.data?.id;
 }
 

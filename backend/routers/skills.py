@@ -23,7 +23,7 @@ USER_SKILLS_DIR = DATA_DIR / "skills"
 BUILTIN_SKILLS: dict[str, str] = {
     "file_tree": "扫描目录树（仅第一层）",
     "file_peek": "读取文件前 N 行（≤50行）",
-    "terminal": "受限终端执行（指定目录沙箱）",
+    "terminal": "受限终端执行（指定目录沙箱，支持后台执行）",
     "html_render": "生成纯黑白 HTML 骨架",
     "css_color": "基于描述生成 CSS 配色方案（支持暖色/冷色/自然/深色等多种风格）",
     "doc_write": "生成 Markdown 格式技术文档或需求说明",
@@ -42,6 +42,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "qrcode_create": "生成 SVG 二维码（文本或 URL），返回文件路径与预览链接",
     "python_api_extract": "提取 Python 库/模块的公共 API 文档（函数签名、类方法、属性），输出 JSON/Markdown",
     "html_bundle": "将 html 及相对路径的 css/js 内联合并为单个 html 文件（便携分发）",
+    "code_scan": "代码安全扫描（检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等）",
 }
 
 

@@ -1070,4 +1070,43 @@ export const EN_DICT = {
   "启用 Responses API 模式（仅部分模型支持，开启后将使用新版 API 格式）": "Enable Responses API mode (only some models support it; uses the new API format when enabled)",
   "支持 Responses API 的模型：{models}": "Models supporting Responses API: {models}",
   "当前无模型支持 Responses API": "No models currently support Responses API",
+
+  // ── 终端后台执行 ──────────────────────────────
+  "命令已在后台启动": "Command started in background",
+  "当前无后台任务": "No background tasks running",
+  "任务不存在": "Task not found",
+  "任务已结束": "Task already finished",
+  "已标记任务为停止": "Task marked as stopped",
+  "用户手动终止": "Manually terminated by user",
+
+  // ── 代码安全扫描 ──────────────────────────────
+  "代码安全扫描": "Code Security Scan",
+  "扫描目录": "Scan directory",
+  "扫描文件数": "Files scanned",
+  "发现问题数": "Issues found",
+  "严重级别": "Severity",
+  "类别": "Category",
+  "硬编码密钥": "Hardcoded Secret",
+  "硬编码密码": "Hardcoded Password",
+  "SQL 注入": "SQL Injection",
+  "XSS 风险": "XSS Risk",
+  "弱哈希算法": "Weak Hash Algorithm",
+  "弱加密算法": "Weak Encryption Algorithm",
+  "调试残留": "Debug Code Left",
+  "不安全反序列化": "Insecure Deserialization",
+  "路径遍历": "Path Traversal",
+  "不安全随机数": "Insecure Random Number",
+  "代码注入": "Code Injection",
+  "安全隐患标记": "Security Concern Marker",
+
+  // ── 知识库分类 ─────────────────────────────
+  "模块级知识": "Module-level Knowledge",
+  "仓库级知识": "Repository-level Knowledge",
+  "记忆分类": "Memory Categories",
+  "架构": "Architecture",
+  "技术": "Technology",
+  "规范": "Convention",
+  "构建": "Build",
+  "日志": "Logging",
+  "配置": "Configuration",
 };

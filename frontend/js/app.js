@@ -2,24 +2,24 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260814-48";
-import { initI18n, t } from "./services/i18n.js?v=20260814-48";
-import { get, post, put } from "./services/api.js?v=20260814-48";
-import { dlgConfirm } from "./services/dialog.js?v=20260814-48";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260814-48";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260814-48";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260814-48";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260814-48";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260814-48";
-import { initTeamPanel } from "./components/team.js?v=20260814-48";
-import { initProjectBar } from "./components/project_bar.js?v=20260814-48";
-import { initMemoryPanel } from "./components/memory.js?v=20260814-48";
-import { initExpertsPanel } from "./components/experts.js?v=20260814-48";
-import { initSchedule } from "./components/schedule.js?v=20260814-48";
-import { initRiskGuard } from "./services/riskguard.js?v=20260814-48";
-import { initUnderstandPanel } from "./components/understand.js?v=20260814-48";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260814-48";
-import { setProject, setProjectFileTree } from "./store.js?v=20260814-48";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260815-50";
+import { initI18n, t } from "./services/i18n.js?v=20260815-50";
+import { get, post, put } from "./services/api.js?v=20260815-50";
+import { dlgConfirm } from "./services/dialog.js?v=20260815-50";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260815-50";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260815-50";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260815-50";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260815-50";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260815-50";
+import { initTeamPanel } from "./components/team.js?v=20260815-50";
+import { initProjectBar } from "./components/project_bar.js?v=20260815-50";
+import { initMemoryPanel } from "./components/memory.js?v=20260815-50";
+import { initExpertsPanel } from "./components/experts.js?v=20260815-50";
+import { initSchedule } from "./components/schedule.js?v=20260815-50";
+import { initRiskGuard } from "./services/riskguard.js?v=20260815-50";
+import { initUnderstandPanel } from "./components/understand.js?v=20260815-50";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260815-50";
+import { setProject, setProjectFileTree } from "./store.js?v=20260815-50";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -53,17 +53,17 @@ function safeInit(name, fn) {
     fn();
     return true;
   } catch (e) {
-    console.error(`[SLATE] ${name} 初始化失�?`, e);
+    console.error(`[SLATE] ${name} 初始化失�?`, e);
     toast(t("{name} 初始化失败，请查看控制台", { name }));
     return false;
   }
 }
 
-// ── 模型选择�?──────────────────────────────
+// ── 模型选择�?──────────────────────────────
 
 function populateModelSelect() {
   const select = document.getElementById("model-select");
-  select.innerHTML = '<option value="">选择模型�?/option>';
+  select.innerHTML = '<option value="">选择模型�?/option>';
 
   const groups = { international: "国外", domestic: "国内", local: "本地" };
 
@@ -77,21 +77,21 @@ function populateModelSelect() {
       opt.value = m.id;
       const hasKey = hasModelKey(m.id);
       const supportsResponses = m.supports_responses === true;
-      opt.textContent = (hasKey ? "�?" : "�?") + m.name + (supportsResponses ? " �? : "");
+      opt.textContent = (hasKey ? "�?" : "�?") + m.name + (supportsResponses ? " �? : "");
       opt.title = m.base_url + (supportsResponses ? " (支持 Responses API)" : "");
       optgroup.appendChild(opt);
     }
     select.appendChild(optgroup);
   }
 
-  // 自定义模�?  if (state.customModels.length > 0) {
+  // 自定义模�?  if (state.customModels.length > 0) {
     const optgroup = document.createElement("optgroup");
-    optgroup.label = "自定�?;
+    optgroup.label = "自定�?;
     for (const m of state.customModels) {
       const opt = document.createElement("option");
       opt.value = m.id;
       const hasKey = hasModelKey(m.id);
-      opt.textContent = (hasKey ? "�?" : "�?") + m.name;
+      opt.textContent = (hasKey ? "�?" : "�?") + m.name;
       optgroup.appendChild(opt);
     }
     select.appendChild(optgroup);
@@ -99,7 +99,7 @@ function populateModelSelect() {
 
   const customOpt = document.createElement("option");
   customOpt.value = "__custom__";
-  customOpt.textContent = "+ 自定义模型�?;
+  customOpt.textContent = "+ 自定义模型�?;
   select.appendChild(customOpt);
 
   if (state.currentModel) select.value = state.currentModel.id;
@@ -118,7 +118,7 @@ function populateAutoReviewModelSelect() {
   const select = document.getElementById("setting-auto-review-model");
   if (!select) return;
   const currentValue = state.autoReview?.modelId || "";
-  select.innerHTML = '<option value="">跟随当前主模�?/option>';
+  select.innerHTML = '<option value="">跟随当前主模�?/option>';
   for (const m of getAllModels()) {
     const opt = document.createElement("option");
     opt.value = m.id;
@@ -142,24 +142,24 @@ function handleModelSelect(e) {
     const found = models.find(m => m.id === value);
     if (found) {
       if (!hasModelKey(found.id) && found.id !== "local") {
-        // 没有 API key，弹出输�?        openKeyInputModal(found);
+        // 没有 API key，弹出输�?        openKeyInputModal(found);
       } else {
         setCurrentModel(found);
         resetUsage();
-        toast(t("已切�? {name}", { name: found.name }));
+        toast(t("已切�? {name}", { name: found.name }));
       }
       return;
     }
   }
 
-  // 查找自定义模�?  const custom = state.customModels.find(m => m.id === value);
+  // 查找自定义模�?  const custom = state.customModels.find(m => m.id === value);
   if (custom) {
     if (!hasModelKey(custom.id)) {
       openKeyInputModal(custom);
     } else {
       setCurrentModel(custom);
       resetUsage();
-      toast(t("已切�? {name}", { name: custom.name }));
+      toast(t("已切�? {name}", { name: custom.name }));
     }
   }
 }
@@ -174,7 +174,7 @@ function openKeyInputModal(model) {
   toast(t("请先配置 API Key: {name}", { name: model.name }));
 }
 
-// ── 自定义模型编�?──────────────────────────
+// ── 自定义模型编�?──────────────────────────
 
 let editingCustomModelId = null;
 
@@ -184,7 +184,7 @@ function openCustomModelModal(model = null) {
   renderKeyManagement();
   editingCustomModelId = model?.id || null;
   const editor = document.getElementById("custom-model-editor");
-  document.getElementById("custom-model-editor-title").textContent = model ? "编辑自定义模�? : "添加自定义模�?;
+  document.getElementById("custom-model-editor-title").textContent = model ? "编辑自定义模�? : "添加自定义模�?;
   document.getElementById("btn-save-custom-model").textContent = model ? "保存" : "添加";
   document.getElementById("custom-model-name").value = model?.id || "";
   document.getElementById("custom-model-url").value = model?.base_url || "";
@@ -201,7 +201,7 @@ function closeCustomModelModal() {
   document.getElementById("custom-model-url").value = "";
   document.getElementById("custom-model-key").value = "";
   document.getElementById("custom-model-ctx").value = "32768";
-  document.getElementById("custom-model-editor-title").textContent = "添加自定义模�?;
+  document.getElementById("custom-model-editor-title").textContent = "添加自定义模�?;
   document.getElementById("btn-save-custom-model").textContent = "添加";
 }
 
@@ -219,7 +219,7 @@ function saveCustomModel() {
   const model = { id: name, name, provider: "openai", base_url: baseUrl, context_window: ctx };
   const duplicate = state.customModels.some(m => m.id === name && m.id !== editingCustomModelId);
   if (duplicate) {
-    toast("模型名称已存�?);
+    toast("模型名称已存�?);
     return;
   }
 
@@ -240,7 +240,7 @@ function saveCustomModel() {
   toast(t(wasEditing ? "已更新自定义模型: {name}" : "已添加自定义模型: {name}", { name }));
 }
 
-// ── 密钥管理面板（设置弹窗内�?──────────────
+// ── 密钥管理面板（设置弹窗内�?──────────────
 
 function renderCustomModelManagement() {
   const container = document.getElementById("custom-model-list");
@@ -250,7 +250,7 @@ function renderCustomModelManagement() {
   if (!state.customModels.length) {
     const empty = document.createElement("div");
     empty.className = "custom-model-empty";
-    empty.textContent = "暂无自定义模�?;
+    empty.textContent = "暂无自定义模�?;
     container.appendChild(empty);
     return;
   }
@@ -275,7 +275,7 @@ function renderCustomModelManagement() {
 
     const editBtn = document.createElement("button");
     editBtn.className = "icon-btn";
-    editBtn.textContent = "�?;
+    editBtn.textContent = "�?;
     editBtn.title = "编辑";
     editBtn.addEventListener("click", () => openCustomModelModal(model));
 
@@ -334,11 +334,11 @@ function renderKeyManagement() {
     input.className = "setting-input key-mgmt-input";
     input.dataset.modelKey = m.id;
     input.value = getModelKey(m.id) || "";
-    input.placeholder = hasModelKey(m.id) ? "已配�?(留空删除)" : "未配�?;
+    input.placeholder = hasModelKey(m.id) ? "已配�?(留空删除)" : "未配�?;
 
     const saveBtn = document.createElement("button");
     saveBtn.className = "icon-btn key-mgmt-save";
-    saveBtn.textContent = "�?;
+    saveBtn.textContent = "�?;
     saveBtn.title = "保存";
     saveBtn.addEventListener("click", () => {
       const val = input.value.trim();
@@ -350,7 +350,7 @@ function renderKeyManagement() {
         pendingKeyModel = null;
         populateModelSelect();
       }
-      toast(t(val ? "已保�? {name}" : "已删�? {name}", { name: m.name }));
+      toast(t(val ? "已保�? {name}" : "已删�? {name}", { name: m.name }));
     });
 
     inputWrap.appendChild(input);
@@ -414,7 +414,7 @@ function openSettings(options = {}) {
 
 function closeSettings() { switchPanel("chat"); }
 
-// ── 设置页：左侧锚点导航（点击滚�?+ 滚动高亮�?──────────────
+// ── 设置页：左侧锚点导航（点击滚�?+ 滚动高亮�?──────────────
 
 function initSettingsNav() {
   const page = document.querySelector(".settings-page");
@@ -430,7 +430,7 @@ function initSettingsNav() {
     });
   });
 
-  // 高亮规则：取顶边已越过容器顶�?24px 线的最后一个区�?  const onScroll = () => {
+  // 高亮规则：取顶边已越过容器顶�?24px 线的最后一个区�?  const onScroll = () => {
     const top = page.getBoundingClientRect().top;
     let activeId = items[0].dataset.target;
     for (const item of items) {
@@ -451,7 +451,7 @@ function renderResponsesApiHint() {
 
   checkbox.checked = state.useResponses === true;
 
-  // 收集支持 Responses API 的模型名�?  const supportedModels = [];
+  // 收集支持 Responses API 的模型名�?  const supportedModels = [];
   for (const models of Object.values(state.modelRegistry)) {
     for (const m of models) {
       if (m.supports_responses === true) {
@@ -461,9 +461,9 @@ function renderResponsesApiHint() {
   }
 
   if (supportedModels.length > 0) {
-    hint.textContent = t("支持 Responses API 的模型：{models}", { models: supportedModels.join("�?) });
+    hint.textContent = t("支持 Responses API 的模型：{models}", { models: supportedModels.join("�?) });
   } else {
-    hint.textContent = t("当前无模型支�?Responses API");
+    hint.textContent = t("当前无模型支�?Responses API");
   }
 
   checkbox.onchange = () => {
@@ -472,11 +472,11 @@ function renderResponsesApiHint() {
   };
 }
 
-// ── 设置页：关于与更新检�?──────────────
+// ── 设置页：关于与更新检�?──────────────
 
 let aboutVersionShown = false;
 
-/** 展示当前版本号（首次打开设置页时拉取，失败保留占位符�?*/
+/** 展示当前版本号（首次打开设置页时拉取，失败保留占位符�?*/
 async function renderAbout() {
   const verEl = document.getElementById("about-version");
   if (!verEl || aboutVersionShown) return;
@@ -496,14 +496,14 @@ async function renderAbout() {
 async function renderLanInfo() {
   const box = document.getElementById("lan-info");
   if (!box) return;
-  box.innerHTML = '<div class="lan-info-loading">正在获取遥控地址�?/div>';
+  box.innerHTML = '<div class="lan-info-loading">正在获取遥控地址�?/div>';
   let data = null;
   try {
     const res = await get("/lan/info");
     if (res?.code === 0) data = res.data;
   } catch {}
   if (!data || !data.enabled) {
-    box.innerHTML = `<div class="lan-info-error">${t("遥控服务未启�?)}${data?.error ? "�? + data.error : t("，请重启应用")}</div>`;
+    box.innerHTML = `<div class="lan-info-error">${t("遥控服务未启�?)}${data?.error ? "�? + data.error : t("，请重启应用")}</div>`;
     return;
   }
   const url = data.urls[0];
@@ -513,15 +513,15 @@ async function renderLanInfo() {
       <button id="btn-lan-copy" class="send-btn send-btn-sm" type="button">复制地址</button>
     </div>
     <div class="lan-qr-row">
-      <img class="lan-qr" src="/api/lan/qrcode?t=${Date.now()}" alt="遥控地址二维�?>
-      <div class="lan-qr-tip">手机扫码直接打开<br>（需连入同一局域网�?/div>
+      <img class="lan-qr" src="/api/lan/qrcode?t=${Date.now()}" alt="遥控地址二维�?>
+      <div class="lan-qr-tip">手机扫码直接打开<br>（需连入同一局域网�?/div>
     </div>
-    <p class="lan-tip">�?遥控未设密码：同一局域网内的任何人都能完整操作本应用（含终端命令），请勿在不受信任的网络中使用�?/p>
+    <p class="lan-tip">�?遥控未设密码：同一局域网内的任何人都能完整操作本应用（含终端命令），请勿在不受信任的网络中使用�?/p>
   `;
   document.getElementById("btn-lan-copy")?.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(url);
-      toast("遥控地址已复�?);
+      toast("遥控地址已复�?);
     } catch {
       const el = document.getElementById("lan-url-text");
       const range = document.createRange();
@@ -553,7 +553,7 @@ function initOnboarding() {
   if (!localStorage.getItem("slate_onboarded")) modal.classList.remove("hidden");
 }
 
-// ── 数据备份与恢�?────────────────────
+// ── 数据备份与恢�?────────────────────
 
 function initBackupRestore() {
   const statusEl = document.getElementById("backup-status");
@@ -582,9 +582,9 @@ function initBackupRestore() {
       setTimeout(() => URL.revokeObjectURL(a.href), 500);
       const d = res.data || {};
       if (statusEl) {
-        statusEl.textContent = t("已导出：{a} 会话 / {b} 条消�?/ {c} 条记�?/ {d} 条素�?, { a: d.conversations?.length || 0, b: d.messages?.length || 0, c: d.memories?.length || 0, d: d.snippets?.length || 0 });
+        statusEl.textContent = t("已导出：{a} 会话 / {b} 条消�?/ {c} 条记�?/ {d} 条素�?, { a: d.conversations?.length || 0, b: d.messages?.length || 0, c: d.memories?.length || 0, d: d.snippets?.length || 0 });
       }
-      toast("备份已下�?);
+      toast("备份已下�?);
     } catch (e) {
       toast(t("导出备份失败: {msg}", { msg: e.message }));
     }
@@ -600,9 +600,9 @@ function initBackupRestore() {
       const payload = JSON.parse(await file.text());
       const backend = payload.backend || payload;
       if (!Array.isArray(backend.conversations) && !Array.isArray(backend.messages)) {
-        throw new Error("无法识别的备份文�?);
+        throw new Error("无法识别的备份文�?);
       }
-      if (!await dlgConfirm("导入备份？已存在的数据会跳过，不会覆盖现有内容。导入后页面将重载�?, { okText: "导入" })) return;
+      if (!await dlgConfirm("导入备份？已存在的数据会跳过，不会覆盖现有内容。导入后页面将重载�?, { okText: "导入" })) return;
       const res = await post("/chat/import", { backend });
       if (res.code !== 0) throw new Error(res.message || "导入失败");
       if (payload.local && typeof payload.local === "object") {
@@ -610,9 +610,9 @@ function initBackupRestore() {
       }
       const s = res.data || {};
       if (statusEl) {
-        statusEl.textContent = t("已导入：{a} 会话 / {b} 条消�?/ {c} 条记�?/ {d} 条素材（已存在的跳过�?, { a: s.conversations || 0, b: s.messages || 0, c: s.memories || 0, d: s.snippets || 0 });
+        statusEl.textContent = t("已导入：{a} 会话 / {b} 条消�?/ {c} 条记�?/ {d} 条素材（已存在的跳过�?, { a: s.conversations || 0, b: s.messages || 0, c: s.memories || 0, d: s.snippets || 0 });
       }
-      toast("恢复完成，正在重载以应用本地设置�?);
+      toast("恢复完成，正在重载以应用本地设置�?);
       setTimeout(() => location.reload(), 1200);
     } catch (e) {
       toast(t("恢复失败: {msg}", { msg: e.message }));
@@ -620,7 +620,7 @@ function initBackupRestore() {
   });
 }
 
-// ── 关于区项目链�?────────────────────
+// ── 关于区项目链�?────────────────────
 
 const WEBSITE_URL = "https://carywang1234.github.io/SLATE/docs/index.html";
 const GITHUB_URL = "https://github.com/CaryWang1234/SLATE";
@@ -656,10 +656,10 @@ async function runStorageCleanup(target, btn) {
     const res = await post("/settings/storage/cleanup", { target });
     if (res.code !== 0) { toast(res.message || "清理失败"); return; }
     const freed = res.data?.freed || 0;
-    if (statusEl) statusEl.textContent = freed > 0 ? t("已释�?{size}", { size: fmtBytes(freed) }) : "无可释放空间（文件可能正被占用，关闭应用后重试）";
-    toast(freed > 0 ? t("已释�?{size}", { size: fmtBytes(freed) }) : "清理完成");
+    if (statusEl) statusEl.textContent = freed > 0 ? t("已释�?{size}", { size: fmtBytes(freed) }) : "无可释放空间（文件可能正被占用，关闭应用后重试）";
+    toast(freed > 0 ? t("已释�?{size}", { size: fmtBytes(freed) }) : "清理完成");
     if (target === "history") {
-      // 清空历史后同步侧栏列�?      try { await refreshConversationList(); } catch (e) {}
+      // 清空历史后同步侧栏列�?      try { await refreshConversationList(); } catch (e) {}
     }
     await renderStorageUsage();
   } catch (e) {
@@ -680,7 +680,7 @@ async function renderStorageUsage() {
 
     const totalRow = document.createElement("div");
     totalRow.className = "storage-total";
-    totalRow.textContent = t("总占�?{size}", { size: fmtBytes(total) });
+    totalRow.textContent = t("总占�?{size}", { size: fmtBytes(total) });
     box.appendChild(totalRow);
 
     for (const it of items) {
@@ -705,9 +705,9 @@ async function renderStorageUsage() {
         const clearBtn = document.createElement("button");
         clearBtn.className = "send-btn send-btn-sm btn-danger";
         clearBtn.textContent = "清空对话";
-        clearBtn.title = "删除全部历史会话与消�?;
+        clearBtn.title = "删除全部历史会话与消�?;
         clearBtn.addEventListener("click", async () => {
-          if (!await dlgConfirm("清空全部对话历史？此操作不可恢复，建议先在「数据备份」里导出备份�?, { danger: true, okText: "清空" })) return;
+          if (!await dlgConfirm("清空全部对话历史？此操作不可恢复，建议先在「数据备份」里导出备份�?, { danger: true, okText: "清空" })) return;
           await runStorageCleanup("history", clearBtn);
         });
         row.appendChild(clearBtn);
@@ -728,32 +728,32 @@ async function renderStorageUsage() {
 
 function initStorageManage() {
   renderStorageUsage();
-  // 打开设置页时刷新一次用�?  document.getElementById("btn-settings")?.addEventListener("click", () => setTimeout(renderStorageUsage, 300));
+  // 打开设置页时刷新一次用�?  document.getElementById("btn-settings")?.addEventListener("click", () => setTimeout(renderStorageUsage, 300));
 }
 
-/** 手动检查更新：结果内嵌展示，下�?说明走后端白名单打开系统浏览�?*/
+/** 手动检查更新：结果内嵌展示，下�?说明走后端白名单打开系统浏览�?*/
 async function checkUpdateNow(btn) {
   const info = document.getElementById("about-update-info");
   if (!info) return;
   btn.disabled = true;
-  btn.textContent = "检查中�?;
+  btn.textContent = "检查中�?;
   info.classList.remove("hidden");
-  info.textContent = "正在查询最�?Release�?;
+  info.textContent = "正在查询最�?Release�?;
   try {
     const res = await get("/update/check");
     const d = res?.code === 0 ? res.data : null;
     info.innerHTML = "";
     if (!d?.checked) {
-      info.textContent = "检查更新失败：网络不可用，请稍后重试�?;
+      info.textContent = "检查更新失败：网络不可用，请稍后重试�?;
       return;
     }
     if (d.current) document.getElementById("about-version").textContent = `v${d.current}`;
     if (!d.hasUpdate) {
-      info.textContent = t("已是最新版本（v{v}）�?, { v: d.current });
+      info.textContent = t("已是最新版本（v{v}）�?, { v: d.current });
       return;
     }
     const line = document.createElement("div");
-    line.textContent = t("�?发现新版�?v{latest}（当�?v{current}�?, { latest: d.latest, current: d.current });
+    line.textContent = t("�?发现新版�?v{latest}（当�?v{current}�?, { latest: d.latest, current: d.current });
     info.appendChild(line);
     if (d.notes) {
       const notes = document.createElement("div");
@@ -765,7 +765,7 @@ async function checkUpdateNow(btn) {
     actions.className = "about-update-actions";
     const dlBtn = document.createElement("button");
     dlBtn.className = "send-btn send-btn-sm";
-    dlBtn.textContent = "�?下载更新";
+    dlBtn.textContent = "�?下载更新";
     dlBtn.addEventListener("click", () => post("/update/open-url", { url: d.downloadUrl }));
     const relBtn = document.createElement("button");
     relBtn.className = "icon-btn";
@@ -778,7 +778,7 @@ async function checkUpdateNow(btn) {
     info.textContent = t("检查更新失败：{msg}", { msg: e.message });
   } finally {
     btn.disabled = false;
-    btn.textContent = "检查更�?;
+    btn.textContent = "检查更�?;
   }
 }
 
@@ -787,7 +787,7 @@ async function checkUpdateNow(btn) {
 async function renderUsageSummary() {
   const box = document.getElementById("usage-summary");
   if (!box) return;
-  box.innerHTML = '<div class="usage-summary-loading">加载中�?/div>';
+  box.innerHTML = '<div class="usage-summary-loading">加载中�?/div>';
   try {
     const res = await get("/chat/usage/summary");
     if (res.code !== 0) throw new Error(res.message || "加载失败");
@@ -800,16 +800,16 @@ async function renderUsageSummary() {
     grid.innerHTML = `
       <div class="usage-summary-card usage-summary-main">
         <div class="usage-summary-num">${fmtTokens(d.total_tokens)}</div>
-        <div class="usage-summary-label">�?tokens</div>
+        <div class="usage-summary-label">�?tokens</div>
         ${equiv ? `<div class="usage-summary-equiv">${equiv}</div>` : ""}
       </div>
       <div class="usage-summary-card">
         <div class="usage-summary-num">${fmtTokens(d.prompt_tokens)}</div>
-        <div class="usage-summary-label">总输�?/div>
+        <div class="usage-summary-label">总输�?/div>
       </div>
       <div class="usage-summary-card">
         <div class="usage-summary-num">${fmtTokens(d.completion_tokens)}</div>
-        <div class="usage-summary-label">总输�?/div>
+        <div class="usage-summary-label">总输�?/div>
       </div>
       <div class="usage-summary-card">
         <div class="usage-summary-num">${(d.message_count || 0).toLocaleString()}</div>
@@ -817,7 +817,7 @@ async function renderUsageSummary() {
       </div>
       <div class="usage-summary-card">
         <div class="usage-summary-num">${d.conversation_count || 0}</div>
-        <div class="usage-summary-label">对话�?/div>
+        <div class="usage-summary-label">对话�?/div>
       </div>
     `;
     box.appendChild(grid);
@@ -838,7 +838,7 @@ async function renderUsageSummary() {
         title.textContent = item.title || t("对话 {id}", { id: String(item.id || "").slice(0, 6) });
         const tok = document.createElement("span");
         tok.className = "usage-summary-top-tokens";
-        tok.textContent = t("{tokens} tokens · {n} 条消�?, { tokens: fmtTokens(item.total_tokens), n: item.message_count || 0 });
+        tok.textContent = t("{tokens} tokens · {n} 条消�?, { tokens: fmtTokens(item.total_tokens), n: item.message_count || 0 });
         row.append(title, tok);
         list.appendChild(row);
       }
@@ -849,7 +849,7 @@ async function renderUsageSummary() {
   }
 }
 
-// 自动推进设置：变更后立即持久化，无需点保存按�?function applyAutoReviewSettings() {
+// 自动推进设置：变更后立即持久化，无需点保存按�?function applyAutoReviewSettings() {
   state.autoReview = {
     enabled: document.getElementById("setting-auto-review-enabled").checked,
     modelId: document.getElementById("setting-auto-review-model").value || "",
@@ -888,7 +888,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260814-48");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260815-50");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -900,21 +900,21 @@ async function saveSettings() {
   }
 
   savePersistent();
-  toast("设置已保�?);
+  toast("设置已保�?);
 }
 
-// ── 标签页切�?──────────────────────────────
+// ── 标签页切�?──────────────────────────────
 
 function initTabs() {
   const tabs = document.querySelectorAll(".tab-btn");
   tabs.forEach(tab => tab.addEventListener("click", () => {
-    // 设置页须�?openSettings 渲染模型列表/用量等内容，否则首入为空
+    // 设置页须�?openSettings 渲染模型列表/用量等内容，否则首入为空
     if (tab.dataset.panel === "settings") openSettings();
     else switchPanel(tab.dataset.panel);
   }));
 }
 
-// ── 键盘快捷�?──────────────────────────────
+// ── 键盘快捷�?──────────────────────────────
 
 function initKeyboardShortcuts() {
   document.addEventListener("keydown", (e) => {
@@ -985,9 +985,9 @@ async function loadModels() {
   }
 }
 
-// ── 启动时自动检查更�?────────────────
+// ── 启动时自动检查更�?────────────────
 
-/** 查询 GitHub 最�?Release，有新版本时展示金色横幅；失败静默，不打扰用�?*/
+/** 查询 GitHub 最�?Release，有新版本时展示金色横幅；失败静默，不打扰用�?*/
 async function checkAppUpdate() {
   try {
     const res = await get("/update/check");
@@ -995,14 +995,14 @@ async function checkAppUpdate() {
     if (!d?.hasUpdate) return;
     let dismissed = "";
     try { dismissed = localStorage.getItem("slate-update-dismissed") || ""; } catch {}
-    if (dismissed === d.latest) return; // 用户已选择忽略该版�?
+    if (dismissed === d.latest) return; // 用户已选择忽略该版�?
     const banner = document.getElementById("update-banner");
     if (!banner) return;
     banner.innerHTML = "";
 
     const txt = document.createElement("span");
     txt.className = "update-banner-text";
-    txt.textContent = t("�?发现新版�?v{latest}（当�?v{current}�?, { latest: d.latest, current: d.current });
+    txt.textContent = t("�?发现新版�?v{latest}（当�?v{current}�?, { latest: d.latest, current: d.current });
 
     const openLink = (url) => async () => {
       const r = await post("/update/open-url", { url });
@@ -1011,7 +1011,7 @@ async function checkAppUpdate() {
 
     const dl = document.createElement("button");
     dl.className = "update-banner-btn";
-    dl.textContent = "�?下载更新";
+    dl.textContent = "�?下载更新";
     dl.addEventListener("click", openLink(d.downloadUrl));
 
     const rel = document.createElement("button");
@@ -1021,8 +1021,8 @@ async function checkAppUpdate() {
 
     const close = document.createElement("button");
     close.className = "update-banner-close";
-    close.textContent = "�?;
-    close.title = "忽略该版�?;
+    close.textContent = "�?;
+    close.title = "忽略该版�?;
     close.addEventListener("click", () => {
       banner.classList.add("hidden");
       try { localStorage.setItem("slate-update-dismissed", d.latest); } catch {}
@@ -1031,33 +1031,33 @@ async function checkAppUpdate() {
     banner.append(txt, dl, rel, close);
     banner.classList.remove("hidden");
   } catch (e) {
-    console.warn("检查更新失�?", e);
+    console.warn("检查更新失�?", e);
   }
 }
 
-// ── 初始�?──────────────────────────────────
+// ── 初始�?──────────────────────────────────
 
 async function init() {
-  // i18n 必须最先完成：英文模式要在任何界面渲染前挂好翻译监�?  await initI18n();
+  // i18n 必须最先完成：英文模式要在任何界面渲染前挂好翻译监�?  await initI18n();
 
   loadPersistent();
   await loadSharedPersistent();
 
-  // 应用保存的主�?  document.documentElement.setAttribute("data-theme", state.theme);
+  // 应用保存的主�?  document.documentElement.setAttribute("data-theme", state.theme);
 
-  safeInit("标签�?, initTabs);
+  safeInit("标签�?, initTabs);
   safeInit("对话", initChat);
   safeInit("黑板", initWhiteboard);
-  safeInit("提示词工�?, initPromptFactory);
-  safeInit("技能面�?, initSkillPanel);
+  safeInit("提示词工�?, initPromptFactory);
+  safeInit("技能面�?, initSkillPanel);
   safeInit("AI 团队", initTeamPanel);
-  safeInit("项目�?, initProjectBar);
+  safeInit("项目�?, initProjectBar);
   safeInit("记忆面板", initMemoryPanel);
-  safeInit("专家�?, initExpertsPanel);
+  safeInit("专家�?, initExpertsPanel);
   safeInit("定时任务", initSchedule);
   safeInit("高危命令守卫", initRiskGuard);
   safeInit("项目理解", initUnderstandPanel);
-  safeInit("快捷�?, initKeyboardShortcuts);
+  safeInit("快捷�?, initKeyboardShortcuts);
   safeInit("文本复制", initSelectionCopySupport);
 
   // 模型选择
@@ -1080,37 +1080,37 @@ async function init() {
   // 设置弹窗
   document.getElementById("btn-settings").addEventListener("click", openSettings);
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
-  // 顶栏 📡：直达设置页“局域网遥控”区块（明显的网址获取入口�?  document.getElementById("btn-lan")?.addEventListener("click", () => openSettings({ focusLan: true }));
+  // 顶栏 📡：直达设置页“局域网遥控”区块（明显的网址获取入口�?  document.getElementById("btn-lan")?.addEventListener("click", () => openSettings({ focusLan: true }));
   document.getElementById("btn-lan-refresh")?.addEventListener("click", renderLanInfo);
   initAutoReviewPersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
-  // 设置页导航与关于�?  safeInit("设置导航", initSettingsNav);
+  // 设置页导航与关于�?  safeInit("设置导航", initSettingsNav);
   document.getElementById("btn-check-update")?.addEventListener("click", (e) => checkUpdateNow(e.currentTarget));
   safeInit("首次启动引导", initOnboarding);
   safeInit("数据备份恢复", initBackupRestore);
-  safeInit("关于区链�?, initAboutLinks);
+  safeInit("关于区链�?, initAboutLinks);
   safeInit("存储空间管理", initStorageManage);
 
   await loadModels();
 
-  // 自动恢复上次打开的项�?  if (state._lastProjectPath) {
+  // 自动恢复上次打开的项�?  if (state._lastProjectPath) {
     const res = await getCurrentProject();
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260814-48");
+      const { openProject } = await import("./services/project.js?v=20260815-50");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }
-    // 确保文件树加�?    const browseRes = await browseFiles("");
+    // 确保文件树加�?    const browseRes = await browseFiles("");
     if (browseRes.code === 0) setProjectFileTree(browseRes.data);
   }
 
   // 启动时自动检查更新（不阻塞初始化，失败静默）
   checkAppUpdate();
 
-  console.log("[SLATE] v3 初始化完�?);
+  console.log("[SLATE] v3 初始化完�?);
 }
 
 document.addEventListener("DOMContentLoaded", init);

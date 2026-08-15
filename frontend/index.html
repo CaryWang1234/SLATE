@@ -3,24 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SLATE �?�?/title>
+  <title>SLATE �?�?/title>
   <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260814-48">
+  <link rel="stylesheet" href="./css/style.css?v=20260815-50">
   <script>
-    // i18n：英文模式先遮蔽页面，翻译完成后�?app.js 显示；兜底超时强显避免白�?    document.documentElement.classList.add("i18n-pending");
+    // i18n：英文模式先遮蔽页面，翻译完成后�?app.js 显示；兜底超时强显避免白�?    document.documentElement.classList.add("i18n-pending");
     setTimeout(function () { document.documentElement.classList.remove("i18n-pending"); }, 2500);
   </script>
 </head>
 <body>
 
-  <!-- ══�?顶栏 ══�?-->
+  <!-- ══�?顶栏 ══�?-->
   <header id="topbar">
     <div class="topbar-left">
       <span class="logo-icon"><img src="./icon.png" alt=""></span>
-      <span class="logo">�?/span>
+      <span class="logo">�?/span>
       <span class="logo-sub">SLATE</span>
     </div>
     <div class="topbar-center">
@@ -31,25 +31,25 @@
     </div>
     <div class="topbar-right">
       <select id="model-select" title="当前模型">
-        <option value="">选择模型�?/option>
+        <option value="">选择模型�?/option>
       </select>
       <button id="btn-manage-keys" class="icon-btn" title="管理模型密钥">🔑</button>
       <button id="btn-lan" class="icon-btn" title="局域网遥控地址">📡</button>
-      <button id="btn-theme" class="theme-btn" title="切换主题">�?/button>
-      <button id="btn-settings" class="icon-btn" title="设置">�?/button>
+      <button id="btn-theme" class="theme-btn" title="切换主题">�?/button>
+      <button id="btn-settings" class="icon-btn" title="设置">�?/button>
     </div>
   </header>
 
-  <!-- ══�?更新提示横幅（启动自动检查，可逐版本忽略） ══�?-->
+  <!-- ══�?更新提示横幅（启动自动检查，可逐版本忽略） ══�?-->
   <div id="update-banner" class="update-banner hidden"></div>
 
-  <!-- ══�?主区域：三栏 ══�?-->
+  <!-- ══�?主区域：三栏 ══�?-->
   <main id="workspace">
 
-    <!-- 左栏：对�?+ 团队 -->
+    <!-- 左栏：对�?+ 团队 -->
     <section id="panel-chat" class="panel active">
       <div class="chat-layout">
-        <!-- 左侧：项目目�?-->
+        <!-- 左侧：项目目�?-->
         <div id="project-sidebar" class="project-sidebar">
           <div id="project-bar" class="project-bar"></div>
           <div id="project-file-tree" class="project-file-tree"></div>
@@ -58,7 +58,7 @@
         <!-- 拖拽调整手柄 -->
         <div class="resize-handle" id="sidebar-resize-handle"></div>
 
-        <!-- 右侧：对�?团队 (75%) -->
+        <!-- 右侧：对�?团队 (75%) -->
         <div class="chat-main">
           <div class="panel-header">
             <div class="panel-mode-toggle">
@@ -67,18 +67,18 @@
             </div>
             <div class="panel-actions">
               <button id="btn-brainstorm" class="icon-btn" title="头脑风暴模式">💡</button>
-              <button id="btn-grind" class="icon-btn" title="磨墨模式：把粗糙想法研磨成结构化任务书（也可输入 /grind 想法�?>🖌</button>
-              <button id="btn-harness" class="icon-btn" title="Harness 自主执行：模型自主多轮调用工具直至任务完�?>�?/button>
-              <button id="btn-schedule" class="icon-btn" title="定时任务">�?/button>
-              <button id="btn-compress" class="icon-btn" title="手动压缩上下�?>�?/button>
-              <button id="btn-memory" class="icon-btn" title="记忆与画�?>🧠</button>
-              <button id="btn-experts" class="icon-btn" title="专家包管�?>🎓</button>
-              <button id="btn-snippets" class="icon-btn" title="提示词素�?>�?/button>
-              <button id="btn-toggle-history" class="icon-btn active" title="显示/隐藏历史">�?/button>
+              <button id="btn-grind" class="icon-btn" title="磨墨模式：把粗糙想法研磨成结构化任务书（也可输入 /grind 想法�?>🖌</button>
+              <button id="btn-harness" class="icon-btn" title="Harness 自主执行：模型自主多轮调用工具直至任务完�?>�?/button>
+              <button id="btn-schedule" class="icon-btn" title="定时任务">�?/button>
+              <button id="btn-compress" class="icon-btn" title="手动压缩上下�?>�?/button>
+              <button id="btn-memory" class="icon-btn" title="记忆与画�?>🧠</button>
+              <button id="btn-experts" class="icon-btn" title="专家包管�?>🎓</button>
+              <button id="btn-snippets" class="icon-btn" title="提示词素�?>�?/button>
+              <button id="btn-toggle-history" class="icon-btn active" title="显示/隐藏历史">�?/button>
               <button id="btn-new-chat" class="icon-btn" title="新建对话 (Ctrl+N)">+</button>
             </div>
           </div>
-          <!-- 用量信息�?-->
+          <!-- 用量信息�?-->
           <div id="usage-bar" class="usage-bar"></div>
 
           <!-- 对话区域 -->
@@ -87,30 +87,30 @@
             <div id="conv-sidebar" class="conv-sidebar">
               <div class="conv-sidebar-header">
                 <span class="conv-sidebar-title">历史</span>
-                <button id="btn-conv-manage" class="icon-btn conv-manage-btn" title="批量管理历史会话">�?管理</button>
+                <button id="btn-conv-manage" class="icon-btn conv-manage-btn" title="批量管理历史会话">�?管理</button>
               </div>
               <div class="conv-search-wrap">
-                <input id="conv-search" class="conv-search" type="text" placeholder="🔍 搜索历史�? autocomplete="off">
+                <input id="conv-search" class="conv-search" type="text" placeholder="🔍 搜索历史�? autocomplete="off">
               </div>
               <div id="conv-list"></div>
             </div>
             <div class="chat-area-row">
               <div id="chat-messages" class="chat-scroll"></div>
-              <!-- TODOLIST 任务清单（Harness，右侧栏�?-->
+              <!-- TODOLIST 任务清单（Harness，右侧栏�?-->
               <div id="todo-panel" class="todo-panel hidden"></div>
-              <!-- 磨墨模式：墨迹面板（�?已定 / �?未知�?-->
+              <!-- 磨墨模式：墨迹面板（�?已定 / �?未知�?-->
               <div id="grind-panel" class="grind-panel hidden"></div>
             </div>
-            <!-- 文件附件预览�?-->
+            <!-- 文件附件预览�?-->
             <div id="file-preview-area" class="file-preview-area hidden"></div>
             <div id="chat-input-area">
               <button id="btn-attach-file" class="icon-btn" title="附加文件">📎</button>
               <input type="file" id="file-input" multiple hidden accept=".txt,.md,.csv,.tsv,.json,.py,.js,.html,.css,.yaml,.yml,.xml,.sh,.bat,.docx,.xlsx,.pdf,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg">
               <select id="expert-select" class="expert-select" title="选择专家包（注入人格与规则）">
-                <option value="">无专�?/option>
+                <option value="">无专�?/option>
               </select>
-              <textarea id="chat-input" placeholder="输入消息�?(Enter 发�? Shift+Enter 换行)" rows="1"></textarea>
-              <button id="btn-send" class="send-btn">发�?/button>
+              <textarea id="chat-input" placeholder="输入消息�?(Enter 发�? Shift+Enter 换行)" rows="1"></textarea>
+              <button id="btn-send" class="send-btn">发�?/button>
             </div>
           </div>
 
@@ -119,14 +119,14 @@
             <aside class="team-history-sidebar">
               <div class="team-history-header">
                 <span class="team-label">团队历史</span>
-                <button id="btn-new-team-discussion" class="icon-btn" title="新团队讨�?>+</button>
+                <button id="btn-new-team-discussion" class="icon-btn" title="新团队讨�?>+</button>
               </div>
               <div id="team-history-list" class="team-history-list"></div>
             </aside>
             <div class="team-main">
               <div class="team-view-tabs">
                 <button id="btn-team-view-discuss" class="team-view-tab active">团队讨论</button>
-                <button id="btn-team-view-workflow" class="team-view-tab">工作�?/button>
+                <button id="btn-team-view-workflow" class="team-view-tab">工作�?/button>
               </div>
               <div id="team-discuss-view">
                 <div class="team-config">
@@ -139,27 +139,27 @@
                 <div class="team-discuss">
                   <div id="team-usage-bar" class="team-usage-bar"></div>
                   <div class="team-input-row">
-                    <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题�?>
-                    <select id="team-max-rounds" class="team-rounds-select" title="最大辩论轮�?>
-                      <option value="3">3�?/option>
-                      <option value="5" selected>5�?/option>
-                      <option value="8">8�?/option>
-                      <option value="10">10�?/option>
+                    <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题�?>
+                    <select id="team-max-rounds" class="team-rounds-select" title="最大辩论轮�?>
+                      <option value="3">3�?/option>
+                      <option value="5" selected>5�?/option>
+                      <option value="8">8�?/option>
+                      <option value="10">10�?/option>
                     </select>
-                    <button id="btn-start-discuss" class="send-btn">开始讨�?/button>
+                    <button id="btn-start-discuss" class="send-btn">开始讨�?/button>
                   </div>
                   <div id="team-output" class="team-output"></div>
                 </div>
               </div>
               <div id="team-workflow-view" class="team-workflow-view hidden">
                 <div class="wf-config">
-                  <span class="team-label">工作�?/span>
+                  <span class="team-label">工作�?/span>
                   <select id="wf-select" class="wf-select"></select>
-                  <div id="wf-desc" class="wf-desc">加载中�?/div>
+                  <div id="wf-desc" class="wf-desc">加载中�?/div>
                 </div>
                 <div class="wf-input-row">
-                  <textarea id="wf-input" class="wf-input" rows="3" placeholder="输入交给工作流的任务需求（作为 $input 传入各节点）�?></textarea>
-                  <button id="btn-wf-run" class="send-btn">�?运行工作�?/button>
+                  <textarea id="wf-input" class="wf-input" rows="3" placeholder="输入交给工作流的任务需求（作为 $input 传入各节点）�?></textarea>
+                  <button id="btn-wf-run" class="send-btn">�?运行工作�?/button>
                 </div>
                 <div id="wf-run-status" class="wf-run-status"></div>
                 <div id="wf-node-list" class="wf-node-list"></div>
@@ -171,48 +171,48 @@
       </div>
     </section>
 
-    <!-- 中栏：黑�?-->
+    <!-- 中栏：黑�?-->
     <section id="panel-whiteboard" class="panel">
       <div class="panel-header">
         <span class="panel-title">黑板</span>
         <div class="panel-actions">
           <button id="btn-add-card" class="icon-btn" title="添加卡片">+</button>
-          <button id="btn-ai-organize" class="icon-btn" title="AI 整理成流程图">�?/button>
-          <button id="btn-toggle-mermaid" class="icon-btn" title="显示/隐藏流程�?>📊</button>
-          <button id="btn-export-board" class="icon-btn" title="导出黑板">�?/button>
+          <button id="btn-ai-organize" class="icon-btn" title="AI 整理成流程图">�?/button>
+          <button id="btn-toggle-mermaid" class="icon-btn" title="显示/隐藏流程�?>📊</button>
+          <button id="btn-export-board" class="icon-btn" title="导出黑板">�?/button>
           <button id="btn-clear-board" class="icon-btn" title="清空黑板">×</button>
         </div>
       </div>
-      <!-- 工具�?-->
+      <!-- 工具�?-->
       <div id="board-toolbar" class="board-toolbar">
-        <button class="board-tool-btn active" data-mode="select" title="选择/移动">�?/button>
-        <button class="board-tool-btn" data-mode="connect" title="连线">�?/button>
-        <button class="board-tool-btn" data-mode="draw" title="画笔">�?/button>
+        <button class="board-tool-btn active" data-mode="select" title="选择/移动">�?/button>
+        <button class="board-tool-btn" data-mode="connect" title="连线">�?/button>
+        <button class="board-tool-btn" data-mode="draw" title="画笔">�?/button>
         <button class="board-tool-btn" data-mode="text" title="文字">T</button>
         <span class="board-toolbar-sep"></span>
-        <button id="btn-undo-stroke" class="icon-btn" title="撤销笔画">�?/button>
-        <button id="btn-clear-strokes" class="icon-btn" title="清除所有画�?>🗑</button>
+        <button id="btn-undo-stroke" class="icon-btn" title="撤销笔画">�?/button>
+        <button id="btn-clear-strokes" class="icon-btn" title="清除所有画�?>🗑</button>
       </div>
       <!-- 画布区域 -->
       <div id="whiteboard-canvas" class="board-canvas">
-        <!-- SVG 连线�?-->
+        <!-- SVG 连线�?-->
         <svg id="board-svg" class="board-svg-layer"></svg>
-        <!-- Canvas 画笔�?-->
+        <!-- Canvas 画笔�?-->
         <canvas id="board-draw-canvas" class="board-draw-layer"></canvas>
-        <!-- 卡片�?-->
+        <!-- 卡片�?-->
         <div id="board-cards" class="board-cards"></div>
-        <!-- 文字笔记�?-->
+        <!-- 文字笔记�?-->
         <div id="board-notes" class="board-notes-layer"></div>
         <!-- 连线中临时指示线 -->
         <svg id="board-temp-svg" class="board-svg-layer" style="pointer-events:none;"></svg>
         <div id="board-empty" class="board-empty">
-          <p>黑板是空�?/p>
-          <p class="hint">点击 + 添加卡片，或选择工具开始创�?/p>
+          <p>黑板是空�?/p>
+          <p class="hint">点击 + 添加卡片，或选择工具开始创�?/p>
         </div>
       </div>
       <div id="mermaid-preview" class="mermaid-preview hidden">
         <div class="mermaid-preview-header">
-          <span>流程图预�?/span>
+          <span>流程图预�?/span>
           <button id="btn-close-mermaid" class="icon-btn" title="关闭">×</button>
         </div>
         <div id="mermaid-render-area" class="mermaid-render-area"></div>
@@ -220,7 +220,7 @@
       </div>
     </section>
 
-    <!-- ══ 卡片编辑弹窗 ══�?-->
+    <!-- ══ 卡片编辑弹窗 ══�?-->
     <div id="card-modal" class="modal hidden">
       <div class="modal-backdrop"></div>
       <div class="modal-content">
@@ -242,7 +242,7 @@
             <div id="card-color-options" class="card-color-options"></div>
           </div>
           <div class="setting-group">
-            <label class="setting-label">箭头指向（目标卡�?ID，多个用逗号分隔�?/label>
+            <label class="setting-label">箭头指向（目标卡�?ID，多个用逗号分隔�?/label>
             <input id="card-input-arrows" type="text" class="setting-input" placeholder="c1, c2, ...">
           </div>
         </div>
@@ -254,40 +254,40 @@
       </div>
     </div>
 
-    <!-- 右栏：工�?+ 技�?-->
+    <!-- 右栏：工�?+ 技�?-->
     <section id="panel-factory" class="panel">
       <div class="panel-header">
-        <span class="panel-title">提示词工�?/span>
+        <span class="panel-title">提示词工�?/span>
       </div>
       <div id="factory-area" class="factory-area">
         <div class="factory-section">
-          <label class="factory-label">项目上下�?/label>
+          <label class="factory-label">项目上下�?/label>
           <div id="constitution-display" class="constitution-display"></div>
         </div>
         <div class="factory-section">
           <label class="factory-label">任务描述</label>
-          <textarea id="factory-task" class="factory-input" placeholder="描述你要完成的任务�? rows="3"></textarea>
+          <textarea id="factory-task" class="factory-input" placeholder="描述你要完成的任务�? rows="3"></textarea>
         </div>
         <div class="factory-section">
-          <label class="factory-label">相关文件上下�?/label>
-          <textarea id="factory-context" class="factory-input" placeholder="文件路径或关键代码片段�? rows="3"></textarea>
+          <label class="factory-label">相关文件上下�?/label>
+          <textarea id="factory-context" class="factory-input" placeholder="文件路径或关键代码片段�? rows="3"></textarea>
         </div>
         <div class="factory-section">
           <label class="factory-label">约束条件</label>
-          <textarea id="factory-constraints" class="factory-input" placeholder="禁止修改的文件、必须遵守的规则�? rows="2"></textarea>
+          <textarea id="factory-constraints" class="factory-input" placeholder="禁止修改的文件、必须遵守的规则�? rows="2"></textarea>
         </div>
-        <button id="btn-generate-prompt" class="generate-btn">生成提示�?/button>
+        <button id="btn-generate-prompt" class="generate-btn">生成提示�?/button>
         <div id="prompt-output" class="prompt-output hidden">
           <div class="prompt-output-header">
             <span>输出</span>
-            <button id="btn-copy-prompt" class="icon-btn" title="复制">�?/button>
+            <button id="btn-copy-prompt" class="icon-btn" title="复制">�?/button>
           </div>
           <pre id="prompt-result" class="prompt-result"></pre>
         </div>
       </div>
     </section>
 
-    <!-- 设置�?-->
+    <!-- 设置�?-->
     <section id="panel-settings" class="panel settings-panel">
       <div class="panel-header">
         <span class="panel-title">设置</span>
@@ -296,13 +296,13 @@
         </div>
       </div>
       <div class="settings-page">
-        <!-- 左侧锚点导航（滚动高亮，�?app.js initSettingsNav�?-->
+        <!-- 左侧锚点导航（滚动高亮，�?app.js initSettingsNav�?-->
         <nav class="settings-nav" id="settings-nav">
           <a class="settings-nav-item active" data-target="settings-models">模型配置</a>
           <a class="settings-nav-item" data-target="settings-usage">用量统计</a>
           <a class="settings-nav-item" data-target="settings-context">上下文与项目</a>
           <a class="settings-nav-item" data-target="settings-auto-review">自动推进</a>
-          <a class="settings-nav-item" data-target="settings-skills">MCP / 技�?/a>
+          <a class="settings-nav-item" data-target="settings-skills">MCP / 技�?/a>
           <a class="settings-nav-item" data-target="settings-data">数据备份</a>
           <a class="settings-nav-item" data-target="settings-lan">局域网遥控</a>
           <a class="settings-nav-item" data-target="settings-about">关于</a>
@@ -312,19 +312,19 @@
           <div class="settings-block-head">
             <div>
               <h2>模型配置</h2>
-              <p>管理自定义模型和内置模型密钥�?/p>
+              <p>管理自定义模型和内置模型密钥�?/p>
             </div>
             <button id="btn-add-custom-model-settings" class="send-btn send-btn-sm" type="button">+ 添加模型</button>
           </div>
 
           <div class="setting-section">
-            <label class="setting-label">自定义模�?/label>
+            <label class="setting-label">自定义模�?/label>
             <div id="custom-model-list" class="custom-model-list"></div>
           </div>
 
           <div id="custom-model-editor" class="custom-model-editor hidden">
             <div class="custom-model-editor-head">
-              <span id="custom-model-editor-title">添加自定义模�?/span>
+              <span id="custom-model-editor-title">添加自定义模�?/span>
               <button id="btn-cancel-custom-model" class="icon-btn" type="button" title="取消">×</button>
             </div>
             <div class="settings-grid">
@@ -358,7 +358,7 @@
           <div class="setting-section">
             <label class="setting-check">
               <input id="setting-use-responses" type="checkbox">
-              <span>启用 Responses API 模式（仅部分模型支持，开启后将使用新�?API 格式�?/span>
+              <span>启用 Responses API 模式（仅部分模型支持，开启后将使用新�?API 格式�?/span>
             </label>
             <div id="responses-models-hint" class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);"></div>
           </div>
@@ -368,11 +368,11 @@
           <div class="settings-block-head">
             <div>
               <h2>用量统计</h2>
-              <p>全部对话的累�?token 用量（随对话发送自动更新）�?/p>
+              <p>全部对话的累�?token 用量（随对话发送自动更新）�?/p>
             </div>
           </div>
           <div id="usage-summary" class="usage-summary">
-            <div class="usage-summary-loading">加载中�?/div>
+            <div class="usage-summary-loading">加载中�?/div>
           </div>
         </section>
 
@@ -380,11 +380,11 @@
           <div class="settings-block-head">
             <div>
               <h2>上下文与项目</h2>
-              <p>调整上下文上限和项目宪法�?/p>
+              <p>调整上下文上限和项目宪法�?/p>
             </div>
           </div>
           <div class="setting-group">
-            <label class="setting-label">上下�?Token 上限</label>
+            <label class="setting-label">上下�?Token 上限</label>
             <input id="setting-max-tokens" type="number" class="setting-input" value="64000">
           </div>
           <div class="setting-group">
@@ -409,7 +409,7 @@
           <div class="settings-block-head">
             <div>
               <h2>自动推进</h2>
-              <p>回复疑似停顿时（过短只表态，或只陈述计划不动手），让审阅模型补出工具或技能调用�?/p>
+              <p>回复疑似停顿时（过短只表态，或只陈述计划不动手），让审阅模型补出工具或技能调用�?/p>
             </div>
           </div>
           <label class="setting-check">
@@ -418,14 +418,14 @@
           </label>
           <label class="setting-check">
             <input id="setting-auto-review-long-stall" type="checkbox" checked>
-            <span>长回复停顿也审查（回复不短但通篇只描述下一步计划、未调用工具�?/span>
+            <span>长回复停顿也审查（回复不短但通篇只描述下一步计划、未调用工具�?/span>
           </label>
           <div class="setting-group">
             <label class="setting-label">审阅模型</label>
             <select id="setting-auto-review-model" class="setting-input"></select>
           </div>
           <div class="setting-group">
-            <label class="setting-label">短回复阈值（字符�?/label>
+            <label class="setting-label">短回复阈值（字符�?/label>
             <input id="setting-auto-review-min-chars" type="number" class="setting-input" min="20" max="800" step="10" value="120">
           </div>
         </section>
@@ -433,15 +433,15 @@
         <section class="settings-block" id="settings-skills">
           <div class="settings-block-head">
             <div>
-              <h2>MCP / 技�?/h2>
-              <p>查看 MCP 内置工具，管�?SKILL.md 技能�?/p>
+              <h2>MCP / 技�?/h2>
+              <p>查看 MCP 内置工具，管�?SKILL.md 技能�?/p>
             </div>
           </div>
           <div id="skill-panel" class="skill-panel">
             <div id="skill-list" class="skill-list"></div>
             <div class="skill-upload">
-              <button id="btn-import-skill" class="icon-btn" title="从本地路径导�?SKILL.md 技�?>�?导入技�?/button>
-              <button id="btn-upload-skill" class="icon-btn" title="上传文件新建 SKILL.md 技�?>+ 新建技�?/button>
+              <button id="btn-import-skill" class="icon-btn" title="从本地路径导�?SKILL.md 技�?>�?导入技�?/button>
+              <button id="btn-upload-skill" class="icon-btn" title="上传文件新建 SKILL.md 技�?>+ 新建技�?/button>
             </div>
           </div>
         </section>
@@ -449,30 +449,30 @@
         <section class="settings-block" id="settings-data">
           <div class="settings-block-head">
             <div>
-              <h2>数据备份与恢�?/h2>
-              <p>一键导出全部数据（对话、记忆、素材与本地设置），换机或重装后可完整恢复�?/p>
+              <h2>数据备份与恢�?/h2>
+              <p>一键导出全部数据（对话、记忆、素材与本地设置），换机或重装后可完整恢复�?/p>
             </div>
           </div>
           <div class="about-row">
             <label class="setting-label" style="margin-bottom:0;">备份</label>
-            <span class="setting-hint">导出为单�?JSON 文件，包含后端数据库与本地设置�?/span>
-            <button id="btn-backup-export" class="send-btn send-btn-sm" type="button">�?下载备份</button>
+            <span class="setting-hint">导出为单�?JSON 文件，包含后端数据库与本地设置�?/span>
+            <button id="btn-backup-export" class="send-btn send-btn-sm" type="button">�?下载备份</button>
           </div>
           <div class="about-row">
             <label class="setting-label" style="margin-bottom:0;">恢复</label>
-            <span class="setting-hint">�?id 合并导入，已存在的数据不会被覆盖�?/span>
-            <button id="btn-backup-import" class="send-btn send-btn-sm" type="button">�?导入备份</button>
+            <span class="setting-hint">�?id 合并导入，已存在的数据不会被覆盖�?/span>
+            <button id="btn-backup-import" class="send-btn send-btn-sm" type="button">�?导入备份</button>
             <input type="file" id="backup-file-input" accept=".json,application/json" hidden>
           </div>
           <div id="backup-status" class="setting-hint"></div>
           <div class="settings-block-head" style="margin-top:18px;">
             <div>
               <h2>存储空间</h2>
-              <p>查看各部分占用，按需压缩数据库或清理缓存�?/p>
+              <p>查看各部分占用，按需压缩数据库或清理缓存�?/p>
             </div>
           </div>
           <div id="storage-usage" class="storage-usage">
-            <span class="setting-hint">加载中�?/span>
+            <span class="setting-hint">加载中�?/span>
           </div>
           <div id="storage-status" class="setting-hint"></div>
         </section>
@@ -481,12 +481,12 @@
           <div class="settings-block-head">
             <div>
               <h2>局域网遥控</h2>
-              <p>同一局域网内的手机 / 平板 / 其他电脑，用浏览器打开下面的地址即可遥控 SLATE，界面与主应用一致�?/p>
+              <p>同一局域网内的手机 / 平板 / 其他电脑，用浏览器打开下面的地址即可遥控 SLATE，界面与主应用一致�?/p>
             </div>
-            <button id="btn-lan-refresh" class="icon-btn" type="button" title="刷新地址">�?/button>
+            <button id="btn-lan-refresh" class="icon-btn" type="button" title="刷新地址">�?/button>
           </div>
           <div id="lan-info" class="lan-info">
-            <div class="lan-info-loading">正在获取遥控地址�?/div>
+            <div class="lan-info-loading">正在获取遥控地址�?/div>
           </div>
         </section>
 
@@ -494,19 +494,19 @@
           <div class="settings-block-head">
             <div>
               <h2>关于 SLATE</h2>
-              <p>版本信息与更新检查�?/p>
+              <p>版本信息与更新检查�?/p>
             </div>
           </div>
           <div class="about-row">
             <label class="setting-label" style="margin-bottom:0;">当前版本</label>
-            <span id="about-version" class="about-version">�?/span>
-            <button id="btn-check-update" class="send-btn send-btn-sm" type="button">检查更�?/button>
+            <span id="about-version" class="about-version">�?/span>
+            <button id="btn-check-update" class="send-btn send-btn-sm" type="button">检查更�?/button>
             <button id="btn-view-onboarding" class="send-btn send-btn-sm" type="button" title="重新查看首次启动引导">新手引导</button>
           </div>
           <div class="about-row">
             <label class="setting-label" style="margin-bottom:0;">项目链接</label>
             <button id="btn-open-website" class="send-btn send-btn-sm" type="button" title="在系统浏览器打开官网">🌐 官网</button>
-            <button id="btn-open-github" class="send-btn send-btn-sm" type="button" title="在系统浏览器打开 GitHub 仓库">�?GitHub</button>
+            <button id="btn-open-github" class="send-btn send-btn-sm" type="button" title="在系统浏览器打开 GitHub 仓库">�?GitHub</button>
           </div>
           <div id="about-update-info" class="about-update-info hidden"></div>
         </section>
@@ -516,12 +516,12 @@
 
   </main>
 
-  <!-- ══�?技能执行弹�?══�?-->
+  <!-- ══�?技能执行弹�?══�?-->
   <div id="skill-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <span id="skill-modal-title">执行技�?/span>
+        <span id="skill-modal-title">执行技�?/span>
         <button class="modal-close icon-btn">×</button>
       </div>
       <div class="modal-body">
@@ -534,7 +534,7 @@
     </div>
   </div>
 
-  <!-- ══�?打开项目弹窗 ══�?-->
+  <!-- ══�?打开项目弹窗 ══�?-->
   <div id="project-open-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
@@ -545,7 +545,7 @@
       <div class="modal-body">
         <div class="setting-group">
           <label class="setting-label">项目目录路径</label>
-          <input id="project-path-input" type="text" class="setting-input" placeholder="C:\Users\...\project �?/home/user/project">
+          <input id="project-path-input" type="text" class="setting-input" placeholder="C:\Users\...\project �?/home/user/project">
         </div>
         <div class="setting-group">
           <label class="setting-label">快速选择</label>
@@ -558,16 +558,16 @@
     </div>
   </div>
 
-  <!-- ══�?记忆与画像弹�?══�?-->
+  <!-- ══�?记忆与画像弹�?══�?-->
   <div id="memory-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-wide">
       <div class="modal-header">
-        <span>记忆与画�?/span>
+        <span>记忆与画�?/span>
         <button class="modal-close icon-btn">×</button>
       </div>
       <div class="modal-body">
-        <!-- 标签�?-->
+        <!-- 标签�?-->
         <div class="memory-tabs">
           <button class="memory-tab active" data-tab="memories">长期记忆</button>
           <button class="memory-tab" data-tab="profile">用户画像</button>
@@ -577,7 +577,7 @@
         <div id="memory-tab-memories" class="memory-tab-content active">
           <div class="memory-toolbar">
             <button id="btn-add-memory" class="send-btn send-btn-sm">+ 添加记忆</button>
-            <button id="btn-extract-memory" class="send-btn send-btn-sm">🔍 从对话提�?/button>
+            <button id="btn-extract-memory" class="send-btn send-btn-sm">🔍 从对话提�?/button>
             <button id="btn-auto-refine-memory" class="send-btn send-btn-sm">自动提炼画像</button>
           </div>
           <div id="memory-list" class="memory-list"></div>
@@ -586,23 +586,23 @@
         <div id="memory-tab-profile" class="memory-tab-content">
           <div class="setting-group">
             <label class="setting-label">角色/职业</label>
-            <input id="profile-role" type="text" class="setting-input" placeholder="如：全栈开发者、产品经理�?>
+            <input id="profile-role" type="text" class="setting-input" placeholder="如：全栈开发者、产品经理�?>
           </div>
           <div class="setting-group">
             <label class="setting-label">工作风格</label>
-            <input id="profile-style" type="text" class="setting-input" placeholder="如：注重细节、快速原型�?>
+            <input id="profile-style" type="text" class="setting-input" placeholder="如：注重细节、快速原型�?>
           </div>
           <div class="setting-group">
             <label class="setting-label">技术栈偏好</label>
-            <input id="profile-tech" type="text" class="setting-input" placeholder="如：Python, React, TypeScript�?>
+            <input id="profile-tech" type="text" class="setting-input" placeholder="如：Python, React, TypeScript�?>
           </div>
           <div class="setting-group">
-            <label class="setting-label">沟通习�?/label>
-            <input id="profile-habits" type="text" class="setting-input" placeholder="如：简洁直接、多用示例�?>
+            <label class="setting-label">沟通习�?/label>
+            <input id="profile-habits" type="text" class="setting-input" placeholder="如：简洁直接、多用示例�?>
           </div>
           <div class="setting-group">
             <label class="setting-label">其他</label>
-            <textarea id="profile-custom" class="setting-input setting-textarea" rows="2" placeholder="其他希望 AI 了解的信息�?></textarea>
+            <textarea id="profile-custom" class="setting-input setting-textarea" rows="2" placeholder="其他希望 AI 了解的信息�?></textarea>
           </div>
           <div class="memory-profile-actions">
             <button id="btn-reset-profile" class="send-btn send-btn-sm" style="background:#555;">重置画像</button>
@@ -612,7 +612,7 @@
         <!-- 知识中心 -->
         <div id="memory-tab-knowledge" class="memory-tab-content">
           <div class="knowledge-toolbar">
-            <input id="knowledge-search-input" class="setting-input" type="text" placeholder="搜索知识库�?>
+            <input id="knowledge-search-input" class="setting-input" type="text" placeholder="搜索知识库�?>
             <button id="btn-search-knowledge" class="send-btn send-btn-sm">搜索</button>
             <button id="btn-add-knowledge" class="send-btn send-btn-sm">+ 添加知识</button>
           </div>
@@ -622,7 +622,7 @@
               <span>聊天时自动检索知识库</span>
             </label>
             <label class="knowledge-topk">
-              <span>片段�?/span>
+              <span>片段�?/span>
               <input id="knowledge-topk" class="setting-input" type="number" min="1" max="12" value="5">
             </label>
           </div>
@@ -632,12 +632,12 @@
     </div>
   </div>
 
-  <!-- ══�?压缩选项弹窗 ══�?-->
+  <!-- ══�?压缩选项弹窗 ══�?-->
   <div id="compress-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <span>手动压缩上下�?/span>
+        <span>手动压缩上下�?/span>
         <button class="modal-close icon-btn">×</button>
       </div>
       <div class="modal-body">
@@ -655,24 +655,24 @@
               <input type="radio" name="compress-level" value="heavy">
               <span class="compress-label">
                 <strong>重度压缩</strong>
-                <span>仅保留摘要，�?80% 压缩</span>
+                <span>仅保留摘要，�?80% 压缩</span>
               </span>
             </label>
           </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btn-do-compress" class="send-btn">开始压�?/button>
+        <button id="btn-do-compress" class="send-btn">开始压�?/button>
       </div>
     </div>
   </div>
 
-  <!-- ══�?专家包弹�?══�?-->
+  <!-- ══�?专家包弹�?══�?-->
   <div id="expert-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-wide">
       <div class="modal-header">
-        <span>专家�?/span>
+        <span>专家�?/span>
         <button class="modal-close icon-btn">×</button>
       </div>
       <div class="modal-body exp-modal-body">
@@ -685,23 +685,23 @@
           <div id="expert-list" class="exp-list"></div>
         </div>
         <div class="exp-detail">
-          <div id="expert-detail-empty" class="exp-detail-empty">从左侧选择专家包，或新�?/ 导入一�?/div>
+          <div id="expert-detail-empty" class="exp-detail-empty">从左侧选择专家包，或新�?/ 导入一�?/div>
           <div id="expert-detail-form" class="exp-detail-form hidden">
             <div class="exp-field-row">
               <label class="exp-field">名称<input id="expert-name" type="text" class="exp-input" placeholder="专家名称"></label>
-              <label class="exp-field">描述<input id="expert-desc" type="text" class="exp-input" placeholder="一句话描述该专�?></label>
+              <label class="exp-field">描述<input id="expert-desc" type="text" class="exp-input" placeholder="一句话描述该专�?></label>
             </div>
             <div class="exp-tabs">
               <button class="exp-tab active" data-tab="persona">人格 persona.md</button>
               <button class="exp-tab" data-tab="rules">规则 rules.md</button>
               <button class="exp-tab" data-tab="knowledge">知识 knowledge/</button>
-              <button class="exp-tab" data-tab="skills">技�?skills/</button>
+              <button class="exp-tab" data-tab="skills">技�?skills/</button>
             </div>
             <div id="expert-tab-persona" class="exp-tab-content active">
-              <textarea id="expert-persona" class="exp-textarea" placeholder="专家人格设定（persona.md 内容），例：你是一位资深后端架构师…�?></textarea>
+              <textarea id="expert-persona" class="exp-textarea" placeholder="专家人格设定（persona.md 内容），例：你是一位资深后端架构师…�?></textarea>
             </div>
             <div id="expert-tab-rules" class="exp-tab-content">
-              <textarea id="expert-rules" class="exp-textarea" placeholder="专家行为规则（rules.md 内容），例：1. 回答先给结论再给理由…�?></textarea>
+              <textarea id="expert-rules" class="exp-textarea" placeholder="专家行为规则（rules.md 内容），例：1. 回答先给结论再给理由…�?></textarea>
             </div>
             <div id="expert-tab-knowledge" class="exp-tab-content">
               <div class="exp-file-toolbar">
@@ -715,7 +715,7 @@
               <div class="exp-file-toolbar">
                 <button id="btn-expert-add-skills" class="send-btn send-btn-sm">+ 添加文件</button>
                 <input type="file" id="expert-skills-input" multiple hidden>
-                <span class="exp-hint">专家包自带的技能定义文�?/span>
+                <span class="exp-hint">专家包自带的技能定义文�?/span>
               </div>
               <div id="expert-skills-list" class="exp-file-list"></div>
             </div>
@@ -730,12 +730,12 @@
     </div>
   </div>
 
-  <!-- ══�?提示词素材弹�?══�?-->
+  <!-- ══�?提示词素材弹�?══�?-->
   <div id="snippet-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-wide">
       <div class="modal-header">
-        <span>提示词素�?/span>
+        <span>提示词素�?/span>
         <button class="modal-close icon-btn">×</button>
       </div>
       <div class="modal-body">
@@ -747,7 +747,7 @@
     </div>
   </div>
 
-  <!-- ══�?定时任务弹窗 ══�?-->
+  <!-- ══�?定时任务弹窗 ══�?-->
   <div id="schedule-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-wide">
@@ -758,7 +758,7 @@
       <div class="modal-body">
         <div class="setting-group">
           <label class="setting-label">新建任务</label>
-          <input id="schedule-name" class="setting-input" placeholder="任务名称，如：每日晨�?>
+          <input id="schedule-name" class="setting-input" placeholder="任务名称，如：每日晨�?>
           <textarea id="schedule-prompt" class="setting-input schedule-prompt" rows="3" placeholder="到点后发送给模型的提示词，如：总结今天的对话重点并列出明日待办"></textarea>
           <div class="schedule-row">
             <select id="schedule-model" class="setting-input"></select>
@@ -768,17 +768,17 @@
               <option value="interval">间隔</option>
             </select>
             <input id="schedule-time" type="time" class="setting-input" value="09:00">
-            <input id="schedule-minutes" type="number" class="setting-input" min="1" value="60" title="间隔分钟�? style="display:none">
+            <input id="schedule-minutes" type="number" class="setting-input" min="1" value="60" title="间隔分钟�? style="display:none">
           </div>
           <button id="btn-add-schedule" class="send-btn send-btn-sm">+ 添加任务</button>
         </div>
         <div id="schedule-list" class="schedule-list"></div>
-        <p class="schedule-note">�?定时任务由本地后端执行：请保�?SLATE 运行，并确保所选模型已配置 API Key（仅支持 OpenAI 兼容模型）。结果将归档到标题带 [定时] 的新会话�?/p>
+        <p class="schedule-note">�?定时任务由本地后端执行：请保�?SLATE 运行，并确保所选模型已配置 API Key（仅支持 OpenAI 兼容模型）。结果将归档到标题带 [定时] 的新会话�?/p>
       </div>
     </div>
   </div>
 
-  <!-- ══�?高危命令审批弹窗 ══�?-->
+  <!-- ══�?高危命令审批弹窗 ══�?-->
   <div id="risk-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
@@ -791,8 +791,8 @@
         <label class="setting-label">命令</label>
         <pre id="risk-command" class="risk-command"></pre>
         <label class="setting-label">目的说明（模型分析）</label>
-        <div id="risk-explain" class="risk-explain">正在分析�?/div>
-        <p class="risk-note">批准后命令将直接执行，请确认已理解其影响�?/p>
+        <div id="risk-explain" class="risk-explain">正在分析�?/div>
+        <p class="risk-note">批准后命令将直接执行，请确认已理解其影响�?/p>
       </div>
       <div class="modal-footer">
         <button id="btn-risk-reject" class="send-btn btn-ghost">拒绝</button>
@@ -801,7 +801,7 @@
     </div>
   </div>
 
-  <!-- ══�?Better Project Understanding 弹窗 ══�?-->
+  <!-- ══�?Better Project Understanding 弹窗 ══�?-->
   <div id="understand-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-wide">
@@ -811,15 +811,15 @@
       </div>
       <!-- 设置视图：选档 -->
       <div id="understand-setup" class="modal-body">
-        <p class="understand-intro">AI 将全量扫描当前项目（目录结构 + 关键文件），生成两份文档�?/p>
+        <p class="understand-intro">AI 将全量扫描当前项目（目录结构 + 关键文件），生成两份文档�?/p>
         <div class="understand-docs-hint">
-          <span>🗺 导览·百科：项目概�?/ 技术栈 / 模块职责 / 入口导航</span>
-          <span>📏 规则手册：后续开发应遵守的项目规�?/span>
+          <span>🗺 导览·百科：项目概�?/ 技术栈 / 模块职责 / 入口导航</span>
+          <span>📏 规则手册：后续开发应遵守的项目规�?/span>
         </div>
         <label class="setting-label">扫描深度</label>
         <div id="understand-levels" class="understand-levels"></div>
         <div class="modal-footer">
-          <button id="btn-understand-start" class="send-btn">开始生�?/button>
+          <button id="btn-understand-start" class="send-btn">开始生�?/button>
         </div>
       </div>
       <!-- 进度视图 -->
@@ -852,7 +852,7 @@
     </div>
   </div>
 
-  <!-- ══�?历史会话批量管理弹窗 ══�?-->
+  <!-- ══�?历史会话批量管理弹窗 ══�?-->
   <div id="conv-manage-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content conv-manage-content">
@@ -864,7 +864,7 @@
         <div class="conv-manage-toolbar">
           <label class="conv-manage-checkall">
             <input type="checkbox" id="conv-manage-checkall">
-            <span>全�?/span>
+            <span>全�?/span>
           </label>
           <span id="conv-manage-count" class="setting-hint"></span>
           <button id="btn-conv-delete-selected" class="send-btn send-btn-sm" type="button">删除选中</button>
@@ -875,12 +875,12 @@
     </div>
   </div>
 
-  <!-- ══�?首次启动引导（新手速览，可在设置·关于里重新查看�?══�?-->
+  <!-- ══�?首次启动引导（新手速览，可在设置·关于里重新查看�?══�?-->
   <div id="onboarding-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content onboarding-content">
       <div class="modal-header">
-        <span>欢迎使用 SLATE · �?/span>
+        <span>欢迎使用 SLATE · �?/span>
         <button class="modal-close icon-btn">×</button>
       </div>
       <div class="modal-body">
@@ -889,57 +889,57 @@
           <div class="onboarding-card">
             <span class="onboarding-icon">💬</span>
             <div class="onboarding-card-body">
-              <b>多模型对�?/b>
-              <p>顶栏切换模型，@ 提及文件或技能，Enter 发送。历史侧栏支持搜索与导出�?/p>
+              <b>多模型对�?/b>
+              <p>顶栏切换模型，@ 提及文件或技能，Enter 发送。历史侧栏支持搜索与导出�?/p>
             </div>
           </div>
           <div class="onboarding-card">
-            <span class="onboarding-icon">�?/span>
+            <span class="onboarding-icon">�?/span>
             <div class="onboarding-card-body">
               <b>Harness 自主执行</b>
-              <p>输入�?�?按钮开启：模型自主多轮调用工具直至任务完成，大任务自动�?TODOLIST�?/p>
+              <p>输入�?�?按钮开启：模型自主多轮调用工具直至任务完成，大任务自动�?TODOLIST�?/p>
             </div>
           </div>
           <div class="onboarding-card">
             <span class="onboarding-icon">🖌</span>
             <div class="onboarding-card-body">
               <b>磨墨模式</b>
-              <p>输入 /grind 想法：AI 三段式追问，把粗糙想法研磨成结构化任务书，一键送入 Harness�?/p>
+              <p>输入 /grind 想法：AI 三段式追问，把粗糙想法研磨成结构化任务书，一键送入 Harness�?/p>
             </div>
           </div>
           <div class="onboarding-card">
             <span class="onboarding-icon">🛠</span>
             <div class="onboarding-card-body">
               <b>内置工具</b>
-              <p>文件读写编辑、终端沙箱、联网搜索、PPT/Word 生成�?17 �?MCP 工具，高危命令需审批�?/p>
+              <p>文件读写编辑、终端沙箱、联网搜索、PPT/Word 生成�?17 �?MCP 工具，高危命令需审批�?/p>
             </div>
           </div>
           <div class="onboarding-card">
             <span class="onboarding-icon">🧠</span>
             <div class="onboarding-card-body">
               <b>记忆与知识库</b>
-              <p>🧠 按钮管理长期记忆与用户画像；左侧项目栏可扫描生成项目导览与规则手册�?/p>
+              <p>🧠 按钮管理长期记忆与用户画像；左侧项目栏可扫描生成项目导览与规则手册�?/p>
             </div>
           </div>
           <div class="onboarding-card">
             <span class="onboarding-icon">🏭</span>
             <div class="onboarding-card-body">
               <b>更多面板</b>
-              <p>顶栏黑板（卡片式逻辑链）、工厂（提示词生产）、设置（模型/上下�?备份）�?/p>
+              <p>顶栏黑板（卡片式逻辑链）、工厂（提示词生产）、设置（模型/上下�?备份）�?/p>
             </div>
           </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btn-onboarding-done" class="send-btn">开始使�?/button>
+        <button id="btn-onboarding-done" class="send-btn">开始使�?/button>
       </div>
     </div>
   </div>
 
-  <!-- ══�?Toast 容器 ══�?-->
+  <!-- ══�?Toast 容器 ══�?-->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260814-48"></script>
+  <script type="module" src="./js/app.js?v=20260815-50"></script>
 
 </body>
 </html>

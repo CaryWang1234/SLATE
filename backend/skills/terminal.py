@@ -3,12 +3,21 @@
 高危命令采用写死的规则判定（与前端 riskguard.js 保持同一份清单）：
 - BLOCKED_PREFIXES：灾难级命令，无条件禁止
 - HIGH_RISK_PATTERNS：高危命令，必须携带 approved=True（用户在前端批准后注入）
+
+后台执行支持：
+- background=True：命令异步执行，立即返回 task_id
+- action="status"：查询后台任务状态
+- action="list"：列出所有后台任务
+- action="stop"：终止后台任务
 """
 
 from __future__ import annotations
 
+import asyncio
 import re
 import subprocess
+import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +27,9 @@ DEFAULT_WORK_DIR = "."
 TIMEOUT = 30
 # 禁止的命令前缀（无条件拦截）
 BLOCKED_PREFIXES = ("rm -rf /", "format", "mkfs", "dd if=")
+
+# 后台任务存储（内存）
+_background_tasks: dict[str, dict[str, Any]] = {}
 
 # 高危命令规则（写死）：命中任一条即要求用户批准
 HIGH_RISK_PATTERNS: list[tuple[re.Pattern, str]] = [
@@ -71,8 +83,120 @@ def check_high_risk(command: str) -> str:
     return ""
 
 
-def execute(command: str = "", work_dir: str = DEFAULT_WORK_DIR, approved: bool = False, **_: Any) -> dict[str, Any]:
-    """在指定目录中执行 Shell 命令。高危命令须 approved=True（前端用户批准后注入）。"""
+# ── 后台任务管理 ─────────────────────────────────
+
+def _run_background_task(task_id: str, command: str, cwd: str) -> None:
+    """在后台执行命令并更新任务状态。"""
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 后台任务最长 5 分钟
+        )
+        _background_tasks[task_id]["status"] = "completed"
+        _background_tasks[task_id]["exit_code"] = result.returncode
+        output = result.stdout
+        if result.stderr:
+            output += f"\n[STDERR]\n{result.stderr}"
+        _background_tasks[task_id]["output"] = output.strip() or "(无输出)"
+    except subprocess.TimeoutExpired:
+        _background_tasks[task_id]["status"] = "timeout"
+        _background_tasks[task_id]["output"] = f"命令执行超时（300秒）"
+    except Exception as e:
+        _background_tasks[task_id]["status"] = "error"
+        _background_tasks[task_id]["output"] = f"执行失败: {e}"
+    finally:
+        _background_tasks[task_id]["finished_at"] = time.time()
+
+
+def _start_background_task(command: str, cwd: str) -> str:
+    """启动后台任务，返回 task_id。"""
+    task_id = str(uuid.uuid4())[:8]
+    _background_tasks[task_id] = {
+        "task_id": task_id,
+        "command": command,
+        "work_dir": cwd,
+        "status": "running",
+        "started_at": time.time(),
+        "finished_at": None,
+        "exit_code": None,
+        "output": None,
+    }
+    # 使用 threading 而非 asyncio，因为 subprocess.run 是同步阻塞的
+    import threading
+    t = threading.Thread(target=_run_background_task, args=(task_id, command, cwd), daemon=True)
+    t.start()
+    return task_id
+
+
+def execute(
+    command: str = "",
+    work_dir: str = DEFAULT_WORK_DIR,
+    approved: bool = False,
+    background: bool = False,
+    action: str = "",
+    task_id: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    """在指定目录中执行 Shell 命令。高危命令须 approved=True（前端用户批准后注入）。
+
+    后台执行模式：
+    - background=True：异步执行命令，立即返回 task_id
+    - action="status"：查询指定 task_id 的状态
+    - action="list"：列出所有后台任务
+    - action="stop"：终止指定 task_id 的任务
+    """
+    # ── 后台任务管理操作 ─────────────────────────
+    if action == "list":
+        if not _background_tasks:
+            return {"message": "当前无后台任务"}
+        tasks = []
+        for tid, info in _background_tasks.items():
+            tasks.append({
+                "task_id": tid,
+                "command": info["command"],
+                "status": info["status"],
+                "started_at": info["started_at"],
+                "finished_at": info.get("finished_at"),
+            })
+        return {"tasks": tasks}
+
+    if action == "status":
+        if not task_id:
+            return {"error": "缺少 task_id 参数"}
+        if task_id not in _background_tasks:
+            return {"error": f"任务不存在: {task_id}"}
+        info = _background_tasks[task_id]
+        result = {
+            "task_id": task_id,
+            "command": info["command"],
+            "status": info["status"],
+            "started_at": info["started_at"],
+            "finished_at": info.get("finished_at"),
+        }
+        if info["status"] in ("completed", "timeout", "error"):
+            result["exit_code"] = info.get("exit_code")
+            result["output"] = info.get("output")
+        return result
+
+    if action == "stop":
+        if not task_id:
+            return {"error": "缺少 task_id 参数"}
+        if task_id not in _background_tasks:
+            return {"error": f"任务不存在: {task_id}"}
+        info = _background_tasks[task_id]
+        if info["status"] != "running":
+            return {"message": f"任务已结束（状态: {info['status']}）"}
+        # 无法直接终止 threading.Thread，标记为 stopped
+        info["status"] = "stopped"
+        info["finished_at"] = time.time()
+        info["output"] = "用户手动终止"
+        return {"message": f"已标记任务为停止: {task_id}"}
+
+    # ── 正常命令执行 ─────────────────────────────
     if not command:
         return {"error": "命令不能为空"}
 
@@ -91,6 +215,17 @@ def execute(command: str = "", work_dir: str = DEFAULT_WORK_DIR, approved: bool 
     if not cwd.is_dir():
         return {"error": f"工作目录不存在: {work_dir}"}
 
+    # ── 后台执行模式 ─────────────────────────────
+    if background:
+        task_id = _start_background_task(command, str(cwd))
+        return {
+            "message": "命令已在后台启动",
+            "task_id": task_id,
+            "command": command,
+            "tip": f"使用 action='status', task_id='{task_id}' 查询状态",
+        }
+
+    # ── 同步执行（原有逻辑） ─────────────────────
     try:
         result = subprocess.run(
             command,

@@ -1,54 +1,54 @@
 /**
- * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交�?Prompt�? */
+ * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交�?Prompt�? */
 
-import { state, subscribe, addPromptSnippet } from "../store.js?v=20260814-48";
-import { get, post } from "../services/api.js?v=20260814-48";
-import { browseFiles } from "../services/project.js?v=20260814-48";
-import { t } from "../services/i18n.js?v=20260814-48";
+import { state, subscribe, addPromptSnippet } from "../store.js?v=20260815-50";
+import { get, post } from "../services/api.js?v=20260815-50";
+import { browseFiles } from "../services/project.js?v=20260815-50";
+import { t } from "../services/i18n.js?v=20260815-50";
 
 const FACTORY_PRESETS = {
   codex: {
     label: "Codex",
-    goal: "交给 Codex 在当前代码库中实现、验证并说明结果�?,
-    output: "请直接完成修改，并在最后简要说明改动文件、验证方式和剩余风险�?,
+    goal: "交给 Codex 在当前代码库中实现、验证并说明结果�?,
+    output: "请直接完成修改，并在最后简要说明改动文件、验证方式和剩余风险�?,
   },
   claude: {
     label: "Claude Code",
-    goal: "交给 Claude Code 按现有工程风格完成代码修改�?,
-    output: "请先阅读相关文件，再执行最小必要修改，最后给出测试结果�?,
+    goal: "交给 Claude Code 按现有工程风格完成代码修改�?,
+    output: "请先阅读相关文件，再执行最小必要修改，最后给出测试结果�?,
   },
   cursor: {
     label: "Cursor",
-    goal: "交给 Cursor 作为编辑器内任务指令使用�?,
-    output: "请给出清晰的编辑步骤、目标文件和需要保留的行为�?,
+    goal: "交给 Cursor 作为编辑器内任务指令使用�?,
+    output: "请给出清晰的编辑步骤、目标文件和需要保留的行为�?,
   },
   generic: {
     label: "通用 Agent",
-    goal: "交给任意 Coding Agent 执行�?,
-    output: "请输出可执行方案、必要修改和验证清单�?,
+    goal: "交给任意 Coding Agent 执行�?,
+    output: "请输出可执行方案、必要修改和验证清单�?,
   },
 };
 
 const FACTORY_TEMPLATES = {
   feature: {
     label: "功能实现",
-    task: "实现：\n\n期望行为：\n\n验收标准�?,
-    constraints: "遵循现有架构和代码风格。\n保持改动范围尽量小。\n完成后运行相关检查�?,
+    task: "实现：\n\n期望行为：\n\n验收标准�?,
+    constraints: "遵循现有架构和代码风格。\n保持改动范围尽量小。\n完成后运行相关检查�?,
   },
   bugfix: {
     label: "Bug 修复",
-    task: "问题现象：\n\n复现路径：\n\n期望结果�?,
-    constraints: "先定位根因，再修改。\n不要回滚无关改动。\n补充或运行能覆盖该问题的验证�?,
+    task: "问题现象：\n\n复现路径：\n\n期望结果�?,
+    constraints: "先定位根因，再修改。\n不要回滚无关改动。\n补充或运行能覆盖该问题的验证�?,
   },
   review: {
     label: "代码审查",
-    task: "请审查以下变更或模块：\n\n重点关注�?,
-    constraints: "按严重程度列出问题。\n每条问题包含文件位置、风险和建议修复方式�?,
+    task: "请审查以下变更或模块：\n\n重点关注�?,
+    constraints: "按严重程度列出问题。\n每条问题包含文件位置、风险和建议修复方式�?,
   },
   refactor: {
     label: "重构整理",
     task: "重构目标：\n\n保持不变的行为：\n\n希望改善的问题：",
-    constraints: "保持外部行为兼容。\n避免引入大型新依赖。\n优先沿用项目已有模式�?,
+    constraints: "保持外部行为兼容。\n避免引入大型新依赖。\n优先沿用项目已有模式�?,
   },
 };
 
@@ -103,10 +103,10 @@ function renderShell() {
         <div class="factory-strip">
           <div>
             <div class="factory-kicker">Prompt Factory</div>
-            <h1 class="factory-heading">把零散意图整理成可执行任�?/h1>
+            <h1 class="factory-heading">把零散意图整理成可执行任�?/h1>
           </div>
           <div class="factory-strip-actions">
-            <button id="factory-btn-from-chat" class="factory-ghost-btn" type="button">引用最近对�?/button>
+            <button id="factory-btn-from-chat" class="factory-ghost-btn" type="button">引用最近对�?/button>
             <button id="factory-btn-clear" class="factory-ghost-btn" type="button">清空</button>
           </div>
         </div>
@@ -121,7 +121,7 @@ function renderShell() {
           <label class="factory-field">
             <span class="factory-label">任务类型</span>
             <select id="factory-template" class="factory-select">
-              <option value="">从空白开�?/option>
+              <option value="">从空白开�?/option>
               ${Object.entries(FACTORY_TEMPLATES).map(([key, tpl]) => `<option value="${key}">${tpl.label}</option>`).join("")}
             </select>
           </label>
@@ -137,23 +137,23 @@ function renderShell() {
 
         <label class="factory-field factory-field-main">
           <span class="factory-label">任务描述</span>
-          <textarea id="factory-task" class="factory-input factory-task-input" placeholder="${t("写清楚你�?Agent 做什么、为什么做、怎样算完成�?)}" rows="7"></textarea>
+          <textarea id="factory-task" class="factory-input factory-task-input" placeholder="${t("写清楚你�?Agent 做什么、为什么做、怎样算完成�?)}" rows="7"></textarea>
         </label>
 
         <div class="factory-grid">
           <label class="factory-field">
-            <span class="factory-label">相关上下�?/span>
-            <textarea id="factory-context" class="factory-input" placeholder="${t("粘贴文件路径、报错、接口约定、关键代码片段�?)}" rows="7"></textarea>
+            <span class="factory-label">相关上下�?/span>
+            <textarea id="factory-context" class="factory-input" placeholder="${t("粘贴文件路径、报错、接口约定、关键代码片段�?)}" rows="7"></textarea>
           </label>
           <label class="factory-field">
             <span class="factory-label">约束条件</span>
-            <textarea id="factory-constraints" class="factory-input" placeholder="${t("不能改什么、必须保留什么、需要遵守哪些风格或流程�?)}" rows="7"></textarea>
+            <textarea id="factory-constraints" class="factory-input" placeholder="${t("不能改什么、必须保留什么、需要遵守哪些风格或流程�?)}" rows="7"></textarea>
           </label>
         </div>
 
         <div class="factory-context-bar">
           <button id="factory-btn-insert-constitution" class="factory-ghost-btn" type="button">插入项目宪法</button>
-          <button id="factory-btn-insert-files" class="factory-ghost-btn" type="button">插入勾选文�?/button>
+          <button id="factory-btn-insert-files" class="factory-ghost-btn" type="button">插入勾选文�?/button>
           <button id="btn-generate-prompt" class="generate-btn factory-primary-btn" type="button">生成 Prompt</button>
         </div>
       </section>
@@ -169,7 +169,7 @@ function renderShell() {
 
         <section class="factory-side-section">
           <div class="factory-side-head">
-            <span class="factory-label">可引用文�?/span>
+            <span class="factory-label">可引用文�?/span>
             <span id="factory-file-count" class="factory-count">0</span>
           </div>
           <div id="factory-file-list" class="factory-file-list"></div>
@@ -177,7 +177,7 @@ function renderShell() {
 
         <section class="factory-side-section">
           <div class="factory-side-head">
-            <span class="factory-label">质量检�?/span>
+            <span class="factory-label">质量检�?/span>
           </div>
           <div id="factory-checklist" class="factory-checklist"></div>
         </section>
@@ -188,9 +188,9 @@ function renderShell() {
       <div class="prompt-output-header">
         <span>生成结果</span>
         <div class="factory-output-actions">
-          <button id="factory-btn-save-snippet" class="icon-btn" title="保存为素�? type="button">�?/button>
-          <button id="factory-btn-download" class="icon-btn" title="下载 Markdown" type="button">�?/button>
-          <button id="btn-copy-prompt" class="icon-btn" title="复制" type="button">�?/button>
+          <button id="factory-btn-save-snippet" class="icon-btn" title="保存为素�? type="button">�?/button>
+          <button id="factory-btn-download" class="icon-btn" title="下载 Markdown" type="button">�?/button>
+          <button id="btn-copy-prompt" class="icon-btn" title="复制" type="button">�?/button>
         </div>
       </div>
       <pre id="prompt-result" class="prompt-result"></pre>
@@ -263,7 +263,7 @@ function insertRecentChat() {
     return;
   }
   appendToTextarea(fields.context, `最近对话摘要：\n${recent.slice(0, 8000)}`);
-  showToast("已引用最近对�?);
+  showToast("已引用最近对�?);
 }
 
 function insertConstitutionRules() {
@@ -273,7 +273,7 @@ function insertConstitutionRules() {
     return;
   }
   appendToTextarea(fields.constraints, rules.map((rule, i) => `${i + 1}. ${rule}`).join("\n"));
-  showToast("已插入项目宪�?);
+  showToast("已插入项目宪�?);
 }
 
 async function insertSelectedFiles() {
@@ -285,7 +285,7 @@ async function insertSelectedFiles() {
 
   buttons.insertFiles.disabled = true;
   const oldText = buttons.insertFiles.textContent;
-  buttons.insertFiles.textContent = "读取�?..";
+  buttons.insertFiles.textContent = "读取�?..";
 
   try {
     const chunks = [];
@@ -293,15 +293,15 @@ async function insertSelectedFiles() {
       const res = await browseFiles(path);
       if (res.code === 0 && res.data?.type === "file") {
         const content = (res.data.content || "").slice(0, 6000);
-        chunks.push(`文件�?{res.data.path || path}\n\`\`\`\n${content}\n\`\`\``);
+        chunks.push(`文件�?{res.data.path || path}\n\`\`\`\n${content}\n\`\`\``);
       }
     }
     if (chunks.length === 0) {
-      showToast("没有读取到可用文�?);
+      showToast("没有读取到可用文�?);
       return;
     }
     appendToTextarea(fields.context, chunks.join("\n\n"));
-    showToast(t("已插�?{n} 个文�?, { n: chunks.length }));
+    showToast(t("已插�?{n} 个文�?, { n: chunks.length }));
   } finally {
     buttons.insertFiles.disabled = false;
     buttons.insertFiles.textContent = oldText;
@@ -347,7 +347,7 @@ function renderFilePicker() {
     return;
   }
   if (files.length === 0) {
-    fileListEl.innerHTML = '<div class="factory-empty">当前目录没有可引用文�?/div>';
+    fileListEl.innerHTML = '<div class="factory-empty">当前目录没有可引用文�?/div>';
     return;
   }
 
@@ -391,7 +391,7 @@ function renderChecklist() {
 
   checklistEl.innerHTML = checks.map(check => `
     <div class="factory-check ${check.ok ? "ok" : ""}">
-      <span>${check.ok ? "�? : "·"}</span>
+      <span>${check.ok ? "�? : "·"}</span>
       ${check.label}
     </div>
   `).join("");
@@ -406,9 +406,9 @@ function buildPrompt() {
   const selected = [...selectedFiles.keys()];
 
   const toneMap = {
-    direct: "请直接进入执行，不需要长篇方案铺垫�?,
-    careful: "请先审计风险和边界，再做修改�?,
-    explore: "请先给出 2-3 个可行方向，再选择最稳妥方案执行�?,
+    direct: "请直接进入执行，不需要长篇方案铺垫�?,
+    careful: "请先审计风险和边界，再做修改�?,
+    explore: "请先给出 2-3 个可行方向，再选择最稳妥方案执行�?,
   };
 
   const sections = [
@@ -420,7 +420,7 @@ function buildPrompt() {
     "",
     "# 工作方式",
     toneMap[fields.tone.value] || toneMap.direct,
-    "阅读现有代码后再行动，优先沿用项目已有模式�?,
+    "阅读现有代码后再行动，优先沿用项目已有模式�?,
   ];
 
   if (rules.length) {
@@ -432,7 +432,7 @@ function buildPrompt() {
   }
 
   if (context) {
-    sections.push("", "# 已知上下�?, context);
+    sections.push("", "# 已知上下�?, context);
   }
 
   if (constraints) {
@@ -443,8 +443,8 @@ function buildPrompt() {
     "",
     "# 交付要求",
     preset.output,
-    "不要修改与任务无关的文件；遇到已有未提交改动时，先理解并兼容它们�?,
-    "完成后说明验证命令或无法验证的原因�?
+    "不要修改与任务无关的文件；遇到已有未提交改动时，先理解并兼容它们�?,
+    "完成后说明验证命令或无法验证的原因�?
   );
 
   return sections.join("\n").replace(/\n{3,}/g, "\n\n").trim();
@@ -475,7 +475,7 @@ async function copyPrompt() {
     document.execCommand("copy");
     document.body.removeChild(textarea);
   }
-  showToast("Prompt 已复�?);
+  showToast("Prompt 已复�?);
 }
 
 function downloadPrompt() {
@@ -495,10 +495,10 @@ function downloadPrompt() {
 async function savePromptAsSnippet() {
   const text = getPromptText();
   if (!text) return;
-  const snip = { id: makeSnippetId(), text, source: "提示词工�? };
+  const snip = { id: makeSnippetId(), text, source: "提示词工�? };
   addPromptSnippet(snip);
   post("/chat/snippets", snip).catch(() => {});
-  showToast("已保存到提示词素�?);
+  showToast("已保存到提示词素�?);
 }
 
 async function loadConstitution() {

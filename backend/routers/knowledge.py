@@ -152,19 +152,30 @@ def delete_document(doc_id: str) -> None:
     conn.close()
 
 
-def search_knowledge(query: str, limit: int = 6) -> list[dict[str, Any]]:
+def search_knowledge(query: str, limit: int = 6, category: str = "") -> list[dict[str, Any]]:
     query = str(query or "").strip()
     if not query:
         return []
     q_vector = _hash_vector(query)
     q_terms = set(_tokenize(query))
     conn = _get_db()
-    rows = conn.execute("""
-        SELECT c.id, c.doc_id, c.chunk_index, c.content, c.vector, c.terms,
-               d.title, d.source, d.kind, d.created_at, d.updated_at
-        FROM knowledge_chunks c
-        JOIN knowledge_docs d ON d.id = c.doc_id
-    """).fetchall()
+
+    # 构建 SQL，支持按 category 过滤
+    if category:
+        rows = conn.execute("""
+            SELECT c.id, c.doc_id, c.chunk_index, c.content, c.vector, c.terms,
+                   d.title, d.source, d.kind, d.created_at, d.updated_at
+            FROM knowledge_chunks c
+            JOIN knowledge_docs d ON d.id = c.doc_id
+            WHERE d.kind = ? OR d.metadata LIKE ?
+        """, (category, f'%"category": "{category}"%')).fetchall()
+    else:
+        rows = conn.execute("""
+            SELECT c.id, c.doc_id, c.chunk_index, c.content, c.vector, c.terms,
+                   d.title, d.source, d.kind, d.created_at, d.updated_at
+            FROM knowledge_chunks c
+            JOIN knowledge_docs d ON d.id = c.doc_id
+        """).fetchall()
     conn.close()
 
     ranked = []
@@ -227,7 +238,11 @@ async def remove_doc(doc_id: str) -> dict[str, Any]:
 
 @router.post("/search")
 async def search(body: dict[str, Any]) -> dict[str, Any]:
-    results = search_knowledge(str(body.get("query", "")), int(body.get("limit", 6) or 6))
+    results = search_knowledge(
+        str(body.get("query", "")),
+        int(body.get("limit", 6) or 6),
+        str(body.get("category", "") or "").strip(),
+    )
     return {"code": 0, "data": results, "message": "ok"}
 
 
