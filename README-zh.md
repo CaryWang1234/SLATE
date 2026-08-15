@@ -34,7 +34,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 - ⚡ **Harness 自主执行** —— 六阶段闭环自主推进，默认 50 轮不断线，大任务自动建 TODOLIST 统筹批量销账；停止不退出，仅手动停止 / 轮数用完 / 清单了结才结束
 - 🖌️ **磨墨模式** —— `/grind` 一句粗糙想法，AI 三段式追问研磨成结构化任务书，一键送入 Harness
 - 🗂️ **对话与数据管理** —— 历史全文搜索、会话导出 / 改名 / 批量管理、消息编辑删除，一键备份恢复全部数据，存储用量可视可清理
-- 🛠️ **21 个内置 MCP 工具** —— 文件读写编辑追加、终端沙箱、PPT / Word 文档生成、SVG 图表与二维码、Python API 文档提取、便携网页打包、联网搜索与网页抓取等
+- 🛠️ **22 个内置 MCP 工具** —— 文件读写编辑追加、终端沙箱、PPT / Word 文档生成、SVG 图表与二维码、Python API 文档提取、便携网页打包、联网搜索与网页抓取、MCP 工厂自生产工具等
 - 🧩 **自定义 Skill 系统** —— `SKILL.md` 即插即用，聊天中 `@` 提及即注入上下文
 - 🎓 **专家包（Expert Pack）** —— 人格 + 规则 + 知识 + 技能五件套，zip 导入导出，对话 / 团队 / @提及三路注入
 - 📖 **Better Project Understanding** —— 简略 / 平衡 / 详细三档扫描项目，自动生成导览·百科与规则手册
@@ -92,6 +92,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 | `web_search` / `web_fetch` | 联网搜索（免 Key）/ 网页内容获取 |
 | `chart_create` / `qrcode_create` | SVG 图表生成（柱状/条形/折线/饼图）/ 二维码生成，产出内联预览 |
 | `python_api_extract` / `html_bundle` | Python 库公共 API 文档提取（JSON/Markdown）/ 网页 css/js 内联单文件打包 |
+| `code_scan` / `mcp_factory` | 代码安全扫描 / MCP 工具自生产（让 SLATE 自生产适配自身的 MCP） |
 
 自定义 Skill：上传或导入 `SKILL.md` 即可扩展新能力；聊天输入框 `@` 提及 MCP 工具、Skill 或专家包，发送时自动注入对应上下文。
 
@@ -232,7 +233,7 @@ SLATE/
 │   │   ├── update.py           # 启动更新检查（GitHub Releases）
 │   │   ├── workflows.py        # 团队工作流 DAG 定义
 │   │   └── files.py            # 多模态文件解析
-│   └── skills/                 # 21 个内置 MCP 工具实现（含高危命令双层拦截）
+│   └── skills/                 # 22 个内置 MCP 工具实现（含高危命令双层拦截）
 ├── frontend/
 │   ├── index.html              # 三栏布局入口（对话 / 黑板 / 工厂+能力）
 │   ├── css/style.css           # 全局样式（双主题）

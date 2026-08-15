@@ -48,6 +48,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "python_api_extract": "提取 Python 库/模块的公共 API 文档（函数签名、类方法、属性），输出 JSON/Markdown",
     "html_bundle": "将 html 及相对路径的 css/js 内联合并为单个 html 文件（便携分发）",
     "code_scan": "代码安全扫描（检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等）",
+    "mcp_factory": "MCP 工厂：根据描述自动生成新的 MCP 工具，让 SLATE 自生产适配自身的工具",
 }
 
 

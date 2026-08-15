@@ -1,11 +1,11 @@
 ﻿/**
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除�? */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260815-54";
-import { get, post, del, upload } from "../services/api.js?v=20260815-54";
-import { guardSkillParams } from "../services/riskguard.js?v=20260815-54";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260815-54";
-import { t } from "../services/i18n.js?v=20260815-54";
+import { state, subscribe, setSkills } from "../store.js?v=20260815-55";
+import { get, post, del, upload } from "../services/api.js?v=20260815-55";
+import { guardSkillParams } from "../services/riskguard.js?v=20260815-55";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260815-55";
+import { t } from "../services/i18n.js?v=20260815-55";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -120,7 +120,14 @@ const SKILL_PARAM_DEFS = {
   html_bundle: [
     { key: "src", label: "�?html 文件路径", type: "text", placeholder: "C:/path/to/page/index.html" },
     { key: "out", label: "输出路径（可选）", type: "text", placeholder: "缺省为源同目�?<原名>.bundled.html" },
-  ],
+  ,
+  mcp_factory: [
+    { key: "tool_name", label: "工具名称（英文）", type: "text", placeholder: "my_tool" },
+    { key: "description", label: "工具描述", type: "text", placeholder: "我的自定义工具功能描述" },
+    { key: "params", label: "参数规格（JSON 数组）", type: "textarea", placeholder: '[{"name":"input","type":"str","required":true,"description":"输入内容"}]' },
+    { key: "body", label: "核心逻辑代码", type: "textarea", placeholder: 'result = {"message": "Hello"}' },
+    { key: "overwrite", label: "覆盖已有（true/false）", type: "text", placeholder: "false" },
+  ],],
 };
 
 // ── 列表渲染：MCP 工具�?+ SKILL.md 技能区 ────────────
