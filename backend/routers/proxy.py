@@ -250,11 +250,36 @@ def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, Any]):
-    """流式转发 OpenAI 兼容 API（共享客户端连接池）。"""
+    """流式转发 OpenAI 兼容 API（共享客户端连接池）。
+    标准化 reasoning 字段：delta.reasoning_content / delta.reasoning → delta.reasoning
+    """
     client = _get_stream_client(url.rsplit("/", 2)[0])  # 提取 base_url
     async with client.stream("POST", url, json=payload, headers=headers) as resp:
         async for line in resp.aiter_lines():
-            if line:
+            if not line:
+                continue
+            trimmed = line.strip()
+            if not trimmed.startswith("data:"):
+                yield f"{line}\n\n"
+                continue
+            data_str = trimmed[5:].strip()
+            if data_str == "[DONE]":
+                yield f"{line}\n\n"
+                continue
+            try:
+                parsed = json.loads(data_str)
+                delta = parsed.get("choices", [{}])[0].get("delta", {})
+                # 标准化 reasoning 字段
+                reasoning = delta.get("reasoning_content") or delta.get("reasoning") or delta.get("thinking")
+                if reasoning:
+                    delta["reasoning"] = reasoning
+                    # 移除原始字段，保持干净
+                    for k in ("reasoning_content", "reasoning", "thinking"):
+                        if k in delta and k != "reasoning":
+                            del delta[k]
+                    parsed["choices"][0]["delta"] = delta
+                yield f"data: {json.dumps(parsed, ensure_ascii=False)}\n\n"
+            except json.JSONDecodeError:
                 yield f"{line}\n\n"
 
 
@@ -282,6 +307,13 @@ async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str
                     delta = data.get("delta", "")
                     if delta:
                         chunk = {"choices": [{"delta": {"content": delta}, "index": 0}]}
+                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+
+                # 思考增量：response.reasoning_text.delta（Responses API）
+                elif obj_type == "response.reasoning_text.delta":
+                    delta = data.get("delta", "")
+                    if delta:
+                        chunk = {"choices": [{"delta": {"reasoning": delta}, "index": 0}]}
                         yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
                 # 完成信号
@@ -325,12 +357,23 @@ async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str
                     # 转换为 OpenAI SSE 格式
                     if event_type == "content_block_delta":
                         delta = data.get("delta", {})
-                        text = delta.get("text", "")
-                        if text:
-                            chunk = {
-                                "choices": [{"delta": {"content": text}, "index": 0}]
-                            }
-                            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                        delta_type = delta.get("type", "")
+                        # Anthropic 思考块（Extended Thinking）
+                        if delta_type == "thinking_delta":
+                            thinking = delta.get("thinking", "")
+                            if thinking:
+                                chunk = {
+                                    "choices": [{"delta": {"reasoning": thinking}, "index": 0}]
+                                }
+                                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                        # 普通文本块
+                        else:
+                            text = delta.get("text", "")
+                            if text:
+                                chunk = {
+                                    "choices": [{"delta": {"content": text}, "index": 0}]
+                                }
+                                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
                     elif event_type == "message_stop":
                         yield "data: [DONE]\n\n"
 

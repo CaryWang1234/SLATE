@@ -1,4 +1,7 @@
-"""技能路由：MCP 内置工具 + SKILL.md 技能，支持执行、上传与本地导入。"""
+"""技能路由：MCP 内置工具 + SKILL.md 技能，支持执行、上传与本地导入。
+
+通用插件适配：支持 SKILL.md 开放标准（Codex CLI / Claude Code / Cursor 等）。
+"""
 
 from __future__ import annotations
 
@@ -12,6 +15,8 @@ from typing import Any
 
 from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
+
+from backend.skills import plugin_adapter
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
@@ -224,3 +229,40 @@ async def delete_skill(skill_name: str) -> dict[str, Any]:
     except OSError as e:
         return {"code": 1, "message": f"删除失败: {e}"}
     return {"code": 0, "data": None, "message": "ok"}
+
+
+# ── 通用插件适配接口 ─────────────────────────────────
+
+@router.get("/sources")
+async def list_sources() -> dict[str, Any]:
+    """列出所有可用的技能来源（本地已安装 + Codex 插件）。"""
+    sources = plugin_adapter.list_available_sources()
+    return {"code": 0, "data": sources, "message": "ok"}
+
+
+class ImportFromPathRequest(BaseModel):
+    path: str
+    name: str = ""
+
+
+@router.post("/import-path")
+async def import_from_path(req: ImportFromPathRequest) -> dict[str, Any]:
+    """从本地路径导入技能（支持 SKILL.md 或 Codex 插件格式）。"""
+    result = plugin_adapter.import_from_path(req.path, USER_SKILLS_DIR, req.name)
+    if "error" in result:
+        return {"code": 1, "message": result["error"]}
+    return {"code": 0, "data": result, "message": "ok"}
+
+
+class ImportFromGithubRequest(BaseModel):
+    url: str
+    subpath: str = ""
+
+
+@router.post("/import-github")
+async def import_from_github(req: ImportFromGithubRequest) -> dict[str, Any]:
+    """从 GitHub 仓库导入技能。"""
+    result = plugin_adapter.import_from_github(req.url, USER_SKILLS_DIR, req.subpath)
+    if "error" in result:
+        return {"code": 1, "message": result["error"]}
+    return {"code": 0, "data": result, "message": "ok"}

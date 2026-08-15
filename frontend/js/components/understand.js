@@ -4,11 +4,11 @@
  * 三档深度：简�?/ 平衡 / 详细（扫描预算与输出长度随档位变化）
  */
 
-import { state, setProject, getModelKey } from "../store.js?v=20260815-50";
-import { post, streamChat } from "../services/api.js?v=20260815-50";
-import { updateProjectConfig } from "../services/project.js?v=20260815-50";
-import { renderMarkdown } from "../services/markdown.js?v=20260815-50";
-import { t } from "../services/i18n.js?v=20260815-50";
+import { state, setProject, getModelKey } from "../store.js?v=20260815-51";
+import { post, streamChat } from "../services/api.js?v=20260815-51";
+import { updateProjectConfig } from "../services/project.js?v=20260815-51";
+import { renderMarkdown } from "../services/markdown.js?v=20260815-51";
+import { t } from "../services/i18n.js?v=20260815-51";
 
 const LEVELS = {
   brief: { label: "简�?, tree: "目录深度 2 �?, files: "精读 6 个关键文�?, out: "输出�?900 �? },
@@ -36,7 +36,7 @@ function showView(name) {
 function openUnderstandModal() {
   bindUnderstandModal();
   if (!state.project) {
-    import("../app.js?v=20260815-50").then(({ toast }) => toast("请先打开一个项�?)).catch(() => {});
+    import("../app.js?v=20260815-51").then(({ toast }) => toast("请先打开一个项�?)).catch(() => {});
     return;
   }
   currentResult = state.project.config?.understanding || null;
@@ -103,7 +103,7 @@ async function startUnderstanding() {
   const model = state.currentModel;
   const apiKey = model?.id ? getModelKey(model.id) : "";
   if (!model?.id || !apiKey) {
-    import("../app.js?v=20260815-50").then(({ toast }) => toast("请先选择模型并配�?API Key")).catch(() => {});
+    import("../app.js?v=20260815-51").then(({ toast }) => toast("请先选择模型并配�?API Key")).catch(() => {});
     return;
   }
 
@@ -159,7 +159,7 @@ async function startUnderstanding() {
 
     renderResult();
     showView("result");
-    import("../app.js?v=20260815-50").then(({ toast }) => toast("项目理解已生�?)).catch(() => {});
+    import("../app.js?v=20260815-51").then(({ toast }) => toast("项目理解已生�?)).catch(() => {});
   } catch (e) {
     if (e.name === "AbortError") {
       appendLog("已取�?);
@@ -170,7 +170,7 @@ async function startUnderstanding() {
         if (steps[i].classList.contains("running")) setStepStatus(i, "error");
       }
       appendLog(t("�?失败: {msg}", { msg: e.message }));
-      import("../app.js?v=20260815-50").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
+      import("../app.js?v=20260815-51").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
     }
   } finally {
     running = false;
@@ -282,9 +282,9 @@ async function copyCurrentResult() {
   const text = activeTab === "tour" ? currentResult.tour : currentResult.rules;
   try {
     await navigator.clipboard.writeText(text || "");
-    import("../app.js?v=20260815-50").then(({ toast }) => toast("已复制到剪贴�?)).catch(() => {});
+    import("../app.js?v=20260815-51").then(({ toast }) => toast("已复制到剪贴�?)).catch(() => {});
   } catch {
-    import("../app.js?v=20260815-50").then(({ toast }) => toast("复制失败")).catch(() => {});
+    import("../app.js?v=20260815-51").then(({ toast }) => toast("复制失败")).catch(() => {});
   }
 }
 

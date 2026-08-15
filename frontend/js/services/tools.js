@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SLATE AI 工具系统：让 AI 直接操作黑板、MCP 工具、提示词工厂
  *
  * 工具调用格式（AI 输出）：
@@ -11,10 +11,10 @@
  *   文件内容原样（第二行起）
  *   ◈◆�? */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260815-50";
-import { post } from "../services/api.js?v=20260815-50";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260815-50";
-import { t } from "./i18n.js?v=20260815-50";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260815-54";
+import { post } from "../services/api.js?v=20260815-54";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260815-54";
+import { t } from "./i18n.js?v=20260815-54";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");

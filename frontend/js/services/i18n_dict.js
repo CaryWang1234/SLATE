@@ -1,4 +1,4 @@
-// i18n_dict.js — 英文翻译词典（键为中文原文，未命中保留原文）
+﻿// i18n_dict.js — 英文翻译词典（键为中文原文，未命中保留原文）
 // 说明：模型提示词/生成内容（Harness 六阶段、审查提示、工具调用纪律、注入块等）刻意不收录。
 // 带 {var} 占位符的键供 t(key, vars) 在调用处使用。
 
@@ -370,10 +370,31 @@ export const EN_DICT = {
   "删除这条消息？删除后不可恢复。": "Delete this message? This cannot be undone.",
   "已删除消息": "Message deleted",
   "研墨中": "Thinking",
+  "思考过程": "Thinking Process",
+  "步骤": "Step",
+  "查看目录结构": "View directory structure",
+  "读取文件内容": "Read file content",
+  "编辑文件": "Edit file",
+  "创建文件": "Create file",
+  "执行命令": "Execute command",
+  "代码扫描": "Code scan",
+  "任务扫描": "Task scan",
+  "添加卡片": "Add card",
+  "更新卡片": "Update card",
+  "批量操作": "Batch operation",
+  "读取黑板": "Read whiteboard",
+  "搜索知识": "Search knowledge",
+  "添加知识": "Add knowledge",
+  "管理记忆": "Manage memory",
+  "完成": "Done",
+  "失败": "Failed",
   "⧉ 复制": "⧉ Copy",
   "✓ 已复制": "✓ Copied",
   "复制失败": "Copy failed",
   "停止": "Stop",
+  "停止": "Stop",
+  "讨论已手动停止": "Discussion manually stopped",
+  "辩论中...": "Debating...",
   "正在生成": "Generating",
   "待发送": "Queued",
   "发送({n})": "Send ({n})",
@@ -1109,4 +1130,20 @@ export const EN_DICT = {
   "构建": "Build",
   "日志": "Logging",
   "配置": "Configuration",
+
+  // ── 插件适配 ─────────────────────────────
+  "发现插件": "Discover Plugins",
+  "从 GitHub 导入": "Import from GitHub",
+  "正在扫描标准插件目录...": "Scanning standard plugin directories...",
+  "未发现已安装的插件": "No installed plugins found",
+  "发现 {n} 个插件": "Found {n} plugins",
+  "是否导入全部？": "Import all?",
+  "导入全部": "Import All",
+  "成功导入 {n} 个插件": "Successfully imported {n} plugins",
+  "扫描失败": "Scan failed",
+  "正在下载...": "Downloading...",
+  "输入 GitHub 仓库地址：": "Enter GitHub repository URL:",
+  "子路径（可选，留空自动查找 SKILL.md）：": "Subpath (optional, leave empty to auto-find SKILL.md):",
+  "扫描 Codex/Claude 标准目录发现已安装插件": "Scan Codex/Claude standard directories to discover installed plugins",
+  "从 GitHub 仓库导入 SKILL.md 技能": "Import SKILL.md skill from GitHub repository",
 };

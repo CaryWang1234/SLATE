@@ -1,13 +1,13 @@
-/**
+﻿/**
  * SLATE 终端高危命令守卫
  * - 高危判定为写死规则（与后�?backend/skills/terminal.py 同一份清单）
  * - 命中后弹出审批框，并调用当前模型解释命令目的
  * - 用户批准 �?注入 approved 参数放行；拒�?�?返回拒绝结果给模�?
  */
 
-import { state, getModelKey } from "../store.js?v=20260815-50";
-import { post } from "./api.js?v=20260815-50";
-import { t } from "./i18n.js?v=20260815-50";
+import { state, getModelKey } from "../store.js?v=20260815-54";
+import { post } from "./api.js?v=20260815-54";
+import { t } from "./i18n.js?v=20260815-54";
 
 // 高危命令规则（写死）：命中任一条即要求批准
 const HIGH_RISK_PATTERNS = [

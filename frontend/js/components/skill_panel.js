@@ -1,13 +1,13 @@
-/**
+﻿/**
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除�? */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260815-50";
-import { get, post, del, upload } from "../services/api.js?v=20260815-50";
-import { guardSkillParams } from "../services/riskguard.js?v=20260815-50";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260815-50";
-import { t } from "../services/i18n.js?v=20260815-50";
+import { state, subscribe, setSkills } from "../store.js?v=20260815-54";
+import { get, post, del, upload } from "../services/api.js?v=20260815-54";
+import { guardSkillParams } from "../services/riskguard.js?v=20260815-54";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260815-54";
+import { t } from "../services/i18n.js?v=20260815-54";
 
-let skillList, btnUpload, btnImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
+let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
 function showToast(msg) {
   const container = document.getElementById("toast-container");
@@ -154,7 +154,7 @@ function renderSkillList() {
   if (Object.keys(skills).length === 0) {
     const empty = document.createElement("div");
     empty.className = "skill-empty-hint";
-    empty.textContent = "暂无技能，可点击下方「导入技能」或「新建技能�?;
+    empty.textContent = "暂无技能，可点击下方「导入技能」或「新建技能�?";
     skillList.appendChild(empty);
   }
   for (const [name, desc] of Object.entries(skills)) {
@@ -184,7 +184,7 @@ function createSkillItem(name, desc, kind) {
   // Skill 支持删除；MCP 内置工具不可�?  if (kind === "Skill") {
     const delBtn = document.createElement("button");
     delBtn.className = "skill-item-del";
-    delBtn.title = "删除技�?;
+    delBtn.title = "删除技�?";
     delBtn.textContent = "×";
     delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -254,7 +254,7 @@ async function openSkillViewer(name) {
   skillParams.innerHTML = "";
   btnRunSkill.classList.add("hidden");
   skillResult.classList.remove("hidden");
-  skillResult.textContent = "读取中�?;
+  skillResult.textContent = "读取中�?";
   skillModal.classList.remove("hidden");
 
   try {
@@ -363,17 +363,99 @@ async function handleUploadSkill() {
   input.click();
 }
 
-// ── 导入 SKILL.md 技能（本地路径�?────────────────
+// ── 导入 SKILL.md 技能（本地路径） ───────────────
 
 async function handleImportSkill() {
-  const path = await dlgPrompt("输入本地路径（包�?SKILL.md 的目录，或单�?.md 文件）：", { title: "导入技�?, placeholder: "D:\\skills\\my-skill" });
+  const path = await dlgPrompt("输入本地路径（包含 SKILL.md 的目录，或单个 .md 文件）：", { title: "导入技能", placeholder: "D:\\skills\\my-skill" });
   if (!path || !path.trim()) return;
-  const name = (await dlgPrompt("技能名称（留空则自动取目录/文件名）�?, { title: "导入技�? })) || "";
+  const name = (await dlgPrompt("技能名称（留空则自动取目录/文件名）：", { title: "导入技能" })) || "";
 
   try {
     const res = await post("/skills/import", { path: path.trim(), name });
     if (res.code === 0) {
-      showToast(t("技�?{name} 导入成功（{n} 个文件）", { name: res.data.skill, n: res.data.files }));
+      showToast(t("技能 {name} 导入成功（{n} 个文件）", { name: res.data.skill, n: res.data.files }));
+      refreshSkills();
+    } else {
+      showToast(t("导入失败: {msg}", { msg: res.message }));
+    }
+  } catch (e) {
+    showToast(t("导入失败: {msg}", { msg: e.message }));
+  }
+}
+
+// ── 发现已安装插件（Codex/Claude 标准路径） ──────
+
+async function handleDiscoverPlugins() {
+  showToast("正在扫描标准插件目录...");
+  try {
+    const res = await get("/skills/sources");
+    if (res.code !== 0) {
+      showToast(t("扫描失败: {msg}", { msg: res.message }));
+      return;
+    }
+    const data = res.data;
+    const localSkills = data.local_skills || [];
+    const codexPlugins = data.codex_plugins || [];
+    const total = localSkills.length + codexPlugins.length;
+
+    if (total === 0) {
+      showToast("未发现已安装的插件");
+      return;
+    }
+
+    // 显示发现结果
+    let msg = `发现 ${total} 个插件：\n\n`;
+    if (localSkills.length) {
+      msg += `SKILL.md 技能 (${localSkills.length}):\n`;
+      localSkills.forEach(s => { msg += `  - ${s.name}: ${s.description}\n`; });
+    }
+    if (codexPlugins.length) {
+      msg += `\nCodex 插件 (${codexPlugins.length}):\n`;
+      codexPlugins.forEach(p => { msg += `  - ${p.name}: ${p.description}\n`; });
+    }
+    msg += "\n是否导入全部？";
+
+    if (await dlgConfirm(msg, { title: "发现插件", okText: "导入全部", cancelText: "取消" })) {
+      let imported = 0;
+      for (const skill of localSkills) {
+        try {
+          await post("/skills/import-path", { path: skill.path, name: skill.name });
+          imported++;
+        } catch (e) {}
+      }
+      for (const plugin of codexPlugins) {
+        try {
+          await post("/skills/import-path", { path: plugin.path, name: plugin.name });
+          imported++;
+        } catch (e) {}
+      }
+      showToast(`成功导入 ${imported} 个插件`);
+      refreshSkills();
+    }
+  } catch (e) {
+    showToast(t("扫描失败: {msg}", { msg: e.message }));
+  }
+}
+
+// ── 从 GitHub 导入技能 ─────────────────────────
+
+async function handleGithubImport() {
+  const url = await dlgPrompt("输入 GitHub 仓库地址：", {
+    title: "从 GitHub 导入",
+    placeholder: "https://github.com/user/repo 或 user/repo",
+  });
+  if (!url || !url.trim()) return;
+
+  const subpath = await dlgPrompt("子路径（可选，留空自动查找 SKILL.md）：", {
+    title: "从 GitHub 导入",
+    placeholder: "path/to/skill",
+  });
+
+  showToast("正在下载...");
+  try {
+    const res = await post("/skills/import-github", { url: url.trim(), subpath: (subpath || "").trim() });
+    if (res.code === 0) {
+      showToast(t("技能 {name} 导入成功（{n} 个文件）", { name: res.data.name, n: res.data.files }));
       refreshSkills();
     } else {
       showToast(t("导入失败: {msg}", { msg: res.message }));
@@ -403,9 +485,13 @@ function initSkillPanel() {
   skillParams = document.getElementById("skill-params");
   skillResult = document.getElementById("skill-result");
   btnRunSkill = document.getElementById("btn-run-skill");
+  btnDiscover = document.getElementById("btn-discover-plugins");
+  btnGithubImport = document.getElementById("btn-github-import");
 
   btnUpload.addEventListener("click", handleUploadSkill);
   btnImport.addEventListener("click", handleImportSkill);
+  if (btnDiscover) btnDiscover.addEventListener("click", handleDiscoverPlugins);
+  if (btnGithubImport) btnGithubImport.addEventListener("click", handleGithubImport);
   btnRunSkill.addEventListener("click", executeSkill);
 
   // 关闭弹窗

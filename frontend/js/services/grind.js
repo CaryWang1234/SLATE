@@ -3,7 +3,7 @@
  * 提示词注入、墨迹解析、墨稿检测与三个动作（送入 Harness / 投到白板 / 存为模板）�?
  */
 
-import { get, post, del, patch } from "./api.js?v=20260815-50";
+import { get, post, del, patch } from "./api.js?v=20260815-51";
 
 const MAX_ROUNDS = 7;
 

@@ -1,11 +1,11 @@
-/**
+﻿/**
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260815-50";
-import { streamChat } from "../services/api.js?v=20260815-50";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260815-50";
-import { t } from "../services/i18n.js?v=20260815-50";
+import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260815-54";
+import { streamChat } from "../services/api.js?v=20260815-54";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260815-54";
+import { t } from "../services/i18n.js?v=20260815-54";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -765,4 +765,94 @@ function initWhiteboard() {
   renderAllCards();
 }
 
-export { initWhiteboard, parseCardsFromLLM, cardsToMermaid };
+// ── 自动记录：工具执行步骤可视化 ─────────────────────────────────
+
+/** 工具执行时自动创建步骤卡片，形成逻辑链 */
+function addToolStepCard(toolName, params, status = "running") {
+  // 生成步骤编号
+  const stepCards = state.boardCards.filter(c => c._isToolStep);
+  const stepNum = stepCards.length + 1;
+  
+  // 工具图标映射
+  const toolIcons = {
+    file_tree: "📁", file_peek: "👀", file_edit: "✏️", file_create: "📄",
+    terminal: "💻", code_scan: "🔍", todo_scan: "✓", board_add: "🗒",
+    board_update: "🗒", board_batch: "🗒", board_read: "🗒",
+    knowledge_search: "🔎", knowledge_add: "📚", memory_manage: "🧠",
+  };
+  const icon = toolIcons[toolName] || "⚙️";
+  
+  // 工具描述映射
+  const toolDescs = {
+    file_tree: "查看目录结构", file_peek: "读取文件内容", file_edit: "编辑文件",
+    file_create: "创建文件", terminal: "执行命令", code_scan: "代码扫描",
+    todo_scan: "任务扫描", board_add: "添加卡片", board_update: "更新卡片",
+    board_batch: "批量操作", board_read: "读取黑板", knowledge_search: "搜索知识",
+    knowledge_add: "添加知识", memory_manage: "管理记忆",
+  };
+  const desc = toolDescs[toolName] || toolName;
+  
+  // 提取关键参数作为摘要
+  let summary = "";
+  if (params.path) summary = params.path;
+  else if (params.command) summary = params.command.slice(0, 40);
+  else if (params.query) summary = params.query;
+  else if (params.title) summary = params.title;
+  else if (params.directory) summary = params.directory;
+  
+  // 状态颜色：running=yellow, done=green, error=red
+  const statusColors = { running: "yellow", done: "green", error: "red" };
+  const color = statusColors[status] || "default";
+  
+  // 创建步骤卡片
+  const card = {
+    id: `step_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    title: `${icon} 步骤 ${stepNum}: ${desc}`,
+    body: summary || "(无参数)",
+    color,
+    arrows: [],
+    _isToolStep: true,
+    _toolName: toolName,
+    _stepNum: stepNum,
+    _status: status,
+    _timestamp: Date.now(),
+  };
+  
+  // 连接到上一步
+  if (stepCards.length > 0) {
+    const prevCard = stepCards[stepCards.length - 1];
+    card.arrows = [prevCard.id];
+  }
+  
+  addBoardCard(card);
+  return card.id;
+}
+
+/** 更新步骤卡片状态 */
+function updateToolStepCard(cardId, status, result = "") {
+  const card = state.boardCards.find(c => c.id === cardId);
+  if (!card || !card._isToolStep) return;
+  
+  const statusColors = { running: "yellow", done: "green", error: "red" };
+  card.color = statusColors[status] || card.color;
+  card._status = status;
+  
+  // 更新 body 显示结果摘要
+  if (result && status === "done") {
+    const maxLen = 100;
+    card.body = result.length > maxLen ? result.slice(0, maxLen) + "..." : result;
+  } else if (status === "error") {
+    card.body = "❌ " + (result || "执行失败");
+  }
+  
+  // 触发更新
+  setBoardCards([...state.boardCards]);
+}
+
+/** 清除所有步骤卡片 */
+function clearToolStepCards() {
+  const nonStepCards = state.boardCards.filter(c => !c._isToolStep);
+  setBoardCards(nonStepCards);
+}
+
+export { initWhiteboard, parseCardsFromLLM, cardsToMermaid, addToolStepCard, updateToolStepCard, clearToolStepCards };

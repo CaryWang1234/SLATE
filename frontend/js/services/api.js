@@ -1,9 +1,12 @@
-/**
+﻿/**
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260815-50";
-import { t } from "./i18n.js?v=20260815-50";
+import { API_BASE } from "../store.js?v=20260815-54";
+import { t } from "./i18n.js?v=20260815-54";
+
+// 思考内容标记前缀（用于在流式输出中区分 reasoning 与 content）
+export const REASONING_PREFIX = "\x00\x01R\x01\x00";
 
 // ── 超时与重试常量（参考主�?Agent：idle watchdog + 零内容自动重试） ──
 const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（�?MCP 工具）总超�?const STREAM_IDLE_TIMEOUT_MS = 90000;   // 流式�?0 秒无任何数据视为连接已死
@@ -104,7 +107,8 @@ async function* streamChat(payload) {
       let buffer = "";
       let done = false;
 
-      // 解析 SSE 行：收集 content 增量，回�?finish_reason，遇 [DONE] 结束
+      // 解析 SSE 行：收集 content 增量，回写 finish_reason，遇 [DONE] 结束
+      // 同时提取 delta.reasoning 字段，以 REASONING_PREFIX 标记后 yield
       const parseLines = (lines) => {
         const chunks = [];
         for (const line of lines) {
@@ -116,10 +120,14 @@ async function* streamChat(payload) {
             const parsed = JSON.parse(data);
             const fr = parsed?.choices?.[0]?.finish_reason;
             if (fr && meta) meta.finishReason = fr;
-            const content = parsed?.choices?.[0]?.delta?.content;
+            const delta = parsed?.choices?.[0]?.delta || {};
+            const content = delta.content;
             if (content) chunks.push(content);
+            // 提取 reasoning 字段（DeepSeek/OpenAI o-series/Anthropic thinking）
+            const reasoning = delta.reasoning;
+            if (reasoning) chunks.push(REASONING_PREFIX + reasoning);
           } catch (e) {
-            // �?JSON 行，跳过
+            // 非 JSON 行，跳过
           }
         }
         return chunks;

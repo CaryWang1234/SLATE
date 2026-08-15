@@ -1,25 +1,27 @@
-/**
+﻿/**
  * SLATE AI 团队组件：多模型协作讨论
  * 轻量模型初步讨论 �?重型模型最终决�? */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens } from "../store.js?v=20260815-50";
-import { streamChat } from "../services/api.js?v=20260815-50";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260815-50";
-import { renderMarkdown } from "../services/markdown.js?v=20260815-50";
-import { loadWorkflows, getWorkflow, runWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260815-50";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260815-50";
-import { getExpertsCached } from "./experts.js?v=20260815-50";
-import { t } from "../services/i18n.js?v=20260815-50";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260815-54";
+import { streamChat } from "../services/api.js?v=20260815-54";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260815-54";
+import { renderMarkdown } from "../services/markdown.js?v=20260815-54";
+import { loadWorkflows, getWorkflow, runWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260815-54";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260815-54";
+import { getExpertsCached } from "./experts.js?v=20260815-54";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260815-54";
+import { t } from "../services/i18n.js?v=20260815-54";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项�?subscribe("modelRegistry", () => renderTeamMembers());
 
 let teamPanel, teamMembersArea, teamTopicInput, btnStartDiscuss, teamOutput, btnAddMember;
-let teamHistoryList, teamUsageBar, btnNewTeamDiscussion;
+let teamHistoryList, teamUsageBar, btnNewTeamDiscussion, btnStopDiscuss;
 let teamMembers = [];
 let teamHistory = [];
 let currentTeamUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0, messageCount: 0 };
 let isDiscussing = false;
 let maxRounds = 5;
+let discussAbortController = null;
 const TEAM_HISTORY_KEY = "slate_team_history";
 
 // ── 默认团队成员 ────────────────────────────
@@ -359,6 +361,7 @@ async function startDiscussion() {
   if (isDiscussing) return;
 
   isDiscussing = true;
+  discussAbortController = new AbortController();
   btnStartDiscuss.disabled = true;
   btnStartDiscuss.textContent = "辩论中�?;
   teamOutput.innerHTML = "";
@@ -420,6 +423,7 @@ async function startDiscussion() {
           temperature: member.role === "decider" ? 0.3 : 0.7,
           max_tokens: 500,
           stream: true,
+          signal: discussAbortController?.signal,
         })) {
           fullText += chunk;
           entry.content.textContent = fullText;
@@ -471,11 +475,31 @@ async function startDiscussion() {
   });
 
   isDiscussing = false;
+  discussAbortController = null;
   btnStartDiscuss.disabled = false;
   btnStartDiscuss.textContent = "开始讨�?;
 }
 
 /** 轮次用尽仍无共识时，由决策者（或首位有 Key 的成员）给出最终方�?*/
+
+/** 停止正在进行的讨论 */
+function stopDiscussion() {
+  if (!isDiscussing || !discussAbortController) return;
+  discussAbortController.abort();
+  isDiscussing = false;
+  discussAbortController = null;
+  btnStartDiscuss.disabled = false;
+  btnStartDiscuss.textContent = t("开始讨论");
+  if (btnStopDiscuss) {
+    btnStopDiscuss.classList.add("hidden");
+    btnStopDiscuss.disabled = true;
+  }
+  const stopEl = document.createElement("div");
+  stopEl.className = "team-stopped-notice";
+  stopEl.textContent = t("讨论已手动停止");
+  teamOutput.appendChild(stopEl);
+}
+
 async function forceVerdict(topic, boardContext, entries) {
   const decider = teamMembers.find(m => m.role === "decider") || teamMembers[0];
   const apiKey = decider ? getModelKey(decider.modelId) : "";
@@ -498,6 +522,7 @@ async function forceVerdict(topic, boardContext, entries) {
       temperature: 0.3,
       max_tokens: 800,
       stream: true,
+      signal: discussAbortController?.signal,
     })) {
       fullText += chunk;
       entry.content.textContent = fullText;
@@ -884,6 +909,13 @@ function initTeamPanel() {
 
   btnStartDiscuss.addEventListener("click", startDiscussion);
 
+  // 停止按钮
+  btnStopDiscuss = document.getElementById("btn-stop-discuss");
+  if (btnStopDiscuss) {
+    btnStopDiscuss.addEventListener("click", stopDiscussion);
+    btnStopDiscuss.classList.add("hidden");
+  }
+
   // 最大辩论轮�?  const maxRoundsSelect = document.getElementById("team-max-rounds");
   if (maxRoundsSelect) {
     maxRounds = parseInt(maxRoundsSelect.value, 10) || 5;
@@ -926,4 +958,4 @@ function initTeamPanel() {
   }
 }
 
-export { initTeamPanel };
+export { initTeamPanel, stopDiscussion };

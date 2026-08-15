@@ -1,10 +1,10 @@
 /**
  * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交�?Prompt�? */
 
-import { state, subscribe, addPromptSnippet } from "../store.js?v=20260815-50";
-import { get, post } from "../services/api.js?v=20260815-50";
-import { browseFiles } from "../services/project.js?v=20260815-50";
-import { t } from "../services/i18n.js?v=20260815-50";
+import { state, subscribe, addPromptSnippet } from "../store.js?v=20260815-51";
+import { get, post } from "../services/api.js?v=20260815-51";
+import { browseFiles } from "../services/project.js?v=20260815-51";
+import { t } from "../services/i18n.js?v=20260815-51";
 
 const FACTORY_PRESETS = {
   codex: {
