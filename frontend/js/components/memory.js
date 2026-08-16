@@ -9,10 +9,10 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260817-59";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260817-59";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-59";
-import { t } from "../services/i18n.js?v=20260817-59";
+} from "../store.js?v=20260817-60";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260817-60";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-60";
+import { t } from "../services/i18n.js?v=20260817-60";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -139,12 +139,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260817-59");
+    const { toast } = await import("../app.js?v=20260817-60");
     toast("对话内容太少，无法提取记�?);
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260817-59");
+  const { toast } = await import("../app.js?v=20260817-60");
   toast("正在分析对话内容�?);
 
   // 构建对话文本
@@ -240,7 +240,7 @@ async function extractMemoriesFromConversation() {
 }
 
 function buildMemoryProfilePrompt(dialogText) {
-  const existingMemories = state.memories
+  const recentMemories = state.memories
     .slice(-40);
   const existingMemories = recentMemories
     .map((m, i) => `#${i + 1} [${m.category || "general"}] ${m.content || ""} (id:${m.id})`)
@@ -383,7 +383,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || overwritten || deleted || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260817-59");
+      const { toast } = await import("../app.js?v=20260817-60");
       let msg = "";
       if (added) msg += t("新增 {n} 条", { n: added });
       if (overwritten) msg += (msg ? "，" : "") + t("覆盖 {n} 条", { n: overwritten });
@@ -497,7 +497,7 @@ async function addKnowledgeDialog() {
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260817-59");
+    const { toast } = await import("../app.js?v=20260817-60");
     toast("知识已添�?);
     await loadKnowledgeDocs();
   }
@@ -651,7 +651,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260817-59").then(({ toast }) => toast("资料已保�?));
+    import("../app.js?v=20260817-60").then(({ toast }) => toast("资料已保�?));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗�?, { danger: true, okText: "重置" })) {
@@ -705,6 +705,101 @@ function openSnippetModal() {
   snippetModal.classList.remove("hidden");
 }
 
+
+// ── 灵光（Spark）：对话结束时自动捕获技术洞察 ─────────────────
+
+let sparkRunning = false;
+let lastSparkAt = 0;
+
+function buildSparkPrompt(recent) {
+  return `分析以下对话，判断是否产生了值得长期保留的技术洞察。
+只捕获真正有跨对话复用价值的内容：
+- 重要的技术决策（选择了什么方案、为什么、权衡了什么）
+- 问题的关键解决方案（尤其是非显而易见的修复方法）
+- 可复用的代码模式或架构模式
+- 关键配置或环境设置的发现
+- 值得记住的工程经验教训
+
+如果没有值得保留的洞察，输出空数组。不要捕获普通问答、闲聊、工具输出或临时调试。
+
+输出 JSON 数组：
+[{"title":"简明标题","content":"关键洞察内容（200字以内）","tags":["标签"],"category":"decision|solution|pattern|config|experience"}]
+
+对话内容：
+${recent}`;
+}
+
+async function captureConversationSpark() {
+  if (sparkRunning) return;
+  if (Date.now() - lastSparkAt < 120000) return;
+  const visible = state.messages.filter(m =>
+    !m.hidden && (m.role === "user" || m.role === "assistant")
+  );
+  if (visible.length < 6) return;
+
+  const modelId = state.currentModel?.id;
+  if (!modelId) return;
+  const apiKey = getModelKey(modelId);
+  if (!apiKey && modelId !== "local") return;
+
+  sparkRunning = true;
+  lastSparkAt = Date.now();
+
+  try {
+    const recent = visible.slice(-16)
+      .map(m => `[${m.role === "user" ? "用户" : "助手"}]: ${String(m.content || "").slice(0, 1200)}`)
+      .join("\n\n");
+
+    const baseUrl = state.currentModel?.base_url || undefined;
+    let result = "";
+    for await (const chunk of streamChat({
+      model: modelId,
+      messages: [{ role: "user", content: buildSparkPrompt(recent) }],
+      api_key: apiKey,
+      base_url: baseUrl,
+      temperature: 0.3,
+      max_tokens: 1024,
+      stream: true,
+    })) {
+      result += chunk;
+    }
+
+    const jsonMatch = result.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return;
+    const insights = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(insights) || !insights.length) return;
+
+    let count = 0;
+    for (const insight of insights) {
+      const title = String(insight.title || "").trim();
+      const content = String(insight.content || "").trim();
+      if (!title || !content) continue;
+
+      const docId = `spark:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      await post("/knowledge/docs", {
+        title: `灵光 · ${title}`,
+        source: "spark",
+        kind: "spark",
+        content,
+        metadata: {
+          tags: Array.isArray(insight.tags) ? insight.tags : [],
+          category: insight.category || "decision",
+        },
+      }).catch(() => {});
+      count++;
+    }
+
+    if (count > 0) {
+      const { toast } = await import("../app.js?v=20260817-60");
+      toast(t("已捕获 {n} 条灵光", { n: count }));
+    }
+  } catch (e) {
+    console.warn("灵光捕获失败:", e);
+  } finally {
+    sparkRunning = false;
+  }
+}
+
 export {
   initMemoryPanel,
   openMemoryModal,
@@ -712,4 +807,5 @@ export {
   renderMemoryList,
   renderSnippetList,
   autoRefineMemoryAndProfile,
+  captureConversationSpark,
 };
