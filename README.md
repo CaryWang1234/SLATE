@@ -130,7 +130,7 @@ Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention i
 - Auto-generated discussion summaries (≤500 tokens), user can intervene with votes
 - **Stop mechanism**: Abort mid-debate with one click; completed replies are preserved
 - **Whiteboard integration**: Debate steps auto-logged as cards with action type and summary
-- **Team Workflow DAG**: Requirements → Decompose → Code → Review → Summarize pipeline with upstream/downstream artifact passing, real-time node status, auto-archive to knowledge base
+- **Team Workflow DAG**: Requirements → Decompose → Code → Review → Summarize pipeline with upstream/downstream artifact passing, real-time node status, auto-archive to knowledge base; **parallel execution** for independent nodes, **stop button** for mid-run interruption
 
 ### Whiteboard Logic Chain
 

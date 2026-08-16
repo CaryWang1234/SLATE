@@ -2,15 +2,15 @@
  * SLATE AI 团队组件：多模型协作讨论
  * 轻量模型初步讨论 �?重型模型最终决�? */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260815-55";
-import { streamChat } from "../services/api.js?v=20260815-55";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260815-55";
-import { renderMarkdown } from "../services/markdown.js?v=20260815-55";
-import { loadWorkflows, getWorkflow, runWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260815-55";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260815-55";
-import { getExpertsCached } from "./experts.js?v=20260815-55";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260815-55";
-import { t } from "../services/i18n.js?v=20260815-55";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260816-56";
+import { streamChat } from "../services/api.js?v=20260816-56";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260816-56";
+import { renderMarkdown } from "../services/markdown.js?v=20260816-56";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260816-56";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260816-56";
+import { getExpertsCached } from "./experts.js?v=20260816-56";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260816-56";
+import { t } from "../services/i18n.js?v=20260816-56";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项�?subscribe("modelRegistry", () => renderTeamMembers());
 
@@ -677,6 +677,7 @@ function renderSimpleMarkdown(text) {
 let wfSelect, wfDesc, wfInput, btnWfRun, wfRunStatus, wfNodeList, wfResultBar;
 let wfList = [];
 let wfRunning = false;
+let wfAbortBtn = null;
 
 const WF_STATUS_TEXT = {
   waiting: "�?等待",
@@ -712,6 +713,18 @@ async function initWorkflowView() {
 
   wfSelect.addEventListener("change", renderWfDesc);
   btnWfRun.addEventListener("click", runSelectedWorkflow);
+
+  // 工作流停止按钮
+  wfAbortBtn = document.getElementById("btn-wf-stop");
+  if (wfAbortBtn) {
+    wfAbortBtn.addEventListener("click", () => {
+      stopWorkflow();
+      wfAbortBtn.classList.add("hidden");
+      wfRunStatus.textContent = t("工作流正在停止...");
+    });
+    wfAbortBtn.classList.add("hidden");
+  }
+
   await refreshWorkflowList();
 }
 
@@ -836,6 +849,7 @@ async function runSelectedWorkflow() {
 
   wfRunning = true;
   btnWfRun.disabled = true;
+  wfAbortBtn?.classList.remove("hidden");
   wfResultBar.innerHTML = "";
   wfRunStatus.textContent = "加载工作流定义�?;
 
@@ -867,6 +881,7 @@ async function runSelectedWorkflow() {
       wfResultBar.innerHTML = `<span class="wf-result-error">${t("节点成功 {ok}/{n}，但写入知识库失�? {msg}", { ok: okCount, n: total, msg: e.message })}</span>`;
     }
     wfRunStatus.textContent = "";
+    wfAbortBtn?.classList.add("hidden");
   } catch (e) {
     wfRunStatus.textContent = "";
     wfResultBar.innerHTML = `<span class="wf-result-error">${t("�?工作流执行失�? {msg}", { msg: e.message })}</span>`;

@@ -1,33 +1,46 @@
-/**
- * SLATE 工作流引擎：DAG 拓扑执行、节点状态机、产物入�?
- * - 依赖后端 /workflows 读取定义�?proxy/chat 调用模型�?skills/execute 复用技能链�?
+﻿/**
+ * SLATE 工作流引擎：DAG 并行执行、节点状态机、产物入库
+ * - 依赖后端 /workflows 读取定义、/proxy/chat 调用模型、/skills/execute 复用技能链路
  * - 执行完成后通过 /knowledge/docs 复用现有知识库写入逻辑
+ * - 支持并行节点：无依赖关系的节点同时执行
+ * - 支持 AbortController 中断
  */
 
-import { get, post } from "./api.js?v=20260815-51";
-import { state, getModelKey } from "../store.js?v=20260815-51";
-import { guardSkillParams } from "./riskguard.js?v=20260815-51";
-import { t } from "./i18n.js?v=20260815-51";
+import { get, post } from "./api.js?v=20260816-56";
+import { state, getModelKey } from "../store.js?v=20260816-56";
+import { guardSkillParams } from "./riskguard.js?v=20260816-56";
+import { t } from "./i18n.js?v=20260816-56";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
+
+// ── 中断控制 ────────────────────────────────
+
+let _workflowAbort = null;
+
+function stopWorkflow() {
+  if (_workflowAbort) {
+    _workflowAbort.abort();
+    _workflowAbort = null;
+  }
+}
 
 // ── 定义读取 ────────────────────────────────
 
 async function loadWorkflows() {
   const res = await get("/workflows");
-  if (res.code !== 0) throw new Error(res.message || "工作流列表加载失�?);
+  if (res.code !== 0) throw new Error(res.message || "工作流列表加载失败");
   return res.data || [];
 }
 
 async function getWorkflow(id) {
   const res = await get(`/workflows/${encodeURIComponent(id)}`);
-  if (res.code !== 0) throw new Error(res.message || "工作流加载失�?);
+  if (res.code !== 0) throw new Error(res.message || "工作流加载失败");
   return res.data;
 }
 
 // ── DAG 工具 ────────────────────────────────
 
-/** 合并显式 edges �?inputs 隐式引用�?node_id），构建前置依赖�?*/
+/** 合并显式 edges 与 inputs 隐式引用（$node_id），构建前置依赖表 */
 function buildDeps(wf) {
   const ids = new Set((wf.nodes || []).map(n => n.id));
   const preds = new Map([...ids].map(id => [id, new Set()]));
@@ -69,9 +82,25 @@ function topoSort(wf) {
   return { order, error: null };
 }
 
+/** 计算每个节点的层级（用于并行分组） */
+function computeLevels(wf) {
+  const preds = buildDeps(wf);
+  const levels = new Map();
+  const compute = (id) => {
+    if (levels.has(id)) return levels.get(id);
+    const p = preds.get(id);
+    if (!p || p.size === 0) { levels.set(id, 0); return 0; }
+    const lv = Math.max(...[...p].map(pid => compute(pid))) + 1;
+    levels.set(id, lv);
+    return lv;
+  };
+  for (const id of preds.keys()) compute(id);
+  return levels;
+}
+
 // ── 变量解析 ────────────────────────────────
 
-/** $input �?用户输入�?node_id �?上游节点输出；其余视为字面量 */
+/** $input = 用户输入，$node_id = 上游节点输出；其余视为字面量 */
 function resolveVar(value, userInput, outputs) {
   if (typeof value !== "string") return value == null ? "" : String(value);
   if (value === "$input") return userInput;
@@ -98,7 +127,7 @@ function fillTemplate(tpl, vars) {
 
 function truncate(text, max = 300) {
   const s = String(text || "");
-  return s.length > max ? s.slice(0, max) + "�? : s;
+  return s.length > max ? s.slice(0, max) + "..." : s;
 }
 
 // ── 节点绑定解析 ────────────────────────────
@@ -123,20 +152,76 @@ function resolveBinding(node, members) {
   return { member, modelId, modelLabel: findModelName(modelId), persona: member?.persona || "" };
 }
 
-// ── 执行引擎 ────────────────────────────────
+// ── 单节点执行 ────────────────────────────
+
+async function executeNode(node, userInput, outputs, members, rec) {
+  rec.status = STATUS.RUNNING;
+  rec.startedAt = Date.now();
+
+  const vars = resolveInputs(node, userInput, outputs);
+  rec.inputPreview = Object.entries(node.inputs || {})
+    .map(([key, raw]) => `{{${key}}} = ${raw} => ${truncate(vars[key], 120)}`)
+    .join("\n");
+
+  let output;
+  if (node.skill) {
+    rec.modelLabel = `[技能] ${node.skill}`;
+    const params = {};
+    for (const [key, raw] of Object.entries(node.inputs || {})) params[key] = vars[key] ?? raw;
+    if (!(await guardSkillParams(node.skill, params))) {
+      throw new Error(t("高危命令被用户拒绝执行: {cmd}", { cmd: params.command || node.skill }));
+    }
+    const res = await post("/skills/execute", { skill: node.skill, params });
+    if (res.code !== 0) throw new Error(res.message || t("技能 {name} 执行失败", { name: node.skill }));
+    output = typeof res.data === "string" ? res.data : JSON.stringify(res.data, null, 2);
+  } else {
+    const binding = resolveBinding(node, members);
+    rec.modelLabel = binding.modelLabel || binding.modelId;
+    if (!binding.modelId) throw new Error(t("节点未绑定可用模型（role/model 均为空且无当前模型）"));
+    const apiKey = getModelKey(binding.modelId);
+    if (!apiKey) throw new Error(t("模型 {name} 未配置 API Key，请先在设置页配置", { name: rec.modelLabel }));
+
+    const systemPrompt = binding.persona || "你是 SLATE 工作流的执行成员：认真完成分配的任务，紧扣任务要求作答，只输出结果本身，不要寒暄与前言后语。";
+    const userPrompt = fillTemplate(node.prompt || "", vars);
+    const res = await post("/proxy/chat", {
+      model: binding.modelId,
+      api_key: apiKey,
+      stream: false,
+      temperature: node.temperature ?? 0.5,
+      max_tokens: node.max_tokens || 1200,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    });
+    if (res.code !== 0) throw new Error(res.message || "模型请求失败");
+    output = res.data?.choices?.[0]?.message?.content ?? "";
+    if (!String(output).trim()) throw new Error("模型返回内容为空");
+  }
+
+  rec.status = STATUS.SUCCESS;
+  rec.output = String(output);
+  rec.finishedAt = Date.now();
+  return output;
+}
+
+// ── 并行执行引擎 ────────────────────────────
 
 function makeRunId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 /**
- * �?DAG 拓扑顺序执行工作流�?
+ * 并行执行工作流：无依赖关系的节点同时运行
  * hooks: { onNode(record), onDone(result) }
- * record: { id, name, status, skill, outputKey, modelLabel, inputPreview, output, error, startedAt, finishedAt }
  */
 async function runWorkflow(wf, userInput, members, hooks = {}) {
   const { order, error } = topoSort(wf);
   if (error) throw new Error(error);
+
+  // 设置中断控制器
+  _workflowAbort = new AbortController();
+  const signal = _workflowAbort.signal;
 
   const nodeMap = new Map((wf.nodes || []).map(n => [n.id, n]));
   const preds = buildDeps(wf);
@@ -154,114 +239,148 @@ async function runWorkflow(wf, userInput, members, hooks = {}) {
   const result = {
     runId: makeRunId(), workflowId: wf.id, workflowName: wf.name,
     startedAt: Date.now(), finishedAt: 0, order, records, outputs,
+    parallel: true,
   };
 
-  for (const nodeId of order) {
-    const node = nodeMap.get(nodeId);
-    const rec = records[nodeId];
+  try {
+    // 并行调度：反复找"所有依赖已满足"的节点批量执行
+    const done = new Set();     // 已完成的节点 ID
+    const failed = new Set();   // 失败的节点 ID
+    const skipped = new Set();  // 跳过的节点 ID
 
-    // 上游存在失败/跳过 �?本节点跳过（明确错误信息�?
-    const blockedBy = [...preds.get(nodeId)].filter(pid =>
-      records[pid].status === STATUS.FAILED || records[pid].status === STATUS.SKIPPED
-    );
-    if (blockedBy.length > 0) {
-      rec.status = STATUS.SKIPPED;
-      rec.error = t("上游节点未成功（{names}），自动跳过", { names: blockedBy.map(id => records[id].name).join("�?) });
-      hooks.onNode?.(rec);
-      continue;
-    }
-
-    rec.status = STATUS.RUNNING;
-    rec.startedAt = Date.now();
-    hooks.onNode?.(rec);
-
-    try {
-      const vars = resolveInputs(node, userInput, outputs);
-      rec.inputPreview = Object.entries(node.inputs || {})
-        .map(([key, raw]) => `{{${key}}} �?${raw}�?{truncate(vars[key], 120)}`)
-        .join("\n");
-
-      let output;
-      if (node.skill) {
-        // 技能节点：复用现有 /skills/execute 链路，inputs 作为工具参数
-        rec.modelLabel = `�?${node.skill}`;
-        const params = {};
-        for (const [key, raw] of Object.entries(node.inputs || {})) params[key] = vars[key] ?? raw;
-        // 高危命令审批：命中写死规则时弹框请求批准
-        if (!(await guardSkillParams(node.skill, params))) {
-          throw new Error(t("高危命令被用户拒绝执�? {cmd}", { cmd: params.command || node.skill }));
+    while (done.size + failed.size + skipped.size < order.length) {
+      // 检查中断
+      if (signal.aborted) {
+        // 将所有 waiting 节点标记为 skipped
+        for (const id of order) {
+          if (records[id].status === STATUS.WAITING) {
+            records[id].status = STATUS.SKIPPED;
+            records[id].error = t("工作流已被手动停止");
+            records[id].finishedAt = Date.now();
+            hooks.onNode?.(records[id]);
+          }
         }
-        const res = await post("/skills/execute", { skill: node.skill, params });
-        if (res.code !== 0) throw new Error(res.message || t("技�?{name} 执行失败", { name: node.skill }));
-        output = typeof res.data === "string" ? res.data : JSON.stringify(res.data, null, 2);
-      } else {
-        // LLM 节点：role/model 绑定解析 + API Key 校验
-        const binding = resolveBinding(node, members);
-        rec.modelLabel = binding.modelLabel || binding.modelId;
-        if (!binding.modelId) throw new Error(t("节点未绑定可用模型（role/model 均为空且无当前模型）"));
-        const apiKey = getModelKey(binding.modelId);
-        if (!apiKey) throw new Error(t("模型 {name} 未配�?API Key，请先在设置页配�?, { name: rec.modelLabel }));
-
-        const systemPrompt = binding.persona || "你是 SLATE 工作流的执行成员：认真完成分配的任务，紧扣任务要求作答，只输出结果本身，不要寒暄与前言�?;
-        const userPrompt = fillTemplate(node.prompt || "", vars);
-        const res = await post("/proxy/chat", {
-          model: binding.modelId,
-          api_key: apiKey,
-          stream: false,
-          temperature: node.temperature ?? 0.5,
-          max_tokens: node.max_tokens || 1200,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-        });
-        if (res.code !== 0) throw new Error(res.message || "模型请求失败");
-        output = res.data?.choices?.[0]?.message?.content ?? "";
-        if (!String(output).trim()) throw new Error("模型返回内容为空");
+        break;
       }
 
-      rec.status = STATUS.SUCCESS;
-      rec.output = String(output);
-      rec.finishedAt = Date.now();
-      outputs[nodeId] = rec.output;
-    } catch (e) {
-      rec.status = STATUS.FAILED;
-      rec.error = e.message || String(e);
-      rec.finishedAt = Date.now();
+      // 找所有 ready 节点（依赖全部 done）
+      const ready = [];
+      for (const id of order) {
+        if (records[id].status !== STATUS.WAITING) continue;
+        const deps = preds.get(id) || new Set();
+        const allDone = [...deps].every(d => done.has(d));
+        if (allDone) ready.push(id);
+      }
+
+      // 找所有 blocked 节点（有依赖 failed/skipped）
+      for (const id of order) {
+        if (records[id].status !== STATUS.WAITING) continue;
+        const deps = preds.get(id) || new Set();
+        const blocked = [...deps].some(d => failed.has(d) || skipped.has(d));
+        if (blocked) {
+          const blockedBy = [...deps].filter(pid =>
+            records[pid].status === STATUS.FAILED || records[pid].status === STATUS.SKIPPED
+          );
+          records[id].status = STATUS.SKIPPED;
+          records[id].error = t("上游节点未成功（{names}），自动跳过", { names: blockedBy.map(pid => records[pid].name).join("、") });
+          records[id].finishedAt = Date.now();
+          skipped.add(id);
+          hooks.onNode?.(records[id]);
+        }
+      }
+
+      if (ready.length === 0) {
+        // 没有 ready 也没有 blocked，可能是全部完成或死锁
+        break;
+      }
+
+      // 并行执行所有 ready 节点
+      if (ready.length === 1) {
+        // 单节点直接执行
+        const id = ready[0];
+        const node = nodeMap.get(id);
+        const rec = records[id];
+        hooks.onNode?.({ ...rec, status: STATUS.RUNNING });
+        try {
+          const output = await executeNode(node, userInput, outputs, members, rec);
+          outputs[id] = output;
+          done.add(id);
+        } catch (e) {
+          rec.status = STATUS.FAILED;
+          rec.error = e.message || String(e);
+          rec.finishedAt = Date.now();
+          failed.add(id);
+        }
+        hooks.onNode?.(rec);
+      } else {
+        // 多节点并行执行
+        const promises = ready.map(async (id) => {
+          const node = nodeMap.get(id);
+          const rec = records[id];
+          hooks.onNode?.({ ...rec, status: STATUS.RUNNING });
+          try {
+            const output = await executeNode(node, userInput, outputs, members, rec);
+            outputs[id] = output;
+            done.add(id);
+          } catch (e) {
+            rec.status = STATUS.FAILED;
+            rec.error = e.message || String(e);
+            rec.finishedAt = Date.now();
+            failed.add(id);
+          }
+          hooks.onNode?.(rec);
+          return rec;
+        });
+        await Promise.all(promises);
+      }
     }
-    hooks.onNode?.(rec);
+  } catch (e) {
+    // 全局异常：标记所有 waiting 为 skipped
+    for (const id of order) {
+      if (records[id].status === STATUS.WAITING || records[id].status === STATUS.RUNNING) {
+        records[id].status = STATUS.SKIPPED;
+        records[id].error = e.message || String(e);
+        records[id].finishedAt = Date.now();
+        hooks.onNode?.(records[id]);
+      }
+    }
   }
 
+  // 清理中断控制器
+  _workflowAbort = null;
   result.finishedAt = Date.now();
   hooks.onDone?.(result);
   return result;
 }
 
-// ── 产物写入 knowledge（复用现�?/knowledge/docs 链路�?──
+// ── 产物写入 knowledge（复用现有 /knowledge/docs 链路） ──
 
 async function saveRunToKnowledge(wf, result) {
-  const icons = { success: "�?, failed: "�?, skipped: "�?, waiting: "�?, running: "�? };
+  const icons = { success: "✅", failed: "❌", skipped: "⏭", waiting: "⏳", running: "🔄" };
   const recs = result.order.map(id => result.records[id]);
   const okCount = recs.filter(r => r.status === STATUS.SUCCESS).length;
   const finalNodeId = [...result.order].reverse().find(id => result.records[id].status === STATUS.SUCCESS);
-  const finalOutput = finalNodeId ? result.records[finalNodeId].output : "（无成功节点产出�?;
+  const finalOutput = finalNodeId ? result.records[finalNodeId].output : "（无成功节点产出）";
 
-  let content = `# 工作流产�?· ${wf.name}\n\n`;
-  content += `- 工作�?ID: \`${wf.id}\`\n`;
+  let content = `# 工作流产物 · ${wf.name}\n\n`;
+  content += `- 工作流 ID: \`${wf.id}\`\n`;
   content += `- 运行 ID: \`${result.runId}\`\n`;
   content += `- 运行时间: ${new Date(result.startedAt).toLocaleString()}\n`;
-  content += `- 节点结果: ${okCount}/${recs.length} 成功\n\n`;
+  content += `- 节点结果: ${okCount}/${recs.length} 成功\n`;
+  content += `- 并行执行: ${result.parallel ? "是" : "否"}\n\n`;
   content += `## 节点摘要\n\n`;
   for (const r of recs) {
-    content += `### ${icons[r.status] || ""} ${r.name}�?{r.outputKey}）\n`;
-    content += `绑定: ${r.modelLabel || "�?} · 状�? ${r.status}\n\n`;
+    content += `### ${icons[r.status] || ""} ${r.name}（${r.outputKey}）\n`;
+    content += `绑定: ${r.modelLabel || "无"} · 状态: ${r.status}`;
+    if (r.startedAt && r.finishedAt) content += ` · 耗时 ${((r.finishedAt - r.startedAt) / 1000).toFixed(1)}s`;
+    content += "\n\n";
     if (r.error) content += `> 错误: ${r.error}\n\n`;
     if (r.output) content += truncate(r.output, 800) + "\n\n";
   }
   content += `## 最终结果\n\n${finalOutput}\n`;
 
   const res = await post("/knowledge/docs", {
-    title: `工作流产�?· ${wf.name}`,
+    title: `工作流产物 · ${wf.name}`,
     source: "workflow",
     kind: "workflow",
     content,
@@ -271,12 +390,13 @@ async function saveRunToKnowledge(wf, result) {
       workflow_name: wf.name,
       node_count: recs.length,
       success_count: okCount,
+      parallel: result.parallel,
       started_at: result.startedAt,
       finished_at: result.finishedAt,
     },
   });
-  if (res.code !== 0) throw new Error(res.message || t("写入知识库失�?));
+  if (res.code !== 0) throw new Error(res.message || t("写入知识库失败"));
   return res.data?.id;
 }
 
-export { STATUS, loadWorkflows, getWorkflow, topoSort, runWorkflow, saveRunToKnowledge };
+export { STATUS, loadWorkflows, getWorkflow, topoSort, computeLevels, runWorkflow, stopWorkflow, saveRunToKnowledge };
