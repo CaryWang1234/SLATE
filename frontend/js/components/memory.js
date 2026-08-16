@@ -9,10 +9,10 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260817-63";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260817-63";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-63";
-import { t } from "../services/i18n.js?v=20260817-63";
+} from "../store.js?v=20260817-64";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260817-64";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-64";
+import { t } from "../services/i18n.js?v=20260817-64";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -139,12 +139,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260817-63");
+    const { toast } = await import("../app.js?v=20260817-64");
     toast("对话内容太少，无法提取记�?);
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260817-63");
+  const { toast } = await import("../app.js?v=20260817-64");
   toast("正在分析对话内容�?);
 
   // 构建对话文本
@@ -383,7 +383,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || overwritten || deleted || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260817-63");
+      const { toast } = await import("../app.js?v=20260817-64");
       let msg = "";
       if (added) msg += t("新增 {n} 条", { n: added });
       if (overwritten) msg += (msg ? "，" : "") + t("覆盖 {n} 条", { n: overwritten });
@@ -497,7 +497,7 @@ async function addKnowledgeDialog() {
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260817-63");
+    const { toast } = await import("../app.js?v=20260817-64");
     toast("知识已添�?);
     await loadKnowledgeDocs();
   }
@@ -651,7 +651,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260817-63").then(({ toast }) => toast("资料已保�?));
+    import("../app.js?v=20260817-64").then(({ toast }) => toast("资料已保�?));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗�?, { danger: true, okText: "重置" })) {
@@ -790,7 +790,7 @@ async function captureConversationSpark() {
     }
 
     if (count > 0) {
-      const { toast } = await import("../app.js?v=20260817-63");
+      const { toast } = await import("../app.js?v=20260817-64");
       toast(t("已捕获 {n} 条灵光", { n: count }));
     }
   } catch (e) {

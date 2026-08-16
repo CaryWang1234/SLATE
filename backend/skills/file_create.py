@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from backend.skills.sandbox import is_path_safe, MAX_FILE_SIZE
+
 
 def execute(
     file_path: str = "",
@@ -21,6 +23,11 @@ def execute(
     if not file_path:
         return {"error": "文件路径不能为空"}
 
+    # 沙箱路径验证
+    safe, reason = is_path_safe(file_path)
+    if not safe:
+        return {"error": reason}
+
     target = Path(file_path)
 
     # 检查文件是否已存在
@@ -34,6 +41,11 @@ def execute(
 
     if not content and content != "":
         return {"error": "文件内容不能为空"}
+
+    # 内容大小限制
+    if len(content) > MAX_FILE_SIZE:
+        mb = MAX_FILE_SIZE / (1024 * 1024)
+        return {"error": f"文件内容过大（{len(content)/(1024*1024):.1f}MB > {mb:.0f}MB 限制）"}
 
     # 生成 diff 预览（以空文件为基准）
     import difflib

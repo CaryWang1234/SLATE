@@ -7,6 +7,7 @@ import csv
 import io
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -58,7 +59,11 @@ async def upload_file(file: UploadFile) -> dict[str, Any]:
     if not file.filename:
         return {"code": -1, "data": None, "message": "未提供文件名"}
 
-    filename = file.filename
+    # 文件名消毒：去除路径分隔符和特殊字符
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', file.filename)
+    filename = filename.strip('. ')
+    if not filename:
+        filename = 'unnamed'
     ext = Path(filename).suffix.lower()
     content = await file.read()
 

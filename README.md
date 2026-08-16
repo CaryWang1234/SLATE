@@ -157,6 +157,7 @@ Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention i
 - 💾 **Long-Term Memory**: Auto-distill chat highlights, cross-session persistence
 - 📚 **Knowledge Base**: Local knowledge snippet retrieval and injection
 - 🛡️ **Terminal Security**: Hardcoded high-risk command rules, frontend approval + backend interception dual defense, catastrophic commands (`rm -rf /`, `format`, etc.) unconditionally blocked
+- 🔒 **Full Sandbox Protection**: Path traversal prevention (sensitive system dirs blacklisted), credential file access blocked, output truncation (50K chars), file size limits (5MB), request body size cap (20MB), upload filename sanitization, ReDoS timeout protection, env var cleanup — all transparent to users, zero friction
 - 🗜️ **Context Compression**: Auto-summarize over token threshold, manual compression supported
 - 🏭 **Prompt Factory**: Constitution summary → context snippets → task description → constraints → delivery requirements
 - 🎨 **Dual Theme UI**: Light / Dark one-click switch

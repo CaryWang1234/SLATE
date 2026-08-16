@@ -5,8 +5,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.routers import chat, constitution, experts, files, grind, i18n, knowledge, lan, proxy, projects, scheduler, settings, skills, update, workflows
@@ -15,7 +16,7 @@ PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.par
 
 app = FastAPI(title="SLATE", version="20260803-1")
 
-# CORS：开发阶段允许全部来源
+# CORS：桌面应用仅允许本地来源 + 局域网遥控
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,6 +24,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 最大请求体大小 (20MB)
+MAX_REQUEST_BODY_SIZE = 20 * 1024 * 1024
+
+
+@app.middleware("http")
+async def check_request_size(request: Request, call_next):
+    """拦截超大请求体，防止内存溢出攻击。"""
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_REQUEST_BODY_SIZE:
+                return JSONResponse(
+                    status_code=413,
+                    content={"code": -1, "data": None, "message": f"请求体过大（最大 {MAX_REQUEST_BODY_SIZE // 1024 // 1024}MB）"},
+                )
+        except ValueError:
+            pass
+    return await call_next(request)
 
 
 @app.middleware("http")

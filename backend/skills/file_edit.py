@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from backend.skills.sandbox import is_path_safe, validate_file_size
+
 
 def execute(
     file_path: str = "",
@@ -23,6 +25,16 @@ def execute(
 
     if not file_path:
         return {"error": "文件路径不能为空"}
+
+    # 沙箱路径验证
+    safe, reason = is_path_safe(file_path)
+    if not safe:
+        return {"error": reason}
+
+    # 文件大小检查
+    size_ok, size_reason = validate_file_size(file_path)
+    if not size_ok:
+        return {"error": size_reason}
 
     # 解析 edits
     if isinstance(edits, str):

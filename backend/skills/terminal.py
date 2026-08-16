@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import subprocess
 import time
@@ -21,10 +22,16 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from backend.skills.sandbox import truncate_output, MAX_OUTPUT_CHARS
+
 # 默认允许的工作目录
 DEFAULT_WORK_DIR = "."
 # 命令超时（秒）
 TIMEOUT = 30
+# 最大命令长度
+MAX_COMMAND_LENGTH = 10_000
+# 最大输出大小
+MAX_OUTPUT = MAX_OUTPUT_CHARS
 # 禁止的命令前缀（无条件拦截）
 BLOCKED_PREFIXES = ("rm -rf /", "format", "mkfs", "dd if=")
 
@@ -200,6 +207,10 @@ def execute(
     if not command:
         return {"error": "命令不能为空"}
 
+    # 命令长度限制
+    if len(command) > MAX_COMMAND_LENGTH:
+        return {"error": f"命令过长（{len(command)} 字符 > {MAX_COMMAND_LENGTH} 限制）"}
+
     # 灾难级命令：无条件禁止
     cmd_lower = command.lower().strip()
     for prefix in BLOCKED_PREFIXES:
@@ -214,6 +225,12 @@ def execute(
     cwd = Path(work_dir).resolve()
     if not cwd.is_dir():
         return {"error": f"工作目录不存在: {work_dir}"}
+
+    # 环境变量清理：移除可能影响系统安全的变量
+    env = os.environ.copy()
+    for key in list(env.keys()):
+        if key.upper() in ("AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "DATABASE_URL", "SECRET_KEY", "PRIVATE_KEY"):
+            del env[key]
 
     # ── 后台执行模式 ─────────────────────────────
     if background:
@@ -234,15 +251,19 @@ def execute(
             capture_output=True,
             text=True,
             timeout=TIMEOUT,
+            env=env,
         )
         output = result.stdout
         if result.stderr:
             output += f"\n[STDERR]\n{result.stderr}"
+        # 输出截断
+        output, was_truncated = truncate_output(output.strip() or "(无输出)")
         return {
             "command": command,
             "work_dir": str(cwd),
             "exit_code": result.returncode,
-            "output": output.strip() or "(无输出)",
+            "output": output,
+            "truncated": was_truncated,
         }
     except subprocess.TimeoutExpired:
         return {"error": f"命令执行超时（{TIMEOUT}秒）: {command}"}

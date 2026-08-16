@@ -17,6 +17,7 @@ from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
 
 from backend.skills import plugin_adapter
+from backend.skills.sandbox import validate_skill_params, sanitize_param, MAX_PARAM_LENGTH
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
@@ -94,6 +95,11 @@ async def execute_skill(body: dict[str, Any]) -> dict[str, Any]:
     skill_name = body.get("skill", "")
     params = body.get("params", {})
 
+    # 参数大小限制（防止恶意超大参数撑爆内存）
+    param_error = validate_skill_params(params)
+    if param_error:
+        return {"code": -1, "data": None, "message": param_error}
+
     # 查找内置技能
     if skill_name in BUILTIN_SKILLS:
         try:
@@ -140,10 +146,18 @@ async def upload_skill(
 
     saved_files = []
     for f in files:
-        dest = skill_dir / f.filename
+        # 文件名消毒：去除路径分隔符和特殊字符
+        safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', f.filename or 'unnamed')
+        safe_name = safe_name.strip('. ')  # 去除首尾点和空格
+        if not safe_name:
+            safe_name = 'unnamed'
+        dest = skill_dir / safe_name
         content = await f.read()
+        # 上传文件大小限制（5MB）
+        if len(content) > 5 * 1024 * 1024:
+            return {"code": -1, "data": None, "message": f"文件 {safe_name} 过大（最大 5MB）"}
         dest.write_bytes(content)
-        saved_files.append(f.filename)
+        saved_files.append(safe_name)
 
     # 如果没有 SKILL.md，自动生成一个
     skill_md = skill_dir / "SKILL.md"
