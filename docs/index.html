@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE · Local AI Collaboration Studio</title>
-  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Harness autonomous execution, Grind Mode, MCP tools, Expert Packs, AI team debates & DAG workflows, whiteboard logic chains, three-level project scanning. Open source, install and use.">
+  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Harness autonomous execution, Grind Mode, 25 MCP tools, Expert Packs, AI team debates & DAG workflows, Code Review, whiteboard logic chains, full sandbox security. Open source, install and use.">
   <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -111,9 +111,9 @@
     <div class="container">
       <div class="stats-grid">
         <div class="reveal" data-stagger>
-          <div class="stat-num" data-count="21">0</div>
+          <div class="stat-num" data-count="25">0</div>
           <div class="stat-label">Built-in MCP Tools</div>
-          <div class="stat-hint">Files, terminal, PPT / Word, charts / QR codes, web search & scraping — always ready</div>
+          <div class="stat-hint">Files, terminal, PPT / Word, charts / QR codes, web search & scraping, code review — always ready</div>
         </div>
         <div class="reveal" data-stagger>
           <div class="stat-num"><span data-count="10">0</span>+</div>
@@ -169,8 +169,8 @@
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🛠️</div>
-          <div class="feature-name">21 Built-in MCP Tools</div>
-          <div class="feature-desc">File read/write/edit/append, terminal sandbox, PPT / Word generation, SVG charts & QR codes, repo stats, regex testing, text summarization, web search & page scraping — @mention in chat to use, model autonomously calls and displays results. Charts and QR codes render inline.</div>
+          <div class="feature-name">25 Built-in MCP Tools</div>
+          <div class="feature-desc">File read/write/edit/append, terminal sandbox, PPT / Word generation, SVG charts & QR codes, repo stats, regex testing, text summarization, web search & page scraping, code review, browser & desktop automation — @mention in chat to use, model autonomously calls and displays results. Charts and QR codes render inline.</div>
           <div class="feature-plain">MCP is "AI's standard socket" — plug in tools and it doesn't just talk, it acts.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -220,6 +220,24 @@
           <div class="feature-name">Long-Term Memory & Knowledge Base</div>
           <div class="feature-desc">Auto-distill chat highlights, recall across sessions — AI learns your preferences over time. Local knowledge snippets retrieved and injected on demand, turning your materials into its reference library.</div>
           <div class="feature-plain">AI no longer has "goldfish memory" — what you discussed last time doesn't need re-explaining.</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🔍</div>
+          <div class="feature-name">Code Review</div>
+          <div class="feature-desc">Reads git diff (unstaged / staged / commit range), AI reviews code across four dimensions — quality, security, performance, maintainability — and outputs a structured report with inline line-level comments. Three views: full report, comment list sorted by severity, and dimension cards.</div>
+          <div class="feature-plain">Like having a senior engineer review every commit — catches issues before they become bugs.</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🔔</div>
+          <div class="feature-name">Task Completion Notifications</div>
+          <div class="feature-desc">When long tasks finish — Harness autonomous execution, team debates, or workflow pipelines — SLATE plays a chime sound and sends a system notification. Both can be toggled independently in Settings. Step away without fear of missing results.</div>
+          <div class="feature-plain">Like a timer for AI tasks — you get notified the moment the work is done.</div>
+        </div>
+        <div class="feature-card reveal" data-stagger>
+          <div class="feature-icon">🔒</div>
+          <div class="feature-name">Full Sandbox Security</div>
+          <div class="feature-desc">Seven-layer defense: path traversal prevention (sensitive system dirs blacklisted), credential file access blocked, output truncation (50K chars), file size limits (5MB), request body cap (20MB), upload filename sanitization, ReDoS timeout protection. All transparent to users — zero friction, maximum safety.</div>
+          <div class="feature-plain">Like a security guard that never sleeps — blocks threats silently, never slows you down.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">📖</div>
@@ -380,7 +398,7 @@
     <div class="container">
       <div class="reveal">
         <div class="section-tag">Built-in Tools</div>
-        <h2 class="section-title">21 Built-in MCP Tools</h2>
+        <h2 class="section-title">25 Built-in MCP Tools</h2>
         <p class="section-desc">MCP (Model Context Protocol) can be understood as "AI's standard socket": tools connect via a unified interface, and the model autonomously decides when to use them. All tools below are implemented in Python at backend/skills/, ready out of the box.</p>
         <p class="section-note">Usage is simple: <strong>@tool-name</strong> in chat, or just describe what you need — the model picks the right tool and shows you the results.</p>
       </div>
@@ -407,6 +425,10 @@
         <div class="tool-item reveal" data-stagger><code>qrcode_create</code><span>QR code generation, text links to scannable SVG</span></div>
         <div class="tool-item reveal" data-stagger><code>python_api_extract</code><span>Python library API docs, signatures/methods/properties</span></div>
         <div class="tool-item reveal" data-stagger><code>html_bundle</code><span>Portable web pages, html/css/js bundled as single file</span></div>
+        <div class="tool-item reveal" data-stagger><code>code_scan</code><span>Security scanning — hardcoded keys, SQL injection, XSS</span></div>
+        <div class="tool-item reveal" data-stagger><code>mcp_factory</code><span>Self-producing new MCP tools from descriptions</span></div>
+        <div class="tool-item reveal" data-stagger><code>browser_automation</code><span>Chromium automation — navigate, screenshot, click, type</span></div>
+        <div class="tool-item reveal" data-stagger><code>computer_use</code><span>Desktop automation — mouse, keyboard, screenshot, OCR</span></div>
       </div>
     </div>
   </section>
@@ -573,7 +595,10 @@
     const phrases = [
       "Turn 'organize project docs' into a real deliverable report",
       "Grind Mode: a rough idea, ground into a structured task brief",
-      "21 built-in tools — @mention and start working",
+      "25 built-in tools — @mention and start working",
+      "Code Review: AI reads git diff, reviews 4 dimensions, inline comments",
+      "Task done? 🔔 Chime + system notification — step away worry-free",
+      "7-layer sandbox security — blocks threats silently, never slows you down",
       "Expert Packs @mention — AI becomes your specialist instantly",
       "Three-level project scanning: AI reads first, then acts",
       "Idea → Card → Logic chain → Executable plan",
