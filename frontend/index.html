@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260817-61">
+  <link rel="stylesheet" href="./css/style.css?v=20260817-62">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后�?app.js 显示；兜底超时强显避免白�?    document.documentElement.classList.add("i18n-pending");
     setTimeout(function () { document.documentElement.classList.remove("i18n-pending"); }, 2500);
@@ -877,6 +877,60 @@
     </div>
   </div>
 
+  <!-- ═══ Code Review 弹窗 ═══ -->
+  <div id="review-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <span>Code Review</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <!-- 设置视图 -->
+      <div id="review-setup" class="modal-body">
+        <p class="review-intro">读取 git diff，AI 从代码质量、安全性、性能、可维护性四个维度进行结构化审查</p>
+        <div class="review-mode-row">
+          <button class="review-mode-btn active" data-mode="unstaged">📝 未暂存变更</button>
+          <button class="review-mode-btn" data-mode="staged">📦 已暂存变更</button>
+          <button class="review-mode-btn" data-mode="commit">🔀 提交范围</button>
+        </div>
+        <div id="review-commit-range" class="review-commit-range hidden">
+          <label class="setting-label">起始提交</label>
+          <input id="review-from-commit" class="review-commit-input" placeholder="HEAD~3">
+          <label class="setting-label">终止提交</label>
+          <input id="review-to-commit" class="review-commit-input" placeholder="HEAD" value="HEAD">
+        </div>
+        <div class="modal-footer">
+          <button id="btn-review-start" class="send-btn">开始审查</button>
+        </div>
+      </div>
+      <!-- 进度视图 -->
+      <div id="review-progress" class="modal-body hidden">
+        <div id="review-diff-summary" class="review-diff-summary"></div>
+        <div id="review-log" class="review-log"></div>
+        <div class="modal-footer">
+          <button id="btn-review-cancel" class="send-btn btn-ghost">取消</button>
+        </div>
+      </div>
+      <!-- 结果视图 -->
+      <div id="review-result" class="modal-body hidden">
+        <div class="review-result-bar">
+          <div id="review-result-tabs" class="review-tabs">
+            <button class="review-tab active" data-tab="report">📊 审查报告</button>
+            <button class="review-tab" data-tab="comments">💬 行级评论</button>
+            <button class="review-tab" data-tab="dimensions">🎯 四维度</button>
+          </div>
+          <span id="review-result-meta" class="review-result-meta"></span>
+        </div>
+        <div id="review-result-body" class="review-result-body"></div>
+        <div class="modal-footer">
+          <button id="btn-review-copy" class="send-btn btn-ghost">复制审查结果</button>
+          <button id="btn-review-redo" class="send-btn">重新审查</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <!-- ══�?历史会话批量管理弹窗 ══�?-->
   <div id="conv-manage-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
@@ -964,7 +1018,7 @@
   <!-- ══�?Toast 容器 ══�?-->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260817-61"></script>
+  <script type="module" src="./js/app.js?v=20260817-62"></script>
 
 </body>
 </html>

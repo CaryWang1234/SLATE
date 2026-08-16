@@ -38,6 +38,7 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
+- 🔍 **Code Review** — Read git diff (staged/unstaged/commit range), AI reviews across code quality, security, performance, and maintainability with structured report and line-level comments
 - 📡 **LAN Remote Control** — Opens port 8001 on launch; scan QR from phone/tablet browser for the full interface
 - 🛡️ **High-Risk Command Approval** — Dual-layer frontend+backend interception with hardcoded rules; AI explains command purpose before approval; catastrophic commands unconditionally blocked
 - 👥 **AI Team Multi-Round Debate** — Multi-role propose/oppose/decide with light/heavy model division; plus DAG workflow pipeline; stop button for mid-debate interruption; **9 built-in team presets** (Code Review, Product Brainstorm, Red-Blue Debate, etc.) + custom configuration
@@ -108,6 +109,14 @@ Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention i
 - Three scan budgets: brief / balanced / detailed, priority-reading of README, dependency manifests, and core files
 - Auto-generates two documents: project guide & encyclopedia, and rulebook (evidence-based dev rules)
 - Results persisted to `.slate/config.json`, instant access on reopen
+
+### Code Review
+
+- Read git diff in three modes: unstaged changes, staged changes, commit range
+- AI reviews across four dimensions: code quality, security, performance, maintainability
+- Structured report with overall assessment, per-dimension analysis, and line-level comments
+- Line-level comments with severity badges (critical/major/minor/info), clickable file:line locations
+- Three result views: full report (Markdown), line comments list, four-dimension cards
 
 ### Scheduled Tasks
 
@@ -225,7 +234,7 @@ SLATE/
 │   │   ├── chat.py             # Chat history / context compression
 │   │   ├── scheduler.py        # Scheduled task dispatcher
 │   │   ├── knowledge.py        # Knowledge base retrieval
-│   │   ├── projects.py         # Project management / Better Project Understanding
+│   │   ├── projects.py         # Project management / Better Project Understanding / Code Review
 │   │   ├── experts.py          # Expert pack CRUD / zip import/export
 │   │   ├── skills.py           # Skill invocation
 │   │   ├── settings.py         # Settings / cross-device sync / storage management

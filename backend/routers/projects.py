@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -200,6 +201,145 @@ async def browse_files(req: BrowseRequest):
             "path": str(target.relative_to(project_dir)) if target != project_dir else ".",
             "entries": entries,
         },
+    }
+
+
+# ── Code Review：Git Diff 读取与解析 ──────────
+
+class ReviewDiffRequest(BaseModel):
+    mode: str = "unstaged"           # staged | unstaged | commit
+    from_commit: str = ""            # for mode=commit
+    to_commit: str = "HEAD"          # for mode=commit
+    max_lines: int = 8000            # safety cap
+
+
+def _parse_unified_diff(diff_text: str) -> list[dict]:
+    """Parse unified diff into structured per-file data with line numbers."""
+    files: list[dict] = []
+    current_file: dict | None = None
+    current_chunk: dict | None = None
+    old_line = 0
+    new_line = 0
+
+    for raw_line in diff_text.splitlines():
+        # File header
+        if raw_line.startswith("diff --git"):
+            current_file = None
+            current_chunk = None
+            continue
+        if raw_line.startswith("--- a/"):
+            current_file = {"file": raw_line[6:], "changes": []}
+            files.append(current_file)
+            continue
+        if raw_line.startswith("+++ b/"):
+            if current_file:
+                current_file["file"] = raw_line[6:]
+            continue
+
+        # Hunk header
+        if raw_line.startswith("@@"):
+            if current_file is None:
+                continue
+            parts = raw_line.split("@@")
+            if len(parts) >= 3:
+                ranges = parts[1].strip().split()
+                old_start = int(ranges[0].split(",")[0].lstrip("-")) if ranges else 1
+                new_start = int(ranges[1].split(",")[0].lstrip("+")) if len(ranges) > 1 else 1
+                old_line = old_start
+                new_line = new_start
+                current_chunk = {
+                    "old_start": old_start,
+                    "new_start": new_start,
+                    "lines": [],
+                }
+                current_file["changes"].append(current_chunk)
+            continue
+
+        # Diff content lines
+        if current_chunk is None:
+            continue
+        if raw_line.startswith("+"):
+            current_chunk["lines"].append({"type": "add", "old_line": None, "new_line": new_line, "content": raw_line[1:]})
+            new_line += 1
+        elif raw_line.startswith("-"):
+            current_chunk["lines"].append({"type": "del", "old_line": old_line, "new_line": None, "content": raw_line[1:]})
+            old_line += 1
+        elif raw_line.startswith(" "):
+            current_chunk["lines"].append({"type": "ctx", "old_line": old_line, "new_line": new_line, "content": raw_line[1:]})
+            old_line += 1
+            new_line += 1
+
+    return files
+
+
+@router.post("/review/diff")
+async def review_diff(req: ReviewDiffRequest):
+    """Read git diff from project directory and return structured parse result."""
+    if not _current_project:
+        return {"code": 1, "message": "未打开项目"}
+    project_dir = Path(_current_project["path"])
+
+    # Verify it's a git repo
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=project_dir, capture_output=True, timeout=10, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return {"code": 1, "message": "该项目不是 Git 仓库"}
+
+    # Build git diff command
+    if req.mode == "staged":
+        cmd = ["git", "diff", "--cached", "-U3"]
+    elif req.mode == "commit":
+        if not req.from_commit:
+            return {"code": 1, "message": "commit 模式需要指定 from_commit"}
+        cmd = ["git", "diff", "-U3", req.from_commit, req.to_commit or "HEAD"]
+    else:  # unstaged
+        cmd = ["git", "diff", "-U3"]
+
+    try:
+        result = subprocess.run(
+            cmd, cwd=project_dir, capture_output=True, text=True, timeout=30,
+        )
+        diff_text = result.stdout
+    except subprocess.TimeoutExpired:
+        return {"code": 1, "message": "git diff 超时（30s）"}
+    except Exception as e:
+        return {"code": 1, "message": f"git diff 失败: {e}"}
+
+    if not diff_text.strip():
+        return {"code": 0, "data": {"files": [], "raw": "", "total_changes": 0, "message": "无变更"}, "message": "ok"}
+
+    # Safety cap
+    lines = diff_text.splitlines()
+    truncated = len(lines) > req.max_lines
+    if truncated:
+        diff_text = "\n".join(lines[:req.max_lines])
+
+    files = _parse_unified_diff(diff_text)
+
+    # Count changes
+    total_add = sum(
+        1 for f in files for c in f["changes"] for ln in c["lines"] if ln["type"] == "add"
+    )
+    total_del = sum(
+        1 for f in files for c in f["changes"] for ln in c["lines"] if ln["type"] == "del"
+    )
+
+    return {
+        "code": 0,
+        "data": {
+            "files": files,
+            "raw": diff_text[:200000],
+            "total_files": len(files),
+            "total_add": total_add,
+            "total_del": total_del,
+            "total_changes": total_add + total_del,
+            "truncated": truncated,
+            "mode": req.mode,
+        },
+        "message": "ok",
     }
 
 
