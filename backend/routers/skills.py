@@ -49,6 +49,8 @@ BUILTIN_SKILLS: dict[str, str] = {
     "html_bundle": "将 html 及相对路径的 css/js 内联合并为单个 html 文件（便携分发）",
     "code_scan": "代码安全扫描（检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等）",
     "mcp_factory": "MCP 工厂：根据描述自动生成新的 MCP 工具，让 SLATE 自生产适配自身的工具",
+    "browser_automation": "浏览器自动化：基于 Playwright 控制 Chromium 浏览器（导航/截图/点击/输入/执行JS）",
+    "computer_use": "桌面自动化：基于 pyautogui 控制鼠标键盘（截图/点击/输入/组合键/图像定位）",
 }
 
 

@@ -93,6 +93,7 @@ Built-in tools (`backend/skills/`):
 | `chart_create` / `qrcode_create` | SVG charts (bar/line/pie) / QR codes, inline preview |
 | `python_api_extract` / `html_bundle` | Python library API extraction / Web page bundling |
 | `code_scan` / `mcp_factory` | Code security scanning / MCP tool self-production |
+| `browser_automation` / `computer_use` | Browser automation (Playwright) / Desktop automation (mouse/keyboard) |
 
 Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention in chat to auto-inject context.
 
@@ -233,7 +234,7 @@ SLATE/
 │   │   ├── update.py           # Startup update check (GitHub Releases)
 │   │   ├── workflows.py        # Team workflow DAG definition
 │   │   └── files.py            # Multimodal file parsing
-│   └── skills/                 # 22 built-in MCP tool implementations (incl. high-risk command dual interception)
+│   └── skills/                 # 24 built-in MCP tool implementations (incl. high-risk command dual interception)
 ├── frontend/
 │   ├── index.html              # Three-column layout entry (Chat / Whiteboard / Factory+Capabilities)
 │   ├── css/style.css           # Global styles (dual theme)

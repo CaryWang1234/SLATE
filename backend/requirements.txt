@@ -10,3 +10,6 @@ python-docx
 openpyxl
 pdfplumber
 qrcode
+playwright
+pyautogui
+pyperclip

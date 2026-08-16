@@ -43,6 +43,8 @@ hiddenimports = [
     'backend.skills.qrcode_create',
     'backend.skills.python_api_extract',
     'backend.skills.html_bundle',
+    'backend.skills.browser_automation',
+    'backend.skills.computer_use',
     # 多模态文件解析依赖（files.py 内函数级延迟导入，需显式声明）
     'openpyxl',
     'pdfplumber',

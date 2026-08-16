@@ -93,6 +93,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 | `chart_create` / `qrcode_create` | SVG 图表生成（柱状/条形/折线/饼图）/ 二维码生成，产出内联预览 |
 | `python_api_extract` / `html_bundle` | Python 库公共 API 文档提取（JSON/Markdown）/ 网页 css/js 内联单文件打包 |
 | `code_scan` / `mcp_factory` | 代码安全扫描 / MCP 工具自生产（让 SLATE 自生产适配自身的 MCP） |
+| `browser_automation` / `computer_use` | 浏览器自动化（Playwright 控制 Chromium）/ 桌面自动化（鼠标键盘控制） |
 
 自定义 Skill：上传或导入 `SKILL.md` 即可扩展新能力；聊天输入框 `@` 提及 MCP 工具、Skill 或专家包，发送时自动注入对应上下文。
 
@@ -233,7 +234,7 @@ SLATE/
 │   │   ├── update.py           # 启动更新检查（GitHub Releases）
 │   │   ├── workflows.py        # 团队工作流 DAG 定义
 │   │   └── files.py            # 多模态文件解析
-│   └── skills/                 # 22 个内置 MCP 工具实现（含高危命令双层拦截）
+│   └── skills/                 # 24 个内置 MCP 工具实现（含高危命令双层拦截）
 ├── frontend/
 │   ├── index.html              # 三栏布局入口（对话 / 黑板 / 工厂+能力）
 │   ├── css/style.css           # 全局样式（双主题）

@@ -1,11 +1,11 @@
 ﻿/**
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除�? */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260816-56";
-import { get, post, del, upload } from "../services/api.js?v=20260816-56";
-import { guardSkillParams } from "../services/riskguard.js?v=20260816-56";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260816-56";
-import { t } from "../services/i18n.js?v=20260816-56";
+import { state, subscribe, setSkills } from "../store.js?v=20260817-57";
+import { get, post, del, upload } from "../services/api.js?v=20260817-57";
+import { guardSkillParams } from "../services/riskguard.js?v=20260817-57";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-57";
+import { t } from "../services/i18n.js?v=20260817-57";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -127,6 +127,27 @@ const SKILL_PARAM_DEFS = {
     { key: "params", label: "参数规格（JSON 数组）", type: "textarea", placeholder: '[{"name":"input","type":"str","required":true,"description":"输入内容"}]' },
     { key: "body", label: "核心逻辑代码", type: "textarea", placeholder: 'result = {"message": "Hello"}' },
     { key: "overwrite", label: "覆盖已有（true/false）", type: "text", placeholder: "false" },
+  ],
+  browser_automation: [
+    { key: "action", label: "操作类型", type: "text", placeholder: "launch/navigate/screenshot/click/type/get_text/evaluate/scroll/wait/close" },
+    { key: "url", label: "目标 URL", type: "text", placeholder: "https://example.com" },
+    { key: "selector", label: "CSS 选择器", type: "text", placeholder: "#id 或 .class" },
+    { key: "text", label: "输入文字", type: "text", placeholder: "要输入的内容" },
+    { key: "expression", label: "JS 表达式", type: "text", placeholder: "document.title" },
+    { key: "headless", label: "无头模式 (true/false)", type: "text", placeholder: "true" },
+    { key: "full_page", label: "全页截图 (true/false)", type: "text", placeholder: "false" },
+  ],
+  computer_use: [
+    { key: "action", label: "操作类型", type: "text", placeholder: "screenshot/click/double_click/right_click/type/hotkey/scroll/move/drag/position/screen_size/locate" },
+    { key: "x", label: "X 坐标", type: "text", placeholder: "500" },
+    { key: "y", label: "Y 坐标", type: "text", placeholder: "300" },
+    { key: "text", label: "输入文字", type: "text", placeholder: "Hello World" },
+    { key: "keys", label: "组合键（逗号分隔）", type: "text", placeholder: "ctrl,c" },
+    { key: "button", label: "鼠标按键", type: "text", placeholder: "left/right/middle" },
+    { key: "region", label: "截图区域 x,y,w,h", type: "text", placeholder: "0,0,800,600" },
+    { key: "scroll_amount", label: "滚动格数", type: "text", placeholder: "3" },
+    { key: "image_path", label: "参考图片路径", type: "text", placeholder: "C:/path/to/image.png" },
+    { key: "confidence", label: "匹配置信度 0-1", type: "text", placeholder: "0.8" },
   ],],
 };
 

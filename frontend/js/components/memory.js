@@ -9,10 +9,10 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260816-56";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260816-56";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260816-56";
-import { t } from "../services/i18n.js?v=20260816-56";
+} from "../store.js?v=20260817-57";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260817-57";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-57";
+import { t } from "../services/i18n.js?v=20260817-57";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -139,12 +139,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260816-56");
+    const { toast } = await import("../app.js?v=20260817-57");
     toast("对话内容太少，无法提取记�?);
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260816-56");
+  const { toast } = await import("../app.js?v=20260817-57");
   toast("正在分析对话内容�?);
 
   // 构建对话文本
@@ -319,7 +319,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260816-56");
+      const { toast } = await import("../app.js?v=20260817-57");
       toast(t("已自动提�?{n} 条记�?, { n: added }) + (profileUpdated ? t("，并更新画像") : ""));
     }
     return { added, profileUpdated };
@@ -428,7 +428,7 @@ async function addKnowledgeDialog() {
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260816-56");
+    const { toast } = await import("../app.js?v=20260817-57");
     toast("知识已添�?);
     await loadKnowledgeDocs();
   }
@@ -582,7 +582,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260816-56").then(({ toast }) => toast("资料已保�?));
+    import("../app.js?v=20260817-57").then(({ toast }) => toast("资料已保�?));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗�?, { danger: true, okText: "重置" })) {
