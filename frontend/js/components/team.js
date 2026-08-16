@@ -2,15 +2,15 @@
  * SLATE AI 团队组件：多模型协作讨论
  * 轻量模型初步讨论 �?重型模型最终决�? */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260817-60";
-import { streamChat } from "../services/api.js?v=20260817-60";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260817-60";
-import { renderMarkdown } from "../services/markdown.js?v=20260817-60";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260817-60";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260817-60";
-import { getExpertsCached } from "./experts.js?v=20260817-60";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260817-60";
-import { t } from "../services/i18n.js?v=20260817-60";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260817-61";
+import { streamChat } from "../services/api.js?v=20260817-61";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260817-61";
+import { renderMarkdown } from "../services/markdown.js?v=20260817-61";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260817-61";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260817-61";
+import { getExpertsCached } from "./experts.js?v=20260817-61";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260817-61";
+import { t } from "../services/i18n.js?v=20260817-61";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项�?subscribe("modelRegistry", () => renderTeamMembers());
 
@@ -30,7 +30,304 @@ const DEFAULT_MEMBERS = [
   { id: "member-1", name: "分析�?, modelId: "deepseek-v4-flash", persona: "你是务实派分析师。关注可行性和成本，回答简洁（1-3句）�?, role: "analyst" },
   { id: "member-2", name: "创意�?, modelId: "gemini-3.6-flash", persona: "你是创意导向的思考者。关注创新可能性和用户体验，回答简洁（1-3句）�?, role: "creative" },
   { id: "member-3", name: "决策�?, modelId: "gpt-5.6-sol", persona: "你是最终决策者。综合各方观点给出明确建议和理由，回答简洁（1-3句）�?, role: "decider" },
+];];
+
+// ── 团队预设 ────────────────────────────
+
+const TEAM_PRESETS = [
+  {
+    "id": "classic",
+    "name": "经典三人组",
+    "icon": "🎯",
+    "desc": "分析师 + 创意者 + 决策者",
+    "members": [
+      {
+        "name": "分析师",
+        "modelId": "deepseek-v4-flash",
+        "persona": "你是务实派分析师。关注可行性和成本，回答简洁（1-3句）。",
+        "role": "analyst"
+      },
+      {
+        "name": "创意者",
+        "modelId": "gemini-3.6-flash",
+        "persona": "你是创意导向的思考者。关注创新可能性和用户体验，回答简洁（1-3句）。",
+        "role": "creative"
+      },
+      {
+        "name": "决策者",
+        "modelId": "gpt-5.6-sol",
+        "persona": "你是最终决策者。综合各方观点给出明确建议和理由，回答简洁（1-3句）。",
+        "role": "decider"
+      }
+    ]
+  },
+  {
+    "id": "code-review",
+    "name": "代码审查组",
+    "icon": "🔍",
+    "desc": "安全专家 + 性能专家 + 架构师",
+    "members": [
+      {
+        "name": "安全专家",
+        "modelId": "deepseek-v4-flash",
+        "persona": "你是安全审计专家。专注代码安全漏洞、注入风险、敏感信息泄露，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "性能专家",
+        "modelId": "gemini-3.6-flash",
+        "persona": "你是性能优化专家。关注算法复杂度、内存泄漏、并发问题，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "架构师",
+        "modelId": "gpt-5.6-sol",
+        "persona": "你是资深架构师。关注代码结构、设计模式、可维护性，综合给出改进方案。",
+        "role": "decider"
+      }
+    ]
+  },
+  {
+    "id": "product-brainstorm",
+    "name": "产品头脑风暴",
+    "icon": "💡",
+    "desc": "产品经理 + 设计师 + 用户代言 + 技术负责人",
+    "members": [
+      {
+        "name": "产品经理",
+        "modelId": "gemini-3.6-flash",
+        "persona": "你是资深产品经理。关注用户价值、市场定位和商业可行性，回答简洁。",
+        "role": "creative"
+      },
+      {
+        "name": "设计师",
+        "modelId": "deepseek-v4-flash",
+        "persona": "你是交互设计师。关注用户体验、信息架构和视觉层次，回答简洁。",
+        "role": "creative"
+      },
+      {
+        "name": "用户代言",
+        "modelId": "kimi-k2.7-code",
+        "persona": "你代表终端用户发声。关注易用性、学习成本和真实使用场景，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "技术负责人",
+        "modelId": "gpt-5.6-sol",
+        "persona": "你是技术负责人。综合产品、设计、用户视角给出技术可行方案和优先级。",
+        "role": "decider"
+      }
+    ]
+  },
+  {
+    "id": "tech-selection",
+    "name": "技术选型",
+    "icon": "⚙️",
+    "desc": "前端专家 + 后端专家 + 基础设施专家",
+    "members": [
+      {
+        "name": "前端专家",
+        "modelId": "deepseek-v4-flash",
+        "persona": "你是前端技术专家。从框架生态、开发体验、性能角度评估技术方案，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "后端专家",
+        "modelId": "gemini-3.6-flash",
+        "persona": "你是后端技术专家。从可扩展性、维护成本、社区成熟度角度评估技术方案，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "基础设施专家",
+        "modelId": "kimi-k2.7-code",
+        "persona": "你是基础设施专家。从部署运维、监控告警、成本角度评估技术方案，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "技术总监",
+        "modelId": "gpt-5.6-sol",
+        "persona": "你是技术总监。综合前端、后端、基础设施的意见，给出最终技术选型建议和理由。",
+        "role": "decider"
+      }
+    ]
+  },
+  {
+    "id": "red-blue",
+    "name": "红蓝对抗",
+    "icon": "⚔️",
+    "desc": "正方辩手 + 反方辩手 + 裁判",
+    "members": [
+      {
+        "name": "正方辩手",
+        "modelId": "gemini-3.6-flash",
+        "persona": "你是正方辩手。积极论证方案的可行性、优势和价值，用事实和逻辑支撑，回答简洁。",
+        "role": "creative"
+      },
+      {
+        "name": "反方辩手",
+        "modelId": "deepseek-v4-flash",
+        "persona": "你是反方辩手。尖锐质疑方案的漏洞、风险和盲点，用反例和数据反驳，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "裁判",
+        "modelId": "gpt-5.6-sol",
+        "persona": "你是公正的裁判。听取正反双方论点，裁定谁的论证更有说服力，给出平衡的结论。",
+        "role": "decider"
+      }
+    ]
+  },
+  {
+    "id": "fullstack-review",
+    "name": "全栈评审",
+    "icon": "🏗️",
+    "desc": "前端 + 后端 + 数据库 + 运维",
+    "members": [
+      {
+        "name": "前端评审",
+        "modelId": "deepseek-v4-flash",
+        "persona": "你负责前端评审。关注组件设计、状态管理、渲染性能和可访问性，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "后端评审",
+        "modelId": "gemini-3.6-flash",
+        "persona": "你负责后端评审。关注 API 设计、业务逻辑、错误处理和安全性，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "数据库评审",
+        "modelId": "kimi-k2.7-code",
+        "persona": "你负责数据层评审。关注数据模型、查询效率、索引策略和数据一致性，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "运维评审",
+        "modelId": "deepseek-v4-flash",
+        "persona": "你负责运维评审。关注部署流程、日志监控、容灾恢复和成本，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "技术总监",
+        "modelId": "gpt-5.6-sol",
+        "persona": "你是技术总监。综合各层评审意见，给出最终改进方案和优先级排序。",
+        "role": "decider"
+      }
+    ]
+  },
+  {
+    "id": "writing-workshop",
+    "name": "写作工坊",
+    "icon": "✍️",
+    "desc": "内容策划 + 文案写手 + 编辑",
+    "members": [
+      {
+        "name": "内容策划",
+        "modelId": "gemini-3.6-flash",
+        "persona": "你是内容策划。负责确定主题、受众、核心论点和内容结构，回答简洁。",
+        "role": "creative"
+      },
+      {
+        "name": "文案写手",
+        "modelId": "deepseek-v4-flash",
+        "persona": "你是文案写手。负责文字表达、修辞润色和节奏把控，回答简洁。",
+        "role": "creative"
+      },
+      {
+        "name": "编辑",
+        "modelId": "gpt-5.6-sol",
+        "persona": "你是资深编辑。负责质量把关、逻辑校对和整体改进建议，综合给出最终版本。",
+        "role": "decider"
+      }
+    ]
+  },
+  {
+    "id": "startup-advisory",
+    "name": "创业顾问团",
+    "icon": "🚀",
+    "desc": "市场顾问 + 技术顾问 + 财务顾问 + 运营顾问",
+    "members": [
+      {
+        "name": "市场顾问",
+        "modelId": "gemini-3.6-flash",
+        "persona": "你是市场营销顾问。关注目标市场、获客策略、品牌定位和竞争分析，回答简洁。",
+        "role": "creative"
+      },
+      {
+        "name": "技术顾问",
+        "modelId": "deepseek-v4-flash",
+        "persona": "你是技术顾问。关注技术可行性、MVP 范围、开发周期和技术债，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "财务顾问",
+        "modelId": "kimi-k2.7-code",
+        "persona": "你是财务顾问。关注成本结构、盈利模式、现金流和融资策略，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "运营顾问",
+        "modelId": "gemini-3.6-flash",
+        "persona": "你是运营顾问。关注用户增长、留存策略、团队搭建和运营效率，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "CEO",
+        "modelId": "gpt-5.6-sol",
+        "persona": "你是 CEO。综合市场、技术、财务、运营意见，做出战略决策和优先级排序。",
+        "role": "decider"
+      }
+    ]
+  },
+  {
+    "id": "academic-seminar",
+    "name": "学术研讨",
+    "icon": "🎓",
+    "desc": "方法论专家 + 实证研究者 + 批判者",
+    "members": [
+      {
+        "name": "方法论专家",
+        "modelId": "gemini-3.6-flash",
+        "persona": "你是方法论专家。关注研究设计、理论框架和方法论严谨性，回答简洁。",
+        "role": "creative"
+      },
+      {
+        "name": "实证研究者",
+        "modelId": "deepseek-v4-flash",
+        "persona": "你是实证研究者。关注数据证据、实验设计和统计分析，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "批判者",
+        "modelId": "kimi-k2.7-code",
+        "persona": "你是学术批判者。质疑假设、指出逻辑漏洞和替代解释，回答简洁。",
+        "role": "analyst"
+      },
+      {
+        "name": "主持人",
+        "modelId": "gpt-5.6-sol",
+        "persona": "你是研讨会主持人。综合各方观点，总结共识与分歧，指出未来研究方向。",
+        "role": "decider"
+      }
+    ]
+  }
 ];
+
+function applyTeamPreset(presetId) {
+  if (presetId === "custom") return; // 自定义模式：保留当前成员
+  const preset = TEAM_PRESETS.find(p => p.id === presetId);
+  if (!preset) return;
+  teamMembers = preset.members.map((m, i) => ({
+    id: `preset-${presetId}-${i}`,
+    name: m.name,
+    modelId: m.modelId,
+    persona: m.persona,
+    role: m.role,
+    expertId: "",
+  }));
+  renderTeamMembers();
+}
+
 
 function fmtTok(n) {
   return n >= 1000 ? (n / 1000).toFixed(1) + "K" : String(n || 0);
@@ -906,6 +1203,29 @@ function initTeamPanel() {
 
   // 默认成员
   teamMembers = [...DEFAULT_MEMBERS.map(m => ({ ...m }))];
+
+  // 预设选择器
+  const presetSelect = document.getElementById("team-preset-select");
+  if (presetSelect) {
+    presetSelect.innerHTML = "";
+    // 自定义选项
+    const customOpt = document.createElement("option");
+    customOpt.value = "custom";
+    customOpt.textContent = "\u270f\ufe0f " + t("自定义");
+    presetSelect.appendChild(customOpt);
+    // 预设选项
+    for (const preset of TEAM_PRESETS) {
+      const opt = document.createElement("option");
+      opt.value = preset.id;
+      opt.textContent = preset.icon + " " + t(preset.name);
+      presetSelect.appendChild(opt);
+    }
+    // 默认选中第一个预设
+    presetSelect.value = "classic";
+    presetSelect.addEventListener("change", () => {
+      applyTeamPreset(presetSelect.value);
+    });
+  }
   loadTeamHistory();
   renderTeamHistory();
   renderTeamUsage();

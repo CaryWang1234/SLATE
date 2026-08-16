@@ -2314,6 +2314,29 @@ textarea::-webkit-scrollbar-thumb {
   margin-bottom: 6px;
 }
 
+.team-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.team-preset-select {
+  flex: 1;
+  background: var(--bg-input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+.team-preset-select:focus {
+  border-color: var(--accent);
+}
+
 .team-label {
   font-size: 10px;
   font-weight: 600;
