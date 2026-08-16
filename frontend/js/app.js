@@ -2,24 +2,24 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260817-62";
-import { initI18n, t } from "./services/i18n.js?v=20260817-62";
-import { get, post, put } from "./services/api.js?v=20260817-62";
-import { dlgConfirm } from "./services/dialog.js?v=20260817-62";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260817-62";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260817-62";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260817-62";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260817-62";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260817-62";
-import { initTeamPanel } from "./components/team.js?v=20260817-62";
-import { initProjectBar } from "./components/project_bar.js?v=20260817-62";
-import { initMemoryPanel } from "./components/memory.js?v=20260817-62";
-import { initExpertsPanel } from "./components/experts.js?v=20260817-62";
-import { initSchedule } from "./components/schedule.js?v=20260817-62";
-import { initRiskGuard } from "./services/riskguard.js?v=20260817-62";
-import { initUnderstandPanel } from "./components/understand.js?v=20260817-62";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260817-62";
-import { setProject, setProjectFileTree } from "./store.js?v=20260817-62";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260817-63";
+import { initI18n, t } from "./services/i18n.js?v=20260817-63";
+import { get, post, put } from "./services/api.js?v=20260817-63";
+import { dlgConfirm } from "./services/dialog.js?v=20260817-63";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260817-63";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260817-63";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260817-63";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260817-63";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260817-63";
+import { initTeamPanel } from "./components/team.js?v=20260817-63";
+import { initProjectBar } from "./components/project_bar.js?v=20260817-63";
+import { initMemoryPanel } from "./components/memory.js?v=20260817-63";
+import { initExpertsPanel } from "./components/experts.js?v=20260817-63";
+import { initSchedule } from "./components/schedule.js?v=20260817-63";
+import { initRiskGuard } from "./services/riskguard.js?v=20260817-63";
+import { initUnderstandPanel } from "./components/understand.js?v=20260817-63";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260817-63";
+import { setProject, setProjectFileTree } from "./store.js?v=20260817-63";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -382,6 +382,10 @@ function openSettings(options = {}) {
   document.getElementById("setting-auto-review-long-stall").checked = state.autoReview?.reviewLongStall !== false;
   document.getElementById("setting-auto-review-min-chars").value = state.autoReview?.minChars || 120;
   populateAutoReviewModelSelect();
+  // 通知设置
+  document.getElementById("setting-notif-sound").checked = state.notifications?.soundEnabled !== false;
+  document.getElementById("setting-notif-system").checked = state.notifications?.systemNotifEnabled === true;
+  updateNotifPermissionHint();
   if (state.constitution) {
     document.getElementById("setting-constitution").value = JSON.stringify(state.constitution, null, 2);
   }
@@ -866,6 +870,48 @@ function initAutoReviewPersistence() {
   document.getElementById("setting-auto-review-long-stall")?.addEventListener("change", applyAutoReviewSettings);
 }
 
+// 通知设置：变更后立即持久化
+function updateNotifPermissionHint() {
+  const hint = document.getElementById("notif-permission-hint");
+  if (!hint) return;
+  if (!("Notification" in window)) {
+    hint.textContent = t("当前环境不支持系统通知");
+    return;
+  }
+  const perm = Notification.permission;
+  if (perm === "granted") hint.textContent = t("\u2705 已授权系统通知");
+  else if (perm === "denied") hint.textContent = t("\u274c 系统通知权限已被拒绝，请在浏览器设置中手动开启");
+  else hint.textContent = t("开启系统通知后将请求浏览器授权");
+}
+
+function applyNotificationSettings() {
+  state.notifications = {
+    soundEnabled: document.getElementById("setting-notif-sound").checked,
+    systemNotifEnabled: document.getElementById("setting-notif-system").checked,
+  };
+  savePersistent();
+  // 开启系统通知时自动请求权限
+  if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
+    import("./services/notify.js?v=20260817-63").then(({ requestNotificationPermission }) => {
+      return requestNotificationPermission();
+    }).then((perm) => {
+      updateNotifPermissionHint();
+      if (perm === "denied") {
+        state.notifications.systemNotifEnabled = false;
+        document.getElementById("setting-notif-system").checked = false;
+        savePersistent();
+      }
+    }).catch(() => {});
+  } else {
+    updateNotifPermissionHint();
+  }
+}
+
+function initNotificationPersistence() {
+  document.getElementById("setting-notif-sound")?.addEventListener("change", applyNotificationSettings);
+  document.getElementById("setting-notif-system")?.addEventListener("change", applyNotificationSettings);
+}
+
 async function saveSettings() {
   const maxTokens = parseInt(document.getElementById("setting-max-tokens").value) || 64000;
   state.maxTokens = maxTokens;
@@ -882,13 +928,17 @@ async function saveSettings() {
     minChars: Math.max(20, Math.min(800, parseInt(document.getElementById("setting-auto-review-min-chars").value) || 120)),
     reviewLongStall: document.getElementById("setting-auto-review-long-stall")?.checked !== false,
   };
-
+  state.notifications = {
+    soundEnabled: document.getElementById("setting-notif-sound").checked,
+    systemNotifEnabled: document.getElementById("setting-notif-system").checked,
+  };
+  
   const constText = document.getElementById("setting-constitution").value.trim();
   if (constText) {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260817-62");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260817-63");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1083,6 +1133,7 @@ async function init() {
   // 顶栏 📡：直达设置页“局域网遥控”区块（明显的网址获取入口�?  document.getElementById("btn-lan")?.addEventListener("click", () => openSettings({ focusLan: true }));
   document.getElementById("btn-lan-refresh")?.addEventListener("click", renderLanInfo);
   initAutoReviewPersistence();
+  initNotificationPersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
   // 设置页导航与关于�?  safeInit("设置导航", initSettingsNav);
@@ -1099,7 +1150,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260817-62");
+      const { openProject } = await import("./services/project.js?v=20260817-63");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

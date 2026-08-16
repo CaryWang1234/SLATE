@@ -39,6 +39,7 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
 - 🔍 **Code Review** — Read git diff (staged/unstaged/commit range), AI reviews across code quality, security, performance, and maintainability with structured report and line-level comments
+- 🔔 **Task Completion Notifications** — Chime sound + system notification when Harness/team/workflow finishes; both toggleable in settings
 - 📡 **LAN Remote Control** — Opens port 8001 on launch; scan QR from phone/tablet browser for the full interface
 - 🛡️ **High-Risk Command Approval** — Dual-layer frontend+backend interception with hardcoded rules; AI explains command purpose before approval; catastrophic commands unconditionally blocked
 - 👥 **AI Team Multi-Round Debate** — Multi-role propose/oppose/decide with light/heavy model division; plus DAG workflow pipeline; stop button for mid-debate interruption; **9 built-in team presets** (Code Review, Product Brainstorm, Red-Blue Debate, etc.) + custom configuration

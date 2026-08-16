@@ -2,15 +2,16 @@
  * SLATE AI 团队组件：多模型协作讨论
  * 轻量模型初步讨论 �?重型模型最终决�? */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260817-62";
-import { streamChat } from "../services/api.js?v=20260817-62";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260817-62";
-import { renderMarkdown } from "../services/markdown.js?v=20260817-62";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260817-62";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260817-62";
-import { getExpertsCached } from "./experts.js?v=20260817-62";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260817-62";
-import { t } from "../services/i18n.js?v=20260817-62";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260817-63";
+import { notifyTaskComplete } from "../services/notify.js?v=20260817-63";
+import { streamChat } from "../services/api.js?v=20260817-63";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260817-63";
+import { renderMarkdown } from "../services/markdown.js?v=20260817-63";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260817-63";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260817-63";
+import { getExpertsCached } from "./experts.js?v=20260817-63";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260817-63";
+import { t } from "../services/i18n.js?v=20260817-63";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项�?subscribe("modelRegistry", () => renderTeamMembers());
 
@@ -787,6 +788,7 @@ function stopDiscussion() {
   discussAbortController = null;
   btnStartDiscuss.disabled = false;
   btnStartDiscuss.textContent = t("开始讨论");
+  notifyTaskComplete(t("团队讨论完成"), t("辩论已结束"));
   if (btnStopDiscuss) {
     btnStopDiscuss.classList.add("hidden");
     btnStopDiscuss.disabled = true;
@@ -1179,6 +1181,7 @@ async function runSelectedWorkflow() {
     }
     wfRunStatus.textContent = "";
     wfAbortBtn?.classList.add("hidden");
+    notifyTaskComplete(t("工作流完成"), t("{ok}/{n} 节点成功", { ok: okCount, n: total }));
   } catch (e) {
     wfRunStatus.textContent = "";
     wfResultBar.innerHTML = `<span class="wf-result-error">${t("�?工作流执行失�? {msg}", { msg: e.message })}</span>`;

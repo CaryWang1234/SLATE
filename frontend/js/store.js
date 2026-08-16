@@ -90,6 +90,12 @@ const state = {
     maxRounds: 50,
   },
 
+  // 任务完成通知：音效 + 系统通知
+  notifications: {
+    soundEnabled: true,
+    systemNotifEnabled: false,
+  },
+
   knowledgeSettings: {
     enabled: true,
     topK: 5,
@@ -136,6 +142,7 @@ function buildPersistentData() {
     outputSettings: state.outputSettings,
     fileOutput: state.fileOutput,
     harness: state.harness,
+    notifications: state.notifications,
     knowledgeSettings: state.knowledgeSettings,
     activeExpertId: state.activeExpertId,
     useResponses: state.useResponses,
@@ -208,6 +215,10 @@ function loadPersistent() {
     };
     // 旧版本持久化的 maxRounds=20 统一提升到 50 轮上限
     if ((state.harness.maxRounds || 0) < 50) state.harness.maxRounds = 50;
+    state.notifications = {
+      ...state.notifications,
+      ...(data.notifications || {}),
+    };
     state.knowledgeSettings = {
       ...state.knowledgeSettings,
       ...(data.knowledgeSettings || {}),

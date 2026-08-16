@@ -1229,4 +1229,20 @@ export const EN_DICT = {
   "行级评论": "Line comments",
   "四维度": "4 dimensions",
 
+
+  // ── notify.js / 通知设置 ─────────────────────────────
+  "通知": "Notifications",
+  "大任务结束时的音效与系统通知（Harness 自主执行、团队讨论、工作流完成时触发）": "Sound & system notification when a big task finishes (Harness, team discussion, workflow)",
+  "任务完成时播放提示音效": "Play chime when task completes",
+  "任务完成时发送系统通知（需浏览器授权）": "Send system notification when task completes (browser permission required)",
+  "当前环境不支持系统通知": "System notifications not supported in this environment",
+  "✅ 已授权系统通知": "✅ System notification authorized",
+  "❌ 系统通知权限已被拒绝，请在浏览器设置中手动开启": "❌ Notification permission denied, enable it manually in browser settings",
+  "开启系统通知后将请求浏览器授权": "Enabling will request browser permission",
+  "Harness 任务完成": "Harness task complete",
+  "团队讨论完成": "Team discussion complete",
+  "辩论已结束": "Debate finished",
+  "工作流完成": "Workflow complete",
+  "{ok}/{n} 节点成功": "{ok}/{n} nodes succeeded",
+
 };
