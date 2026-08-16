@@ -10,6 +10,46 @@
 </head>
 <body>
 
+  <!-- ═══ Mobile Drawer ═══ -->
+  <div class="mobile-drawer-overlay" id="mobile-drawer-overlay">
+    <nav class="mobile-drawer" id="mobile-drawer">
+      <div class="drawer-header">
+        <img src="./icon.png" alt="SLATE" class="drawer-logo">
+        <span class="drawer-title">SLATE</span>
+        <button class="drawer-close" id="drawer-close" aria-label="Close">✕</button>
+      </div>
+      <div class="drawer-links">
+        <a href="#features"><span class="drawer-icon">✦</span> Features</a>
+        <a href="#highlights"><span class="drawer-icon">⚡</span> Highlights</a>
+        <a href="#scenes"><span class="drawer-icon">🎯</span> Use Cases</a>
+        <a href="#tools"><span class="drawer-icon">🛠</span> Tools</a>
+        <a href="#stack"><span class="drawer-icon">⚙</span> Tech Stack</a>
+        <a href="#start"><span class="drawer-icon">🚀</span> Quick Start</a>
+      </div>
+      <div class="drawer-footer">
+        <a class="drawer-action" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ Download Installer</a>
+        <a class="drawer-action ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">★ Star on GitHub</a>
+        <a class="drawer-lang" href="./zh/index.html">中文 / English</a>
+      </div>
+    </nav>
+  </div>
+
+  <!-- ═══ Mobile Bottom Bar ═══ -->
+  <div class="mobile-bottom-bar" id="mobile-bottom-bar">
+    <a class="bottom-btn" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">
+      <span class="bottom-icon">⬇</span>
+      <span class="bottom-label">Download</span>
+    </a>
+    <a class="bottom-btn primary" href="#start">
+      <span class="bottom-icon">🚀</span>
+      <span class="bottom-label">Get Started</span>
+    </a>
+    <a class="bottom-btn" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">
+      <span class="bottom-icon">★</span>
+      <span class="bottom-label">GitHub</span>
+    </a>
+  </div>
+
   <!-- ═══ Scroll Progress Bar ═══ -->
   <div class="scroll-progress" aria-hidden="true"><span id="progress-bar"></span></div>
 
@@ -32,6 +72,9 @@
         <a class="nav-lang" href="./zh/index.html">中文</a>
         <button class="theme-toggle" id="theme-toggle" title="Toggle theme">☾</button>
         <a class="nav-github" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub ↗</a>
+        <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
   </nav>
@@ -546,6 +589,47 @@
     applyTheme(saved);
     themeBtn.addEventListener("click", () => {
       applyTheme(document.body.dataset.theme === "light" ? "dark" : "light");
+    });
+
+    // ── Mobile drawer navigation ──
+    const hamburger = document.getElementById("nav-hamburger");
+    const drawerOverlay = document.getElementById("mobile-drawer-overlay");
+    const drawer = document.getElementById("mobile-drawer");
+    const drawerClose = document.getElementById("drawer-close");
+
+    function openDrawer() {
+      drawerOverlay.classList.add("open");
+      hamburger.classList.add("active");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeDrawer() {
+      drawerOverlay.classList.remove("open");
+      hamburger.classList.remove("active");
+      document.body.style.overflow = "";
+    }
+
+    hamburger?.addEventListener("click", () => {
+      drawerOverlay.classList.contains("open") ? closeDrawer() : openDrawer();
+    });
+
+    drawerClose?.addEventListener("click", closeDrawer);
+
+    // 点击遮罩关闭
+    drawerOverlay?.addEventListener("click", (e) => {
+      if (e.target === drawerOverlay) closeDrawer();
+    });
+
+    // 点击抽屉内链接后关闭
+    drawer?.querySelectorAll("a[href^='#']").forEach((link) => {
+      link.addEventListener("click", () => {
+        closeDrawer();
+      });
+    });
+
+    // ESC 键关闭
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && drawerOverlay?.classList.contains("open")) closeDrawer();
     });
 
     // ── Stagger entrance: group items get递增 delay by index ──
