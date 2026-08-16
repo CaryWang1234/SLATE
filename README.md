@@ -112,7 +112,8 @@ Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention i
 ### Scheduled Tasks
 
 - Three scheduling modes: one-time / daily at time / fixed interval
-- Backend asyncio scheduler calls model directly, results archived to `[Scheduled]` prefixed sessions
+- **Event-driven triggers**: file change watcher / Git push detector / Webhook receiver — auto-execute tasks when events occur
+- Backend asyncio scheduler calls model directly, results archived to `[Scheduled]` or `[Event]` prefixed sessions
 - Frontend visual management: add/remove, enable/disable, run now, execution status display
 
 ### Chat & Data Management

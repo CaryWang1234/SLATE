@@ -3,6 +3,10 @@
 任务持久化在 data/scheduled_tasks.json；后台协程每 30 秒检查一次，
 触发时：创建 [定时] 专属会话 → 用 desktop_state.json 中的 API Key
 调用 OpenAI 兼容模型 → 将用户提示词与模型回复归档进会话。
+
+支持「定时 + 事件」双驱动模式：
+- 定时模式：once / daily / interval（原有）
+- 事件模式：file_change（文件变更）/ git_push（Git 推送）/ webhook（HTTP 回调）
 """
 
 from __future__ import annotations
@@ -10,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import subprocess
 import time
 import uuid
 from datetime import datetime
@@ -17,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from backend.routers.chat import _get_db, add_message, create_conversation
 from backend.routers.proxy import _find_model
@@ -30,6 +35,13 @@ TASKS_PATH = DATA_DIR / "scheduled_tasks.json"
 
 _loop_started = False
 _running: set[str] = set()  # 正在执行中的任务 id，防止长任务被重复触发
+
+# ── 事件驱动状态 ────────────────────────────────
+
+_file_mtimes: dict[str, float] = {}          # path -> last mtime
+_git_heads: dict[str, str] = {}              # repo_path -> last HEAD hash
+_pending_webhooks: dict[str, list[dict]] = {}  # task_id -> [payload, ...]
+_event_loop_started = False
 
 
 # ── 持久化 ────────────────────────────────────
@@ -96,6 +108,129 @@ def _should_run(task: dict[str, Any], now_ts: float) -> bool:
     return last_run < occ_ts  # daily：今天的时间点尚未执行
 
 
+# ── 事件驱动检测器 ─────────────────────────────
+
+def _check_file_changes(task: dict[str, Any]) -> bool:
+    """检查文件变更事件：比较 mtime 是否更新。"""
+    paths_str = task.get("watch_paths", "")
+    if not paths_str:
+        return False
+    paths = [p.strip() for p in paths_str.split("\n") if p.strip()]
+    changed = False
+    for p in paths:
+        fp = Path(p)
+        if not fp.exists():
+            continue
+        if fp.is_dir():
+            # 目录：取最新修改的文件
+            try:
+                newest = max(fp.rglob("*"), key=lambda f: f.stat().st_mtime, default=None)
+                if newest:
+                    mtime = newest.stat().st_mtime
+                    key = str(newest.resolve())
+                    if key in _file_mtimes and mtime > _file_mtimes[key]:
+                        changed = True
+                    _file_mtimes[key] = mtime
+            except (OSError, ValueError):
+                pass
+        elif fp.is_file():
+            mtime = fp.stat().st_mtime
+            key = str(fp.resolve())
+            if key in _file_mtimes and mtime > _file_mtimes[key]:
+                changed = True
+            _file_mtimes[key] = mtime
+    return changed
+
+
+def _check_git_push(task: dict[str, Any]) -> bool:
+    """检查 Git push 事件：比较 HEAD hash 是否变化。"""
+    repo_path = task.get("git_repo", "").strip()
+    if not repo_path:
+        return False
+    rp = Path(repo_path)
+    if not (rp / ".git").exists():
+        return False
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(rp), capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            return False
+        current_head = result.stdout.strip()
+        key = str(rp.resolve())
+        if key in _git_heads and current_head != _git_heads[key]:
+            _git_heads[key] = current_head
+            return True
+        _git_heads[key] = current_head
+    except Exception:
+        pass
+    return False
+
+
+def _check_webhook(task: dict[str, Any]) -> bool:
+    """检查是否有待处理的 webhook 触发。"""
+    task_id = task.get("id", "")
+    pending = _pending_webhooks.get(task_id, [])
+    if pending:
+        # 取出并清空
+        _pending_webhooks[task_id] = []
+        return True
+    return False
+
+
+def _should_run_event(task: dict[str, Any]) -> bool:
+    """事件模式任务是否应触发。"""
+    event_type = task.get("event_type", "")
+    cooldown = max(10, int(task.get("cooldown_seconds") or 60))  # 最小触发间隔 10 秒
+    last_run = task.get("last_run") or 0
+    # 冷却期内不触发
+    if time.time() - last_run < cooldown:
+        return False
+
+    if event_type == "file_change":
+        return _check_file_changes(task)
+    elif event_type == "git_push":
+        return _check_git_push(task)
+    elif event_type == "webhook":
+        return _check_webhook(task)
+    return False
+
+
+def _init_event_snapshots() -> None:
+    """初始化事件快照：记录当前文件 mtime 和 git HEAD，避免启动时误触发。"""
+    for task in _load_tasks():
+        if task.get("mode") != "event" or not task.get("enabled"):
+            continue
+        event_type = task.get("event_type", "")
+        if event_type == "file_change":
+            paths_str = task.get("watch_paths", "")
+            for p in (x.strip() for x in paths_str.split("\n") if x.strip()):
+                fp = Path(p)
+                if fp.is_file():
+                    _file_mtimes[str(fp.resolve())] = fp.stat().st_mtime
+                elif fp.is_dir():
+                    try:
+                        for f in fp.rglob("*"):
+                            if f.is_file():
+                                _file_mtimes[str(f.resolve())] = f.stat().st_mtime
+                    except OSError:
+                        pass
+        elif event_type == "git_push":
+            repo_path = task.get("git_repo", "").strip()
+            rp = Path(repo_path)
+            if (rp / ".git").exists():
+                try:
+                    result = subprocess.run(
+                        ["git", "rev-parse", "HEAD"],
+                        cwd=str(rp), capture_output=True, text=True, timeout=10,
+                    )
+                    if result.returncode == 0:
+                        _git_heads[str(rp.resolve())] = result.stdout.strip()
+                except Exception:
+                    pass
+
+
 # ── 任务执行 ──────────────────────────────────
 
 def _finish_run(task: dict[str, Any], error: str | None = None, conversation_id: str | None = None) -> None:
@@ -111,6 +246,32 @@ def _finish_run(task: dict[str, Any], error: str | None = None, conversation_id:
 async def _run_task(task: dict[str, Any]) -> None:
     model_id = task.get("model_id", "")
     prompt = task.get("prompt", "")
+
+    # 事件模式：注入触发上下文
+    if task.get("mode") == "event":
+        event_type = task.get("event_type", "")
+        context_parts = []
+        if event_type == "file_change":
+            # 找出最近变更的文件
+            changed_files = []
+            for p_str, mtime in _file_mtimes.items():
+                if time.time() - mtime < 120:  # 2 分钟内变更的
+                    changed_files.append(p_str)
+            context_parts.append(f"触发原因：文件变更\n最近变更文件：{', '.join(changed_files[-10:])}")
+        elif event_type == "git_push":
+            repo = task.get("git_repo", "")
+            head = _git_heads.get(str(Path(repo).resolve()), "")
+            context_parts.append(f"触发原因：Git push 检测\n仓库：{repo}\n最新 HEAD：{head[:12]}")
+        elif event_type == "webhook":
+            payloads = _pending_webhooks.get(task.get("id", ""), [])
+            context_parts.append(f"触发原因：Webhook 回调")
+            if payloads:
+                try:
+                    context_parts.append(f"Payload: {json.dumps(payloads[-1], ensure_ascii=False)[:2000]}")
+                except Exception:
+                    pass
+        if context_parts:
+            prompt = f"{prompt}\n\n---\n事件上下文：\n" + "\n".join(context_parts)
 
     try:
         shared = json.loads(STATE_PATH.read_text(encoding="utf-8")) if STATE_PATH.exists() else {}
@@ -161,7 +322,8 @@ async def _run_task(task: dict[str, Any]) -> None:
 
     # 归档到专属会话
     stamp = datetime.now().strftime("%m-%d %H:%M")
-    title = f"[定时] {task.get('name') or '未命名'} · {stamp}"
+    prefix = "[事件]" if task.get("mode") == "event" else "[定时]"
+    title = f"{prefix} {task.get('name') or '未命名'} · {stamp}"
     conv = await create_conversation({"title": title})
     conv_id = conv["data"]["id"]
     await add_message(conv_id, {"role": "user", "content": prompt, "model": ""})
@@ -197,7 +359,11 @@ async def _tick() -> None:
             continue
         if task.get("id") in _running:
             continue
-        if _should_run(task, now_ts):
+        mode = task.get("mode", "daily")
+        if mode == "event":
+            if _should_run_event(task):
+                asyncio.create_task(_guarded_run(dict(task)))
+        elif _should_run(task, now_ts):
             asyncio.create_task(_guarded_run(dict(task)))
 
 
@@ -211,11 +377,14 @@ async def _loop() -> None:
 
 
 def start_scheduler() -> None:
-    global _loop_started
+    global _loop_started, _event_loop_started
     if _loop_started:
         return
     _loop_started = True
+    _init_event_snapshots()
     asyncio.create_task(_loop())
+    # 事件检测循环（与定时循环共用 _tick，无需独立循环）
+    _event_loop_started = True
 
 
 # ── API ───────────────────────────────────────
@@ -231,11 +400,15 @@ async def create_task(body: dict[str, Any]) -> dict[str, Any]:
     prompt = str(body.get("prompt", "")).strip()
     model_id = str(body.get("model_id", "")).strip()
     mode = body.get("mode", "daily")
-    if mode not in ("once", "daily", "interval"):
-        return {"code": 1, "message": "无效的执行方式"}
+    if mode not in ("once", "daily", "interval", "event"):
+        return {"code": 1, "message": "无效的执行模式"}
     if not name or not prompt or not model_id:
         return {"code": 1, "message": "名称、提示词、模型均必填"}
-    if mode != "interval" and not _parse_hhmm(body.get("time", "")):
+    if mode == "event":
+        event_type = body.get("event_type", "")
+        if event_type not in ("file_change", "git_push", "webhook"):
+            return {"code": 1, "message": "无效的事件类型"}
+    elif mode != "interval" and not _parse_hhmm(body.get("time", "")):
         return {"code": 1, "message": "请填写有效的执行时间（HH:MM）"}
     task = {
         "id": str(uuid.uuid4())[:8],
@@ -243,8 +416,14 @@ async def create_task(body: dict[str, Any]) -> dict[str, Any]:
         "prompt": prompt,
         "model_id": model_id,
         "mode": mode,
-        "time": body.get("time", "09:00") if mode != "interval" else "",
+        "time": body.get("time", "09:00") if mode not in ("interval", "event") else "",
         "every_minutes": max(1, int(body.get("every_minutes") or 60)) if mode == "interval" else 0,
+        # 事件模式字段
+        "event_type": body.get("event_type", "") if mode == "event" else "",
+        "watch_paths": body.get("watch_paths", "") if mode == "event" else "",
+        "git_repo": body.get("git_repo", "") if mode == "event" else "",
+        "webhook_secret": body.get("webhook_secret", "") if mode == "event" else "",
+        "cooldown_seconds": max(10, int(body.get("cooldown_seconds") or 60)) if mode == "event" else 0,
         "enabled": True,
         "created_at": time.time(),
         "last_run": None,
@@ -254,6 +433,9 @@ async def create_task(body: dict[str, Any]) -> dict[str, Any]:
     tasks = _load_tasks()
     tasks.append(task)
     _save_tasks(tasks)
+    # 初始化事件快照（避免启动时误触发）
+    if mode == "event":
+        _init_event_snapshots()
     return {"code": 0, "data": task, "message": "ok"}
 
 
@@ -263,7 +445,8 @@ async def update_task(task_id: str, body: dict[str, Any]) -> dict[str, Any]:
     target = next((t for t in tasks if t.get("id") == task_id), None)
     if not target:
         return {"code": 1, "message": "任务不存在"}
-    allowed = {"name", "prompt", "model_id", "mode", "time", "every_minutes", "enabled"}
+    allowed = {"name", "prompt", "model_id", "mode", "time", "every_minutes", "enabled",
+               "event_type", "watch_paths", "git_repo", "webhook_secret", "cooldown_seconds"}
     for key in allowed:
         if key in body:
             target[key] = body[key]
@@ -287,3 +470,58 @@ async def run_task_now(task_id: str) -> dict[str, Any]:
         return {"code": 1, "message": "任务正在执行中"}
     asyncio.create_task(_guarded_run(dict(target)))
     return {"code": 0, "data": None, "message": "已触发"}
+
+
+# ── Webhook 接收端点 ─────────────────────────────
+
+@router.post("/webhook/{task_id}")
+async def receive_webhook(task_id: str, request: Request) -> dict[str, Any]:
+    """接收外部 Webhook 回调，触发对应的事件任务。
+
+    调用方式：POST /api/schedule/webhook/{task_id}
+    Body: 任意 JSON（可选，会作为上下文注入提示词）
+    """
+    tasks = _load_tasks()
+    target = next((t for t in tasks if t.get("id") == task_id), None)
+    if not target:
+        return {"code": 1, "message": "任务不存在"}
+    if target.get("mode") != "event" or target.get("event_type") != "webhook":
+        return {"code": 1, "message": "该任务不是 Webhook 事件类型"}
+    if not target.get("enabled"):
+        return {"code": 1, "message": "任务已停用"}
+
+    # 解析 payload
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {"raw": "(non-JSON body)"}
+
+    # 校验 secret（如果任务配置了 webhook_secret）
+    expected_secret = target.get("webhook_secret", "")
+    if expected_secret:
+        received_secret = str(payload.get("secret", ""))
+        if received_secret != expected_secret:
+            return {"code": 1, "message": "Webhook secret 校验失败"}
+
+    # 加入待处理队列
+    if task_id not in _pending_webhooks:
+        _pending_webhooks[task_id] = []
+    _pending_webhooks[task_id].append({
+        "received_at": time.time(),
+        "payload": payload,
+    })
+    return {"code": 0, "data": None, "message": "Webhook 已接收，将在下次轮询时触发任务"}
+
+
+@router.get("/events/status")
+async def event_status() -> dict[str, Any]:
+    """返回事件驱动系统状态（调试用）。"""
+    return {
+        "code": 0,
+        "data": {
+            "file_watchers": len(_file_mtimes),
+            "git_watchers": len(_git_heads),
+            "pending_webhooks": {k: len(v) for k, v in _pending_webhooks.items() if v},
+        },
+        "message": "ok",
+    }

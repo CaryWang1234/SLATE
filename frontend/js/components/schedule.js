@@ -1,12 +1,12 @@
-/**
+﻿/**
  * SLATE 定时任务组件：创�?管理定时对话任务�?
  * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话�?
  */
 
-import { state } from "../store.js?v=20260815-51";
-import { get, post, del, patch } from "../services/api.js?v=20260815-51";
-import { dlgConfirm } from "../services/dialog.js?v=20260815-51";
-import { t as tr } from "../services/i18n.js?v=20260815-51"; // 任务变量也叫 t，此处别名避免遮�?
+import { state } from "../store.js?v=20260817-58";
+import { get, post, del, patch } from "../services/api.js?v=20260817-58";
+import { dlgConfirm } from "../services/dialog.js?v=20260817-58";
+import { t as tr } from "../services/i18n.js?v=20260817-58"; // 任务变量也叫 t，此处别名避免遮�?
 
 let modal, listEl;
 let pollTimer = null;
@@ -26,7 +26,7 @@ function formatTs(ts) {
 
 async function toast(msg) {
   try {
-    const app = await import("../app.js?v=20260815-51");
+    const app = await import("../app.js?v=20260817-58");
     app.toast(msg);
   } catch {}
 }

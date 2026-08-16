@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260817-57">
+  <link rel="stylesheet" href="./css/style.css?v=20260817-58">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后�?app.js 显示；兜底超时强显避免白�?    document.documentElement.classList.add("i18n-pending");
     setTimeout(function () { document.documentElement.classList.remove("i18n-pending"); }, 2500);
@@ -755,7 +755,7 @@
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-wide">
       <div class="modal-header">
-        <span>定时任务</span>
+        <span>定时 / 事件任务</span>
         <button class="modal-close icon-btn">×</button>
       </div>
       <div class="modal-body">
@@ -769,14 +769,32 @@
               <option value="daily">每天</option>
               <option value="once">单次</option>
               <option value="interval">间隔</option>
+              <option value="event">事件触发</option>
             </select>
             <input id="schedule-time" type="time" class="setting-input" value="09:00">
             <input id="schedule-minutes" type="number" class="setting-input" min="1" value="60" title="间隔分钟�? style="display:none">
+
+          <div id="event-config" class="schedule-row" style="display:none">
+            <select id="schedule-event-type" class="setting-input">
+              <option value="file_change">文件变更</option>
+              <option value="git_push">Git Push</option>
+              <option value="webhook">Webhook</option>
+            </select>
+            <input id="schedule-cooldown" type="number" class="setting-input" min="10" value="60" title="冷却秒数（最小触发间隔）" placeholder="冷却 60s">
           </div>
+          <div id="event-paths-config" style="display:none">
+            <textarea id="schedule-watch-paths" class="setting-input schedule-prompt" rows="2" placeholder="监听的文件/目录路径（每行一个），如：&#10;c:/Users/me/project/src&#10;c:/Users/me/notes.md"></textarea>
+          </div>
+          <div id="event-git-config" style="display:none">
+            <input id="schedule-git-repo" class="setting-input" placeholder="Git 仓库路径，如：c:/Users/me/project">
+          </div>
+          <div id="event-webhook-config" style="display:none">
+            <input id="schedule-webhook-secret" class="setting-input" placeholder="Webhook 密钥（可选，用于验证请求来源）">
+          </div>          </div>
           <button id="btn-add-schedule" class="send-btn send-btn-sm">+ 添加任务</button>
         </div>
         <div id="schedule-list" class="schedule-list"></div>
-        <p class="schedule-note">�?定时任务由本地后端执行：请保�?SLATE 运行，并确保所选模型已配置 API Key（仅支持 OpenAI 兼容模型）。结果将归档到标题带 [定时] 的新会话�?/p>
+        <p class="schedule-note">�?定时/事件任务由本地后端执行：请保�?SLATE 运行，并确保所选模型已配置 API Key（仅支持 OpenAI 兼容模型）。结果将归档到标题带 [定时] 的新会话�?/p>
       </div>
     </div>
   </div>
@@ -942,7 +960,7 @@
   <!-- ══�?Toast 容器 ══�?-->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260817-57"></script>
+  <script type="module" src="./js/app.js?v=20260817-58"></script>
 
 </body>
 </html>
