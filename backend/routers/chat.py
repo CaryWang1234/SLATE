@@ -624,12 +624,20 @@ async def extract_memories(body: dict[str, Any]) -> dict[str, Any]:
         "分析以下对话，提取值得长期记忆的关键信息。\n"
         "筛选标准：只记录跨对话仍然有用的稳定信息（用户偏好、重要决策、项目背景、常用术语），"
         "不记录一次性任务细节或临时状态。\n"
-        "以 JSON 数组格式输出，每项包含 category 和 content 字段，content 写成一条独立、完整的陈述。\n"
+        "以 JSON 数组格式输出，每项包含 action 字段：\n"
+        '- action: "add" 表示新增记忆，需包含 category 和 content\n'
+        '- action: "overwrite" 表示覆盖已有记忆，需包含 target_id（对应已有记忆的编号）、category 和 content\n'
+        '- action: "delete" 表示删除过时记忆，需包含 target_id 和 reason\n'
         "category 可选: preference, decision, project, term, fact, other。\n"
+        "如果对话中用户明确修正或推翻了某条已有记忆，请用 overwrite 动作更新它。\n"
+        "如果某条已有记忆已被对话内容否定，请用 delete 动作删除它。\n"
         "只输出 JSON，不要其他文字。如果没有值得记忆的内容，输出空数组 []。\n\n"
     )
     if existing:
-        prompt += f"已有记忆（避免重复）:\n" + "\n".join(f"- [{m.get('category','')}] {m.get('content','')}" for m in existing[:20]) + "\n\n"
+        prompt += "已有记忆（编号可用于 target_id）:\n" + "\n".join(
+            f"#{i+1} (id:{m.get('id','')}) [{m.get('category','')}] {m.get('content','')}"
+            for i, m in enumerate(existing[:30])
+        ) + "\n\n"
     prompt += f"对话内容:\n{text[:6000]}"
     return {"code": 0, "data": {"prompt": prompt}, "message": "ok"}
 

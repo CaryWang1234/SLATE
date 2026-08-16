@@ -9,10 +9,10 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260817-58";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260817-58";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-58";
-import { t } from "../services/i18n.js?v=20260817-58";
+} from "../store.js?v=20260817-59";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260817-59";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-59";
+import { t } from "../services/i18n.js?v=20260817-59";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -139,12 +139,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260817-58");
+    const { toast } = await import("../app.js?v=20260817-59");
     toast("对话内容太少，无法提取记�?);
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260817-58");
+  const { toast } = await import("../app.js?v=20260817-59");
   toast("正在分析对话内容�?);
 
   // 构建对话文本
@@ -156,7 +156,7 @@ async function extractMemoriesFromConversation() {
   try {
     // 获取提取提示�?    const res = await post("/chat/extract-memories", {
       text: dialogText,
-      existing_memories: state.memories.map(m => ({ category: m.category, content: m.content })),
+      existing_memories: state.memories.map(m => ({ id: m.id, category: m.category, content: m.content })),
     });
 
     if (res.code !== 0) {
@@ -190,21 +190,49 @@ async function extractMemoriesFromConversation() {
     }
 
     const memories = JSON.parse(jsonMatch[0]);
-    let addedCount = 0;
+    let addedCount = 0, overwrittenCount = 0, deletedCount = 0;
 
     for (const mem of memories) {
-      if (mem.content && mem.content.trim()) {
-        const newMem = {
-          category: mem.category || "general",
-          content: mem.content.trim(),
-        };
-        addMemory(newMem);
-        // 同步到后�?        post("/chat/memories", newMem).catch(() => {});
+      const action = mem.action || "add";
+      const content = String(mem?.content || "").trim();
+      const targetId = String(mem?.target_id || "").trim();
+
+      if (action === "delete" && targetId) {
+        const exists = state.memories.find(m => m.id === targetId);
+        if (exists) {
+          removeMemory(targetId);
+          del(`/chat/memories/${targetId}`).catch(() => {});
+          del(`/knowledge/docs/memory:${targetId}`).catch(() => {});
+          deletedCount++;
+        }
+        continue;
+      }
+
+      if (action === "overwrite" && targetId && content) {
+        const exists = state.memories.find(m => m.id === targetId);
+        if (exists) {
+          updateMemory(targetId, { category: mem.category || exists.category, content });
+          patch(`/chat/memories/${targetId}`, { category: mem.category || exists.category, content }).catch(() => {});
+          indexMemoryInKnowledge({ id: targetId, category: mem.category || exists.category, content });
+          overwrittenCount++;
+        }
+        continue;
+      }
+
+      if (content) {
+        const newMem = { category: mem.category || "general", content };
+        const saved = addMemory(newMem);
+        post("/chat/memories", { id: saved.id, category: saved.category, content: saved.content }).catch(() => {});
+        indexMemoryInKnowledge(saved);
         addedCount++;
       }
     }
 
-    toast(t("成功提取 {n} 条记�?, { n: addedCount }));
+    let msg = "";
+    if (addedCount) msg += t("新增 {n} 条", { n: addedCount });
+    if (overwrittenCount) msg += (msg ? "，" : "") + t("覆盖 {n} 条", { n: overwrittenCount });
+    if (deletedCount) msg += (msg ? "，" : "") + t("删除 {n} 条", { n: deletedCount });
+    toast(msg || t("未提取到有效记忆"));
   } catch (e) {
     console.error("提取记忆失败:", e);
     toast(t("提取失败: {msg}", { msg: e.message }));
@@ -213,16 +241,26 @@ async function extractMemoriesFromConversation() {
 
 function buildMemoryProfilePrompt(dialogText) {
   const existingMemories = state.memories
-    .slice(-40)
-    .map(m => `- [${m.category || "general"}] ${m.content || ""}`)
+    .slice(-40);
+  const existingMemories = recentMemories
+    .map((m, i) => `#${i + 1} [${m.category || "general"}] ${m.content || ""} (id:${m.id})`)
     .join("\n");
   const profile = state.userProfile || {};
   return `请分析以下最近对话，自主提炼可以长期保留的信息�?
 你需要同时更新两类内容：
 1. 长期记忆：稳定、可复用、以后会影响协作的信息，例如用户偏好、项目背景、重要决策、常用术语、明确约束�?2. 用户画像：用户的角色、工作风格、技术栈、协作习惯、其他长期偏好�?
-严格规则�?- 只保留长期有价值的信息，不要记录一次性任务、临时状态、寒暄、工具结果、纯代码输出�?- 不要重复已有记忆�?- 不要编造用户没有表达过的信息�?- 如果没有新增内容，memories 输出空数组�?- profile 只输出需要新增或修正的字段；不确定就省略�?- 只输�?JSON，不�?Markdown，不要解释�?
-输出格式�?{
-  "memories": [{"category":"preference|decision|project|term|fact|other","content":"..."}],
+严格规则�?- 只保留长期有价值的信息，不要记录一次性任务、临时状态、寒暄、工具结果、纯代码输出�?- 不要重复已有记忆�?- 不要编造用户没有表达过的信息
+- 如果对话中用户明确修正、推翻、或废弃了某条已有记忆，用 overwrite 或 delete 动作处理（用 target_id 指定记忆 id）
+- 如果没有新增内容，memories 输出空数组
+- profile 只输出需要新增或修正的字段；不确定就省略
+- 只输出 JSON，不要 Markdown，不要解释
+输出格式：
+{
+  "memories": [
+    {"action":"add","category":"preference|decision|project|term|fact|other","content":"..."},
+    {"action":"overwrite","target_id":"记忆id","category":"...","content":"更新后的内容"},
+    {"action":"delete","target_id":"记忆id","reason":"简要原因"}
+  ],
   "profile": {
     "role": "",
     "style": "",
@@ -271,13 +309,13 @@ async function indexMemoryInKnowledge(memory) {
 }
 
 async function autoRefineMemoryAndProfile({ silent = true } = {}) {
-  if (autoRefineRunning) return { added: 0, profileUpdated: false };
-  if (Date.now() - lastAutoRefineAt < 45000) return { added: 0, profileUpdated: false };
+  if (autoRefineRunning) return { added: 0, overwritten: 0, deleted: 0, profileUpdated: false };
+  if (Date.now() - lastAutoRefineAt < 45000) return { added: 0, overwritten: 0, deleted: 0, profileUpdated: false };
   const visibleMessages = state.messages.filter(m => !m.hidden && (m.role === "user" || m.role === "assistant"));
-  if (visibleMessages.length < 4) return { added: 0, profileUpdated: false };
+  if (visibleMessages.length < 4) return { added: 0, overwritten: 0, deleted: 0, profileUpdated: false };
 
   const modelId = state.currentModel?.id;
-  if (!modelId) return { added: 0, profileUpdated: false };
+  if (!modelId) return { added: 0, overwritten: 0, deleted: 0, profileUpdated: false };
   const apiKey = getModelKey(modelId);
   if (!apiKey && modelId !== "local") return { added: 0, profileUpdated: false };
 
@@ -305,9 +343,35 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const jsonMatch = result.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return { added: 0, profileUpdated: false };
     const parsed = JSON.parse(jsonMatch[0]);
-    let added = 0;
+    let added = 0, overwritten = 0, deleted = 0;
     for (const mem of Array.isArray(parsed.memories) ? parsed.memories : []) {
+      const action = mem.action || "add";
       const content = String(mem?.content || "").trim();
+      const targetId = String(mem?.target_id || "").trim();
+
+      if (action === "delete" && targetId) {
+        const exists = state.memories.find(m => m.id === targetId);
+        if (exists) {
+          removeMemory(targetId);
+          del(`/chat/memories/${targetId}`).catch(() => {});
+          del(`/knowledge/docs/memory:${targetId}`).catch(() => {});
+          deleted++;
+        }
+        continue;
+      }
+
+      if (action === "overwrite" && targetId && content) {
+        const exists = state.memories.find(m => m.id === targetId);
+        if (exists) {
+          updateMemory(targetId, { category: mem.category || exists.category, content });
+          patch(`/chat/memories/${targetId}`, { category: mem.category || exists.category, content }).catch(() => {});
+          indexMemoryInKnowledge({ id: targetId, category: mem.category || exists.category, content });
+          overwritten++;
+        }
+        continue;
+      }
+
+      // action === "add" (default)
       if (!content || isDuplicateMemory(content)) continue;
       const saved = addMemory({ category: mem.category || "general", content });
       post("/chat/memories", { id: saved.id, category: saved.category, content: saved.content }).catch(() => {});
@@ -318,14 +382,19 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const patch = normalizeProfilePatch(parsed.profile);
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
-    if (!silent && (added || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260817-58");
-      toast(t("已自动提�?{n} 条记�?, { n: added }) + (profileUpdated ? t("，并更新画像") : ""));
+    if (!silent && (added || overwritten || deleted || profileUpdated)) {
+      const { toast } = await import("../app.js?v=20260817-59");
+      let msg = "";
+      if (added) msg += t("新增 {n} 条", { n: added });
+      if (overwritten) msg += (msg ? "，" : "") + t("覆盖 {n} 条", { n: overwritten });
+      if (deleted) msg += (msg ? "，" : "") + t("删除 {n} 条", { n: deleted });
+      if (profileUpdated) msg += (msg ? "，" : "") + t("更新画像");
+      toast(msg || t("记忆已更新"));
     }
-    return { added, profileUpdated };
+    return { added, overwritten, deleted, profileUpdated };
   } catch (e) {
     console.warn("自动提炼记忆失败:", e);
-    return { added: 0, profileUpdated: false, error: e.message };
+    return { added: 0, overwritten: 0, deleted: 0, profileUpdated: false, error: e.message };
   } finally {
     autoRefineRunning = false;
   }
@@ -428,7 +497,7 @@ async function addKnowledgeDialog() {
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260817-58");
+    const { toast } = await import("../app.js?v=20260817-59");
     toast("知识已添�?);
     await loadKnowledgeDocs();
   }
@@ -582,7 +651,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260817-58").then(({ toast }) => toast("资料已保�?));
+    import("../app.js?v=20260817-59").then(({ toast }) => toast("资料已保�?));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗�?, { danger: true, okText: "重置" })) {

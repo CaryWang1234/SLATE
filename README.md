@@ -43,7 +43,7 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 - 👥 **AI Team Multi-Round Debate** — Multi-role propose/oppose/decide with light/heavy model division; plus DAG workflow pipeline; stop button for mid-debate interruption
 - ⏰ **Scheduled Chat Tasks** — Auto-execute preset prompts on schedule, results archived as separate sessions
 - 🧠 **Whiteboard Logic Chain** — Card + connector brainstorming, Mermaid-rendered flowcharts & mindmaps; auto-logs tool execution steps as colored status cards with arrow connections
-- 💾 **Long-Term Memory & Knowledge Base** — Auto-distill chat highlights, cross-session recall
+- 💾 **Long-Term Memory & Knowledge Base** — Auto-distill chat highlights, cross-session recall; **overwrite outdated memories and delete obsolete ones** via AI-driven add/overwrite/delete actions
 - 🗜️ **Smart Context Compression** — Auto-summarize over threshold, four-layer truncation defense with auto-continuation, four-layer timeout prevention
 - 🏭 **Prompt Factory** — Constitution + context + constraints integrated into a deliverable prompt
 - 🌍 **Multilingual UI** — Choose Simplified Chinese or English at install time; full interface and toast localization

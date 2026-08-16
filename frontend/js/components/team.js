@@ -2,15 +2,15 @@
  * SLATE AI 团队组件：多模型协作讨论
  * 轻量模型初步讨论 �?重型模型最终决�? */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260817-58";
-import { streamChat } from "../services/api.js?v=20260817-58";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260817-58";
-import { renderMarkdown } from "../services/markdown.js?v=20260817-58";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260817-58";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260817-58";
-import { getExpertsCached } from "./experts.js?v=20260817-58";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260817-58";
-import { t } from "../services/i18n.js?v=20260817-58";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260817-59";
+import { streamChat } from "../services/api.js?v=20260817-59";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260817-59";
+import { renderMarkdown } from "../services/markdown.js?v=20260817-59";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260817-59";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260817-59";
+import { getExpertsCached } from "./experts.js?v=20260817-59";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260817-59";
+import { t } from "../services/i18n.js?v=20260817-59";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项�?subscribe("modelRegistry", () => renderTeamMembers());
 
