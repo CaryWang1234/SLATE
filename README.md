@@ -10,6 +10,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-1a1a1a.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/Website-carywang1234.github.io%2FSLATE-1a1a1a.svg)](https://carywang1234.github.io/SLATE/docs/index.html)
+[![Guide](https://img.shields.io/badge/Guide-User%20Tutorial-d4a24e.svg)](https://carywang1234.github.io/SLATE/docs/guide.html)
 [![Python](https://img.shields.io/badge/Python-3.13%2B-1a1a1a.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-1a1a1a.svg)]()
 [![Build](https://img.shields.io/badge/Build-Zero%20npm%20%2F%20Zero%20Bundler-1a1a1a.svg)]()
@@ -230,6 +231,7 @@ SLATE/
 ├── SLATE.spec                  # PyInstaller config
 ├── SLATE_InnoSetup.iss         # Inno Setup installer script
 ├── README.md / README-zh.md    # Project docs (English / Chinese)
+├── GUIDE.md                    # Bilingual user guide (source)
 ├── QODER.md                    # Development specification
 ├── backend/
 │   ├── main.py                 # FastAPI entry (static serving + route registration + scheduler)
@@ -259,7 +261,8 @@ SLATE/
 │       └── services/           # api / adapter / tools / markdown / i18n / grind
 ├── docs/                       # Website Landing Page (GitHub Pages)
 │   ├── index.html              # English version
-│   └── zh/index.html           # Chinese version
+│   ├── zh/index.html           # Chinese version
+│   └── guide.html              # Bilingual tutorial (scroll-style)
 ├── installer/                  # Installer artifacts
 └── data/                       # Runtime data (SQLite / constitution / schedules / custom Skills / expert packs / grind sessions)
 ```

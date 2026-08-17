@@ -10,6 +10,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-1a1a1a.svg)](LICENSE)
 [![Website](https://img.shields.io/badge/Website-carywang1234.github.io%2FSLATE-1a1a1a.svg)](https://carywang1234.github.io/SLATE/docs/zh/index.html)
+[![Guide](https://img.shields.io/badge/%E6%95%99%E7%A8%8B-%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97-d4a24e.svg)](https://carywang1234.github.io/SLATE/docs/guide.html)
 [![Python](https://img.shields.io/badge/Python-3.13%2B-1a1a1a.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-1a1a1a.svg)]()
 [![Build](https://img.shields.io/badge/Build-Zero%20npm%20%2F%20Zero%20Bundler-1a1a1a.svg)]()
@@ -230,6 +231,7 @@ SLATE/
 ├── SLATE.spec                  # PyInstaller 配置
 ├── SLATE_InnoSetup.iss         # Inno Setup 安装包脚本
 ├── README.md / README-zh.md    # 项目说明（English / 中文）
+├── GUIDE.md                    # 双语使用教程（源文件）
 ├── QODER.md                    # 项目开发规格书
 ├── backend/
 │   ├── main.py                 # FastAPI 入口（静态服务 + 路由注册 + 调度器启动）
@@ -259,7 +261,8 @@ SLATE/
 │       └── services/           # api / adapter / tools / markdown / i18n / grind
 ├── docs/                       # 官网 Landing Page（GitHub Pages）
 │   ├── index.html              # 英文版
-│   └── zh/index.html           # 中文版
+│   ├── zh/index.html           # 中文版
+│   └── guide.html              # 双语文档（卷轴式教程）
 ├── installer/                  # 安装包产物
 └── data/                       # 运行数据（SQLite / 宪法 / 定时任务 / 自定义 Skill / 专家包 / 磨墨会话）
 ```

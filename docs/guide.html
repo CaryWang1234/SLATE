@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLATE · 使用教程 | User Guide</title>
+  <meta name="description" content="SLATE 完整使用教程：从安装到高级功能，卷轴式阅读体验。">
+  <link rel="icon" type="image/png" href="./icon.png">
+  <style>
+    /* ── 基础变量 ─────────────────────────── */
+    :root {
+      --bg: #0e0e0e;
+      --parchment: #1a1712;
+      --parchment-edge: #2a2318;
+      --ink: #e8dcc8;
+      --ink-dim: #a89878;
+      --ink-faint: #6a5a42;
+      --gold: #d4a24e;
+      --gold-soft: rgba(212,162,78,0.15);
+      --gold-glow: rgba(212,162,78,0.3);
+      --roller-dark: #3a2a18;
+      --roller-mid: #5a4228;
+      --roller-light: #7a5a38;
+      --roller-shine: #9a7a4a;
+      --mono: "Cascadia Code","JetBrains Mono",Consolas,"Courier New",monospace;
+      --ease-out: cubic-bezier(0.22,1,0.36,1);
+    }
+    body[data-theme="light"] {
+      --bg: #f6f5f2;
+      --parchment: #faf6ee;
+      --parchment-edge: #e8dcc8;
+      --ink: #2a2018;
+      --ink-dim: #5a4a32;
+      --ink-faint: #9a8a6a;
+      --gold: #a5762a;
+      --gold-soft: rgba(165,118,42,0.1);
+      --gold-glow: rgba(165,118,42,0.22);
+      --roller-dark: #8a6a3a;
+      --roller-mid: #a88a52;
+      --roller-light: #c8a86a;
+      --roller-shine: #d8c088;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+      line-height: 1.8;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--gold); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── 顶部导航 ─────────────────────────── */
+    .guide-nav {
+      position: fixed; top:0; left:0; right:0; z-index: 100;
+      background: color-mix(in srgb, var(--bg) 85%, transparent);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--gold-soft);
+      padding: 0 24px;
+      height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: background 0.3s;
+    }
+    .guide-nav-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 15px; font-weight: 600; color: var(--gold);
+    }
+    .guide-nav-brand img { width: 26px; height: 26px; border-radius: 6px; }
+    .guide-nav-actions { display: flex; gap: 8px; align-items: center; }
+    .nav-btn {
+      background: none; border: 1px solid var(--gold-soft);
+      color: var(--ink-dim); padding: 5px 14px; border-radius: 6px;
+      font-size: 12px; cursor: pointer; transition: all 0.2s;
+      font-family: inherit;
+    }
+    .nav-btn:hover { color: var(--gold); border-color: var(--gold); }
+    .nav-btn.active { color: var(--gold); border-color: var(--gold); background: var(--gold-soft); }
+
+    /* ── 卷轴容器 ─────────────────────────── */
+    .scroll-container {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 72px 20px 60px;
+      position: relative;
+    }
+
+    /* ── 卷轴辊（上下横轴） ─────────────── */
+    .scroll-roller {
+      height: 38px;
+      border-radius: 19px;
+      position: relative;
+      z-index: 10;
+      background: linear-gradient(180deg,
+        var(--roller-shine) 0%,
+        var(--roller-light) 18%,
+        var(--roller-mid) 40%,
+        var(--roller-dark) 70%,
+        var(--roller-mid) 88%,
+        var(--roller-shine) 100%
+      );
+      box-shadow:
+        0 4px 16px rgba(0,0,0,0.4),
+        inset 0 2px 4px rgba(255,255,255,0.15),
+        inset 0 -2px 4px rgba(0,0,0,0.3);
+    }
+    .scroll-roller::before,
+    .scroll-roller::after {
+      content: '';
+      position: absolute; top: 4px; bottom: 4px; width: 28px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at 40% 40%,
+        var(--roller-shine), var(--roller-dark) 70%);
+      box-shadow: inset 0 1px 3px rgba(255,255,255,0.2);
+    }
+    .scroll-roller::before { left: -8px; }
+    .scroll-roller::after { right: -8px; }
+    .roller-top { margin-bottom: 0; }
+    .roller-bottom { margin-top: 0; }
+
+    /* ── 卷轴纸面 ─────────────────────────── */
+    .scroll-body {
+      background: var(--parchment);
+      border-left: 3px solid var(--parchment-edge);
+      border-right: 3px solid var(--parchment-edge);
+      padding: 48px 56px;
+      position: relative;
+      box-shadow:
+        inset 4px 0 12px rgba(0,0,0,0.15),
+        inset -4px 0 12px rgba(0,0,0,0.15),
+        4px 0 20px rgba(0,0,0,0.2),
+        -4px 0 20px rgba(0,0,0,0.2);
+      /* 羊皮纸纹理 */
+      background-image:
+        radial-gradient(ellipse at 20% 50%, var(--gold-soft) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, var(--gold-soft) 0%, transparent 40%),
+        radial-gradient(ellipse at 60% 80%, var(--gold-soft) 0%, transparent 45%);
+    }
+    .scroll-body::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 38px,
+        var(--gold-soft) 38px,
+        var(--gold-soft) 39px
+      );
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    /* ── 卷轴展开动画 ─────────────────────── */
+    .scroll-section {
+      opacity: 0;
+      transform: translateY(30px) scaleY(0.95);
+      transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+      margin-bottom: 48px;
+    }
+    .scroll-section.unfurled {
+      opacity: 1;
+      transform: translateY(0) scaleY(1);
+    }
+
+    /* ── 内容排版 ─────────────────────────── */
+    .scroll-title {
+      text-align: center;
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--gold);
+      margin-bottom: 8px;
+      letter-spacing: 2px;
+    }
+    .scroll-subtitle {
+      text-align: center;
+      font-size: 14px;
+      color: var(--ink-faint);
+      margin-bottom: 40px;
+      font-style: italic;
+    }
+    .chapter-num {
+      display: inline-block;
+      width: 32px; height: 32px;
+      line-height: 32px;
+      text-align: center;
+      border-radius: 50%;
+      background: var(--gold-soft);
+      color: var(--gold);
+      font-size: 14px;
+      font-weight: 700;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+    .chapter-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--gold-soft);
+    }
+    .chapter-body { font-size: 15px; color: var(--ink-dim); }
+    .chapter-body p { margin-bottom: 12px; }
+    .chapter-body strong { color: var(--ink); }
+    .chapter-body ul, .chapter-body ol {
+      margin: 8px 0 16px 20px;
+    }
+    .chapter-body li { margin-bottom: 6px; }
+    .chapter-body code {
+      background: var(--gold-soft);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--gold);
+    }
+    .chapter-body pre {
+      background: color-mix(in srgb, var(--bg) 60%, var(--parchment));
+      border: 1px solid var(--gold-soft);
+      border-radius: 8px;
+      padding: 16px 20px;
+      overflow-x: auto;
+      margin: 12px 0 16px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink);
+    }
+
+    /* 表格 */
+    .ink-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 20px;
+      font-size: 14px;
+    }
+    .ink-table th {
+      background: var(--gold-soft);
+      color: var(--gold);
+      text-align: left;
+      padding: 8px 12px;
+      font-weight: 600;
+      border-bottom: 2px solid var(--gold-soft);
+    }
+    .ink-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--gold-soft);
+      color: var(--ink-dim);
+    }
+    .ink-table tr:hover td { background: var(--gold-soft); }
+
+    /* 双语切换 */
+    .lang-en { display: none; }
+    body[data-lang="en"] .lang-zh { display: none; }
+    body[data-lang="en"] .lang-en { display: block; }
+    body[data-lang="en"] span.lang-en { display: inline; }
+    body[data-lang="en"] span.lang-zh { display: none; }
+    body[data-lang="zh"] span.lang-en { display: none; }
+    body[data-lang="zh"] span.lang-zh { display: inline; }
+
+    /* 目录 */
+    .toc {
+      background: var(--gold-soft);
+      border: 1px solid var(--gold-soft);
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 40px;
+    }
+    .toc-title {
+      font-size: 16px; font-weight: 600;
+      color: var(--gold); margin-bottom: 12px;
+    }
+    .toc-list { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 24px; }
+    .toc-list li { margin-bottom: 6px; }
+    .toc-list a {
+      color: var(--ink-dim); font-size: 13px;
+      display: flex; align-items: center; gap: 6px;
+      transition: color 0.2s;
+    }
+    .toc-list a:hover { color: var(--gold); text-decoration: none; }
+    .toc-list a::before {
+      content: '◆'; font-size: 6px; color: var(--gold); opacity: 0.5;
+    }
+
+    /* 分隔线 */
+    .ink-divider {
+      text-align: center;
+      margin: 36px 0;
+      color: var(--ink-faint);
+      font-size: 18px;
+      letter-spacing: 12px;
+      opacity: 0.4;
+    }
+
+    /* 提示框 */
+    .ink-note {
+      background: var(--gold-soft);
+      border-left: 3px solid var(--gold);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0 16px;
+      font-size: 14px;
+      color: var(--ink-dim);
+    }
+    .ink-note strong { color: var(--gold); }
+
+    /* 进度指示 */
+    .scroll-progress-bar {
+      position: fixed; top: 52px; left: 0; right: 0;
+      height: 2px; z-index: 99; background: transparent;
+    }
+    .scroll-progress-bar span {
+      display: block; height: 100%; width: 0;
+      background: linear-gradient(90deg, transparent, var(--gold));
+      box-shadow: 0 0 8px var(--gold-glow);
+      transition: width 0.1s;
+    }
+
+    /* 底部 */
+    .scroll-footer {
+      text-align: center;
+      padding: 20px;
+      color: var(--ink-faint);
+      font-size: 13px;
+    }
+
+    /* ── 响应式 ─────────────────────────── */
+    @media (max-width: 768px) {
+      .scroll-body { padding: 32px 24px; }
+      .scroll-title { font-size: 24px; }
+      .chapter-title { font-size: 18px; }
+      .toc-list { columns: 1; }
+      .scroll-roller { height: 28px; border-radius: 14px; }
+      .scroll-roller::before, .scroll-roller::after { width: 20px; }
+    }
+  </style>
+</head>
+<body data-lang="zh">
+
+  <!-- 导航 -->
+  <nav class="guide-nav">
+    <a class="guide-nav-brand" href="./index.html">
+      <img src="./icon.png" alt="SLATE">
+      <span>SLATE · <span class="lang-zh">教程</span><span class="lang-en">Guide</span></span>
+    </a>
+    <div class="guide-nav-actions">
+      <button class="nav-btn" id="btn-lang" onclick="toggleLang()">EN / 中</button>
+      <button class="nav-btn" id="btn-theme" onclick="toggleTheme()">☀</button>
+      <a class="nav-btn" href="./index.html"><span class="lang-zh">首页</span><span class="lang-en">Home</span></a>
+    </div>
+  </nav>
+
+  <!-- 阅读进度 -->
+  <div class="scroll-progress-bar"><span id="progress-fill"></span></div>
+
+  <!-- 卷轴 -->
+  <div class="scroll-container">
+
+    <!-- 上辊 -->
+    <div class="scroll-roller roller-top"></div>
+
+    <!-- 纸面 -->
+    <div class="scroll-body">
+
+      <!-- 标题 -->
+      <div class="scroll-section">
+        <h1 class="scroll-title">
+          <span class="lang-zh">📜 SLATE（砚）使用教程</span>
+          <span class="lang-en">📜 SLATE User Guide</span>
+        </h1>
+        <p class="scroll-subtitle">
+          <span class="lang-zh">从安装到精通，卷轴式阅读体验</span>
+          <span class="lang-en">From installation to mastery, a scroll-style reading experience</span>
+        </p>
+      </div>
+
+      <!-- 目录 -->
+      <div class="scroll-section toc">
+        <div class="toc-title">
+          <span class="lang-zh">📑 目录</span>
+          <span class="lang-en">📑 Table of Contents</span>
+        </div>
+        <ol class="toc-list">
+          <li><a href="#ch1"><span class="lang-zh">SLATE 是什么</span><span class="lang-en">What is SLATE?</span></a></li>
+          <li><a href="#ch2"><span class="lang-zh">安装与启动</span><span class="lang-en">Installation</span></a></li>
+          <li><a href="#ch3"><span class="lang-zh">多模型对话</span><span class="lang-en">Multi-Model Chat</span></a></li>
+          <li><a href="#ch4"><span class="lang-zh">Harness 自主执行</span><span class="lang-en">Harness Mode</span></a></li>
+          <li><a href="#ch5"><span class="lang-zh">磨墨模式</span><span class="lang-en">Grind Mode</span></a></li>
+          <li><a href="#ch6"><span class="lang-zh">团队模式</span><span class="lang-en">Team Mode</span></a></li>
+          <li><a href="#ch7"><span class="lang-zh">白板逻辑链</span><span class="lang-en">Whiteboard</span></a></li>
+          <li><a href="#ch8"><span class="lang-zh">MCP 工具箱</span><span class="lang-en">MCP Toolbox</span></a></li>
+          <li><a href="#ch9"><span class="lang-zh">专家包</span><span class="lang-en">Expert Packs</span></a></li>
+          <li><a href="#ch10"><span class="lang-zh">工作流模板</span><span class="lang-en">Workflows</span></a></li>
+          <li><a href="#ch11"><span class="lang-zh">知识库与灵光</span><span class="lang-en">Knowledge & Sparks</span></a></li>
+          <li><a href="#ch12"><span class="lang-zh">Code Review</span><span class="lang-en">Code Review</span></a></li>
+          <li><a href="#ch13"><span class="lang-zh">语音输入</span><span class="lang-en">Voice Input</span></a></li>
+          <li><a href="#ch14"><span class="lang-zh">截图转代码</span><span class="lang-en">Screenshot to Code</span></a></li>
+          <li><a href="#ch15"><span class="lang-zh">定时任务</span><span class="lang-en">Scheduled Tasks</span></a></li>
+          <li><a href="#ch16"><span class="lang-zh">设置与个性化</span><span class="lang-en">Settings</span></a></li>
+        </ol>
+      </div>
+
+      <div class="ink-divider">◈ ◈ ◈</div>
+
+      <!-- Ch1 -->
+      <div class="scroll-section" id="ch1">
+        <div class="chapter-title"><span class="chapter-num">1</span>
+          <span class="lang-zh">SLATE 是什么？</span><span class="lang-en">What is SLATE?</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>SLATE（砚）是一款<strong>本地优先</strong>的 AI 协作调度台。它把主流大模型、26 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。</p>
+            <div class="ink-note"><strong>核心理念：</strong>让灵感直达行动，中间不隔工具摩擦。</div>
+          </div>
+          <div class="lang-en">
+            <p>SLATE is a <strong>local-first</strong> AI collaboration studio. It integrates mainstream LLMs, 26 built-in tools, team debates, DAG workflows, and whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.</p>
+            <div class="ink-note"><strong>Core philosophy:</strong> Let ideas go straight to action, without tool friction in between.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ch2 -->
+      <div class="scroll-section" id="ch2">
+        <div class="chapter-title"><span class="chapter-num">2</span>
+          <span class="lang-zh">安装与启动</span><span class="lang-en">Installation & Quick Start</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p><strong>方式一：安装包（推荐）</strong></p>
+            <p>前往 <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank">GitHub Releases</a> 下载 <code>SLATE-Setup-x.x.x.exe</code>，双击安装即可。</p>
+            <p><strong>方式二：源码运行</strong></p>
+            <pre>git clone https://github.com/CaryWang1234/SLATE.git
+cd SLATE
+pip install -r requirements.txt
+python desktop.py</pre>
+            <p>启动后浏览器自动打开 <code>http://localhost:8630</code>。</p>
+            <p><strong>首次配置：</strong></p>
+            <ol>
+              <li>点击左下角 <strong>设置 ⚙</strong></li>
+              <li>在「模型」栏添加 API Key（支持 OpenAI / Claude / Gemini / DeepSeek / 自定义端点）</li>
+              <li>选择默认模型，即可开始对话</li>
+            </ol>
+          </div>
+          <div class="lang-en">
+            <p><strong>Option A: Installer (Recommended)</strong></p>
+            <p>Download <code>SLATE-Setup-x.x.x.exe</code> from <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank">GitHub Releases</a> and run the installer.</p>
+            <p><strong>Option B: From Source</strong></p>
+            <pre>git clone https://github.com/CaryWang1234/SLATE.git
+cd SLATE
+pip install -r requirements.txt
+python desktop.py</pre>
+            <p>Browser opens <code>http://localhost:8630</code> automatically.</p>
+            <p><strong>First-Time Setup:</strong></p>
+            <ol>
+              <li>Click <strong>Settings ⚙</strong> (bottom-left)</li>
+              <li>Add your API Key (OpenAI / Claude / Gemini / DeepSeek / custom endpoints)</li>
+              <li>Select a default model and start chatting</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div class="ink-divider">◈ ◇ ◈</div>
+
+      <!-- Ch3 -->
+      <div class="scroll-section" id="ch3">
+        <div class="chapter-title"><span class="chapter-num">3</span>
+          <span class="lang-zh">多模型对话</span><span class="lang-en">Multi-Model Chat</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>SLATE 支持同时接入多个模型，在对话界面顶部下拉框随时切换。</p>
+            <ul>
+              <li>点击模型下拉框 → 添加/切换模型</li>
+              <li>不同对话可使用不同模型</li>
+              <li>支持本地模型（Ollama / LM Studio 的 OpenAI 兼容端点）</li>
+              <li>每条回复显示模型名称与 Token 用量</li>
+            </ul>
+            <div class="ink-note"><strong>快捷键：</strong>Enter 发送 · Shift+Enter 换行 · Ctrl+N 新建对话</div>
+          </div>
+          <div class="lang-en">
+            <p>SLATE supports multiple models simultaneously — switch anytime from the top dropdown.</p>
+            <ul>
+              <li>Click model dropdown → Add/switch models</li>
+              <li>Different conversations can use different models</li>
+              <li>Supports local models (Ollama / LM Studio via OpenAI-compatible endpoints)</li>
+              <li>Each reply shows model name and token usage</li>
+            </ul>
+            <div class="ink-note"><strong>Shortcuts:</strong> Enter to send · Shift+Enter for newline · Ctrl+N for new conversation</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ch4 -->
+      <div class="scroll-section" id="ch4">
+        <div class="chapter-title"><span class="chapter-num">4</span>
+          <span class="lang-zh">Harness 自主执行</span><span class="lang-en">Harness Autonomous Execution</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模型自主规划、调用工具、多轮执行直至完成。</p>
+            <p><strong>启动方式：</strong>点击顶栏 🚀 按钮，或在消息中提及「用 Harness 执行」</p>
+            <p><strong>六阶段流程：</strong></p>
+            <ol>
+              <li><strong>目标理解</strong> → 解析你的需求</li>
+              <li><strong>计划制定</strong> → 拆解为可执行步骤</li>
+              <li><strong>工具执行</strong> → 自主调用文件/终端/搜索等工具</li>
+              <li><strong>验证检查</strong> → 确认每步结果</li>
+              <li><strong>汇报总结</strong> → 输出执行报告</li>
+              <li><strong>追溯归档</strong> → 记录到 TODOLIST</li>
+            </ol>
+            <div class="ink-note"><strong>特性：</strong>最多 50 轮自主调用 · 中途可暂停不丢进度 · 自动建立 TODOLIST · 异常自动恢复</div>
+          </div>
+          <div class="lang-en">
+            <p>Harness is SLATE's "autopilot" — state your goal, and the model autonomously plans, calls tools, and executes until done.</p>
+            <p><strong>Launch:</strong> Click 🚀 button, or mention "use Harness" in your message.</p>
+            <p><strong>Six-Phase Flow:</strong></p>
+            <ol>
+              <li><strong>Goal Understanding</strong> → Parse requirements</li>
+              <li><strong>Plan Creation</strong> → Break into steps</li>
+              <li><strong>Tool Execution</strong> → Autonomously call tools</li>
+              <li><strong>Verification</strong> → Confirm each result</li>
+              <li><strong>Report</strong> → Output summary</li>
+              <li><strong>Trace</strong> → Log to TODOLIST</li>
+            </ol>
+            <div class="ink-note"><strong>Features:</strong> Up to 50 rounds · Pause anytime · Auto TODOLIST · Auto-recovery</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ink-divider">◈ ◈ ◈</div>
+
+      <!-- Ch5 -->
+      <div class="scroll-section" id="ch5">
+        <div class="chapter-title"><span class="chapter-num">5</span>
+          <span class="lang-zh">磨墨模式</span><span class="lang-en">Grind Mode</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>把粗糙想法研磨成结构化任务书（墨稿）的交互式引导。</p>
+            <p><strong>启动：</strong>输入 <code>/grind 你的想法</code> 或点击 🖌 按钮。输入抽象任务（如"制作一个网站"）时<strong>自动建议切换</strong>。</p>
+            <table class="ink-table">
+              <tr><th>阶段</th><th>说明</th></tr>
+              <tr><td>接墨</td><td>AI 复述想法，列出 3-5 个缺口，只问第一个</td></tr>
+              <tr><td>磨墨</td><td>逐轮追问，一次一问，选择题优先（最多 10 轮）</td></tr>
+              <tr><td>收墨</td><td>输出结构化 JSON 墨稿，含目标/交付物/验收标准</td></tr>
+            </table>
+            <p><strong>收墨触发：</strong>输入「收墨」「够了」「就这样」或达到轮数上限</p>
+            <p><strong>墨稿三键：</strong>送入 Harness 执行 / 投到白板推演 / 存为模板复用</p>
+          </div>
+          <div class="lang-en">
+            <p>Interactive refinement: turn rough ideas into structured task briefs.</p>
+            <p><strong>Launch:</strong> Type <code>/grind your idea</code> or click 🖌. Auto-suggests when detecting abstract tasks.</p>
+            <table class="ink-table">
+              <tr><th>Phase</th><th>Description</th></tr>
+              <tr><td>Receive</td><td>AI restates idea, lists 3-5 gaps, asks only the first</td></tr>
+              <tr><td>Grind</td><td>Round-by-round, one question at a time, A/B choices preferred (up to 10 rounds)</td></tr>
+              <tr><td>Collect</td><td>Outputs structured JSON brief with goals/deliverables/acceptance</td></tr>
+            </table>
+            <p><strong>Trigger Collect:</strong> Type "收墨" / "够了" / "就这样" or reach round limit</p>
+            <p><strong>Three Actions:</strong> Send to Harness / Push to Whiteboard / Save as Template</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ch6 -->
+      <div class="scroll-section" id="ch6">
+        <div class="chapter-title"><span class="chapter-num">6</span>
+          <span class="lang-zh">团队模式</span><span class="lang-en">Team Mode</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>多个 AI 角色围绕你的问题进行多轮辩论，最终输出共识结论。</p>
+            <ol>
+              <li>点击顶栏「团队」标签</li>
+              <li>选择团队成员（9 种预设组合或自定义）</li>
+              <li>输入问题 → 各成员按角色依次发表观点（3 轮辩论）</li>
+              <li>输出共识总结</li>
+            </ol>
+            <p><strong>自定义团队：</strong>设置 → 团队管理 → 添加/编辑成员，每个成员可指定模型、角色、人设。</p>
+          </div>
+          <div class="lang-en">
+            <p>Multiple AI roles debate your question across rounds, producing a consensus conclusion.</p>
+            <ol>
+              <li>Click "Team" tab</li>
+              <li>Select members (9 presets or custom)</li>
+              <li>Enter question → Members speak in role order (3 rounds)</li>
+              <li>Consensus summary output</li>
+            </ol>
+            <p><strong>Custom Teams:</strong> Settings → Team Management → Add/Edit members with model, role, persona.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ink-divider">◇ ◈ ◇</div>
+
+      <!-- Ch7 -->
+      <div class="scroll-section" id="ch7">
+        <div class="chapter-title"><span class="chapter-num">7</span>
+          <span class="lang-zh">白板逻辑链</span><span class="lang-en">Whiteboard Logic Chain</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>可视化的卡片 + 连线系统，用于梳理思路、推演方案。</p>
+            <ul>
+              <li>点击「黑板」标签进入</li>
+              <li>AI 可自动创建卡片（分析结果、方案对比等）</li>
+              <li>手动拖拽卡片、建立连线</li>
+              <li>4 种 AI 白板工具：<code>card_create</code> · <code>card_edit</code> · <code>arrow_create</code> · <code>board_summarize</code></li>
+            </ul>
+          </div>
+          <div class="lang-en">
+            <p>Visual cards + connections system for reasoning and planning.</p>
+            <ul>
+              <li>Click "Whiteboard" tab to enter</li>
+              <li>AI auto-creates cards (analysis, comparisons)</li>
+              <li>Drag cards, create connections manually</li>
+              <li>4 AI tools: <code>card_create</code> · <code>card_edit</code> · <code>arrow_create</code> · <code>board_summarize</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ch8 -->
+      <div class="scroll-section" id="ch8">
+        <div class="chapter-title"><span class="chapter-num">8</span>
+          <span class="lang-zh">MCP 工具箱（26 个）</span><span class="lang-en">MCP Toolbox (26 Tools)</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>模型在对话中自主决定何时使用，直接描述需求或 <code>@工具名</code> 显式调用。</p>
+            <table class="ink-table">
+              <tr><th>类别</th><th>工具</th></tr>
+              <tr><td>文件操作</td><td><code>file_tree</code> <code>file_peek</code> <code>file_create</code> <code>file_edit</code> <code>file_append</code></td></tr>
+              <tr><td>终端</td><td><code>terminal</code>（沙箱执行，高危需审批）</td></tr>
+              <tr><td>文档生成</td><td><code>doc_write</code> <code>ppt_create</code> <code>word_create</code> <code>html_render</code> <code>html_bundle</code></td></tr>
+              <tr><td>数据处理</td><td><code>json_tool</code> <code>regex_test</code> <code>text_summarize</code> <code>chart_create</code> <code>qrcode_create</code></td></tr>
+              <tr><td>网络</td><td><code>web_search</code> <code>web_fetch</code></td></tr>
+              <tr><td>代码</td><td><code>code_scan</code> <code>repo_stats</code> <code>todo_scan</code> <code>python_api_extract</code></td></tr>
+              <tr><td>自动化</td><td><code>browser_automation</code> <code>computer_use</code> <code>screenshot_to_code</code></td></tr>
+              <tr><td>扩展</td><td><code>mcp_factory</code>（动态注册外部工具）</td></tr>
+            </table>
+          </div>
+          <div class="lang-en">
+            <p>The model decides when to use them. Describe your need or call <code>@tool_name</code> explicitly.</p>
+            <table class="ink-table">
+              <tr><th>Category</th><th>Tools</th></tr>
+              <tr><td>File Ops</td><td><code>file_tree</code> <code>file_peek</code> <code>file_create</code> <code>file_edit</code> <code>file_append</code></td></tr>
+              <tr><td>Terminal</td><td><code>terminal</code> (sandbox, high-risk needs approval)</td></tr>
+              <tr><td>Doc Gen</td><td><code>doc_write</code> <code>ppt_create</code> <code>word_create</code> <code>html_render</code> <code>html_bundle</code></td></tr>
+              <tr><td>Data</td><td><code>json_tool</code> <code>regex_test</code> <code>text_summarize</code> <code>chart_create</code> <code>qrcode_create</code></td></tr>
+              <tr><td>Web</td><td><code>web_search</code> <code>web_fetch</code></td></tr>
+              <tr><td>Code</td><td><code>code_scan</code> <code>repo_stats</code> <code>todo_scan</code> <code>python_api_extract</code></td></tr>
+              <tr><td>Automation</td><td><code>browser_automation</code> <code>computer_use</code> <code>screenshot_to_code</code></td></tr>
+              <tr><td>Extension</td><td><code>mcp_factory</code> (register external tools)</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="ink-divider">◈ ◇ ◈</div>
+
+      <!-- Ch9 -->
+      <div class="scroll-section" id="ch9">
+        <div class="chapter-title"><span class="chapter-num">9</span>
+          <span class="lang-zh">专家包</span><span class="lang-en">Expert Packs</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>预制的角色知识包，让 AI 以特定专家身份回答。</p>
+            <ul>
+              <li>对话界面左侧「专家」下拉框选择</li>
+              <li>设置 → 专家包管理 → 导入 <code>.zip</code> / 导出</li>
+              <li>结构：<code>persona.md</code>（人设）+ <code>rules.md</code>（规则）+ <code>knowledge/</code> + <code>skills/</code></li>
+            </ul>
+          </div>
+          <div class="lang-en">
+            <p>Pre-built role knowledge packages for expert-persona responses.</p>
+            <ul>
+              <li>Select from "Expert" dropdown on the left</li>
+              <li>Settings → Expert Pack → Import/Export <code>.zip</code></li>
+              <li>Structure: <code>persona.md</code> + <code>rules.md</code> + <code>knowledge/</code> + <code>skills/</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ch10 -->
+      <div class="scroll-section" id="ch10">
+        <div class="chapter-title"><span class="chapter-num">10</span>
+          <span class="lang-zh">工作流模板</span><span class="lang-en">Workflow Templates</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>预定义的 DAG 工作流，多节点并行执行复杂任务。内置 8 个模板：</p>
+            <table class="ink-table">
+              <tr><th>模板</th><th>用途</th></tr>
+              <tr><td>默认开发流程</td><td>通用开发任务</td></tr>
+              <tr><td>并行研究流程</td><td>多维度并行调研</td></tr>
+              <tr><td>Bug 排查流程</td><td>日志/代码/环境并行分析</td></tr>
+              <tr><td>代码审查流程</td><td>质量/安全/性能并行审查</td></tr>
+              <tr><td>数据分析流程</td><td>趋势/异常/统计并行分析</td></tr>
+              <tr><td>文档生成流程</td><td>大纲→正文→摘要→整合</td></tr>
+              <tr><td>产品需求流程</td><td>想法→用户故事→功能→PRD</td></tr>
+              <tr><td>研究报告流程</td><td>课题→调研→方案→报告</td></tr>
+            </table>
+            <p>团队面板 → 工作流 → 导入/导出/删除自定义模板</p>
+          </div>
+          <div class="lang-en">
+            <p>Pre-defined DAG workflows for multi-node parallel execution. 8 built-in templates:</p>
+            <table class="ink-table">
+              <tr><th>Template</th><th>Purpose</th></tr>
+              <tr><td>Default Dev Flow</td><td>General development tasks</td></tr>
+              <tr><td>Parallel Research</td><td>Multi-dimensional parallel research</td></tr>
+              <tr><td>Bug Investigation</td><td>Parallel log/code/env analysis</td></tr>
+              <tr><td>Code Review</td><td>Parallel quality/security/performance review</td></tr>
+              <tr><td>Data Analysis</td><td>Parallel trend/anomaly/stats analysis</td></tr>
+              <tr><td>Doc Generation</td><td>Outline → Content → Summary → Integration</td></tr>
+              <tr><td>Product Requirements</td><td>Idea → User stories → Features → PRD</td></tr>
+              <tr><td>Research Report</td><td>Topic → Research → Comparison → Report</td></tr>
+            </table>
+            <p>Team Panel → Workflows → Import/Export/Delete custom templates</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ink-divider">◈ ◈ ◈</div>
+
+      <!-- Ch11 -->
+      <div class="scroll-section" id="ch11">
+        <div class="chapter-title"><span class="chapter-num">11</span>
+          <span class="lang-zh">知识库与灵光</span><span class="lang-en">Knowledge Base & Sparks</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p><strong>知识库：</strong>长期存储项目知识，对话时自动注入相关上下文。设置 → 记忆与画 → 知识库标签，支持 Markdown。</p>
+            <p><strong>灵光（Spark）：</strong>对话结束时自动捕获有价值的技术洞察，确认后存入知识库，无需手动操作。</p>
+          </div>
+          <div class="lang-en">
+            <p><strong>Knowledge Base:</strong> Long-term project knowledge storage, auto-injected into conversations. Settings → Memory → Knowledge tab. Markdown supported.</p>
+            <p><strong>Sparks:</strong> Auto-captures valuable technical insights when conversations end. Confirms and stores automatically.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ch12 -->
+      <div class="scroll-section" id="ch12">
+        <div class="chapter-title"><span class="chapter-num">12</span>
+          <span class="lang-zh">Code Review</span><span class="lang-en">Code Review</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>对 Git 仓库变更进行 AI 四维度结构化审查。</p>
+            <ol>
+              <li>设置 → Code Review → 选择仓库路径</li>
+              <li>AI 读取 <code>git diff</code> → 分析代码质量/安全性/性能/可维护性</li>
+              <li>输出行级评论 + 汇总报告</li>
+            </ol>
+          </div>
+          <div class="lang-en">
+            <p>AI-powered four-dimensional structured review of Git changes.</p>
+            <ol>
+              <li>Settings → Code Review → Select repository path</li>
+              <li>AI reads <code>git diff</code> → Analyzes quality/security/performance/maintainability</li>
+              <li>Outputs line-level comments + summary report</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div class="ink-divider">◇ ◈ ◇</div>
+
+      <!-- Ch13 -->
+      <div class="scroll-section" id="ch13">
+        <div class="chapter-title"><span class="chapter-num">13</span>
+          <span class="lang-zh">语音输入</span><span class="lang-en">Voice Input</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>点击输入框旁的 🎤 按钮，说出想法，实时转写到输入框。支持中英文自动检测。需浏览器支持 Web Speech API（Chrome / Edge 已支持）。</p>
+          </div>
+          <div class="lang-en">
+            <p>Click 🎤 button next to the input box, speak your idea, real-time transcription appears. Auto-detects Chinese and English. Requires Web Speech API (Chrome / Edge supported).</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ch14 -->
+      <div class="scroll-section" id="ch14">
+        <div class="chapter-title"><span class="chapter-num">14</span>
+          <span class="lang-zh">截图转代码</span><span class="lang-en">Screenshot to Code</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>将截图还原为 HTML/CSS 代码。在对话中描述「把截图转成代码」或 <code>@screenshot_to_code</code> 指定图片路径。</p>
+            <p><strong>支持格式：</strong>PNG / JPG / JPEG / GIF / WebP / BMP / SVG（≤10MB）</p>
+          </div>
+          <div class="lang-en">
+            <p>Convert screenshots to HTML/CSS code. Describe "convert screenshot to code" or use <code>@screenshot_to_code</code> with image path.</p>
+            <p><strong>Formats:</strong> PNG / JPG / JPEG / GIF / WebP / BMP / SVG (≤10MB)</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ink-divider">◈ ◇ ◈</div>
+
+      <!-- Ch15 -->
+      <div class="scroll-section" id="ch15">
+        <div class="chapter-title"><span class="chapter-num">15</span>
+          <span class="lang-zh">定时任务</span><span class="lang-en">Scheduled Tasks</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>点击顶栏 ⏰ 按钮，新建任务 → 设置名称、触发条件（定时/事件）、执行内容。支持 Cron 表达式。</p>
+            <ul>
+              <li><strong>定时触发：</strong>每隔 N 分钟/小时/天</li>
+              <li><strong>事件触发：</strong>文件变更、对话结束等</li>
+            </ul>
+          </div>
+          <div class="lang-en">
+            <p>Click ⏰ button, create task → Set name, trigger (schedule/event), execution content. Supports Cron expressions.</p>
+            <ul>
+              <li><strong>Schedule:</strong> Every N minutes/hours/days</li>
+              <li><strong>Event:</strong> File changes, conversation end, etc.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ch16 -->
+      <div class="scroll-section" id="ch16">
+        <div class="chapter-title"><span class="chapter-num">16</span>
+          <span class="lang-zh">设置与个性化</span><span class="lang-en">Settings & Customization</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <table class="ink-table">
+              <tr><th>设置项</th><th>说明</th></tr>
+              <tr><td>模型管理</td><td>添加/删除 API Key，配置自定义端点</td></tr>
+              <tr><td>输出控制</td><td>最大 Token 数、流式输出开关</td></tr>
+              <tr><td>安全模式</td><td>高危命令审批策略</td></tr>
+              <tr><td>主题</td><td>深色/浅色切换</td></tr>
+              <tr><td>语言</td><td>中文 / English</td></tr>
+              <tr><td>上下文压缩</td><td>自动/手动压缩历史对话</td></tr>
+              <tr><td>短回复审阅</td><td>模型回复后自动检查是否需要推进</td></tr>
+            </table>
+          </div>
+          <div class="lang-en">
+            <table class="ink-table">
+              <tr><th>Setting</th><th>Description</th></tr>
+              <tr><td>Model Management</td><td>Add/remove API keys, configure custom endpoints</td></tr>
+              <tr><td>Output Control</td><td>Max tokens, streaming toggle</td></tr>
+              <tr><td>Safety Mode</td><td>High-risk command approval policy</td></tr>
+              <tr><td>Theme</td><td>Dark/Light toggle</td></tr>
+              <tr><td>Language</td><td>Chinese / English</td></tr>
+              <tr><td>Context Compression</td><td>Auto/manual history compression</td></tr>
+              <tr><td>Short Reply Review</td><td>Auto-check if reply needs follow-up</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="ink-divider">◈ ◈ ◈</div>
+
+      <!-- 尾声 -->
+      <div class="scroll-section" style="text-align:center; padding: 20px 0;">
+        <p style="font-size:18px; color:var(--gold); font-weight:600;">
+          <span class="lang-zh">砚落成墨，灵感成行。</span>
+          <span class="lang-en">Ink meets paper, ideas become code.</span>
+        </p>
+        <p style="font-size:13px; color:var(--ink-faint); margin-top:8px;">
+          <a href="https://github.com/CaryWang1234/SLATE" target="_blank">GitHub</a> · 
+          <a href="./index.html"><span class="lang-zh">首页</span><span class="lang-en">Home</span></a> · 
+          <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank"><span class="lang-zh">下载</span><span class="lang-en">Download</span></a>
+        </p>
+      </div>
+
+    </div><!-- /scroll-body -->
+
+    <!-- 下辊 -->
+    <div class="scroll-roller roller-bottom"></div>
+
+  </div><!-- /scroll-container -->
+
+  <div class="scroll-footer">
+    SLATE · <span class="lang-zh">砚</span><span class="lang-en">Local AI Collaboration Studio</span> · 
+    <a href="https://github.com/CaryWang1234/SLATE" target="_blank">GitHub</a>
+  </div>
+
+  <script>
+    // ── 卷轴展开动画 ────────────────────────
+    const sections = document.querySelectorAll('.scroll-section');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('unfurled');
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    sections.forEach(s => observer.observe(s));
+
+    // ── 阅读进度条 ──────────────────────────
+    const progressFill = document.getElementById('progress-fill');
+    window.addEventListener('scroll', () => {
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = h > 0 ? (window.scrollY / h) * 100 : 0;
+      progressFill.style.width = pct + '%';
+    });
+
+    // ── 语言切换 ────────────────────────────
+    function toggleLang() {
+      const body = document.body;
+      const next = body.getAttribute('data-lang') === 'zh' ? 'en' : 'zh';
+      body.setAttribute('data-lang', next);
+      document.getElementById('btn-lang').classList.toggle('active', next === 'en');
+      try { localStorage.setItem('slate-guide-lang', next); } catch(e) {}
+    }
+    // 恢复上次语言选择
+    try {
+      const saved = localStorage.getItem('slate-guide-lang');
+      if (saved) {
+        document.body.setAttribute('data-lang', saved);
+        document.getElementById('btn-lang')?.classList.toggle('active', saved === 'en');
+      }
+    } catch(e) {}
+
+    // ── 主题切换 ────────────────────────────
+    function toggleTheme() {
+      const body = document.body;
+      const isLight = body.getAttribute('data-theme') === 'light';
+      body.setAttribute('data-theme', isLight ? 'dark' : 'light');
+      document.getElementById('btn-theme').textContent = isLight ? '☀' : '☾';
+      try { localStorage.setItem('slate-guide-theme', isLight ? 'dark' : 'light'); } catch(e) {}
+    }
+    try {
+      const savedTheme = localStorage.getItem('slate-guide-theme');
+      if (savedTheme) {
+        document.body.setAttribute('data-theme', savedTheme);
+        document.getElementById('btn-theme').textContent = savedTheme === 'light' ? '☾' : '☀';
+      }
+    } catch(e) {}
+  </script>
+</body>
+</html>
