@@ -52,6 +52,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "mcp_factory": "MCP 工厂：根据描述自动生成新的 MCP 工具，让 SLATE 自生产适配自身的工具",
     "browser_automation": "浏览器自动化：基于 Playwright 控制 Chromium 浏览器（导航/截图/点击/输入/执行JS）",
     "computer_use": "桌面自动化：基于 pyautogui 控制鼠标键盘（截图/点击/输入/组合键/图像定位）",
+    "screenshot_to_code": "截图转代码：读取图片编码为 base64，AI 视觉分析生成 HTML/CSS 还原截图内容",
 }
 
 

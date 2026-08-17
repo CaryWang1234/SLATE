@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE · Local AI Collaboration Studio</title>
-  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Harness autonomous execution, Grind Mode, 25 MCP tools, Expert Packs, AI team debates & DAG workflows, Code Review, whiteboard logic chains, full sandbox security. Open source, install and use.">
+  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Harness autonomous execution, Grind Mode, 26 MCP tools, Expert Packs, AI team debates & 8 DAG workflow templates, Code Review, voice input, whiteboard logic chains, full sandbox security. Open source, install and use.">
   <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -207,13 +207,13 @@
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🖌️</div>
           <div class="feature-name">Grind Mode</div>
-          <div class="feature-desc">Type /grind with a rough idea, AI follows a three-phase questioning process (Receive → Grind → Collect, up to 7 rounds) to refine it into a structured task brief with goals, deliverables, and acceptance criteria. The ink panel tracks resolved vs. unknown items in real-time.</div>
+          <div class="feature-desc">Type /grind with a rough idea, AI follows a three-phase questioning process (Receive → Grind → Collect, up to 10 rounds) to refine it into a structured task brief with goals, deliverables, and acceptance criteria. The ink panel tracks resolved vs. unknown items in real-time.</div>
           <div class="feature-plain">Put "I have a vague idea" into the inkstone — what comes out is a clear task specification.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🛠️</div>
-          <div class="feature-name">25 Built-in MCP Tools</div>
-          <div class="feature-desc">File read/write/edit/append, terminal sandbox, PPT / Word generation, SVG charts & QR codes, repo stats, regex testing, text summarization, web search & page scraping, code review, browser & desktop automation — @mention in chat to use, model autonomously calls and displays results. Charts and QR codes render inline.</div>
+          <div class="feature-name">26 Built-in MCP Tools</div>
+          <div class="feature-desc">File read/write/edit/append, terminal sandbox, PPT / Word generation, SVG charts & QR codes, repo stats, regex testing, text summarization, web search & page scraping, screenshot-to-code, browser & desktop automation — @mention in chat to use, model autonomously calls and displays results. Charts and QR codes render inline.</div>
           <div class="feature-plain">MCP is "AI's standard socket" — plug in tools and it doesn't just talk, it acts.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -441,7 +441,7 @@
     <div class="container">
       <div class="reveal">
         <div class="section-tag">Built-in Tools</div>
-        <h2 class="section-title">25 Built-in MCP Tools</h2>
+        <h2 class="section-title">26 Built-in MCP Tools</h2>
         <p class="section-desc">MCP (Model Context Protocol) can be understood as "AI's standard socket": tools connect via a unified interface, and the model autonomously decides when to use them. All tools below are implemented in Python at backend/skills/, ready out of the box.</p>
         <p class="section-note">Usage is simple: <strong>@tool-name</strong> in chat, or just describe what you need — the model picks the right tool and shows you the results.</p>
       </div>
@@ -472,6 +472,7 @@
         <div class="tool-item reveal" data-stagger><code>mcp_factory</code><span>Self-producing new MCP tools from descriptions</span></div>
         <div class="tool-item reveal" data-stagger><code>browser_automation</code><span>Chromium automation — navigate, screenshot, click, type</span></div>
         <div class="tool-item reveal" data-stagger><code>computer_use</code><span>Desktop automation — mouse, keyboard, screenshot, OCR</span></div>
+        <div class="tool-item reveal" data-stagger><code>screenshot_to_code</code><span>Screenshot to code — AI reads image, generates HTML/CSS</span></div>
       </div>
     </div>
   </section>

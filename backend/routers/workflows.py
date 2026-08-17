@@ -8,6 +8,8 @@ id、name、description、nodes（DAG 节点）、edges（依赖边）。
 from __future__ import annotations
 
 import json
+import os
+import re
 import sys
 from collections import deque
 from pathlib import Path
@@ -149,4 +151,59 @@ async def get_workflow(workflow_id: str) -> dict[str, Any]:
             workflow = json.loads(path.read_text(encoding="utf-8"))
             workflow["order"] = entry["order"]
             return {"code": 0, "data": workflow, "message": "ok"}
+    return {"code": -1, "data": None, "message": f"工作流不存在: {workflow_id}"}
+
+
+# ── 工作流管理（导入 / 导出 / 删除）────────────────────
+
+# 内置工作流 ID 集合（不可删除）
+_BUILTIN_IDS = {"default-dev-flow", "parallel-research"}
+
+
+@router.post("/import")
+async def import_workflow(body: dict[str, Any]) -> dict[str, Any]:
+    """导入工作流 JSON 定义。"""
+    data = body.get("data") or {}
+    if not data.get("id") or not data.get("name"):
+        return {"code": 1, "message": "工作流必须包含 id 和 name 字段"}
+    wf_id = re.sub(r"[^\w\u4e00-\u9fff.-]", "-", str(data["id"]).strip()).strip(".")[:64]
+    if not wf_id:
+        return {"code": 1, "message": "无效的工作流 ID"}
+    data["id"] = wf_id
+    _, err = _validate(data)
+    if err:
+        return {"code": 1, "message": f"工作流校验失败: {err}"}
+    path = WORKFLOWS_DIR / f"{wf_id}.json"
+    try:
+        WORKFLOWS_DIR.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError as e:
+        return {"code": 1, "message": f"写入失败: {e}"}
+    return {"code": 0, "data": {"id": wf_id, "file": path.name}, "message": "ok"}
+
+
+@router.get("/{workflow_id}/export")
+async def export_workflow(workflow_id: str) -> dict[str, Any]:
+    """导出单个工作流 JSON 定义。"""
+    for entry in _load_workflows():
+        if entry.get("id") == workflow_id:
+            path = WORKFLOWS_DIR / entry["file"]
+            workflow = json.loads(path.read_text(encoding="utf-8"))
+            return {"code": 0, "data": workflow, "message": "ok"}
+    return {"code": -1, "data": None, "message": f"工作流不存在: {workflow_id}"}
+
+
+@router.delete("/{workflow_id}")
+async def delete_workflow(workflow_id: str) -> dict[str, Any]:
+    """删除自定义工作流（内置工作流不可删除）。"""
+    if workflow_id in _BUILTIN_IDS:
+        return {"code": 1, "message": "内置工作流不可删除"}
+    for entry in _load_workflows():
+        if entry.get("id") == workflow_id:
+            path = WORKFLOWS_DIR / entry["file"]
+            try:
+                os.remove(path)
+            except OSError as e:
+                return {"code": 1, "message": f"删除失败: {e}"}
+            return {"code": 0, "data": None, "message": "ok"}
     return {"code": -1, "data": None, "message": f"工作流不存在: {workflow_id}"}

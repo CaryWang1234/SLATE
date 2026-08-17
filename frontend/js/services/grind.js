@@ -3,9 +3,9 @@
  * 提示词注入、墨迹解析、墨稿检测与三个动作（送入 Harness / 投到白板 / 存为模板）�?
  */
 
-import { get, post, del, patch } from "./api.js?v=20260815-51";
+import { get, post, del, patch } from "./api.js?v=20260817-67";
 
-const MAX_ROUNDS = 7;
+const MAX_ROUNDS = 10;
 
 // 收墨触发词（用户输入命中即终止追问）
 const COLLECT_RE = /^(收墨|够了|就这样|可以了|出墨稿|结束磨墨)\s*[。！!.�?]*\s*$/;

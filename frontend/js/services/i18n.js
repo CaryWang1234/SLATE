@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 国际化引擎：语言在安装时选定（安装程序写�?data/language.txt），应用内不切换�?
  *
  * 机制�?
@@ -9,7 +9,7 @@
  * - 模型生成内容与用户输入不翻译（SKIP_SELECTOR / data-i18n-skip 标记）�?
  */
 
-import { EN_DICT } from "./i18n_dict.js?v=20260817-64";
+import { EN_DICT } from "./i18n_dict.js?v=20260817-67";
 
 let LANG = "zh";
 let observer = null;

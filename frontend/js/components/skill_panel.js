@@ -1,11 +1,11 @@
-﻿/**
+/**
  * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除�? */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260817-64";
-import { get, post, del, upload } from "../services/api.js?v=20260817-64";
-import { guardSkillParams } from "../services/riskguard.js?v=20260817-64";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-64";
-import { t } from "../services/i18n.js?v=20260817-64";
+import { state, subscribe, setSkills } from "../store.js?v=20260817-67";
+import { get, post, del, upload } from "../services/api.js?v=20260817-67";
+import { guardSkillParams } from "../services/riskguard.js?v=20260817-67";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-67";
+import { t } from "../services/i18n.js?v=20260817-67";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -148,6 +148,10 @@ const SKILL_PARAM_DEFS = {
     { key: "scroll_amount", label: "滚动格数", type: "text", placeholder: "3" },
     { key: "image_path", label: "参考图片路径", type: "text", placeholder: "C:/path/to/image.png" },
     { key: "confidence", label: "匹配置信度 0-1", type: "text", placeholder: "0.8" },
+  ],
+  screenshot_to_code: [
+    { key: "image_path", label: "图片路径", type: "text", placeholder: "C:/path/to/screenshot.png" },
+    { key: "style", label: "风格偏好（可选）", type: "text", placeholder: "tailwind / plain css / responsive" },
   ],],
 };
 

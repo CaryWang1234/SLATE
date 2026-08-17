@@ -34,7 +34,7 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 - ⚡ **Harness Autonomous Execution** — Six-phase closed-loop with 50 rounds by default; auto-generates TODOLIST for large tasks; stop doesn't quit — only manual stop / rounds exhausted / checklist done ends the session
 - 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Harness
 - 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
-- 🛠️ **22 Built-in MCP Tools** — File read/write/edit/append, terminal sandbox, PPT/Word generation, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, MCP Factory for self-production
+- 🛠️ **26 Built-in MCP Tools** — File read/write/edit/append, terminal sandbox, PPT/Word generation, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, MCP Factory for self-production, screenshot-to-code, browser & desktop automation
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
@@ -42,12 +42,13 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 - 🔔 **Task Completion Notifications** — Chime sound + system notification when Harness/team/workflow finishes; both toggleable in settings
 - 📡 **LAN Remote Control** — Opens port 8001 on launch; scan QR from phone/tablet browser for the full interface
 - 🛡️ **High-Risk Command Approval** — Dual-layer frontend+backend interception with hardcoded rules; AI explains command purpose before approval; catastrophic commands unconditionally blocked
-- 👥 **AI Team Multi-Round Debate** — Multi-role propose/oppose/decide with light/heavy model division; plus DAG workflow pipeline; stop button for mid-debate interruption; **9 built-in team presets** (Code Review, Product Brainstorm, Red-Blue Debate, etc.) + custom configuration
+- 👥 **AI Team Multi-Round Debate** — Multi-role propose/oppose/decide with light/heavy model division; plus DAG workflow pipeline with **8 built-in templates** (Dev Flow, Code Review, Doc Generation, Data Analysis, Research Report, Product Requirements, Bug Investigation, Parallel Research); stop button for mid-debate interruption; **9 built-in team presets** (Code Review, Product Brainstorm, Red-Blue Debate, etc.) + custom configuration; workflow import/export/delete
 - ⏰ **Scheduled Chat Tasks** — Auto-execute preset prompts on schedule, results archived as separate sessions
 - 🧠 **Whiteboard Logic Chain** — Card + connector brainstorming, Mermaid-rendered flowcharts & mindmaps; auto-logs tool execution steps as colored status cards with arrow connections
 - 💾 **Long-Term Memory & Knowledge Base** — Auto-distill chat highlights, cross-session recall; **overwrite outdated memories and delete obsolete ones** via AI-driven add/overwrite/delete actions; **✨ Spark** — auto-capture technical insights when conversations end, archive as knowledge docs for future RAG injection
 - 🗜️ **Smart Context Compression** — Auto-summarize over threshold, four-layer truncation defense with auto-continuation, four-layer timeout prevention
 - 🏭 **Prompt Factory** — Constitution + context + constraints integrated into a deliverable prompt
+- 🎤 **Voice Input** — Click the mic button to dictate messages via Web Speech API; auto-detects language (Chinese/English); real-time transcription preview
 - 🌍 **Multilingual UI** — Choose Simplified Chinese or English at install time; full interface and toast localization
 
 ---
@@ -72,7 +73,7 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 ### Grind Mode
 
 - Type `/grind <idea>` or click the 🖌 sidebar button to refine rough ideas into a structured task brief
-- Three-phase questioning: Receive → Grind → Collect (up to 7 rounds), sidebar ink panel marks ✔ resolved / ✘ unknown in real-time
+- Three-phase questioning: Receive → Grind → Collect (up to 10 rounds), sidebar ink panel marks ✔ resolved / ✘ unknown in real-time
 - Brief includes goals / audience / deliverables / acceptance criteria / boundaries / suggested path / open questions; three actions: send to Harness / push to whiteboard / save as template
 - Grind sessions persist and auto-restore on refresh or switch
 
@@ -96,6 +97,7 @@ Built-in tools (`backend/skills/`):
 | `python_api_extract` / `html_bundle` | Python library API extraction / Web page bundling |
 | `code_scan` / `mcp_factory` | Code security scanning / MCP tool self-production |
 | `browser_automation` / `computer_use` | Browser automation (Playwright) / Desktop automation (mouse/keyboard) |
+| `screenshot_to_code` | Screenshot to code — AI reads image and generates HTML/CSS to match |
 
 Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention in chat to auto-inject context.
 

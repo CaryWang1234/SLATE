@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import chat, constitution, experts, files, grind, i18n, knowledge, lan, proxy, projects, scheduler, settings, skills, update, workflows
+from backend.routers import chat, constitution, experts, files, grind, i18n, knowledge, lan, proxy, projects, scheduler, settings, skills, update, vault, workflows
 
 PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 
@@ -71,6 +71,7 @@ app.include_router(scheduler.router, prefix="/api")
 app.include_router(workflows.router, prefix="/api")
 app.include_router(lan.router, prefix="/api")
 app.include_router(i18n.router, prefix="/api")
+app.include_router(vault.router, prefix="/api")
 
 
 @app.on_event("startup")

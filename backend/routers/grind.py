@@ -28,7 +28,7 @@ SESSIONS_DIR = DATA_DIR / "grind_sessions"
 # 内存缓存：conv_id -> session dict
 _sessions: dict[str, dict[str, Any]] = {}
 
-MAX_ROUNDS = 7
+MAX_ROUNDS = 10
 
 
 def _load_all() -> None:

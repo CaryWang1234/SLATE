@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SLATE 工作流引擎：DAG 并行执行、节点状态机、产物入库
  * - 依赖后端 /workflows 读取定义、/proxy/chat 调用模型、/skills/execute 复用技能链路
  * - 执行完成后通过 /knowledge/docs 复用现有知识库写入逻辑
@@ -6,10 +6,10 @@
  * - 支持 AbortController 中断
  */
 
-import { get, post } from "./api.js?v=20260817-64";
-import { state, getModelKey } from "../store.js?v=20260817-64";
-import { guardSkillParams } from "./riskguard.js?v=20260817-64";
-import { t } from "./i18n.js?v=20260817-64";
+import { get, post } from "./api.js?v=20260817-67";
+import { state, getModelKey } from "../store.js?v=20260817-67";
+import { guardSkillParams } from "./riskguard.js?v=20260817-67";
+import { t } from "./i18n.js?v=20260817-67";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 

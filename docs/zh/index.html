@@ -164,7 +164,7 @@
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🖌️</div>
           <div class="feature-name">磨墨模式</div>
-          <div class="feature-desc">输入 /grind 加一句粗糙想法，AI 按"接墨→磨墨→收墨"三段式追问（上限 7 轮），把想法研磨成含目标、交付物、验收标准的结构化任务书；墨迹面板实时标记已定与未知，成稿一键送入 Harness 执行、投到白板推演或存为模板。</div>
+          <div class="feature-desc">输入 /grind 加一句粗糙想法，AI 按"接墨→磨墨→收墨"三段式追问（上限 10 轮），把想法研磨成含目标、交付物、验收标准的结构化任务书；墨迹面板实时标记已定与未知，成稿一键送入 Harness 执行、投到白板推演或存为模板。</div>
           <div class="feature-plain">把"我有个模糊的想法"放进砚台里磨一磨，出来的就是一份清清楚楚的任务书。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -374,7 +374,7 @@
     <div class="container">
       <div class="reveal">
         <div class="section-tag">Built-in Tools</div>
-        <h2 class="section-title">21 个内置 MCP 工具</h2>
+        <h2 class="section-title">26 个内置 MCP 工具</h2>
         <p class="section-desc">MCP（Model Context Protocol）可以理解为"AI 的标准插座"：工具按统一接口接入，模型在对话中自主决定何时使用。以下工具全部以 Python 实现于 backend/skills/，开箱即用。</p>
         <p class="section-note">用法只有一句：聊天时 <strong>@工具名</strong> 提及，或直接描述需求，模型会自己挑工具干活，并把执行结果展示给你。</p>
       </div>
@@ -401,6 +401,11 @@
         <div class="tool-item reveal" data-stagger><code>qrcode_create</code><span>二维码生成，文本链接秒变可扫 SVG</span></div>
         <div class="tool-item reveal" data-stagger><code>python_api_extract</code><span>Python 库 API 文档提取，签名/方法/属性一键成档</span></div>
         <div class="tool-item reveal" data-stagger><code>html_bundle</code><span>便携网页打包，html/css/js 合并单文件分发</span></div>
+        <div class="tool-item reveal" data-stagger><code>code_scan</code><span>代码扫描，自动发现潜在问题与改进点</span></div>
+        <div class="tool-item reveal" data-stagger><code>mcp_factory</code><span>MCP 工具工厂，动态注册自定义外部工具</span></div>
+        <div class="tool-item reveal" data-stagger><code>browser_automation</code><span>浏览器自动化，网页截图/表单填写/数据采集</span></div>
+        <div class="tool-item reveal" data-stagger><code>computer_use</code><span>桌面操控，键鼠模拟跨应用自动化</span></div>
+        <div class="tool-item reveal" data-stagger><code>screenshot_to_code</code><span>截图转代码，图片变 HTML/CSS 一键还原</span></div>
       </div>
     </div>
   </section>

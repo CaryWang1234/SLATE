@@ -36,6 +36,11 @@ function renderInline(raw) {
         /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g,
         '<a href="$2" target="_blank" rel="noopener">$1</a>'
       );
+      // wiki-link: [[target]] or [[target|display]]
+      s = s.replace(
+        /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,
+        (_, target, display) => `<a class="vault-wikilink" data-target="${target.trim()}" title="${target.trim()}">${display || target}</a>`
+      );
       return s;
     })
     .join("");

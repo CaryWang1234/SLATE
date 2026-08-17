@@ -45,6 +45,7 @@ hiddenimports = [
     'backend.skills.html_bundle',
     'backend.skills.browser_automation',
     'backend.skills.computer_use',
+    'backend.skills.screenshot_to_code',
     # 多模态文件解析依赖（files.py 内函数级延迟导入，需显式声明）
     'openpyxl',
     'pdfplumber',
