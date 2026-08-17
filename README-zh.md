@@ -87,7 +87,6 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 |------|------|
 | `file_tree` / `file_peek` | 项目目录浏览 / 文件读取 |
 | `file_create` / `file_edit` | 文件创建 / 差异预览式编辑 |
-| `file_append` | 文件末尾追加，超长文件分段写入与截断补齐 |
 | `terminal` | 受限沙箱命令执行 |
 | `html_render` / `css_color` | HTML 骨架生成 / CSS 调色 |
 | `doc_write` / `text_summarize` | Markdown 文档编写 / 文本摘要 |

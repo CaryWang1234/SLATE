@@ -87,7 +87,6 @@ Built-in tools (`backend/skills/`):
 |------|-------------|
 | `file_tree` / `file_peek` | Browse project structure / Read files |
 | `file_create` / `file_edit` | Create files / Diff-preview editing |
-| `file_append` | Append to files, segmented writes for long content |
 | `terminal` | Sandboxed command execution |
 | `html_render` / `css_color` | HTML skeleton generation / CSS color tuning |
 | `doc_write` / `text_summarize` | Markdown writing / Text summarization |
