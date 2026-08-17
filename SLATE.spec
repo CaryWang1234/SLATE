@@ -21,6 +21,7 @@ hiddenimports = [
     'backend.routers.settings',
     'backend.routers.skills',
     'backend.routers.update',
+    'backend.routers.vault',
     'backend.routers.workflows',
     'backend.skills.css_color',
     'backend.skills.doc_write',
@@ -63,14 +64,48 @@ hiddenimports = [
 ]
 
 excludes = [
-    'PyQt5',
-    'PyQt6',
-    'PySide2',
-    'PySide6',
     'kivy',
     'gi',
     'gtk',
     'tkinter',
+    # ML/AI 大包（项目未使用，Blake2B 哈希向量无需神经网络嵌入）
+    'torch',
+    'torchvision',
+    'torchaudio',
+    'transformers',
+    'sentence_transformers',
+    'sentencepiece',
+    'triton',
+    'paddleocr',
+    'paddlex',
+    'paddle',
+    'chromadb',
+    'onnxruntime',
+    'safetensors',
+    'tokenizers',
+    'sklearn',
+    'scikit-learn',
+    # 数据科学大包（项目未使用）
+    'numpy',
+    'scipy',
+    'pandas',
+    'matplotlib',
+    # 3D/CAD/视觉（项目未使用）
+    'vtk',
+    'trame',
+    'cadquery',
+    'trimesh',
+    'cv2',
+    'opencv-python',
+    'opencv-contrib-python',
+    'casadi',
+    'sympy',
+    # GUI 框架（项目使用 pywebview，不需要 Qt/Tk）
+    'PyQt5',
+    'PyQt6',
+    'PySide2',
+    'PySide6',
+    'customtkinter',
 ]
 
 a = Analysis(
