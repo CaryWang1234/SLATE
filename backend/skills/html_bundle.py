@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-html_bundle — 便携网页打包 MCP 工具（零依赖，仅标准库）。
+html_bundle — 便携网页打包 工具（零依赖，仅标准库）。
 
 改编自外部项目 hyperbinder：将一个 html 页面及其相对路径引用的
 css / js 合并为单个 html 文件，便于单文件分发与双击打开。
@@ -257,7 +257,7 @@ def _bundle(src: str, out: str | None = None) -> tuple[str, _Report]:
 
 
 # ---------------------------------------------------------------------------
-# MCP 入口
+# 入口
 # ---------------------------------------------------------------------------
 
 def execute(src: str = "", out: str = "", **_kwargs) -> dict[str, Any]:

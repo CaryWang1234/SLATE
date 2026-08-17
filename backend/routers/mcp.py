@@ -1,0 +1,440 @@
+"""标准 MCP（Model Context Protocol）协议端点。
+
+实现 JSON-RPC 2.0 + tools/list + tools/call，
+让 SLATE 的内置工具可被任何标准 MCP 客户端调用。
+
+协议规范：https://modelcontextprotocol.io
+"""
+
+from __future__ import annotations
+
+import importlib
+import json
+from typing import Any
+
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+
+router = APIRouter(prefix="/mcp", tags=["mcp"])
+
+# ── MCP 协议版本 ──────────────────────────────────────────────
+MCP_PROTOCOL_VERSION = "2024-11-05"
+MCP_SERVER_INFO = {
+    "name": "SLATE",
+    "version": "1.0.0",
+}
+
+
+# ── 工具 JSON Schema 定义（供标准 MCP 客户端使用） ──────────────
+
+_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
+    "file_tree": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "directory": {"type": "string", "description": "目录路径"},
+            },
+        },
+    },
+    "file_peek": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "文件路径"},
+                "lines": {"type": "integer", "description": "读取行数（默认 50）"},
+            },
+            "required": ["file_path"],
+        },
+    },
+    "file_create": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "新文件路径"},
+                "content": {"type": "string", "description": "文件内容"},
+            },
+            "required": ["file_path", "content"],
+        },
+    },
+    "file_edit": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "目标文件路径"},
+                "edits": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "old_text": {"type": "string"},
+                            "new_text": {"type": "string"},
+                        },
+                    },
+                    "description": "编辑列表，每项含 old_text 和 new_text",
+                },
+            },
+            "required": ["file_path", "edits"],
+        },
+    },
+    "terminal": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "要执行的命令"},
+                "work_dir": {"type": "string", "description": "工作目录"},
+                "background": {"type": "boolean", "description": "是否后台执行"},
+                "action": {"type": "string", "description": "后台任务操作: list/status/stop"},
+            },
+            "required": ["command"],
+        },
+    },
+    "html_render": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "html": {"type": "string", "description": "HTML 内容"},
+            },
+            "required": ["html"],
+        },
+    },
+    "css_color": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "description": {"type": "string", "description": "配色描述"},
+                "style": {"type": "string", "description": "风格: warm/cool/natural/dark"},
+            },
+            "required": ["description"],
+        },
+    },
+    "doc_write": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "文档标题"},
+                "content": {"type": "string", "description": "文档内容（Markdown）"},
+            },
+            "required": ["title", "content"],
+        },
+    },
+    "ppt_create": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "演示文稿标题"},
+                "outline": {"type": "string", "description": "章节大纲（逗号分隔）"},
+                "slides": {"type": "array", "description": "精确幻灯片数据"},
+                "theme": {"type": "string", "description": "主题色"},
+            },
+            "required": ["title"],
+        },
+    },
+    "word_create": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "文档标题"},
+                "content": {"type": "string", "description": "文档内容"},
+            },
+            "required": ["title", "content"],
+        },
+    },
+    "text_summarize": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "要摘要的文本"},
+            },
+            "required": ["text"],
+        },
+    },
+    "json_tool": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "操作: validate/format/compact/read"},
+                "text": {"type": "string", "description": "JSON 文本"},
+            },
+            "required": ["action"],
+        },
+    },
+    "regex_test": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pattern": {"type": "string", "description": "正则表达式"},
+                "text": {"type": "string", "description": "测试文本"},
+            },
+            "required": ["pattern", "text"],
+        },
+    },
+    "repo_stats": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "directory": {"type": "string", "description": "项目目录"},
+            },
+            "required": ["directory"],
+        },
+    },
+    "todo_scan": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "directory": {"type": "string", "description": "扫描目录"},
+            },
+            "required": ["directory"],
+        },
+    },
+    "web_search": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "搜索关键词或 URL"},
+                "mode": {"type": "string", "enum": ["search", "fetch"], "description": "search 或 fetch"},
+            },
+            "required": ["query"],
+        },
+    },
+    "web_fetch": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "网页 URL"},
+                "mode": {"type": "string", "enum": ["text", "html"], "description": "text 或 html"},
+                "max_chars": {"type": "integer", "description": "内容截断长度"},
+            },
+            "required": ["url"],
+        },
+    },
+    "chart_create": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "type": {"type": "string", "enum": ["bar", "hbar", "line", "pie"], "description": "图表类型"},
+                "data": {"type": "string", "description": "图表数据（JSON 或文本格式）"},
+                "title": {"type": "string", "description": "图表标题"},
+                "theme": {"type": "string", "description": "配色主题"},
+            },
+            "required": ["type", "data"],
+        },
+    },
+    "qrcode_create": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "二维码内容"},
+                "size": {"type": "integer", "description": "模块像素大小"},
+            },
+            "required": ["text"],
+        },
+    },
+    "python_api_extract": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "target": {"type": "string", "description": "包名或文件路径"},
+                "depth": {"type": "integer", "description": "子模块递归深度"},
+                "format": {"type": "string", "enum": ["json", "markdown"], "description": "输出格式"},
+            },
+            "required": ["target"],
+        },
+    },
+    "html_bundle": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "src": {"type": "string", "description": "源 HTML 文件路径"},
+                "out": {"type": "string", "description": "输出路径（可选）"},
+            },
+            "required": ["src"],
+        },
+    },
+    "code_scan": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "directory": {"type": "string", "description": "扫描目录"},
+                "severity": {"type": "string", "description": "严重级别过滤"},
+                "category": {"type": "string", "description": "类别过滤"},
+            },
+            "required": ["directory"],
+        },
+    },
+    "mcp_factory": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "tool_name": {"type": "string", "description": "工具名称（英文）"},
+                "description": {"type": "string", "description": "工具描述"},
+                "params": {"type": "array", "description": "参数规格 JSON 数组"},
+                "body": {"type": "string", "description": "核心逻辑代码"},
+                "overwrite": {"type": "boolean", "description": "是否覆盖已有工具"},
+            },
+            "required": ["tool_name", "description"],
+        },
+    },
+    "browser_automation": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "操作: launch/navigate/screenshot/click/type/get_text/evaluate/scroll/wait/close"},
+                "url": {"type": "string", "description": "目标 URL"},
+                "selector": {"type": "string", "description": "CSS 选择器"},
+                "text": {"type": "string", "description": "输入文字"},
+                "expression": {"type": "string", "description": "JS 表达式"},
+                "headless": {"type": "boolean", "description": "无头模式"},
+                "full_page": {"type": "boolean", "description": "全页截图"},
+            },
+            "required": ["action"],
+        },
+    },
+    "computer_use": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "操作: screenshot/click/double_click/right_click/type/hotkey/scroll/move/drag/position/screen_size/locate"},
+                "x": {"type": "integer", "description": "X 坐标"},
+                "y": {"type": "integer", "description": "Y 坐标"},
+                "text": {"type": "string", "description": "输入文字"},
+                "keys": {"type": "string", "description": "组合键（逗号分隔）"},
+                "button": {"type": "string", "description": "鼠标按键"},
+                "region": {"type": "string", "description": "截图区域 x,y,w,h"},
+                "scroll_amount": {"type": "integer", "description": "滚动格数"},
+                "image_path": {"type": "string", "description": "参考图片路径"},
+                "confidence": {"type": "number", "description": "匹配置信度 0-1"},
+            },
+            "required": ["action"],
+        },
+    },
+    "screenshot_to_code": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {"type": "string", "description": "图片路径"},
+                "style": {"type": "string", "description": "风格偏好"},
+            },
+            "required": ["image_path"],
+        },
+    },
+}
+
+
+def _build_tools_list() -> list[dict[str, Any]]:
+    """从 BUILTIN_SKILLS 构建 MCP 标准 tools 列表。"""
+    from backend.routers.skills import BUILTIN_SKILLS
+
+    tools = []
+    for name, description in BUILTIN_SKILLS.items():
+        schema = _TOOL_SCHEMAS.get(name, {"inputSchema": {"type": "object", "properties": {}}})
+        tools.append({
+            "name": name,
+            "description": description,
+            "inputSchema": schema["inputSchema"],
+        })
+    return tools
+
+
+# ── JSON-RPC 2.0 辅助函数 ──────────────────────────────────────
+
+def _jsonrpc_result(id: Any, result: Any) -> dict[str, Any]:
+    """构建 JSON-RPC 2.0 成功响应。"""
+    return {"jsonrpc": "2.0", "id": id, "result": result}
+
+
+def _jsonrpc_error(id: Any, code: int, message: str, data: Any = None) -> dict[str, Any]:
+    """构建 JSON-RPC 2.0 错误响应。"""
+    err: dict[str, Any] = {"code": code, "message": message}
+    if data is not None:
+        err["data"] = data
+    return {"jsonrpc": "2.0", "id": id, "error": err}
+
+
+def _handle_tools_list(req_id: Any) -> dict[str, Any]:
+    """处理 tools/list：返回所有工具及其 JSON Schema。"""
+    return _jsonrpc_result(req_id, {
+        "tools": _build_tools_list(),
+    })
+
+
+def _handle_tools_call(req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
+    """处理 tools/call：执行指定工具并返回结果。"""
+    tool_name = params.get("name", "")
+    arguments = params.get("arguments", {}) or {}
+
+    if not tool_name:
+        return _jsonrpc_error(req_id, -32602, "Invalid params: missing 'name'")
+
+    # 查找并加载工具模块
+    try:
+        module = importlib.import_module(f"backend.skills.{tool_name}")
+    except ImportError:
+        return _jsonrpc_error(req_id, -32602, f"Unknown tool: {tool_name}")
+
+    if not hasattr(module, "execute"):
+        return _jsonrpc_error(req_id, -32602, f"Tool {tool_name} has no execute function")
+
+    # 执行工具
+    try:
+        result = module.execute(**arguments)
+        return _jsonrpc_result(req_id, {
+            "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, indent=2)}],
+        })
+    except Exception as e:
+        return _jsonrpc_result(req_id, {
+            "content": [{"type": "text", "text": f"Error: {e}"}],
+            "isError": True,
+        })
+
+
+# ── JSON-RPC 2.0 方法分发发表 ──────────────────────────────────
+
+_METHOD_HANDLERS = {
+    "initialize": lambda req_id, params: _jsonrpc_result(req_id, {
+        "protocolVersion": MCP_PROTOCOL_VERSION,
+        "capabilities": {"tools": {}},
+        "serverInfo": MCP_SERVER_INFO,
+    }),
+    "tools/list": _handle_tools_list,
+    "tools/call": _handle_tools_call,
+}
+
+
+def _dispatch(body: dict[str, Any]) -> dict[str, Any]:
+    """分发 JSON-RPC 2.0 请求到对应方法处理器。"""
+    jsonrpc = body.get("jsonrpc")
+    if jsonrpc != "2.0":
+        return _jsonrpc_error(body.get("id"), -32600, "Invalid Request: jsonrpc must be '2.0'")
+
+    method = body.get("method", "")
+    req_id = body.get("id")
+    params = body.get("params", {}) or {}
+
+    handler = _METHOD_HANDLERS.get(method)
+    if handler:
+        return handler(req_id, params)
+
+    return _jsonrpc_error(req_id, -32601, f"Method not found: {method}")
+
+
+# ── FastAPI 路由 ──────────────────────────────────────────────
+
+@router.post("")
+async def mcp_endpoint(request: Request) -> JSONResponse:
+    """MCP 协议统一入口（JSON-RPC 2.0）。
+
+    支持方法：
+    - initialize: 握手，返回协议版本与服务能力
+    - tools/list: 列出所有工具（含 JSON Schema 参数定义）
+    - tools/call: 调用指定工具
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            content=_jsonrpc_error(None, -32700, "Parse error"),
+            status_code=400,
+        )
+
+    result = _dispatch(body)
+    return JSONResponse(content=result)

@@ -148,7 +148,7 @@ function getMentionCandidates(query) {
   const skills = state.skills?.skills || {};
   const experts = getExpertsCached() || [];
   const list = [
-    ...Object.entries(mcp).map(([name, desc]) => ({ name, desc, type: "MCP" })),
+    ...Object.entries(mcp).map(([name, desc]) => ({ name, desc, type: "工具" })),
     ...Object.entries(skills).map(([name, desc]) => ({ name, desc, type: "Skill" })),
     ...experts.map(x => ({
       name: x.name || x.id,
@@ -191,7 +191,7 @@ function renderMentionPopup() {
     const item = document.createElement("div");
     item.className = "mention-item" + (i === mentionIndex ? " active" : "");
     const badge = document.createElement("span");
-    const kindClass = c.type === "MCP" ? "skill-kind-mcp" : c.type === "Skill" ? "skill-kind-skill" : "skill-kind-expert";
+    const kindClass = c.type === "工具" ? "skill-kind-mcp" : c.type === "Skill" ? "skill-kind-skill" : "skill-kind-expert";
     badge.className = "skill-kind-badge " + kindClass;
     badge.textContent = c.type;
     const name = document.createElement("span");
@@ -206,12 +206,12 @@ function renderMentionPopup() {
     item.addEventListener("mousedown", (e) => { e.preventDefault(); applyMention(c); });
     mentionPopup.appendChild(item);
   });
-  // �?SKILL.md 技能时给出提示，避免误以为只能提及 MCP
+  // �?SKILL.md 技能时给出提示，避免误以为只能提及工具
   const skillCount = Object.keys(state.skills?.skills || {}).length;
   if (skillCount === 0) {
     const hint = document.createElement("div");
     hint.className = "mention-hint";
-    hint.textContent = "暂无 Skill：在右侧「MCP / 技能」面板点击「导入技能」或「新建技能」添�?SKILL.md";
+    hint.textContent = "暂无 Skill：在右侧「工具 / 技能」面板点击「导入技能」或「新建技能」添�?SKILL.md";
     mentionPopup.appendChild(hint);
   }
 }
@@ -237,7 +237,7 @@ function applyMention(candidate) {
   try { localStorage.setItem(CHAT_DRAFT_KEY, chatInput.value); } catch (e) {}
 }
 
-// 发送时解析消息中的 @提及：MCP 注入调用提示，Skill 注入 SKILL.md 定义内容，专家包注入人格/规则/知识
+// 发送时解析消息中的 @提及：工具注入调用提示，Skill 注入 SKILL.md 定义内容，专家包注入人格/规则/知识
 async function resolveMentions(text) {
   const mcp = state.skills?.mcp || {};
   const skills = state.skills?.skills || {};
@@ -246,7 +246,7 @@ async function resolveMentions(text) {
   for (const token of tokens) {
     const name = token.slice(1);
     if (mcp[name]) {
-      context += `\n\n[提及 MCP 工具] ${name} �?${mcp[name]}。任务需要时请通过 skill_run 工具调用。`;
+      context += `\n\n[提及工具] ${name} �?${mcp[name]}。任务需要时请通过 skill_run 工具调用。`;
     } else if (skills[name]) {
       let injected = false;
       try {

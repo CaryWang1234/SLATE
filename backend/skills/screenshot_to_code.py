@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-screenshot_to_code — 截图/图片转代码 MCP 工具。
+screenshot_to_code — 截图/图片转代码 工具。
 
 读取图片文件，编码为 base64 data URI 返回给 AI 视觉模型，
 AI 根据截图内容生成 HTML/CSS 代码。配合 html_render 可即时预览。

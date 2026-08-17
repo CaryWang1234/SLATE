@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-chart_create — 零依赖 SVG 图表生成 MCP 工具。
+chart_create — 零依赖 SVG 图表生成 工具。
 
 支持类型：
 - bar  : 垂直柱状图

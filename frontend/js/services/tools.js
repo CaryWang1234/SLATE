@@ -1,5 +1,5 @@
 /**
- * SLATE AI 工具系统：让 AI 直接操作黑板、MCP 工具、提示词工厂
+ * SLATE AI 工具系统：让 AI 直接操作黑板、工具、提示词工厂
  *
  * 工具调用格式（AI 输出）：
  *   ◈◈◈tool_name
@@ -230,10 +230,10 @@ const TOOLS = {
   },
 
   skill_run: {
-    name: "执行 MCP 工具",
-    description: "调用 MCP 内置工具。可用：file_tree(目录扫描), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令，支持background=true后台执行/action=list|status|stop管理后台任务), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文纯文本，mode=html时返回原始HTML), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), mcp_factory(MCP工厂：根据描述自动生成新的MCP工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘，action=screenshot截图/click点击/double_click双击/right_click右键/type输入/hotkey组合键/scroll滚动/move移动/drag拖拽/position鼠标位置/screen_size屏幕分辨率/locate图像定位，x/y坐标、text文字、keys组合键逗号分隔、button鼠标按键、region截图区域x,y,w,h、scroll_amount滚动格数、image_path参考图片、confidence置信度), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果)。也可传入 SKILL.md 技能名读取其定义内容",
+    name: "执行工具",
+    description: "调用内置工具。可用：file_tree(目录扫描), file_peek(读文件), file_edit(diff编辑文件), file_create(创建新文件), terminal(执行命令，支持background=true后台执行/action=list|status|stop管理后台任务), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文纯文本，mode=html时返回原始HTML), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘，action=screenshot截图/click点击/double_click双击/right_click右键/type输入/hotkey组合键/scroll滚动/move移动/drag拖拽/position鼠标位置/screen_size屏幕分辨率/locate图像定位，x/y坐标、text文字、keys组合键逗号分隔、button鼠标按键、region截图区域x,y,w,h、scroll_amount滚动格数、image_path参考图片、confidence置信度), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果)。也可传入 SKILL.md 技能名读取其定义内容",
     params: {
-      skill: { type: "string", description: "MCP 工具或技能名�?, required: true },
+      skill: { type: "string", description: "工具或技能名�?, required: true },
       params: { type: "object", description: "工具参数" },
     },
     async execute({ skill, params }) {
@@ -265,9 +265,9 @@ const TOOLS = {
           if (typeof data === "string") return data.length > 2000 ? data.slice(0, 2000) + "�? : data;
           return JSON.stringify(data, null, 2);
         }
-        return `MCP 工具执行失败: ${res.message}`;
+        return `工具执行失败: ${res.message}`;
       } catch (e) {
-        return `MCP 工具调用出错: ${e.message}`;
+        return `工具调用出错: ${e.message}`;
       }
     },
   },
@@ -1016,6 +1016,17 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
       }
     }
     s += `示例:\n◈◈�?{key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
+  }
+
+  // 远程 MCP 工具（动态注入）
+  const remoteTools = state.skills?.remoteTools || [];
+  if (remoteTools.length > 0) {
+    s += "### \u8fdc\u7a0b MCP \u5de5\u5177\uff08\u901a\u8fc7 skill_run \u8c03\u7528\uff09\n";
+    s += "\u4ee5\u4e0b\u5de5\u5177\u6765\u81ea\u5df2\u8fde\u63a5\u7684\u5916\u90e8 MCP Server\uff0c\u901a\u8fc7 skill_run \u8c03\u7528\uff0cskill \u53c2\u6570\u683c\u5f0f\u4e3a mcp__serverId__toolName\n";
+    for (const rt of remoteTools) {
+      s += `- mcp__${rt.serverId}__${rt.name}: [${rt.server}] ${rt.description}\n`;
+    }
+    s += "\n";
   }
 
   if (minimal) return s;

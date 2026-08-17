@@ -11,6 +11,7 @@ import { initChat, refreshConversationList } from "./components/chat.js?v=202608
 import { initWhiteboard } from "./components/whiteboard.js?v=20260817-67";
 import { initPromptFactory } from "./components/prompt_factory.js?v=20260817-67";
 import { initSkillPanel } from "./components/skill_panel.js?v=20260817-67";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260817-67";
 import { initTeamPanel } from "./components/team.js?v=20260817-67";
 import { initProjectBar } from "./components/project_bar.js?v=20260817-67";
 import { initMemoryPanel } from "./components/memory.js?v=20260817-67";
@@ -1099,7 +1100,8 @@ async function init() {
   safeInit("对话", initChat);
   safeInit("黑板", initWhiteboard);
   safeInit("提示词工�?, initPromptFactory);
-  safeInit("技能面�?, initSkillPanel);
+  safeInit("技能面板", initSkillPanel);
+  safeInit("MCP Server", initMcpServerPanel);
   safeInit("AI 团队", initTeamPanel);
   safeInit("项目�?, initProjectBar);
   safeInit("记忆面板", initMemoryPanel);

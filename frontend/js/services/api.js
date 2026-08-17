@@ -9,7 +9,7 @@ import { t } from "./i18n.js?v=20260817-67";
 export const REASONING_PREFIX = "\x00\x01R\x01\x00";
 
 // ── 超时与重试常量（参考主�?Agent：idle watchdog + 零内容自动重试） ──
-const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（�?MCP 工具）总超�?const STREAM_IDLE_TIMEOUT_MS = 90000;   // 流式�?0 秒无任何数据视为连接已死
+const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（�?工具）总超�?const STREAM_IDLE_TIMEOUT_MS = 90000;   // 流式�?0 秒无任何数据视为连接已死
 const STREAM_MAX_RETRIES = 2;           // 未产出任何内容时的自动重试次�?
 /**
  * 通用 JSON 请求（带超时保护，防止工�?接口挂起导致界面永久卡死�? */

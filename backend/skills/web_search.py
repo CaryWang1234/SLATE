@@ -1,4 +1,4 @@
-"""MCP 工具：网络搜索与网页抓取（DuckDuckGo，免 API Key），让模型获取实时数据。
+"""工具：网络搜索与网页抓取（DuckDuckGo，免 API Key），让模型获取实时数据。
 
 mode:
 - search：关键词搜索，返回标题/链接/摘要

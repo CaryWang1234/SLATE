@@ -1,7 +1,8 @@
-"""MCP 工厂：让 SLATE 自生产适配自身的 MCP 工具。
+"""工具工厂：让 SLATE 自生产适配自身的工具。
 
-根据描述自动生成符合 SLATE MCP 工具规范的 Python 模块，
+根据描述自动生成符合 SLATE 工具规范的 Python 模块，
 保存到 backend/skills/ 并动态注册到工具列表。
+标准 MCP 协议端点见 backend/routers/mcp.py。
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ SKILLS_DIR = Path(__file__).resolve().parent
 # 工具模板
 TOOL_TEMPLATE = '''"""{description}
 
-由 MCP 工厂自动生成。
+由工具工厂自动生成。
 """
 
 from __future__ import annotations
@@ -110,7 +111,7 @@ def execute(
     overwrite: bool = False,
     **_kw: Any,
 ) -> dict[str, Any]:
-    """创建新的 MCP 工具。
+    """创建新的工具。
 
     Args:
         tool_name: 工具名称（英文，将作为模块名）
@@ -194,5 +195,5 @@ def execute(
         "file_path": str(target_path),
         "description": description,
         "params_count": len(param_list),
-        "message": f"MCP 工具 {name} 创建成功，已注册到工具列表",
+        "message": f"工具 {name} 创建成功，已注册到工具列表",
     }

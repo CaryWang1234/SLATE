@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE · Local AI Collaboration Studio</title>
-  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Harness autonomous execution, Grind Mode, 26 MCP tools, Expert Packs, AI team debates & 8 DAG workflow templates, Code Review, voice input, whiteboard logic chains, full sandbox security. Open source, install and use.">
+  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Harness autonomous execution, Grind Mode, 26 tools, Expert Packs, AI team debates & 8 DAG workflow templates, Code Review, voice input, whiteboard logic chains, full sandbox security. Open source, install and use.">
   <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -157,7 +157,7 @@
       <div class="stats-grid">
         <div class="reveal" data-stagger>
           <div class="stat-num" data-count="26">0</div>
-          <div class="stat-label">Built-in MCP Tools</div>
+          <div class="stat-label">Built-in Tools</div>
           <div class="stat-hint">Files, terminal, PPT / Word, charts / QR codes, web search & scraping, screenshot to code — always ready</div>
         </div>
         <div class="reveal" data-stagger>
@@ -214,9 +214,9 @@
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🛠️</div>
-          <div class="feature-name">26 Built-in MCP Tools</div>
+          <div class="feature-name">26 Built-in Tools</div>
           <div class="feature-desc">File read/write/edit/append, terminal sandbox, PPT / Word generation, SVG charts & QR codes, repo stats, regex testing, text summarization, web search & page scraping, screenshot-to-code, browser & desktop automation — @mention in chat to use, model autonomously calls and displays results. Charts and QR codes render inline.</div>
-          <div class="feature-plain">MCP is "AI's standard socket" — plug in tools and it doesn't just talk, it acts.</div>
+          <div class="feature-plain">Tools are "AI's hands" — plug in tools and it doesn't just talk, it acts.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🛡️</div>
@@ -363,7 +363,7 @@
           <ul>
             <li>Streaming idle watchdog: disconnects after 90 seconds of no data</li>
             <li>Zero-content auto-backoff and retry</li>
-            <li>Request / MCP tool 180-second timeout</li>
+            <li>Request / tool 180-second timeout</li>
             <li>UI fallback watchdog forces interface recovery</li>
           </ul>
         </div>
@@ -380,7 +380,7 @@
       <div class="highlight">
         <div class="highlight-text reveal from-left">
           <h3>🧩 Capabilities as Files</h3>
-          <p>26 built-in MCP tools work out of the box. Custom capabilities need just one SKILL.md file — no code, no plugin installation, no restart. Drop it in the data/skills directory and it takes effect.</p>
+          <p>26 built-in tools work out of the box. Custom capabilities need just one SKILL.md file — no code, no plugin installation, no restart. Drop it in the data/skills directory and it takes effect.</p>
           <div class="highlight-plain">Adding new capabilities for AI is like placing a manual on a shelf — no wall demolition, no rewiring.</div>
           <ul>
             <li>file_tree / file_edit / terminal / repo_stats …</li>
@@ -449,8 +449,8 @@
     <div class="container">
       <div class="reveal">
         <div class="section-tag">Built-in Tools</div>
-        <h2 class="section-title">26 Built-in MCP Tools</h2>
-        <p class="section-desc">MCP (Model Context Protocol) can be understood as "AI's standard socket": tools connect via a unified interface, and the model autonomously decides when to use them. All tools below are implemented in Python at backend/skills/, ready out of the box.</p>
+        <h2 class="section-title">26 Built-in Tools</h2>
+        <p class="section-desc">Tools can be understood as "AI's hands": they connect via a unified interface, and the model autonomously decides when to use them. All tools below are implemented in Python at backend/skills/, ready out of the box.</p>
         <p class="section-note">Usage is simple: <strong>@tool-name</strong> in chat, or just describe what you need — the model picks the right tool and shows you the results.</p>
       </div>
       <div class="tools-grid" data-stagger-group>
@@ -476,7 +476,7 @@
         <div class="tool-item reveal" data-stagger><code>python_api_extract</code><span>Python library API docs, signatures/methods/properties</span></div>
         <div class="tool-item reveal" data-stagger><code>html_bundle</code><span>Portable web pages, html/css/js bundled as single file</span></div>
         <div class="tool-item reveal" data-stagger><code>code_scan</code><span>Security scanning — hardcoded keys, SQL injection, XSS</span></div>
-        <div class="tool-item reveal" data-stagger><code>mcp_factory</code><span>Self-producing new MCP tools from descriptions</span></div>
+        <div class="tool-item reveal" data-stagger><code>mcp_factory</code><span>Self-producing new tools from descriptions</span></div>
         <div class="tool-item reveal" data-stagger><code>browser_automation</code><span>Chromium automation — navigate, screenshot, click, type</span></div>
         <div class="tool-item reveal" data-stagger><code>computer_use</code><span>Desktop automation — mouse, keyboard, screenshot, OCR</span></div>
         <div class="tool-item reveal" data-stagger><code>screenshot_to_code</code><span>Screenshot to code — AI reads image, generates HTML/CSS</span></div>

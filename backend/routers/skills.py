@@ -1,6 +1,7 @@
-"""技能路由：MCP 内置工具 + SKILL.md 技能，支持执行、上传与本地导入。
+"""技能路由：内置工具 + SKILL.md 技能，支持执行、上传与本地导入。
 
 通用插件适配：支持 SKILL.md 开放标准（Codex CLI / Claude Code / Cursor 等）。
+标准 MCP 协议端点见 backend/routers/mcp.py（JSON-RPC 2.0）。
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ SKILLS_DIR = Path(__file__).resolve().parent.parent / "skills"
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
 USER_SKILLS_DIR = DATA_DIR / "skills"
 
-# MCP 内置工具注册表（原“内置技能”，现统一称 MCP 工具）
+# 内置工具注册表（原"MCP 工具"，现统一称"工具"）
 BUILTIN_SKILLS: dict[str, str] = {
     "file_tree": "扫描目录树（仅第一层）",
     "file_peek": "读取文件前 N 行（≤50行）",
@@ -49,7 +50,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "python_api_extract": "提取 Python 库/模块的公共 API 文档（函数签名、类方法、属性），输出 JSON/Markdown",
     "html_bundle": "将 html 及相对路径的 css/js 内联合并为单个 html 文件（便携分发）",
     "code_scan": "代码安全扫描（检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等）",
-    "mcp_factory": "MCP 工厂：根据描述自动生成新的 MCP 工具，让 SLATE 自生产适配自身的工具",
+    "mcp_factory": "工具工厂：根据描述自动生成新的工具，让 SLATE 自生产适配自身的工具",
     "browser_automation": "浏览器自动化：基于 Playwright 控制 Chromium 浏览器（导航/截图/点击/输入/执行JS）",
     "computer_use": "桌面自动化：基于 pyautogui 控制鼠标键盘（截图/点击/输入/组合键/图像定位）",
     "screenshot_to_code": "截图转代码：读取图片编码为 base64，AI 视觉分析生成 HTML/CSS 还原截图内容",
@@ -79,12 +80,21 @@ def _list_md_skills() -> dict[str, str]:
 
 @router.get("")
 async def list_skills() -> dict[str, Any]:
-    """列出所有可用能力：MCP 内置工具 + SKILL.md 技能。"""
+    """列出所有可用能力：内置工具 + SKILL.md 技能 + 远程 MCP 工具。"""
+    from backend import mcp_client
+    remote_tools = mcp_client.get_all_remote_tools()
+    remote_dict: dict[str, str] = {}
+    for t in remote_tools:
+        # 远程工具名称加 server 前缀防止冲突
+        key = f"mcp__{t['serverId']}__{t['name']}"
+        remote_dict[key] = f"[MCP:{t['server']}] {t['description']}"
     return {
         "code": 0,
         "data": {
             "mcp": BUILTIN_SKILLS,
             "skills": _list_md_skills(),
+            "remote": remote_dict,
+            "remoteTools": remote_tools,
         },
         "message": "ok",
     }
@@ -128,6 +138,18 @@ async def execute_skill(body: dict[str, Any]) -> dict[str, Any]:
                 "data": {"type": "custom_skill", "content": content},
                 "message": "ok",
             }
+
+    # 查找远程 MCP 工具（格式: mcp__serverId__toolName）
+    if skill_name.startswith("mcp__"):
+        parts = skill_name.split("__", 2)
+        if len(parts) == 3:
+            from backend import mcp_client
+            server_id, tool_name = parts[1], parts[2]
+            result = await mcp_client.call_remote_tool(server_id, tool_name, params)
+            if "error" in result:
+                return {"code": -1, "data": None, "message": result["error"]}
+            return {"code": 0, "data": result, "message": "ok"}
+        return {"code": -1, "data": None, "message": f"无效的远程工具名称: {skill_name}"}
 
     return {"code": -1, "data": None, "message": f"未知技能: {skill_name}"}
 
@@ -235,7 +257,7 @@ async def import_skill(req: ImportSkillRequest) -> dict[str, Any]:
 
 @router.delete("/{skill_name}")
 async def delete_skill(skill_name: str) -> dict[str, Any]:
-    """删除自定义 SKILL.md 技能（不影响 MCP 内置工具）。"""
+    """删除自定义 SKILL.md 技能（不影响内置工具）。"""
     clean = _sanitize_skill_name(skill_name)
     if clean != skill_name or not clean:
         return {"code": 1, "message": "无效的技能名称"}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -10,7 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import chat, constitution, experts, files, grind, i18n, knowledge, lan, proxy, projects, scheduler, settings, skills, update, vault, workflows
+from backend.routers import chat, constitution, experts, files, grind, i18n, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, update, vault, workflows
+from backend import mcp_client
 
 PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 
@@ -72,6 +74,8 @@ app.include_router(workflows.router, prefix="/api")
 app.include_router(lan.router, prefix="/api")
 app.include_router(i18n.router, prefix="/api")
 app.include_router(vault.router, prefix="/api")
+app.include_router(mcp.router, prefix="/api")
+app.include_router(mcp_servers.router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -84,6 +88,18 @@ async def _start_schedule_loop():
 async def _start_lan_remote():
     """启动局域网遥控副服务（0.0.0.0:8001，共享本 app）。"""
     lan.start_lan_server(app)
+
+
+@app.on_event("startup")
+async def _start_mcp_clients():
+    """启动时自动连接已配置的外部 MCP Server。"""
+    asyncio.create_task(mcp_client.startup_connect_all())
+
+
+@app.on_event("shutdown")
+async def _shutdown_mcp_clients():
+    """关闭时断开所有 MCP Server 连接。"""
+    await mcp_client.shutdown_disconnect_all()
 
 # 挂载前端静态文件
 frontend_dir = PROJECT_ROOT / "frontend"

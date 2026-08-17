@@ -16,6 +16,8 @@ hiddenimports = [
     'backend.routers.i18n',
     'backend.routers.knowledge',
     'backend.routers.lan',
+    'backend.routers.mcp',
+    'backend.routers.mcp_servers',
     'backend.routers.projects',
     'backend.routers.proxy',
     'backend.routers.settings',
@@ -47,6 +49,9 @@ hiddenimports = [
     'backend.skills.browser_automation',
     'backend.skills.computer_use',
     'backend.skills.screenshot_to_code',
+    'backend.skills.mcp_factory',
+    'backend.skills.code_scan',
+    'backend.mcp_client',
     # 多模态文件解析依赖（files.py 内函数级延迟导入，需显式声明）
     'openpyxl',
     'pdfplumber',

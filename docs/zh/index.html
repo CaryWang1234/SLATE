@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE（砚）· 本地 AI 协作调度台</title>
-  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Harness 自主执行、磨墨模式、MCP 工具、专家包、AI 团队辩论与 DAG 工作流、白板式逻辑链、项目理解三档扫描，将灵感转化为结构化方案。开源免费，安装即用。">
+  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Harness 自主执行、磨墨模式、工具、专家包、AI 团队辩论与 DAG 工作流、白板式逻辑链、项目理解三档扫描，将灵感转化为结构化方案。开源免费，安装即用。">
   <link rel="icon" type="image/png" href="../icon.png">
   <link rel="stylesheet" href="../style.css">
 </head>
@@ -113,7 +113,7 @@
       <div class="stats-grid">
         <div class="reveal" data-stagger>
           <div class="stat-num" data-count="26">0</div>
-          <div class="stat-label">个内置 MCP 工具</div>
+          <div class="stat-label">个内置工具</div>
           <div class="stat-hint">文件、终端、PPT / Word、图表 / 二维码、联网检索随叫随到</div>
         </div>
         <div class="reveal" data-stagger>
@@ -170,9 +170,9 @@
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🛠️</div>
-          <div class="feature-name">26 个内置 MCP 工具</div>
+          <div class="feature-name">26 个内置工具</div>
           <div class="feature-desc">文件读写编辑追加、终端沙箱、PPT / Word 文档生成、SVG 图表与二维码、仓库统计、正则测试、文本摘要、联网搜索与网页抓取等，聊天时 @提及即用，模型按需自主调用并展示执行结果，图表/二维码等图片产出直接内联预览。</div>
-          <div class="feature-plain">MCP 就是"AI 的标准插座"——给 AI 接上工具，它不但会说，还会动手做。</div>
+          <div class="feature-plain">工具就是"AI 的双手"——给 AI 接上工具，它不但会说，还会动手做。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🛡️</div>
@@ -295,7 +295,7 @@
           <ul>
             <li>流式 idle 看门狗：90 秒无数据主动断开</li>
             <li>零内容自动退避重试</li>
-            <li>请求 / MCP 工具 180 秒超时</li>
+            <li>请求 / 工具 180 秒超时</li>
             <li>UI 兜底看门狗强制恢复界面</li>
           </ul>
         </div>
@@ -312,7 +312,7 @@
       <div class="highlight">
         <div class="highlight-text reveal from-left">
           <h3>🧩 能力即文件</h3>
-          <p>26 个内置 MCP 工具开箱即用，自定义能力只需一个 SKILL.md 文件——不写代码、不装插件、不重启，放进 data/skills 目录即刻生效。</p>
+          <p>26 个内置工具开箱即用，自定义能力只需一个 SKILL.md 文件——不写代码、不装插件、不重启，放进 data/skills 目录即刻生效。</p>
           <div class="highlight-plain">给 AI 加新本事，就像往书架上放一本说明书，不用拆墙也不用布线。</div>
           <ul>
             <li>file_tree / file_edit / terminal / repo_stats …</li>
@@ -381,8 +381,8 @@
     <div class="container">
       <div class="reveal">
         <div class="section-tag">Built-in Tools</div>
-        <h2 class="section-title">26 个内置 MCP 工具</h2>
-        <p class="section-desc">MCP（Model Context Protocol）可以理解为"AI 的标准插座"：工具按统一接口接入，模型在对话中自主决定何时使用。以下工具全部以 Python 实现于 backend/skills/，开箱即用。</p>
+        <h2 class="section-title">26 个内置工具</h2>
+        <p class="section-desc">工具可以理解为"AI 的双手"：它们按统一接口接入，模型在对话中自主决定何时使用。以下工具全部以 Python 实现于 backend/skills/，开箱即用。</p>
         <p class="section-note">用法只有一句：聊天时 <strong>@工具名</strong> 提及，或直接描述需求，模型会自己挑工具干活，并把执行结果展示给你。</p>
       </div>
       <div class="tools-grid" data-stagger-group>
@@ -408,7 +408,7 @@
         <div class="tool-item reveal" data-stagger><code>python_api_extract</code><span>Python 库 API 文档提取，签名/方法/属性一键成档</span></div>
         <div class="tool-item reveal" data-stagger><code>html_bundle</code><span>便携网页打包，html/css/js 合并单文件分发</span></div>
         <div class="tool-item reveal" data-stagger><code>code_scan</code><span>代码扫描，自动发现潜在问题与改进点</span></div>
-        <div class="tool-item reveal" data-stagger><code>mcp_factory</code><span>MCP 工具工厂，动态注册自定义外部工具</span></div>
+        <div class="tool-item reveal" data-stagger><code>mcp_factory</code><span>工具工厂，动态注册自定义外部工具</span></div>
         <div class="tool-item reveal" data-stagger><code>browser_automation</code><span>浏览器自动化，网页截图/表单填写/数据采集</span></div>
         <div class="tool-item reveal" data-stagger><code>computer_use</code><span>桌面操控，键鼠模拟跨应用自动化</span></div>
         <div class="tool-item reveal" data-stagger><code>screenshot_to_code</code><span>截图转代码，图片变 HTML/CSS 一键还原</span></div>

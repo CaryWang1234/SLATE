@@ -23,7 +23,7 @@
 
 SLATE is a **lightweight local AI collaboration tool** focused on prompt engineering, context management, and project ideation.
 
-It features multi-model chat, MCP tool calling, Harness autonomous execution, Grind Mode, AI team debates, and a whiteboard-style logic chain. It can either drive built-in tools to complete tasks directly, or generate high-quality prompts for external Coding Agents (Claude Code, Codex, Cursor, etc.).
+It features multi-model chat, tool calling, Harness autonomous execution, Grind Mode, AI team debates, and a whiteboard-style logic chain. It can either drive built-in tools to complete tasks directly, or generate high-quality prompts for external Coding Agents (Claude Code, Codex, Cursor, etc.).
 
 **Zero npm dependencies. Zero build tools. Native tech stack. Local-first.**
 
@@ -35,7 +35,7 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 - ⚡ **Harness Autonomous Execution** — Six-phase closed-loop with 50 rounds by default; auto-generates TODOLIST for large tasks; stop doesn't quit — only manual stop / rounds exhausted / checklist done ends the session
 - 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Harness
 - 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
-- 🛠️ **26 Built-in MCP Tools** — File read/write/edit/append, terminal sandbox, PPT/Word generation, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, MCP Factory for self-production, screenshot-to-code, browser & desktop automation
+- 🛠️ **26 Built-in Tools** — File read/write/edit/append, terminal sandbox, PPT/Word generation, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, Tool Factory for self-production, screenshot-to-code, browser & desktop automation
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
@@ -79,7 +79,7 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 - Brief includes goals / audience / deliverables / acceptance criteria / boundaries / suggested path / open questions; three actions: send to Harness / push to whiteboard / save as template
 - Grind sessions persist and auto-restore on refresh or switch
 
-### MCP Tools & Skill System
+### Tools & Skill System
 
 Built-in tools (`backend/skills/`):
 
@@ -96,7 +96,7 @@ Built-in tools (`backend/skills/`):
 | `web_search` / `web_fetch` | Web search (no key needed) / Page content retrieval |
 | `chart_create` / `qrcode_create` | SVG charts (bar/line/pie) / QR codes, inline preview |
 | `python_api_extract` / `html_bundle` | Python library API extraction / Web page bundling |
-| `code_scan` / `mcp_factory` | Code security scanning / MCP tool self-production |
+| `code_scan` / `mcp_factory` | Code security scanning / tool self-production |
 | `browser_automation` / `computer_use` | Browser automation (Playwright) / Desktop automation (mouse/keyboard) |
 | `screenshot_to_code` | Screenshot to code — AI reads image and generates HTML/CSS to match |
 
@@ -251,7 +251,7 @@ SLATE/
 │   │   ├── workflows.py        # Team workflow DAG definition
 │   │   ├── vault.py            # Markdown vault (Obsidian-style knowledge library)
 │   │   └── files.py            # Multimodal file parsing
-│   └── skills/                 # 24 built-in MCP tool implementations (incl. high-risk command dual interception)
+│   └── skills/                 # 24 built-in tool implementations (incl. high-risk command dual interception)
 ├── frontend/
 │   ├── index.html              # Three-column layout entry (Chat / Whiteboard / Factory+Capabilities)
 │   ├── css/style.css           # Global styles (dual theme)

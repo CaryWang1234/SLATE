@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-python_api_extract — Python 库公共 API 提取 MCP 工具（零依赖）。
+python_api_extract — Python 库公共 API 提取 工具（零依赖）。
 
 改编自外部项目 pyparser：递归提取目标包/模块的公共 API
 （函数签名、docstring、类方法与属性、源码位置、调用示例），
@@ -441,7 +441,7 @@ def _format_as_markdown(data: dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# MCP 入口
+# 入口
 # ---------------------------------------------------------------------------
 
 def execute(target: str = "", depth: int = 1, format: str = "json",

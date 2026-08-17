@@ -1831,6 +1831,111 @@ textarea::-webkit-scrollbar-thumb {
   font-size: 12px;
 }
 
+/* ── MCP Server 管理面板 ─────────────────── */
+.mcp-server-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.mcp-server-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card, #fff);
+  transition: box-shadow 0.15s;
+}
+
+.mcp-server-item:hover {
+  box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+}
+
+.mcp-server-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mcp-server-name {
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mcp-server-url {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mcp-server-status {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mcp-server-status.connected { background: #22c55e; }
+.mcp-server-status.connecting { background: #f59e0b; }
+.mcp-server-status.disconnected { background: #9ca3af; }
+.mcp-server-status.error { background: #ef4444; }
+
+.mcp-server-tools {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.mcp-server-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mcp-server-actions button {
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-card, #fff);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.mcp-server-actions button:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.mcp-server-actions button.danger {
+  color: #ef4444;
+  border-color: #fca5a5;
+}
+
+.mcp-server-actions button.danger:hover {
+  background: #fef2f2;
+}
+
+.mcp-server-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+#settings-mcp-servers .skill-upload {
+  justify-content: flex-start;
+}
+
 /* ── 弹窗 ─────────────────────────────── */
 
 .modal {

@@ -1,5 +1,5 @@
 /**
- * SLATE MCP / 技能面板：MCP 内置工具列表 + SKILL.md 技能（上传/导入/删除�? */
+ * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除�? */
 
 import { state, subscribe, setSkills } from "../store.js?v=20260817-67";
 import { get, post, del, upload } from "../services/api.js?v=20260817-67";
@@ -155,7 +155,7 @@ const SKILL_PARAM_DEFS = {
   ],],
 };
 
-// ── 列表渲染：MCP 工具�?+ SKILL.md 技能区 ────────────
+// ── 列表渲染：工具�?+ SKILL.md 技能区 ────────────
 
 function createSectionHeader(text, count) {
   const head = document.createElement("div");
@@ -174,19 +174,30 @@ function createSectionHeader(text, count) {
 function renderSkillList() {
   skillList.innerHTML = "";
 
-  // MCP 内置工具
+  // 内置工具
   const mcp = state.skills.mcp || {};
-  skillList.appendChild(createSectionHeader("MCP 工具", Object.keys(mcp).length));
+  skillList.appendChild(createSectionHeader("工具", Object.keys(mcp).length));
   for (const [name, desc] of Object.entries(mcp)) {
-    skillList.appendChild(createSkillItem(name, desc, "MCP"));
+    skillList.appendChild(createSkillItem(name, desc, "工具"));
   }
 
-  // SKILL.md 技�?  const skills = state.skills.skills || {};
-  skillList.appendChild(createSectionHeader("技�?· SKILL.md", Object.keys(skills).length));
+  // 远程 MCP 工具
+  const remote = state.skills.remote || {};
+  const remoteCount = Object.keys(remote).length;
+  if (remoteCount > 0) {
+    skillList.appendChild(createSectionHeader("MCP 远程工具", remoteCount));
+    for (const [name, desc] of Object.entries(remote)) {
+      skillList.appendChild(createSkillItem(name, desc, "MCP"));
+    }
+  }
+
+  // SKILL.md 技能
+  const skills = state.skills.skills || {};
+  skillList.appendChild(createSectionHeader("技能 · SKILL.md", Object.keys(skills).length));
   if (Object.keys(skills).length === 0) {
     const empty = document.createElement("div");
     empty.className = "skill-empty-hint";
-    empty.textContent = "暂无技能，可点击下方「导入技能」或「新建技能�?";
+    empty.textContent = "暂无技能，可点击下方「导入技能」或「新建技能」";
     skillList.appendChild(empty);
   }
   for (const [name, desc] of Object.entries(skills)) {
@@ -202,7 +213,7 @@ function createSkillItem(name, desc, kind) {
   const nameRow = document.createElement("div");
   nameRow.className = "skill-item-name";
   const badge = document.createElement("span");
-  badge.className = "skill-kind-badge" + (kind === "MCP" ? " skill-kind-mcp" : " skill-kind-skill");
+  badge.className = "skill-kind-badge" + ((kind === "工具" || kind === "MCP") ? " skill-kind-mcp" : " skill-kind-skill");
   badge.textContent = kind;
   nameRow.appendChild(badge);
   nameRow.appendChild(document.createTextNode(" " + name));
@@ -213,7 +224,7 @@ function createSkillItem(name, desc, kind) {
   info.appendChild(descEl);
   item.appendChild(info);
 
-  // Skill 支持删除；MCP 内置工具不可�?  if (kind === "Skill") {
+  // Skill 支持删除；内置工具不可�?  if (kind === "Skill") {
     const delBtn = document.createElement("button");
     delBtn.className = "skill-item-del";
     delBtn.title = "删除技�?";
@@ -226,7 +237,7 @@ function createSkillItem(name, desc, kind) {
   }
 
   item.addEventListener("click", () => {
-    if (kind === "MCP") openSkillModal(name, false);
+    if (kind === "工具") openSkillModal(name, false);
     else openSkillViewer(name);
   });
   return item;
@@ -243,13 +254,13 @@ async function handleDeleteSkill(name) {
   }
 }
 
-// ── MCP 工具执行弹窗 ─────────────────────────────
+// ── 工具执行弹窗 ─────────────────────────────
 
 let currentSkillName = "";
 
 function openSkillModal(name) {
   currentSkillName = name;
-  skillModalTitle.textContent = t("执行 MCP 工具: {name}", { name });
+  skillModalTitle.textContent = t("执行工具: {name}", { name });
   skillParams.innerHTML = "";
   skillResult.classList.add("hidden");
   skillResult.textContent = "";

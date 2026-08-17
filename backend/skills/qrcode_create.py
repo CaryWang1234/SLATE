@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-qrcode_create — 二维码生成 MCP 工具（qrcode 库，SVG 输出）。
+qrcode_create — 二维码生成 工具（qrcode 库，SVG 输出）。
 
 将文本或 URL 编码为 SVG 二维码，落盘到数据目录 outputs/，
 返回 file_path 与 preview_url（前端经 /api/files/output 内联预览）。
