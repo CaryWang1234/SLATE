@@ -50,6 +50,7 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 - 🗜️ **Smart Context Compression** — Auto-summarize over threshold, four-layer truncation defense with auto-continuation, four-layer timeout prevention
 - 🏭 **Prompt Factory** — Constitution + context + constraints integrated into a deliverable prompt
 - 🎤 **Voice Input** — Click the mic button to dictate messages via Web Speech API; auto-detects language (Chinese/English); real-time transcription preview
+- 📚 **Markdown Vault** — Obsidian-style knowledge library integrated into the memory modal: folder + note management, real-time Markdown edit & preview, `[[wiki-link]]` bidirectional linking, full-text search + tag system
 - 🌍 **Multilingual UI** — Choose Simplified Chinese or English at install time; full interface and toast localization
 
 ---
@@ -249,6 +250,7 @@ SLATE/
 │   │   ├── i18n.py             # UI language config (install-time choice, read-only at runtime)
 │   │   ├── update.py           # Startup update check (GitHub Releases)
 │   │   ├── workflows.py        # Team workflow DAG definition
+│   │   ├── vault.py            # Markdown vault (Obsidian-style knowledge library)
 │   │   └── files.py            # Multimodal file parsing
 │   └── skills/                 # 24 built-in MCP tool implementations (incl. high-risk command dual interception)
 ├── frontend/
