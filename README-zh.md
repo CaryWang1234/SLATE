@@ -36,6 +36,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 - 🖌️ **磨墨模式** —— `/grind` 一句粗糙想法，AI 三段式追问研磨成结构化任务书，一键送入 Harness
 - 🗂️ **对话与数据管理** —— 历史全文搜索、会话导出 / 改名 / 批量管理、消息编辑删除，一键备份恢复全部数据，存储用量可视可清理
 - 🛠️ **26 个内置工具** —— 文件读写编辑追加、终端沙箱、PPT / Word 文档生成、SVG 图表与二维码、Python API 文档提取、便携网页打包、联网搜索与网页抓取、工具工厂自生产工具、截图转代码、浏览器与桌面自动化等
+- 🔌 **外部 MCP Server** —— 连接外部 MCP Server（SSE 传输协议）扩展工具能力，远程工具与内置工具统一展示，AI 模型可无缝调用
 - 🧩 **自定义 Skill 系统** —— `SKILL.md` 即插即用，聊天中 `@` 提及即注入上下文
 - 🎓 **专家包（Expert Pack）** —— 人格 + 规则 + 知识 + 技能五件套，zip 导入导出，对话 / 团队 / @提及三路注入
 - 📖 **Better Project Understanding** —— 简略 / 平衡 / 详细三档扫描项目，自动生成导览·百科与规则手册
@@ -100,7 +101,9 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 | `browser_automation` / `computer_use` | 浏览器自动化（Playwright 控制 Chromium）/ 桌面自动化（鼠标键盘控制） |
 | `screenshot_to_code` | 截图转代码——AI 视觉分析截图内容，生成 HTML/CSS 还原视觉效果 |
 
-自定义 Skill：上传或导入 `SKILL.md` 即可扩展新能力；聊天输入框 `@` 提及 MCP 工具、Skill 或专家包，发送时自动注入对应上下文。
+自定义 Skill：上传或导入 `SKILL.md` 即可扩展新能力；聊天输入框 `@` 提及工具、Skill 或专家包，发送时自动注入对应上下文。
+
+外部 MCP Server：设置页 → MCP Server 区块添加外部 MCP Server（SSE 传输协议），自动发现远程工具并与内置工具统一展示，AI 模型可通过 `skill_run` 调用。
 
 ### 专家包（Expert Pack）
 
@@ -243,6 +246,8 @@ SLATE/
 │   │   ├── projects.py         # 项目管理 / Better Project Understanding 扫描 / Code Review
 │   │   ├── experts.py          # 专家包增删改查 / zip 导入导出
 │   │   ├── skills.py           # 技能调用
+│   │   ├── mcp.py              # 标准 MCP 协议端点（JSON-RPC 2.0）
+│   │   ├── mcp_servers.py      # 外部 MCP Server 管理（增删查 + 代理调用）
 │   │   ├── settings.py         # 设置 / 跨设备同步 / 存储空间管理
 │   │   ├── constitution.py     # 项目宪法
 │   │   ├── grind.py            # 磨墨模式会话状态机
@@ -251,7 +256,8 @@ SLATE/
 │   │   ├── workflows.py        # 团队工作流 DAG 定义
 │   │   ├── vault.py            # Markdown 文库（Obsidian 风格知识库）
 │   │   └── files.py            # 多模态文件解析
-│   └── skills/                 # 24 个内置工具实现（含高危命令双层拦截）
+│   └── skills/                 # 26 个内置工具实现（含高危命令双层拦截）
+├── backend/mcp_client.py       # MCP 客户端管理器（SSE 传输协议）
 ├── frontend/
 │   ├── index.html              # 三栏布局入口（对话 / 黑板 / 工厂+能力）
 │   ├── css/style.css           # 全局样式（双主题）

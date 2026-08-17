@@ -36,6 +36,7 @@ It features multi-model chat, tool calling, Harness autonomous execution, Grind 
 - 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Harness
 - 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
 - 🛠️ **26 Built-in Tools** — File read/write/edit/append, terminal sandbox, PPT/Word generation, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, Tool Factory for self-production, screenshot-to-code, browser & desktop automation
+- 🔌 **External MCP Server** — Connect to external MCP Servers (SSE transport) to extend tool capabilities; remote tools appear alongside built-in tools, AI can call them seamlessly
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
@@ -101,6 +102,8 @@ Built-in tools (`backend/skills/`):
 | `screenshot_to_code` | Screenshot to code — AI reads image and generates HTML/CSS to match |
 
 Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention in chat to auto-inject context.
+
+External MCP Servers: Settings → MCP Server section to add external MCP Servers (SSE transport). Remote tools are auto-discovered and displayed alongside built-in tools; AI models can call them via `skill_run`.
 
 ### Expert Packs
 
@@ -243,6 +246,8 @@ SLATE/
 │   │   ├── projects.py         # Project management / Better Project Understanding / Code Review
 │   │   ├── experts.py          # Expert pack CRUD / zip import/export
 │   │   ├── skills.py           # Skill invocation
+│   │   ├── mcp.py              # Standard MCP protocol endpoint (JSON-RPC 2.0)
+│   │   ├── mcp_servers.py      # External MCP Server management (CRUD + proxy)
 │   │   ├── settings.py         # Settings / cross-device sync / storage management
 │   │   ├── constitution.py     # Project constitution
 │   │   ├── grind.py            # Grind Mode session state machine
@@ -251,7 +256,8 @@ SLATE/
 │   │   ├── workflows.py        # Team workflow DAG definition
 │   │   ├── vault.py            # Markdown vault (Obsidian-style knowledge library)
 │   │   └── files.py            # Multimodal file parsing
-│   └── skills/                 # 24 built-in tool implementations (incl. high-risk command dual interception)
+│   └── skills/                 # 26 built-in tool implementations (incl. high-risk command dual interception)
+├── backend/mcp_client.py       # MCP Client manager (SSE transport)
 ├── frontend/
 │   ├── index.html              # Three-column layout entry (Chat / Whiteboard / Factory+Capabilities)
 │   ├── css/style.css           # Global styles (dual theme)
