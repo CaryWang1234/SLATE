@@ -1,5 +1,5 @@
 /**
- * �?记忆与素材管�? * 长期记忆�?CRUD、AI 自动提取、用户资料编辑、素材收藏的归口
+ * 首记忆与素材管首 * 长期记忆首CRUD、AI 自动提取、用户资料编辑、素材收藏的归口
  */
 
 import {
@@ -9,11 +9,11 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260818-72";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260818-72";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-72";
-import { t } from "../services/i18n.js?v=20260818-72";
-import { initVaultPanel, openVaultPanel } from "./vault.js?v=20260818-72";
+} from "../store.js?v=20260818-75";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260818-75";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-75";
+import { t } from "../services/i18n.js?v=20260818-75";
+import { initVaultPanel, openVaultPanel } from "./vault.js?v=20260818-75";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -76,7 +76,7 @@ function renderMemoryList() {
   memoryList.innerHTML = "";
 
   if (state.memories.length === 0) {
-    memoryList.innerHTML = '<div class="memory-empty">暂无记忆项目<br><small>点击"添加记忆"�?从对话提�?</small></div>';
+    memoryList.innerHTML = '<div class="memory-empty">暂无记忆项目<br><small>点击"添加记忆"首从对话提示</small></div>';
     return;
   }
 
@@ -94,7 +94,7 @@ function renderMemoryList() {
     content.className = "memory-item-content";
     content.textContent = mem.content;
     content.addEventListener("dblclick", async () => {
-      const newText = await dlgPrompt("编辑记忆内容�?, { title: "编辑记忆", value: mem.content, textarea: true });
+      const newText = await dlgPrompt("编辑记忆内容：, { title: "编辑记忆", value: mem.content, textarea: true });
       if (newText !== null && newText.trim()) {
         updateMemory(mem.id, { content: newText.trim() });
         patch(`/chat/memories/${mem.id}`, { content: newText.trim() }).catch(() => {});
@@ -107,12 +107,12 @@ function renderMemoryList() {
     actions.className = "memory-item-actions";
 
     const editBtn = document.createElement("button");
-    editBtn.textContent = "�?;
+    editBtn.textContent = "首;
     editBtn.title = "编辑分类";
     editBtn.addEventListener("click", async () => {
       const known = CATEGORY_OPTIONS.some(o => o.value === mem.category);
       const options = known ? CATEGORY_OPTIONS : [{ value: mem.category, label: mem.category }, ...CATEGORY_OPTIONS];
-      const newCat = await dlgPrompt("编辑分类�?, { title: "编辑分类", options, value: mem.category });
+      const newCat = await dlgPrompt("编辑分类：, { title: "编辑分类", options, value: mem.category });
       if (newCat !== null && newCat.trim()) {
         updateMemory(mem.id, { category: newCat.trim() });
         patch(`/chat/memories/${mem.id}`, { category: newCat.trim() }).catch(() => {});
@@ -122,7 +122,7 @@ function renderMemoryList() {
     actions.appendChild(editBtn);
 
     const delBtn = document.createElement("button");
-    delBtn.textContent = "�?;
+    delBtn.textContent = "首;
     delBtn.title = "删除";
     delBtn.addEventListener("click", async () => {
       removeMemory(mem.id);
@@ -136,17 +136,17 @@ function renderMemoryList() {
   }
 }
 
-// ── 从对话提取记�?───────────────────────────────────────────────────────────
+// ── 从对话提取记首───────────────────────────────────────────────────────────
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260818-72");
-    toast("对话内容太少，无法提取记�?);
+    const { toast } = await import("../app.js?v=20260818-75");
+    toast("对话内容太少，无法提取记忆);
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260818-72");
-  toast("正在分析对话内容�?);
+  const { toast } = await import("../app.js?v=20260818-75");
+  toast("正在分析对话内容…);
 
   // 构建对话文本
   const dialogText = state.messages
@@ -155,8 +155,9 @@ async function extractMemoriesFromConversation() {
     .join("\n");
 
   try {
-    // 获取提取提示�?
-    const res = await post("/chat/extract-memories", {
+    // 获取提取提示首
+    const res = await post("/chat/extract-memories", {
+
       text: dialogText,
       existing_memories: state.memories.map(m => ({ id: m.id, category: m.category, content: m.content })),
     });
@@ -248,10 +249,10 @@ function buildMemoryProfilePrompt(dialogText) {
     .map((m, i) => `#${i + 1} [${m.category || "general"}] ${m.content || ""} (id:${m.id})`)
     .join("\n");
   const profile = state.userProfile || {};
-  return `请分析以下最近对话，自主提炼可以长期保留的信息�?
+  return `请分析以下最近对话，自主提炼可以长期保留的信息首
 你需要同时更新两类内容：
-1. 长期记忆：稳定、可复用、以后会影响协作的信息，例如用户偏好、项目背景、重要决策、常用术语、明确约束�?2. 用户画像：用户的角色、工作风格、技术栈、协作习惯、其他长期偏好�?
-严格规则�?- 只保留长期有价值的信息，不要记录一次性任务、临时状态、寒暄、工具结果、纯代码输出�?- 不要重复已有记忆�?- 不要编造用户没有表达过的信息
+1. 长期记忆：稳定、可复用、以后会影响协作的信息，例如用户偏好、项目背景、重要决策、常用术语、明确约束首2. 用户画像：用户的角色、工作风格、技术栈、协作习惯、其他长期偏好首
+严格规则首- 只保留长期有价值的信息，不要记录一次性任务、临时状态、寒暄、工具结果、纯代码输出首- 不要重复已有记忆首- 不要编造用户没有表达过的信息
 - 如果对话中用户明确修正、推翻、或废弃了某条已有记忆，用 overwrite 或 delete 动作处理（用 target_id 指定记忆 id）
 - 如果没有新增内容，memories 输出空数组
 - profile 只输出需要新增或修正的字段；不确定就省略
@@ -272,9 +273,9 @@ function buildMemoryProfilePrompt(dialogText) {
   }
 }
 
-已有记忆�?${existingMemories || "�?}
+已有记忆首${existingMemories || "首}
 
-当前用户画像�?${JSON.stringify(profile, null, 2)}
+当前用户画像首${JSON.stringify(profile, null, 2)}
 
 最近对话：
 ${dialogText.slice(-7000)}`;
@@ -385,7 +386,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || overwritten || deleted || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260818-72");
+      const { toast } = await import("../app.js?v=20260818-75");
       let msg = "";
       if (added) msg += t("新增 {n} 条", { n: added });
       if (overwritten) msg += (msg ? "，" : "") + t("覆盖 {n} 条", { n: overwritten });
@@ -408,7 +409,7 @@ async function showAddMemoryDialog() {
   const content = await dlgPrompt("请输入记忆内容：", { title: "添加记忆", textarea: true });
   if (!content || !content.trim()) return;
 
-  const category = (await dlgPrompt("选择分类�?, { title: "添加记忆", options: CATEGORY_OPTIONS, value: "general" })) || "general";
+  const category = (await dlgPrompt("选择分类：, { title: "添加记忆", options: CATEGORY_OPTIONS, value: "general" })) || "general";
 
   const mem = { category: category.trim(), content: content.trim() };
   const saved = addMemory(mem);
@@ -421,7 +422,7 @@ function renderKnowledgeList(items = []) {
   if (!knowledgeList) return;
   knowledgeList.innerHTML = "";
   if (!items.length) {
-    knowledgeList.innerHTML = '<div class="memory-empty">暂无知识条目<br><small>可以添加笔记、项目背景、资料摘录等长期可复用内�?/small></div>';
+    knowledgeList.innerHTML = '<div class="memory-empty">暂无知识条目<br><small>可以添加笔记、项目背景、资料摘录等长期可复用内容/small></div>';
     return;
   }
   for (const item of items) {
@@ -432,7 +433,7 @@ function renderKnowledgeList(items = []) {
     head.className = "knowledge-item-head";
     const title = document.createElement("span");
     title.className = "knowledge-item-title";
-    title.textContent = item.title || "未命名知�?;
+    title.textContent = item.title || "未命名知识;
     const meta = document.createElement("span");
     meta.className = "knowledge-item-meta";
     meta.textContent = (item.kind || "note") + (item.chunk_count ? t(" · {n} 片段", { n: item.chunk_count }) : "") + (item.score ? ` · ${(item.score * 100).toFixed(0)}%` : "");
@@ -488,19 +489,19 @@ async function searchKnowledge() {
 }
 
 async function addKnowledgeDialog() {
-  const title = await dlgPrompt("知识标题�?, { title: "添加知识" });
+  const title = await dlgPrompt("知识标题：, { title: "添加知识" });
   if (title === null) return;
-  const content = await dlgPrompt("知识内容�?, { title: "添加知识", textarea: true, rows: 8 });
+  const content = await dlgPrompt("知识内容：, { title: "添加知识", textarea: true, rows: 8 });
   if (!content || !content.trim()) return;
   const res = await post("/knowledge/docs", {
-    title: title.trim() || "未命名知�?,
+    title: title.trim() || "未命名知识,
     source: "manual",
     kind: "note",
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260818-72");
-    toast("知识已添�?);
+    const { toast } = await import("../app.js?v=20260818-75");
+    toast("知识已添加);
     await loadKnowledgeDocs();
   }
 }
@@ -552,7 +553,7 @@ function renderSnippetList() {
   snippetList.innerHTML = "";
 
   if (state.promptSnippets.length === 0) {
-    snippetList.innerHTML = '<div class="snippet-empty">暂无素材<br><small>在对话中的消息上点击 �?按钮收藏素材</small></div>';
+    snippetList.innerHTML = '<div class="snippet-empty">暂无素材<br><small>在对话中的消息上点击 首按钮收藏素材</small></div>';
     return;
   }
 
@@ -576,19 +577,19 @@ function renderSnippetList() {
     actions.className = "snippet-item-actions";
 
     const copyBtn = document.createElement("button");
-    copyBtn.textContent = "�?;
+    copyBtn.textContent = "首;
     copyBtn.title = "复制";
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(snip.text);
-        copyBtn.textContent = "�?;
-        setTimeout(() => { copyBtn.textContent = "�?; }, 1200);
+        copyBtn.textContent = "首;
+        setTimeout(() => { copyBtn.textContent = "首; }, 1200);
       } catch (e) {}
     });
     actions.appendChild(copyBtn);
 
     const delBtn = document.createElement("button");
-    delBtn.textContent = "�?;
+    delBtn.textContent = "首;
     delBtn.title = "删除";
     delBtn.addEventListener("click", async () => {
       removePromptSnippet(snip.id);
@@ -602,7 +603,7 @@ function renderSnippetList() {
   }
 }
 
-// ── 标签页切�?───────────────────────────────────────────────────────────────
+// ── 标签页切首───────────────────────────────────────────────────────────────
 
 function initMemoryTabs() {
   memoryTabs = memoryModal.querySelectorAll(".memory-tab");
@@ -620,7 +621,7 @@ function initMemoryTabs() {
   });
 }
 
-// ── 初始�?───────────────────────────────────────────────────────────────────
+// ── 初始首───────────────────────────────────────────────────────────────────
 
 function initMemoryPanel() {
   memoryModal = document.getElementById("memory-modal");
@@ -655,10 +656,10 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260818-72").then(({ toast }) => toast("资料已保�?));
+    import("../app.js?v=20260818-75").then(({ toast }) => toast("资料已保存));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
-    if (await dlgConfirm("确定要重置用户资料吗�?, { danger: true, okText: "重置" })) {
+    if (await dlgConfirm("确定要重置用户资料吗？, { danger: true, okText: "重置" })) {
       resetUserProfile();
       loadProfileToForm();
     }
@@ -671,10 +672,11 @@ function initMemoryPanel() {
   document.getElementById("knowledge-enabled")?.addEventListener("change", saveKnowledgeSettingsFromForm);
   document.getElementById("knowledge-topk")?.addEventListener("change", saveKnowledgeSettingsFromForm);
 
-  // 素材的添加按�?
-  const btnAddSnippet = document.getElementById("btn-add-snippet");
+  // 素材的添加按首
+  const btnAddSnippet = document.getElementById("btn-add-snippet");
+
   if (btnAddSnippet) btnAddSnippet.addEventListener("click", async () => {
-    const text = await dlgPrompt("粘贴或输入提示词素材�?, { title: "添加素材", textarea: true, rows: 6 });
+    const text = await dlgPrompt("粘贴或输入提示词素材：, { title: "添加素材", textarea: true, rows: 6 });
     if (text && text.trim()) {
       const snip = { text: text.trim(), source: "手动添加" };
       addPromptSnippet(snip);
@@ -682,8 +684,9 @@ function initMemoryPanel() {
     }
   });
 
-  // 监听状态变�?
-  subscribe("memories", renderMemoryList);
+  // 监听状态变首
+  subscribe("memories", renderMemoryList);
+
   subscribe("userProfile", loadProfileToForm);
   subscribe("promptSnippets", renderSnippetList);
 
@@ -796,7 +799,7 @@ async function captureConversationSpark() {
     }
 
     if (count > 0) {
-      const { toast } = await import("../app.js?v=20260818-72");
+      const { toast } = await import("../app.js?v=20260818-75");
       toast(t("已捕获 {n} 条灵光", { n: count }));
     }
   } catch (e) {

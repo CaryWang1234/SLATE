@@ -1,19 +1,19 @@
 /**
  * SLATE AI 团队组件：多模型协作讨论
- * 轻量模型初步讨论 �?重型模型最终决�? */
+ * 轻量模型初步讨论 首重型模型最终决策 */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260818-72";
-import { notifyTaskComplete } from "../services/notify.js?v=20260818-72";
-import { streamChat } from "../services/api.js?v=20260818-72";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260818-72";
-import { renderMarkdown } from "../services/markdown.js?v=20260818-72";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260818-72";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260818-72";
-import { getExpertsCached } from "./experts.js?v=20260818-72";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-72";
-import { t } from "../services/i18n.js?v=20260818-72";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260818-75";
+import { notifyTaskComplete } from "../services/notify.js?v=20260818-75";
+import { streamChat } from "../services/api.js?v=20260818-75";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260818-75";
+import { renderMarkdown } from "../services/markdown.js?v=20260818-75";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260818-75";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260818-75";
+import { getExpertsCached } from "./experts.js?v=20260818-75";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-75";
+import { t } from "../services/i18n.js?v=20260818-75";
 
-// 当模型列表加载完成后，重新渲染团队成员（填充下拉选项�?subscribe("modelRegistry", () => renderTeamMembers());
+// 当模型列表加载完成后，重新渲染团队成员（填充下拉选项目subscribe("modelRegistry", () => renderTeamMembers());
 
 let teamPanel, teamMembersArea, teamTopicInput, btnStartDiscuss, teamOutput, btnAddMember;
 let teamHistoryList, teamUsageBar, btnNewTeamDiscussion, btnStopDiscuss;
@@ -28,9 +28,9 @@ const TEAM_HISTORY_KEY = "slate_team_history";
 // ── 默认团队成员 ────────────────────────────
 
 const DEFAULT_MEMBERS = [
-  { id: "member-1", name: "分析�?, modelId: "deepseek-v4-flash", persona: "你是务实派分析师。关注可行性和成本，回答简洁（1-3句）�?, role: "analyst" },
-  { id: "member-2", name: "创意�?, modelId: "gemini-3.6-flash", persona: "你是创意导向的思考者。关注创新可能性和用户体验，回答简洁（1-3句）�?, role: "creative" },
-  { id: "member-3", name: "决策�?, modelId: "gpt-5.6-sol", persona: "你是最终决策者。综合各方观点给出明确建议和理由，回答简洁（1-3句）�?, role: "decider" },
+  { id: "member-1", name: "分析师, modelId: "deepseek-v4-flash", persona: "你是务实派分析师。关注可行性和成本，回答简洁（1-3句）首, role: "analyst" },
+  { id: "member-2", name: "创意官, modelId: "gemini-3.6-flash", persona: "你是创意导向的思考者。关注创新可能性和用户体验，回答简洁（1-3句）首, role: "creative" },
+  { id: "member-3", name: "决策者, modelId: "gpt-5.6-sol", persona: "你是最终决策者。综合各方观点给出明确建议和理由，回答简洁（1-3句）首, role: "decider" },
 ];];
 
 // ── 团队预设 ────────────────────────────
@@ -398,7 +398,7 @@ function renderTeamHistory() {
 
     const title = document.createElement("div");
     title.className = "team-history-title";
-    title.textContent = session.topic || "未命名讨�?;
+    title.textContent = session.topic || "未命名讨论;
     item.appendChild(title);
 
     const meta = document.createElement("div");
@@ -426,7 +426,7 @@ function renderTeamMembers() {
   teamMembersArea.innerHTML = "";
 
   if (teamMembers.length === 0) {
-    teamMembersArea.innerHTML = '<div class="team-empty">暂无团队成员，点�?+ 添加</div>';
+    teamMembersArea.innerHTML = '<div class="team-empty">暂无团队成员，点首+ 添加</div>';
     return;
   }
 
@@ -439,7 +439,7 @@ function renderTeamMembers() {
 
     const avatar = document.createElement("span");
     avatar.className = "team-member-avatar";
-    avatar.textContent = m.role === "analyst" ? "�? : m.role === "creative" ? "�? : m.role === "decider" ? "�? : "�?;
+    avatar.textContent = m.role === "analyst" ? "首 : m.role === "creative" ? "首 : m.role === "decider" ? "首 : "首;
     header.appendChild(avatar);
 
     const info = document.createElement("div");
@@ -475,24 +475,24 @@ function renderTeamMembers() {
     const personaInput = document.createElement("textarea");
     personaInput.className = "team-member-persona";
     personaInput.value = m.persona;
-    personaInput.placeholder = "角色设定�?;
+    personaInput.placeholder = "角色设定…;
     personaInput.rows = 2;
     personaInput.addEventListener("change", () => { m.persona = personaInput.value; });
     card.appendChild(personaInput);
 
-    // 专家包绑定：辩论时注入专�?persona + rules
+    // 专家包绑定：辩论时注入专首persona + rules
     const expertRow = document.createElement("div");
     expertRow.className = "team-member-expert-row";
     const expertLabel = document.createElement("span");
     expertLabel.className = "team-member-expert-label";
-    expertLabel.textContent = "专家�?;
+    expertLabel.textContent = "专家包;
     expertRow.appendChild(expertLabel);
     const expertSelect = document.createElement("select");
     expertSelect.className = "team-member-model member-expert-select";
     expertSelect.dataset.current = m.expertId || "";
     const noneOpt = document.createElement("option");
     noneOpt.value = "";
-    noneOpt.textContent = "无专�?;
+    noneOpt.textContent = "无专家;
     expertSelect.appendChild(noneOpt);
     for (const item of getExpertsCached()) {
       const opt = document.createElement("option");
@@ -523,21 +523,22 @@ function populateModelOptions(select, selectedId) {
     for (const m of models) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      opt.textContent = m.name + (hasModelKey(m.id) ? "" : " �?);
+      opt.textContent = m.name + (hasModelKey(m.id) ? "" : " 首);
       if (m.id === selectedId) opt.selected = true;
       optgroup.appendChild(opt);
     }
     select.appendChild(optgroup);
   }
 
-  // 自定义模�?
-  if (state.customModels.length > 0) {
+  // 自定义模型
+  if (state.customModels.length > 0) {
+
     const optgroup = document.createElement("optgroup");
-    optgroup.label = "自定�?;
+    optgroup.label = "自定义;
     for (const m of state.customModels) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      opt.textContent = m.name + (hasModelKey(m.id) ? "" : " �?);
+      opt.textContent = m.name + (hasModelKey(m.id) ? "" : " 首);
       if (m.id === selectedId) opt.selected = true;
       optgroup.appendChild(opt);
     }
@@ -545,7 +546,7 @@ function populateModelOptions(select, selectedId) {
   }
 }
 
-// ── 辩论逻辑：提�?�?支持/反对/反驳/补充 �?决策 ────
+// ── 辩论逻辑：提5轮支持/反对/反驳/补充 首决策 ────
 
 const DEBATE_ACTIONS = {
   propose: "提案",
@@ -556,9 +557,9 @@ const DEBATE_ACTIONS = {
   verdict: "决策",
 };
 
-/** 解析发言的动作前缀与回应对象：【动作】@成员�?*/
+/** 解析发言的动作前缀与回应对象：【动作】@成员{n}*/
 function parseDebateAction(text) {
-  const m = String(text || "").match(/^\s*�?提案|支持|反对|反驳|补充|决策)】\s*(?:@([^\s【】@]+))?/);
+  const m = String(text || "").match(/^\s*首提案|支持|反对|反驳|补充|决策)】\s*(?:@([^\s【】@]+))?/);
   if (!m) return { action: "propose", target: "", content: String(text || "").trim() };
   const action = Object.keys(DEBATE_ACTIONS).find(k => DEBATE_ACTIONS[k] === m[1]) || "propose";
   return { action, target: m[2] || "", content: String(text || "").slice(m[0].length).trim() };
@@ -566,14 +567,14 @@ function parseDebateAction(text) {
 
 function buildTranscript(entries) {
   return entries.map(e =>
-    `[�?{e.round}轮] ${e.member.name}�?{DEBATE_ACTIONS[e.action] || "发言"}�?{e.target ? `（回�?${e.target}）` : ""}: ${e.text}`
+    `[首{e.round}轮] ${e.member.name}首{DEBATE_ACTIONS[e.action] || "发言"}首{e.target ? `（回首${e.target}）` : ""}: ${e.text}`
   ).join("\n");
 }
 
 function addRoundHeader(round) {
   const el = document.createElement("div");
   el.className = "debate-round-header";
-  el.textContent = t("—�?�?{n} �?—�?, { n: round });
+  el.textContent = t("—5轮{n} 首—首, { n: round });
   teamOutput.appendChild(el);
 }
 
@@ -626,7 +627,7 @@ function finalizeEntry(entry, action, target, text) {
   entry.badge.className = `debate-action-badge action-${action}`;
   entry.badge.textContent = DEBATE_ACTIONS[action];
   if (target) {
-    entry.replyRef.textContent = t("�?回应 {name}", { name: target });
+    entry.replyRef.textContent = t("首回应 {name}", { name: target });
     entry.replyRef.classList.remove("hidden");
   }
   entry.content.textContent = text;
@@ -640,15 +641,15 @@ function buildMemberPrompt(member, topic, boardContext, entries, round, isLastRo
   if (expertPrompt) prompt += `${expertPrompt}\n`;
   prompt += `\n议题: ${topic}${boardContext}\n\n`;
   if (entries.length === 0) {
-    prompt += "这是第一轮，请提出你的想法或方案�?;
+    prompt += "这是第一轮，请提出你的想法或方案首;
   } else {
     prompt += `已有发言记录:\n${buildTranscript(entries)}\n\n请继续参与讨论：可以提出新想法，也可以支持、反对、反驳或补充他人的想法。`;
   }
   prompt += `\n\n发言格式：第一行以【提案】【支持】【反对】【反驳】【补充】之一开头，回应他人时在动作后写 @对方成员名，第二行起写正文（1-3句）。`;
   if (member.role === "decider") {
     prompt += isLastRound
-      ? "\n这是最后一轮：请综合各方观点，以【决策】开头给出最终方案、理由与取舍�?
-      : "\n若各方已达成共识或分歧无法调和，你可以【决策】开头直接给出最终方案（讨论将立即结束）；否则继续正常参与讨论�?;
+      ? "\n这是最后一轮：请综合各方观点，以【决策】开头给出最终方案、理由与取舍首
+      : "\n若各方已达成共识或分歧无法调和，你可以【决策】开头直接给出最终方案（讨论将立即结束）；否则继续正常参与讨论首;
   }
   return prompt;
 }
@@ -662,7 +663,7 @@ async function startDiscussion() {
   isDiscussing = true;
   discussAbortController = new AbortController();
   btnStartDiscuss.disabled = true;
-  btnStartDiscuss.textContent = "辩论中�?;
+  btnStartDiscuss.textContent = "辩论中…;
   teamOutput.innerHTML = "";
   resetTeamUsage();
 
@@ -671,31 +672,34 @@ async function startDiscussion() {
   topicEl.textContent = t("议题: {topic}", { topic });
   teamOutput.appendChild(topicEl);
 
-  // 注入黑板上下�?
-  let boardContext = "";
+  // 注入黑板上下文
+  let boardContext = "";
+
   if (state.boardCards.length > 0) {
     boardContext = "\n\n当前黑板卡片:\n" + state.boardCards.map(c =>
-      `[${c.id}] ${c.title}${c.body ? " �?" + c.body : ""}`
+      `[${c.id}] ${c.title}${c.body ? " 首" + c.body : ""}`
     ).join("\n");
   }
 
   const entries = [];
   let verdict = null;
 
-  // 预加载成员绑定的专家�?
-  const expertDetails = new Map();
+  // 预加载成员绑定的专家包
+  const expertDetails = new Map();
+
   for (const member of teamMembers) {
     if (member.expertId && !expertDetails.has(member.expertId)) {
       try {
         expertDetails.set(member.expertId, await getExpert(member.expertId));
       } catch (e) {
-        console.warn(`专家包加载失败（${member.expertId}�?`, e);
+        console.warn(`专家包加载失败（${member.expertId}首`, e);
       }
     }
   }
 
-  // 多轮辩论：每轮每位成员可提案或回应他人，直到决策产生或轮次用�?
-  for (let round = 1; round <= maxRounds && !verdict; round++) {
+  // 多轮辩论：每轮每位成员可提案或回应他人，直到决策产生或轮次用户
+  for (let round = 1; round <= maxRounds && !verdict; round++) {
+
     addRoundHeader(round);
     const isLastRound = round === maxRounds;
 
@@ -705,12 +709,12 @@ async function startDiscussion() {
       const apiKey = getModelKey(member.modelId);
       if (!apiKey) {
         const skipEntry = addDebateEntry(member, "propose");
-        finalizeEntry(skipEntry, "propose", "", "�?未配�?API Key，跳�?);
+        finalizeEntry(skipEntry, "propose", "", "首未配置API Key，跳首);
         continue;
       }
 
       const entry = addDebateEntry(member, "propose");
-      const systemPrompt = `你是 SLATE 团队协作成员：始终从自己的角色立场出发发表独立观点，直接给观点，不寒暄、不复述他人�?{getToolsSystemPrompt({ minimal: true })}`;
+      const systemPrompt = `你是 SLATE 团队协作成员：始终从自己的角色立场出发发表独立观点，直接给观点，不寒暄、不复述他人首{getToolsSystemPrompt({ minimal: true })}`;
       const userPrompt = buildMemberPrompt(member, topic, boardContext, entries, round, isLastRound, member.expertId ? expertDetails.get(member.expertId) : null);
 
       let fullText = "";
@@ -732,7 +736,7 @@ async function startDiscussion() {
           teamOutput.scrollTop = teamOutput.scrollHeight;
         }
       } catch (e) {
-        fullText = t("�?请求失败: {msg}", { msg: e.message });
+        fullText = t("首请求失败: {msg}", { msg: e.message });
       }
 
       // 处理工具调用
@@ -743,7 +747,7 @@ async function startDiscussion() {
         for (const r of results) {
           const toolEl = document.createElement("div");
           toolEl.className = "team-tool-result";
-          toolEl.textContent = `�?${r.output}`;
+          toolEl.textContent = `首${r.output}`;
           teamOutput.appendChild(toolEl);
         }
       }
@@ -751,7 +755,7 @@ async function startDiscussion() {
       const parsed = parseDebateAction(fullText);
       // 非决策者不允许越权拍板
       const action = parsed.action === "verdict" && member.role !== "decider" ? "propose" : parsed.action;
-      finalizeEntry(entry, action, parsed.target, parsed.content || "（无内容�?);
+      finalizeEntry(entry, action, parsed.target, parsed.content || "（无内容）);
       addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText);
 
       const rec = { round, member: { ...member }, action, target: parsed.target, text: parsed.content || fullText };
@@ -759,8 +763,9 @@ async function startDiscussion() {
       if (action === "verdict") verdict = rec;
     }
 
-    // 轮次用尽仍无决策：决策者强制拍�?
-    if (!verdict && isLastRound) {
+    // 轮次用尽仍无决策：决策者强制拍首
+    if (!verdict && isLastRound) {
+
       verdict = await forceVerdict(topic, boardContext, entries);
     }
   }
@@ -780,10 +785,10 @@ async function startDiscussion() {
   isDiscussing = false;
   discussAbortController = null;
   btnStartDiscuss.disabled = false;
-  btnStartDiscuss.textContent = "开始讨�?;
+  btnStartDiscuss.textContent = "开始讨论;
 }
 
-/** 轮次用尽仍无共识时，由决策者（或首位有 Key 的成员）给出最终方�?*/
+/** 轮次用尽仍无共识时，由决策者（或首位有 Key 的成员）给出最终方首*/
 
 /** 停止正在进行的讨论 */
 function stopDiscussion() {
@@ -809,9 +814,9 @@ async function forceVerdict(topic, boardContext, entries) {
   const apiKey = decider ? getModelKey(decider.modelId) : "";
   if (!decider || !apiKey) return null;
 
-  addRoundHeader("最终决�?);
+  addRoundHeader("最终决策);
   const entry = addDebateEntry(decider, "verdict");
-  const systemPrompt = `你是 SLATE 团队协作成员：始终从自己的角色立场出发发表独立观点，直接给观点，不寒暄、不复述他人�?{getToolsSystemPrompt({ minimal: true })}`;
+  const systemPrompt = `你是 SLATE 团队协作成员：始终从自己的角色立场出发发表独立观点，直接给观点，不寒暄、不复述他人首{getToolsSystemPrompt({ minimal: true })}`;
   const userPrompt = `${decider.persona}\n\n议题: ${topic}${boardContext}\n\n辩论记录:\n${buildTranscript(entries)}\n\n讨论轮次已用尽。请综合各方观点，以【决策】开头给出最终方案、理由与取舍。`;
 
   let fullText = "";
@@ -833,7 +838,7 @@ async function forceVerdict(topic, boardContext, entries) {
       teamOutput.scrollTop = teamOutput.scrollHeight;
     }
   } catch (e) {
-    fullText = t("�?请求失败: {msg}", { msg: e.message });
+    fullText = t("首请求失败: {msg}", { msg: e.message });
   }
 
   fullText = stripToolCalls(fullText);
@@ -841,7 +846,7 @@ async function forceVerdict(topic, boardContext, entries) {
   finalizeEntry(entry, "verdict", parsed.target, parsed.content || fullText);
   addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText);
 
-  const rec = { round: "最终决�?, member: { ...decider }, action: "verdict", target: parsed.target, text: parsed.content || fullText };
+  const rec = { round: "最终决策, member: { ...decider }, action: "verdict", target: parsed.target, text: parsed.content || fullText };
   entries.push(rec);
   return rec;
 }
@@ -861,12 +866,12 @@ function renderDebateSummary(topic, entries, verdict) {
     .map(([k, n]) => `${t(DEBATE_ACTIONS[k] || k)} ${n}`).join(" · ");
 
   let summary = t("**议题**: {topic}", { topic }) + "\n\n";
-  summary += t("**参与成员**: {names}", { names: names.join("�?) }) + "\n\n";
-  summary += t("**发言统计**: �?{n} 条（{counts}�?, { n: entries.length, counts: countText }) + "\n\n";
+  summary += t("**参与成员**: {names}", { names: names.join("首) }) + "\n\n";
+  summary += t("**发言统计**: 首{n} 条（{counts}首, { n: entries.length, counts: countText }) + "\n\n";
   if (verdict) {
-    summary += t("**最终方�?*（{name}�?", { name: verdict.member.name }) + "\n" + verdict.text;
+    summary += t("**最终方首*（{name}首", { name: verdict.member.name }) + "\n" + verdict.text;
   } else {
-    summary += t("**结果**: 未达成明确决�?);
+    summary += t("**结果**: 未达成明确决策);
   }
 
   summaryEl.querySelector(".team-summary-content").innerHTML = renderSimpleMarkdown(summary);
@@ -881,7 +886,7 @@ function renderLoadedSession(session) {
 
   const topicEl = document.createElement("div");
   topicEl.className = "team-topic";
-  topicEl.textContent = t("议题: {topic}", { topic: session.topic || t("未命名讨�?) });
+  topicEl.textContent = t("议题: {topic}", { topic: session.topic || t("未命名讨论) });
   teamOutput.appendChild(topicEl);
 
   if (Array.isArray(session.entries)) {
@@ -976,7 +981,7 @@ function renderSimpleMarkdown(text) {
   return renderMarkdown(text);
 }
 
-// ── 工作流视�?────────────────────────────
+// ── 工作流视首────────────────────────────
 
 let wfSelect, wfDesc, wfInput, btnWfRun, wfRunStatus, wfNodeList, wfResultBar;
 let wfList = [];
@@ -984,11 +989,11 @@ let wfRunning = false;
 let wfAbortBtn = null;
 
 const WF_STATUS_TEXT = {
-  waiting: "�?等待",
-  running: "�?运行�?,
-  success: "�?成功",
-  failed: "�?失败",
-  skipped: "�?跳过",
+  waiting: "首等待",
+  running: "首运行首,
+  success: "首成功",
+  failed: "首失败",
+  skipped: "首跳过",
 };
 
 async function initWorkflowView() {
@@ -1043,12 +1048,12 @@ async function refreshWorkflowList() {
     for (const wf of wfList) {
       const opt = document.createElement("option");
       opt.value = wf.id;
-      opt.textContent = wf.valid ? wf.name + t("（{n} 节点�?, { n: wf.node_count }) : "�?" + wf.name + t("（定义非法）");
+      opt.textContent = wf.valid ? wf.name + t("（{n} 节点）, { n: wf.node_count }) : "首" + wf.name + t("（定义非法）");
       wfSelect.appendChild(opt);
     }
     renderWfDesc();
   } catch (e) {
-    wfDesc.textContent = t("工作流列表加载失�? {msg}", { msg: e.message });
+    wfDesc.textContent = t("工作流列表加载失败 {msg}", { msg: e.message });
   }
 }
 
@@ -1056,8 +1061,8 @@ function renderWfDesc() {
   const wf = wfList.find(w => w.id === wfSelect.value);
   if (!wf) { wfDesc.textContent = ""; return; }
   wfDesc.textContent = wf.valid
-    ? (wf.description || "") + t("（节�?{n} · 依赖�?{m}�?, { n: wf.node_count, m: wf.edge_count })
-    : t("�?该工作流定义非法：{msg}", { msg: wf.error });
+    ? (wf.description || "") + t("（节首{n} · 依赖首{m}首, { n: wf.node_count, m: wf.edge_count })
+    : t("首该工作流定义非法：{msg}", { msg: wf.error });
 }
 
 function makeWfIo(label, text) {
@@ -1075,8 +1080,9 @@ function makeWfIo(label, text) {
 
 function renderWfNodeRows(wf) {
   wfNodeList.innerHTML = "";
-  // 按拓扑顺序展示（后端已返�?order�?
-  const orderIndex = new Map((wf.order || []).map((id, i) => [id, i]));
+  // 按拓扑顺序展示（后端已返首order首
+  const orderIndex = new Map((wf.order || []).map((id, i) => [id, i]));
+
   const nodes = [...(wf.nodes || [])].sort((a, b) =>
     (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0)
   );
@@ -1101,12 +1107,12 @@ function renderWfNodeRows(wf) {
 
     const bindEl = document.createElement("span");
     bindEl.className = "wf-node-bind";
-    bindEl.textContent = node.skill ? `�?${node.skill}` : "";
+    bindEl.textContent = node.skill ? `首${node.skill}` : "";
     head.appendChild(bindEl);
 
     const caret = document.createElement("span");
     caret.className = "wf-node-caret";
-    caret.textContent = "�?;
+    caret.textContent = "首;
     head.appendChild(caret);
 
     const detail = document.createElement("div");
@@ -1131,7 +1137,7 @@ function updateWfNodeRow(rec) {
   if (rec.error) {
     const errEl = document.createElement("div");
     errEl.className = "wf-node-error";
-    errEl.textContent = `�?${rec.error}`;
+    errEl.textContent = `首${rec.error}`;
     detail.appendChild(errEl);
   }
   if (rec.inputPreview) detail.appendChild(makeWfIo("输入", rec.inputPreview));
@@ -1142,7 +1148,7 @@ async function runSelectedWorkflow() {
   if (wfRunning) return;
   const userInput = wfInput.value.trim();
   if (!userInput) {
-    wfRunStatus.textContent = "请先输入任务需�?;
+    wfRunStatus.textContent = "请先输入任务需求;
     return;
   }
   const selected = wfList.find(w => w.id === wfSelect.value);
@@ -1156,7 +1162,7 @@ async function runSelectedWorkflow() {
   btnWfRun.disabled = true;
   wfAbortBtn?.classList.remove("hidden");
   wfResultBar.innerHTML = "";
-  wfRunStatus.textContent = "加载工作流定义�?;
+  wfRunStatus.textContent = "加载工作流定义…;
 
   try {
     const wf = await getWorkflow(selected.id);
@@ -1164,7 +1170,7 @@ async function runSelectedWorkflow() {
 
     const total = (wf.nodes || []).length;
     let doneCount = 0;
-    wfRunStatus.textContent = t("运行中（0/{n}）�?, { n: total });
+    wfRunStatus.textContent = t("运行中（0/{n}）…, { n: total });
 
     const result = await runWorkflow(wf, userInput, teamMembers, {
       onNode: (rec) => {
@@ -1172,8 +1178,8 @@ async function runSelectedWorkflow() {
         if (["success", "failed", "skipped"].includes(rec.status)) {
           doneCount += 1;
           wfRunStatus.textContent = doneCount < total
-            ? t("运行中（{done}/{n}）�?, { done: doneCount, n: total })
-            : "工作流已结束，正在将产物写入知识库�?;
+            ? t("运行中（{done}/{n}）…, { done: doneCount, n: total })
+            : "工作流已结束，正在将产物写入知识库…;
         }
       },
     });
@@ -1181,23 +1187,23 @@ async function runSelectedWorkflow() {
     const okCount = result.order.filter(id => result.records[id].status === "success").length;
     try {
       const docId = await saveRunToKnowledge(wf, result);
-      wfResultBar.innerHTML = `<span class="wf-result-ok">${t("�?{ok}/{n} 节点成功 · 产物已写入知识库（{title}），可在记忆面板查看", { ok: okCount, n: total, title: docId })}</span>`;
+      wfResultBar.innerHTML = `<span class="wf-result-ok">${t("首{ok}/{n} 节点成功 · 产物已写入知识库（{title}），可在记忆面板查看", { ok: okCount, n: total, title: docId })}</span>`;
     } catch (e) {
-      wfResultBar.innerHTML = `<span class="wf-result-error">${t("节点成功 {ok}/{n}，但写入知识库失�? {msg}", { ok: okCount, n: total, msg: e.message })}</span>`;
+      wfResultBar.innerHTML = `<span class="wf-result-error">${t("节点成功 {ok}/{n}，但写入知识库失败 {msg}", { ok: okCount, n: total, msg: e.message })}</span>`;
     }
     wfRunStatus.textContent = "";
     wfAbortBtn?.classList.add("hidden");
     notifyTaskComplete(t("工作流完成"), t("{ok}/{n} 节点成功", { ok: okCount, n: total }));
   } catch (e) {
     wfRunStatus.textContent = "";
-    wfResultBar.innerHTML = `<span class="wf-result-error">${t("�?工作流执行失�? {msg}", { msg: e.message })}</span>`;
+    wfResultBar.innerHTML = `<span class="wf-result-error">${t("首工作流执行失败 {msg}", { msg: e.message })}</span>`;
   } finally {
     wfRunning = false;
     btnWfRun.disabled = false;
   }
 }
 
-// ── 初始�?──────────────────────────────────
+// ── 初始首──────────────────────────────────
 
 function initTeamPanel() {
   teamPanel = document.getElementById("team-panel");
@@ -1245,7 +1251,7 @@ function initTeamPanel() {
       id: `member-${Date.now()}`,
       name: t("成员{n}", { n: teamMembers.length + 1 }),
       modelId: "gpt-5.6-terra",
-      persona: "你是团队成员。简洁发表观点（1-3句）�?,
+      persona: "你是团队成员。简洁发表观点（1-3句）首,
       role: "member",
     });
     renderTeamMembers();
@@ -1260,8 +1266,9 @@ function initTeamPanel() {
     btnStopDiscuss.classList.add("hidden");
   }
 
-  // 最大辩论轮�?
-  const maxRoundsSelect = document.getElementById("team-max-rounds");
+  // 最大辩论轮数
+  const maxRoundsSelect = document.getElementById("team-max-rounds");
+
   if (maxRoundsSelect) {
     maxRounds = parseInt(maxRoundsSelect.value, 10) || 5;
     maxRoundsSelect.addEventListener("change", () => {

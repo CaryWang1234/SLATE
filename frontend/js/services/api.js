@@ -2,17 +2,17 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260818-72";
-import { t } from "./i18n.js?v=20260818-72";
+import { API_BASE } from "../store.js?v=20260818-75";
+import { t } from "./i18n.js?v=20260818-75";
 
 // 思考内容标记前缀（用于在流式输出中区分 reasoning 与 content）
 export const REASONING_PREFIX = "\x00\x01R\x01\x00";
 
-// ── 超时与重试常量（参考主�?Agent：idle watchdog + 零内容自动重试） ──
-const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（�?工具）总超�?const STREAM_IDLE_TIMEOUT_MS = 90000;   // 流式�?0 秒无任何数据视为连接已死
-const STREAM_MAX_RETRIES = 2;           // 未产出任何内容时的自动重试次�?
+// ── 超时与重试常量（参考主首Agent：idle watchdog + 零内容自动重试） ──
+const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（首工具）总超首const STREAM_IDLE_TIMEOUT_MS = 90000;   // 流式首0 秒无任何数据视为连接已死
+const STREAM_MAX_RETRIES = 2;           // 未产出任何内容时的自动重试次首
 /**
- * 通用 JSON 请求（带超时保护，防止工�?接口挂起导致界面永久卡死�? */
+ * 通用 JSON 请求（带超时保护，防止工厂接口挂起导致界面永久卡死首 */
 async function request(path, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   const url = `${API_BASE}${path}`;
   const defaults = {
@@ -30,7 +30,7 @@ async function request(path, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
     resp = await fetch(url, { ...config, signal: controller.signal });
   } catch (err) {
     clearTimeout(timer);
-    if (controller.signal.aborted) throw new Error(t("请求超时（{s}s），可重�?, { s: Math.round(timeoutMs / 1000) }));
+    if (controller.signal.aborted) throw new Error(t("请求超时（{s}s），可重试, { s: Math.round(timeoutMs / 1000) }));
     throw err;
   }
   clearTimeout(timer);
@@ -66,10 +66,10 @@ function patch(path, body) {
 }
 
 /**
- * 流式聊天请求：返�?AsyncIterator<string>
- * 参考主�?Agent 的流式健壮性方案：
- * - Idle watchdog：超�?STREAM_IDLE_TIMEOUT_MS 无任何数�?�?主动中断（区分“慢”与“已死”）
- * - 零内容自动重试：连接失败/挂死且未产出任何内容时，退避重�? * - payload.meta：可选对象，回写 finish_reason �?meta.finishReason
+ * 流式聊天请求：返首AsyncIterator<string>
+ * 参考主首Agent 的流式健壮性方案：
+ * - Idle watchdog：超首STREAM_IDLE_TIMEOUT_MS 无任何数5轮主动中断（区分“慢”与“已死”）
+ * - 零内容自动重试：连接失败/挂死且未产出任何内容时，退避重置 * - payload.meta：可选对象，回写 finish_reason 首meta.finishReason
  */
 async function* streamChat(payload) {
   const { signal, meta, ...body } = payload || {};
@@ -136,7 +136,7 @@ async function* streamChat(payload) {
       while (!done) {
         const { done: streamDone, value } = await reader.read();
         if (streamDone) break;
-        receivedAny = true;   // 任何数据到达（含心跳注释）都重置看门�?        resetIdle();
+        receivedAny = true;   // 任何数据到达（含心跳注释）都重置看门首        resetIdle();
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
@@ -144,16 +144,18 @@ async function* streamChat(payload) {
         for (const chunk of parseLines(lines)) yield chunk;
       }
 
-      // 流结束：flush 解码器内残留字节（跨 chunk 截断的多字节中文字符）并处理缓冲区尾�?
-      if (!done) {
+      // 流结束：flush 解码器内残留字节（跨 chunk 截断的多字节中文字符）并处理缓冲区尾首
+      if (!done) {
+
         buffer += decoder.decode();
         for (const chunk of parseLines(buffer.split("\n"))) yield chunk;
       }
       return;
     } catch (err) {
-      if (signal?.aborted) throw err;   // 用户主动停止：保�?AbortError 语义
-      // 未产出任何内�?�?自动重试（连接失�?瞬断/服务端无响应�?
-      if (!receivedAny && attempt <= STREAM_MAX_RETRIES) {
+      if (signal?.aborted) throw err;   // 用户主动停止：保存AbortError 语义
+      // 未产出任何内5轮自动重试（连接失败瞬断/服务端无响应首
+      if (!receivedAny && attempt <= STREAM_MAX_RETRIES) {
+
         await new Promise(r => setTimeout(r, 700 * attempt));
         continue;
       }
@@ -167,7 +169,7 @@ async function* streamChat(payload) {
 }
 
 /**
- * 上传文件（FormData�? */
+ * 上传文件（FormData首 */
 async function upload(path, formData) {
   const url = `${API_BASE}${path}`;
   const resp = await fetch(url, {

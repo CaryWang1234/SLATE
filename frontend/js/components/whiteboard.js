@@ -2,10 +2,10 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-72";
-import { streamChat } from "../services/api.js?v=20260818-72";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-72";
-import { t } from "../services/i18n.js?v=20260818-72";
+import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-75";
+import { streamChat } from "../services/api.js?v=20260818-75";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-75";
+import { t } from "../services/i18n.js?v=20260818-75";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -58,7 +58,7 @@ function renderCard(card) {
   if (card.arrows && card.arrows.length > 0) {
     const arrow = document.createElement("div");
     arrow.className = "board-card-arrow";
-    arrow.textContent = `�?${card.arrows.join(", ")}`;
+    arrow.textContent = `首${card.arrows.join(", ")}`;
     el.appendChild(arrow);
   }
 
@@ -69,7 +69,7 @@ function renderCard(card) {
   deleteBtn.title = t("删除卡片");
   deleteBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
-    if (await dlgConfirm(t('删除卡片"{title}"�?, { title: card.title }), { danger: true, okText: "删除" })) {
+    if (await dlgConfirm(t('删除卡片"{title}"首, { title: card.title }), { danger: true, okText: "删除" })) {
       const cards = state.boardCards.filter(c => c.id !== card.id);
       setBoardCards(cards);
     }
@@ -116,7 +116,7 @@ function renderAllCards() {
   for (const card of state.boardCards) {
     boardCards.appendChild(renderCard(card));
   }
-  // 绘制箭头（延迟确�?DOM 已更新）
+  // 绘制箭头（延迟确定DOM 已更新）
   setTimeout(drawArrows, 50);
 }
 
@@ -133,8 +133,9 @@ function drawArrows() {
   if (!svgOverlay) initSvgOverlay();
   if (!svgOverlay) return;
 
-  // 清空旧箭�?
-  svgOverlay.innerHTML = "";
+  // 清空旧箭首
+  svgOverlay.innerHTML = "";
+
 
   const containerRect = boardCards.getBoundingClientRect();
   const cards = state.boardCards;
@@ -152,14 +153,16 @@ function drawArrows() {
       const fromRect = fromEl.getBoundingClientRect();
       const toRect = toEl.getBoundingClientRect();
 
-      // 计算连接点（从卡片右侧中心到目标卡片左侧中心�?
-      const x1 = fromRect.right - containerRect.left;
+      // 计算连接点（从卡片右侧中心到目标卡片左侧中心首
+      const x1 = fromRect.right - containerRect.left;
+
       const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
       const x2 = toRect.left - containerRect.left;
       const y2 = toRect.top + toRect.height / 2 - containerRect.top;
 
-      // 绘制贝塞尔曲�?
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      // 绘制贝塞尔曲首
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+
       const midX = (x1 + x2) / 2;
       const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
       path.setAttribute("d", d);
@@ -387,7 +390,7 @@ function openCardModal(card = null) {
   selectedColor = card?.color || "default";
   renderColorOptions();
 
-  // 删除按钮只在编辑时显�?  btnCardDelete.style.display = card ? "" : "none";
+  // 删除按钮只在编辑时显首  btnCardDelete.style.display = card ? "" : "none";
 
   cardModal.classList.remove("hidden");
   cardInputTitle.focus();
@@ -401,7 +404,7 @@ function closeCardModal() {
 function saveCard() {
   const title = cardInputTitle.value.trim();
   if (!title) {
-    dlgToast(t("请输入标�?));
+    dlgToast(t("请输入标题));
     return;
   }
 
@@ -418,8 +421,9 @@ function saveCard() {
     );
     setBoardCards(cards);
   } else {
-    // 添加新卡�?
-    const card = {
+    // 添加新卡片
+    const card = {
+
       id: `c${Date.now().toString(36)}`,
       title,
       body,
@@ -493,10 +497,10 @@ function exportBoard() {
   ];
 
   if (cards.length === 0) {
-    lines.push(t("暂无卡片�?), "");
+    lines.push(t("暂无卡片。), "");
   } else {
     for (const card of cards) {
-      lines.push(`### ${card.id} · ${card.title || t("未命�?)}`);
+      lines.push(`### ${card.id} · ${card.title || t("未命名)}`);
       if (card.body) lines.push("", card.body);
       if (card.arrows?.length) lines.push("", `${t("关联")}: ${card.arrows.join(", ")}`);
       if (card.color && card.color !== "default") lines.push("", `${t("颜色")}: ${card.color}`);
@@ -576,27 +580,28 @@ async function aiOrganize() {
     return;
   }
 
-  // 构建卡片信息（含颜色�?
-  const cardsInfo = state.boardCards.map(c => {
+  // 构建卡片信息（含颜色首
+  const cardsInfo = state.boardCards.map(c => {
+
     let info = `- [${c.id}] ${c.title}`;
     if (c.body) info += `: ${c.body}`;
     if (c.color && c.color !== "default") info += ` (颜色: ${c.color})`;
     return info;
   }).join("\n");
 
-  const prompt = `你是一个结构化思维专家。请分析以下黑板卡片，进行整体重构优化�?
-当前卡片�?${cardsInfo}
+  const prompt = `你是一个结构化思维专家。请分析以下黑板卡片，进行整体重构优化首
+当前卡片首${cardsInfo}
 
 请完成以下工作：
-1. 优化卡片标题，使其简洁明确（不超�?10 字）
+1. 优化卡片标题，使其简洁明确（不超首10 字）
 2. 补充/精炼卡片详情（不超过 3 行）
-3. 根据逻辑关系建立 arrows 连接（指向目标卡�?ID�?4. 按语义分配颜色：
+3. 根据逻辑关系建立 arrows 连接（指向目标卡片ID首4. 按语义分配颜色：
    - red = 问题/风险/阻塞
-   - orange = 进行�?待处�?   - yellow = 想法/待讨�?   - green = 已完�?通过
+   - orange = 进行首待处首   - yellow = 想法/待讨首   - green = 已完成通过
    - blue = 信息/数据/资源
    - purple = 创意/设计
-   - default = 未分�?
-输出�?JSON 数组，每项包�?id、title、body、arrows、color。保持原有卡�?ID 不变�?示例：[{"id":"c1","title":"需求分�?,"body":"收集并整理用户需�?,"arrows":["c2"],"color":"blue"}]`;
+   - default = 未分首
+输出首JSON 数组，每项包首id、title、body、arrows、color。保持原有卡片ID 不变首示例：[{"id":"c1","title":"需求分首,"body":"收集并整理用户需首,"arrows":["c2"],"color":"blue"}]`;
 
   const messages = [{ role: "user", content: prompt }];
   let response = "";
@@ -628,7 +633,7 @@ async function aiOrganize() {
 
     const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
 
-    // 全量更新：保留原�?ID 匹配，应�?title/body/arrows/color 全部字段
+    // 全量更新：保留原首ID 匹配，应首title/body/arrows/color 全部字段
     const updatedCards = state.boardCards.map(card => {
       const aiCard = newCards.find(c => c.id === card.id);
       if (!aiCard) return card;
@@ -648,7 +653,7 @@ async function aiOrganize() {
   }
 }
 
-// ── �?LLM 输出解析卡片 ─────────────────────
+// ── 首LLM 输出解析卡片 ─────────────────────
 
 function parseCardsFromLLM(text) {
   const cards = [];
@@ -660,19 +665,19 @@ function parseCardsFromLLM(text) {
         for (const item of parsed) {
           cards.push({
             id: item.id || `c${Date.now().toString(36)}_${cards.length}`,
-            title: item.title || item.name || t("未命�?),
+            title: item.title || item.name || t("未命名),
             body: item.body || item.description || "",
             arrows: item.arrows || item.depends || [],
             color: item.color || "default",
           });
         }
       }
-    } catch (e) { /* �?JSON */ }
+    } catch (e) { /* 首JSON */ }
   }
   return cards;
 }
 
-// ── 初始�?───────────────────────────────────
+// ── 初始首───────────────────────────────────
 
 function initWhiteboard() {
   boardCanvas = document.getElementById("whiteboard-canvas");
@@ -711,7 +716,7 @@ function initWhiteboard() {
 
   // 清空黑板
   document.getElementById("btn-clear-board").addEventListener("click", async () => {
-    if (await dlgConfirm(t("确认清空黑板�?), { danger: true, okText: t("清空") })) setBoardCards([]);
+    if (await dlgConfirm(t("确认清空黑板？), { danger: true, okText: t("清空") })) setBoardCards([]);
   });
 
   // 模态框按钮
@@ -740,7 +745,7 @@ function initWhiteboard() {
     window.addEventListener("resize", resizeDrawCanvas);
   }
 
-  // 初始�?Mermaid
+  // 初始首Mermaid
   function initMermaidTheme() {
     if (window.mermaid) {
       const isDark = document.documentElement.getAttribute("data-theme") === "dark";

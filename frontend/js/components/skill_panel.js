@@ -1,11 +1,11 @@
 /**
- * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除�? */
+ * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除首 */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260818-72";
-import { get, post, del, upload } from "../services/api.js?v=20260818-72";
-import { guardSkillParams } from "../services/riskguard.js?v=20260818-72";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-72";
-import { t } from "../services/i18n.js?v=20260818-72";
+import { state, subscribe, setSkills } from "../store.js?v=20260818-75";
+import { get, post, del, upload } from "../services/api.js?v=20260818-75";
+import { guardSkillParams } from "../services/riskguard.js?v=20260818-75";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-75";
+import { t } from "../services/i18n.js?v=20260818-75";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -19,7 +19,7 @@ function showToast(msg) {
   setTimeout(() => { el.classList.add("out"); el.addEventListener("animationend", () => el.remove()); }, 2200);
 }
 
-// ── 技能参数定�?─────────────────────────────
+// ── 技能参数定首─────────────────────────────
 
 const SKILL_PARAM_DEFS = {
   file_tree: [
@@ -51,25 +51,25 @@ const SKILL_PARAM_DEFS = {
     { key: "body", label: "HTML 内容", type: "textarea", placeholder: "<p>Hello</p>" },
   ],
   css_color: [
-    { key: "description", label: "样式描述", type: "text", placeholder: "高对比度代码编辑器风�? },
+    { key: "description", label: "样式描述", type: "text", placeholder: "高对比度代码编辑器风格 },
     { key: "component", label: "组件类型", type: "text", placeholder: "page / card / button / nav / form / code" },
   ],
   doc_write: [
-    { key: "title", label: "文档标题", type: "text", placeholder: "项目技术文�? },
+    { key: "title", label: "文档标题", type: "text", placeholder: "项目技术文档 },
     { key: "doc_type", label: "文档类型", type: "text", placeholder: "technical / requirement / api / readme / changelog" },
-    { key: "sections", label: "章节（逗号分隔�?, type: "text", placeholder: "概述,安装,配置,API" },
-    { key: "content_hint", label: "内容提示", type: "textarea", placeholder: "关键信息或要�? },
+    { key: "sections", label: "章节（逗号分隔）, type: "text", placeholder: "概述,安装,配置,API" },
+    { key: "content_hint", label: "内容提示", type: "textarea", placeholder: "关键信息或要点 },
   ],
   ppt_create: [
     { key: "title", label: "演示文稿标题", type: "text", placeholder: "Q3 项目汇报" },
-    { key: "subtitle", label: "副标�?, type: "text", placeholder: "进展 · 风险 · 计划" },
-    { key: "outline", label: "大纲章节（逗号分隔�?, type: "text", placeholder: "背景,方案,实施计划,总结" },
-    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / wine / gray �?6 位色�? },
+    { key: "subtitle", label: "副标题, type: "text", placeholder: "进展 · 风险 · 计划" },
+    { key: "outline", label: "大纲章节（逗号分隔）, type: "text", placeholder: "背景,方案,实施计划,总结" },
+    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / wine / gray 首6 位色首 },
   ],
   word_create: [
-    { key: "title", label: "文档标题", type: "text", placeholder: "项目方案�? },
-    { key: "author", label: "作�?, type: "text", placeholder: "SLATE" },
-    { key: "content", label: "正文（支�?# 标题 / - 列表标记�?, type: "textarea", placeholder: "# 概述\n项目背景说明\n## 目标\n- 目标一" },
+    { key: "title", label: "文档标题", type: "text", placeholder: "项目方案书 },
+    { key: "author", label: "作者, type: "text", placeholder: "SLATE" },
+    { key: "content", label: "正文（支持# 标题 / - 列表标记首, type: "textarea", placeholder: "# 概述\n项目背景说明\n## 目标\n- 目标一" },
   ],
   file_edit: [
     { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/app.js" },
@@ -87,8 +87,8 @@ const SKILL_PARAM_DEFS = {
     { key: "content", label: "文件内容", type: "textarea", placeholder: "文件内容..." },
   ],
   text_summarize: [
-    { key: "text", label: "文本", type: "textarea", placeholder: "粘贴要总结的文�? },
-    { key: "max_points", label: "要点�?, type: "number", placeholder: "5" },
+    { key: "text", label: "文本", type: "textarea", placeholder: "粘贴要总结的文本 },
+    { key: "max_points", label: "要点数, type: "number", placeholder: "5" },
     { key: "keyword_limit", label: "关键词数", type: "number", placeholder: "12" },
   ],
   json_tool: [
@@ -99,9 +99,9 @@ const SKILL_PARAM_DEFS = {
   ],
   regex_test: [
     { key: "pattern", label: "正则", type: "text", placeholder: "\\bTODO\\b" },
-    { key: "text", label: "测试文本", type: "textarea", placeholder: "输入用于测试的文�? },
+    { key: "text", label: "测试文本", type: "textarea", placeholder: "输入用于测试的文本 },
     { key: "flags", label: "标志", type: "text", placeholder: "i / m / s" },
-    { key: "limit", label: "最大结�?, type: "number", placeholder: "20" },
+    { key: "limit", label: "最大结果, type: "number", placeholder: "20" },
   ],
   repo_stats: [
     { key: "directory", label: "目录路径", type: "text", placeholder: "C:\\path\\to\\project" },
@@ -110,36 +110,36 @@ const SKILL_PARAM_DEFS = {
   todo_scan: [
     { key: "directory", label: "目录路径", type: "text", placeholder: "C:\\path\\to\\project" },
     { key: "markers", label: "标记", type: "text", placeholder: "TODO,FIXME,待办" },
-    { key: "limit", label: "最大结�?, type: "number", placeholder: "100" },
+    { key: "limit", label: "最大结果, type: "number", placeholder: "100" },
   ],
   web_search: [
-    { key: "query", label: "搜索关键�?/ URL", type: "text", placeholder: "FastAPI 最新版本号（fetch 模式�?URL�? },
+    { key: "query", label: "搜索关键首/ URL", type: "text", placeholder: "FastAPI 最新版本号（fetch 模式首URL首 },
     { key: "mode", label: "模式", type: "text", placeholder: "search / fetch" },
-    { key: "max_results", label: "结果数（�?0�?, type: "number", placeholder: "5" },
+    { key: "max_results", label: "结果数（首0首, type: "number", placeholder: "5" },
   ],
   web_fetch: [
     { key: "url", label: "网页 URL", type: "text", placeholder: "https://example.com/article" },
     { key: "mode", label: "模式", type: "text", placeholder: "text / html" },
-    { key: "max_chars", label: "截断长度（≤30000�?, type: "number", placeholder: "8000" },
+    { key: "max_chars", label: "截断长度（≤30000）, type: "number", placeholder: "8000" },
   ],
   chart_create: [
-    { key: "data", label: "数据（JSON �?标签:值）", type: "textarea", placeholder: "Q1:120, Q2:90, Q3:150" },
+    { key: "data", label: "数据（JSON 首标签:值）", type: "textarea", placeholder: "Q1:120, Q2:90, Q3:150" },
     { key: "type", label: "图表类型", type: "text", placeholder: "bar / hbar / line / pie" },
     { key: "title", label: "图表标题", type: "text", placeholder: "季度销售额" },
-    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / warm / gray 或逗号分隔色�? },
+    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / warm / gray 或逗号分隔色值 },
   ],
   qrcode_create: [
-    { key: "text", label: "二维码内容（文本/URL�?, type: "textarea", placeholder: "https://github.com/CaryWang1234/SLATE" },
+    { key: "text", label: "二维码内容（文本/URL）, type: "textarea", placeholder: "https://github.com/CaryWang1234/SLATE" },
     { key: "size", label: "模块像素大小", type: "number", placeholder: "8" },
   ],
   python_api_extract: [
-    { key: "target", label: "目标（包名或 .py 文件/目录路径�?, type: "text", placeholder: "requests �?C:/path/to/mylib" },
-    { key: "depth", label: "递归深度�?1 不限�?, type: "number", placeholder: "1" },
+    { key: "target", label: "目标（包名或 .py 文件/目录路径）, type: "text", placeholder: "requests 首C:/path/to/mylib" },
+    { key: "depth", label: "递归深度首1 不限首, type: "number", placeholder: "1" },
     { key: "format", label: "输出格式", type: "text", placeholder: "json / markdown" },
   ],
   html_bundle: [
-    { key: "src", label: "�?html 文件路径", type: "text", placeholder: "C:/path/to/page/index.html" },
-    { key: "out", label: "输出路径（可选）", type: "text", placeholder: "缺省为源同目�?<原名>.bundled.html" },
+    { key: "src", label: "首html 文件路径", type: "text", placeholder: "C:/path/to/page/index.html" },
+    { key: "out", label: "输出路径（可选）", type: "text", placeholder: "缺省为源同目首<原名>.bundled.html" },
   ,
   mcp_factory: [
     { key: "tool_name", label: "工具名称（英文）", type: "text", placeholder: "my_tool" },
@@ -208,7 +208,7 @@ const SKILL_PARAM_DEFS = {
   ],],
 };
 
-// ── 列表渲染：工具�?+ SKILL.md 技能区 ────────────
+// ── 列表渲染：工具首+ SKILL.md 技能区 ────────────
 
 function createSectionHeader(text, count) {
   const head = document.createElement("div");
@@ -277,11 +277,12 @@ function createSkillItem(name, desc, kind) {
   info.appendChild(descEl);
   item.appendChild(info);
 
-  // Skill 支持删除；内置工具不可�?
-  if (kind === "Skill") {
+  // Skill 支持删除；内置工具不可首
+  if (kind === "Skill") {
+
     const delBtn = document.createElement("button");
     delBtn.className = "skill-item-del";
-    delBtn.title = "删除技�?";
+    delBtn.title = "删除技能";
     delBtn.textContent = "×";
     delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -298,10 +299,10 @@ function createSkillItem(name, desc, kind) {
 }
 
 async function handleDeleteSkill(name) {
-  if (!await dlgConfirm(t("确定删除技�?{name}�?, { name }), { danger: true, okText: "删除" })) return;
+  if (!await dlgConfirm(t("确定删除技能{name}首, { name }), { danger: true, okText: "删除" })) return;
   try {
     const res = await del(`/skills/${encodeURIComponent(name)}`);
-    showToast(res.code === 0 ? t("已删除技�?{name}", { name }) : t("删除失败: {msg}", { msg: res.message }));
+    showToast(res.code === 0 ? t("已删除技能{name}", { name }) : t("删除失败: {msg}", { msg: res.message }));
     if (res.code === 0) refreshSkills();
   } catch (e) {
     showToast(t("删除失败: {msg}", { msg: e.message }));
@@ -347,11 +348,11 @@ function openSkillModal(name) {
 // ── SKILL.md 技能查看器（只读展示定义内容） ─────────────
 
 async function openSkillViewer(name) {
-  skillModalTitle.textContent = t("技�? {name}", { name });
+  skillModalTitle.textContent = t("技术 {name}", { name });
   skillParams.innerHTML = "";
   btnRunSkill.classList.add("hidden");
   skillResult.classList.remove("hidden");
-  skillResult.textContent = "读取中�?";
+  skillResult.textContent = "读取中…";
   skillModal.classList.remove("hidden");
 
   try {
@@ -378,7 +379,7 @@ async function executeSkill() {
   }
 
   btnRunSkill.disabled = true;
-  btnRunSkill.textContent = "执行中�?;
+  btnRunSkill.textContent = "执行中…;
 
   try {
     // 高危命令审批：命中写死规则时弹框请求批准
@@ -423,15 +424,16 @@ async function executeSkill() {
   btnRunSkill.textContent = "执行";
 }
 
-// ── 上传自定义技�?───────────────────────────
+// ── 上传自定义技术───────────────────────────
 
 async function handleUploadSkill() {
-  const name = await dlgPrompt("技能名称（英文，如 my-skill）：", { title: "新建技�?, placeholder: "my-skill" });
+  const name = await dlgPrompt("技能名称（英文，如 my-skill）：", { title: "新建技能, placeholder: "my-skill" });
   if (!name || !name.trim()) return;
-  const desc = (await dlgPrompt("技能描述：", { title: "新建技�?, value: name.trim(), textarea: true })) || name.trim();
+  const desc = (await dlgPrompt("技能描述：", { title: "新建技能, value: name.trim(), textarea: true })) || name.trim();
 
-  // 创建文件选择�?
-  const input = document.createElement("input");
+  // 创建文件选择首
+  const input = document.createElement("input");
+
   input.type = "file";
   input.multiple = true;
   input.accept = ".md,.py,.js,.json,.yaml,.yml,.sh,.bat";
@@ -448,7 +450,7 @@ async function handleUploadSkill() {
     try {
       const res = await upload(`/skills/upload?skill_name=${encodeURIComponent(name.trim())}&skill_desc=${encodeURIComponent(desc.trim())}`, formData);
       if (res.code === 0) {
-        showToast(t("技�?{name} 上传成功", { name }));
+        showToast(t("技术{name} 上传成功", { name }));
         refreshSkills();
       } else {
         showToast(t("上传失败: {msg}", { msg: res.message }));
@@ -563,7 +565,7 @@ async function handleGithubImport() {
   }
 }
 
-// ── 刷新技能列�?─────────────────────────────
+// ── 刷新技能列首─────────────────────────────
 
 async function refreshSkills() {
   const res = await get("/skills");
@@ -572,7 +574,7 @@ async function refreshSkills() {
   }
 }
 
-// ── 初始�?───────────────────────────────────
+// ── 初始首───────────────────────────────────
 
 function initSkillPanel() {
   skillList = document.getElementById("skill-list");
@@ -599,8 +601,9 @@ function initSkillPanel() {
 
   subscribe("skills", renderSkillList);
 
-  // 加载技能列�?
-  refreshSkills();
+  // 加载技能列首
+  refreshSkills();
+
 }
 
 export { initSkillPanel, refreshSkills };
