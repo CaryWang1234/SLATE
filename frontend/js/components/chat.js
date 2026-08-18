@@ -1034,31 +1034,31 @@ async function autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal = nul
 
 // 工具卡片的中文标签（含图标），未收录的回退到原始名
 const TOOL_LABELS = {
-  file_create: "�?创建文件",
-  file_edit: "�?编辑文件",
-  file_append: "�?追加文件",
-  skill_run: "�?技�?,
-  project_info: "🏷 项目信息",
-  project_files: "🗂 文件�?,
+  file_create: "📝 创建文件",
+  file_edit: "✏️ 编辑文件",
+  file_append: "➕ 追加文件",
+  skill_run: "⚡ 技能",
+  project_info: "ℹ️ 项目信息",
+  project_files: "📁 文件列表",
   project_read_file: "📄 读取文件",
   project_find_file: "🔍 查找文件",
-  board_add: "🗒 添加卡片",
-  board_read: "🗒 读取黑板",
-  board_update: "🗒 更新卡片",
-  board_batch: "🗒 批量操作",
-  board_clear: "🗒 清空黑板",
-  knowledge_search: "📚 知识检�?,
+  board_add: "📋 添加卡片",
+  board_read: "📋 读取黑板",
+  board_update: "📋 更新卡片",
+  board_batch: "📋 批量操作",
+  board_clear: "📋 清空黑板",
+  knowledge_search: "📚 知识检索",
   knowledge_add: "📚 知识添加",
-  prompt_gen: "🧩 提示词生�?,
-  chat_context: "💬 对话上下�?,
+  prompt_gen: "💡 提示词生成",
+  chat_context: "💬 对话上下文",
 };
 
 function getToolCallLabel(call) {
   if (call?.name === "skill_run") {
     const skillName = call.params?.skill;
-    return skillName ? t("�?技�?· {name}", { name: skillName }) : "�?技�?;
+    return skillName ? t("⚡ 技能 · {name}", { name: skillName }) : "⚡ 技能";
   }
-  return TOOL_LABELS[call?.name] || t("工具 · {name}", { name: call?.name || "unknown" });
+  return TOOL_LABELS[call?.name] || t("🔧 工具 · {name}", { name: call?.name || "unknown" });
 }
 
 function getToolCallStatus(result) {
