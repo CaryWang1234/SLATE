@@ -36,7 +36,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "doc_write": "生成 Markdown 格式技术文档或需求说明",
     "ppt_create": "生成 .pptx 演示文稿（标题页+内容页，支持主题大纲与自定义配色）",
     "word_create": "生成 .docx Word 文档（标题层级、段落、列表排版）",
-    "file_edit": "基于 diff 精确编辑文件（只改指定内容）+ 行操作（insert/delete）+ 剪贴板（copy/paste/cut）",
+    "file_edit": "文件编辑（view 带行号查看 / replace 精确唯一替换 / edit diff / read / insert / delete / copy / paste / cut）",
     "file_create": "创建新文件（预览后确认写入）",
     "text_summarize": "文本摘要与关键词提取",
     "json_tool": "JSON 校验、格式化、压缩与路径读取",

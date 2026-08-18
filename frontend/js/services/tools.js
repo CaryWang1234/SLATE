@@ -11,10 +11,10 @@
  *   文件内容原样（第二行起）
  *   ◈◆�? */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-69";
-import { post } from "../services/api.js?v=20260818-69";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-69";
-import { t } from "./i18n.js?v=20260818-69";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-70";
+import { post } from "../services/api.js?v=20260818-70";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-70";
+import { t } from "./i18n.js?v=20260818-70";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -350,10 +350,12 @@ const TOOLS = {
 
   file_edit: {
     name: "编辑文件",
-    description: "基于 diff 精确编辑项目文件。只改指定内容，未提及的部分绝不触碰。默认自动应用写入（用户在设置关闭自动确认时改为预览后手动接受）。参数名�?file_path（不�?path）�?,
+    description: "文件编辑：view 带行号查看 / replace 精确唯一替换 / edit diff / read / insert / delete / copy / paste / cut。默认自动应用写入（用户在设置关闭自动确认时改为预览后手动接受）。参数名 file_path（不是 path）。",
     params: {
       file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录）", required: true },
-      edits: { type: "array", description: '编辑列表，每项含 old_text �?new_text，如 [{"old_text":"原内�?,"new_text":"新内�?}]', required: true },
+      edits: { type: "array", description: '编辑列表（edit 操作），每项含 old_text 和 new_text，如 [{"old_text":"原内容","new_text":"新内容"}]' },
+      old_str: { type: "string", description: "要被替换的精确字符串（replace 操作，必须唯一匹配）" },
+      new_str: { type: "string", description: "替换后的新字符串（replace 操作）" },
     },
     async execute({ file_path, edits, _truncated }) {
       if (!state.project) return "未打开项目";

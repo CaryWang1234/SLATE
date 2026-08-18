@@ -71,7 +71,7 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "file_path": {"type": "string", "description": "目标文件路径"},
-                "action": {"type": "string", "description": "操作类型: edit/read/insert/delete/copy/paste/cut"},
+                "action": {"type": "string", "description": "操作类型: view/replace/edit/read/insert/delete/copy/paste/cut"},
                 "edits": {
                     "type": "array",
                     "items": {
@@ -84,8 +84,10 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                     "description": "编辑列表（edit 操作），每项含 old_text 和 new_text",
                 },
                 "content": {"type": "string", "description": "要插入的内容（insert 操作）"},
-                "start_line": {"type": "integer", "description": "起始行号（1-based，用于 insert/delete/copy/paste/cut）"},
-                "end_line": {"type": "integer", "description": "结束行号（1-based，用于 delete/copy/cut）"},
+                "old_str": {"type": "string", "description": "要被替换的精确字符串（replace 操作，必须唯一匹配）"},
+                "new_str": {"type": "string", "description": "替换后的新字符串（replace 操作）"},
+                "start_line": {"type": "integer", "description": "起始行号（1-based，用于 view/insert/delete/copy/paste/cut）"},
+                "end_line": {"type": "integer", "description": "结束行号（1-based，用于 view/delete/copy/cut）"},
                 "clipboard_name": {"type": "string", "description": "剪贴板名称（默认 'default'）"},
             },
         },

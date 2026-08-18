@@ -3,7 +3,7 @@
  * 两个开关均可在设置中独立切换
  */
 
-import { state } from "../store.js?v=20260818-69";
+import { state } from "../store.js?v=20260818-70";
 
 // ── 音效（Web Audio API，无需外部文件）─────────────────
 

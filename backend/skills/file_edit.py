@@ -1,6 +1,8 @@
-"""技能：文件编辑 —— 支持 diff 编辑、行操作、剪贴板（复制/粘贴/剪切）。
+"""技能：文件编辑 —— 支持 view/replace 协议 + diff 编辑 + 行操作 + 剪贴板。
 
 操作类型：
+- view: 带行号读取文件（供 AI 精确定位引用）
+- replace: 精确字符串替换（唯一匹配 + 自动备份）
 - edit: 基于 diff 的精确修改（old_text → new_text）
 - read: 读取文件内容（支持行号范围）
 - insert: 在指定行插入内容
@@ -56,6 +58,25 @@ def _read_file(file_path: str) -> tuple[str | None, str | None]:
         return None, "文件不是 UTF-8 文本"
 
 
+def _read_with_lines(file_path: str) -> tuple[list[str], str, str, str | None]:
+    """共享辅助函数：读取文件，返回 (lines, content, line_ending, error)。
+
+    line_ending 为 '\n' 或 '\r\n'，用于写回时保持原换行符。
+    lines 不含行尾换行符。
+    """
+    content, error = _read_file(file_path)
+    if error:
+        return [], "", "\n", error
+
+    # 检测换行符
+    line_ending = "\r\n" if "\r\n" in content else "\n"
+
+    # 拆分为行（去掉所有行尾换行）
+    lines = content.splitlines()
+
+    return lines, content, line_ending, None
+
+
 def _write_file(file_path: str, content: str) -> str | None:
     """写入文件，返回 error 或 None。"""
     target = Path(file_path)
@@ -83,6 +104,126 @@ def _generate_diff(original: str, content: str, filename: str) -> str:
         lineterm="",
     ))
     return "".join(diff_lines)
+
+
+def _execute_view(
+    file_path: str,
+    start_line: int | None = None,
+    end_line: int | None = None,
+) -> dict[str, Any]:
+    """view 操作：带行号读取文件内容。
+
+    每行格式为 "{行号}: {代码内容}"，行号右对齐占 4 位。
+    """
+    lines, content, _le, error = _read_with_lines(file_path)
+    if error:
+        return {"error": error}
+
+    total = len(lines)
+
+    # 校验范围
+    if start_line is not None and start_line < 1:
+        return {"error": f"start_line 必须 >= 1，收到 {start_line}"}
+    if end_line is not None and end_line < 1:
+        return {"error": f"end_line 必须 >= 1，收到 {end_line}"}
+    if start_line is not None and end_line is not None and end_line < start_line:
+        return {"error": f"end_line ({end_line}) 不能小于 start_line ({start_line})"}
+
+    # 确定实际范围
+    s = (start_line - 1) if start_line else 0          # 0-based
+    e = end_line if end_line else total
+    s = min(s, total)
+    e = min(e, total)
+
+    # 生成带行号的输出
+    numbered: list[str] = []
+    for idx in range(s, e):
+        line_no = idx + 1  # 1-based
+        numbered.append(f"{line_no:>4}: {lines[idx]}")
+
+    return {
+        "file": file_path,
+        "total_lines": total,
+        "range": f"{s + 1}-{e}" if (start_line or end_line) else f"1-{total}",
+        "content": "\n".join(numbered),
+        "line_count": e - s,
+    }
+
+
+def _execute_replace(
+    file_path: str,
+    old_str: str,
+    new_str: str,
+) -> dict[str, Any]:
+    """replace 操作：精确字符串替换，唯一匹配 + 自动备份。
+
+    严格逻辑：
+    1. old_str == new_str → 不写入
+    2. count == 0 → 报错
+    3. count > 1 → 报错
+    4. count == 1 → 创建 .bak 备份后写回
+    """
+    if old_str is None or old_str == "":
+        return {"error": "old_str 不能为空"}
+
+    lines, content, line_ending, error = _read_with_lines(file_path)
+    if error:
+        return {"error": error}
+
+    # 新旧相同
+    if old_str == new_str:
+        return {"file": file_path, "action": "replace", "status": "unchanged", "message": "未修改，新旧内容相同"}
+
+    # 统计匹配
+    count = content.count(old_str)
+    if count == 0:
+        return {
+            "file": file_path,
+            "action": "replace",
+            "status": "not_found",
+            "error": "未找到精确匹配，请先 view 最新内容后重新复制 old_str",
+        }
+    if count > 1:
+        return {
+            "file": file_path,
+            "action": "replace",
+            "status": "ambiguous",
+            "error": f"存在 {count} 处匹配，请在 old_str 前后增加 3 行唯一上下文以确保唯一匹配",
+        }
+
+    # 创建备份
+    target = Path(file_path)
+    bak_path = target.with_suffix(target.suffix + ".bak")
+    try:
+        bak_path.write_text(content, encoding="utf-8")
+    except Exception as e:
+        return {"error": f"创建备份失败 ({bak_path}): {e}"}
+
+    # 执行替换
+    new_content = content.replace(old_str, new_str, 1)
+
+    # 写回（保持原换行符）
+    try:
+        target.write_text(new_content, encoding="utf-8")
+    except PermissionError:
+        return {"error": f"无权限写入: {file_path}"}
+    except Exception as e:
+        return {"error": f"写入失败: {e}"}
+
+    # 计算替换位置信息
+    pos = content.index(old_str)
+    line_no = content[:pos].count("\n") + 1
+
+    return {
+        "file": file_path,
+        "action": "replace",
+        "status": "ok",
+        "line": line_no,
+        "backup": str(bak_path),
+        "old_chars": len(old_str),
+        "new_chars": len(new_str),
+        "message": f"已替换第 {line_no} 行附近的唯一匹配，备份至 {bak_path.name}",
+    }
 
 
 def _execute_edit(file_path: str, edits: Any) -> dict[str, Any]:
@@ -362,27 +503,41 @@ def execute(
     action: str = "edit",
     edits: Any = None,
     content: str = "",
+    old_str: str = "",
+    new_str: str = "",
     start_line: int = 0,
     end_line: int = 0,
     clipboard_name: str = "default",
     **_kw: Any,
 ) -> dict[str, Any]:
     """
-    文件编辑工具：支持 diff 编辑、行操作、剪贴板。
+    文件编辑工具：支持 view/replace 协议 + diff 编辑 + 行操作 + 剪贴板。
 
     Args:
         file_path: 目标文件路径
-        action: 操作类型 - edit/read/insert/delete/copy/paste/cut
+        action: 操作类型 - view/replace/edit/read/insert/delete/copy/paste/cut
         edits: JSON 数组（edit 操作），每项含 old_text 和 new_text
         content: 要插入的内容（insert 操作）
-        start_line: 起始行号（1-based，用于 insert/delete/copy/paste/cut）
-        end_line: 结束行号（1-based，用于 delete/copy/cut）
+        old_str: 要被替换的精确字符串（replace 操作）
+        new_str: 替换后的新字符串（replace 操作）
+        start_line: 起始行号（1-based，用于 view/insert/delete/copy/paste/cut）
+        end_line: 结束行号（1-based，用于 view/delete/copy/cut）
         clipboard_name: 剪贴板名称（默认 "default"，支持多个命名剪贴板）
     """
     if not file_path:
         return {"error": "文件路径不能为空"}
     
     action = (action or "edit").strip().lower()
+    
+    if action == "view":
+        return _execute_view(
+            file_path,
+            start_line=start_line if start_line > 0 else None,
+            end_line=end_line if end_line > 0 else None,
+        )
+    
+    if action == "replace":
+        return _execute_replace(file_path, old_str, new_str)
     
     if action == "edit":
         if edits is None:
@@ -407,4 +562,4 @@ def execute(
     if action == "cut":
         return _execute_cut(file_path, start_line, end_line, clipboard_name)
     
-    return {"error": f"未知操作: {action}，可选: edit/read/insert/delete/copy/paste/cut"}
+    return {"error": f"未知操作: {action}，可选: view/replace/edit/read/insert/delete/copy/paste/cut"}

@@ -69,7 +69,7 @@ function renderProjectBar() {
     reviewBtn.textContent = "\u{1F50D}";
     reviewBtn.title = "Code Review\uff1aAI \u4ee3\u7801\u5ba1\u67e5\uff08git diff \u00b7 \u56db\u7ef4\u5ea6 \u00b7 \u884c\u7ea7\u8bc4\u8bba\uff09";
     reviewBtn.addEventListener("click", () => {
-      import("./review.js?v=20260818-69")
+      import("./review.js?v=20260818-70")
         .then(({ openReviewModal }) => openReviewModal())
         .catch(() => {});
     });
