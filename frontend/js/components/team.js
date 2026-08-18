@@ -398,7 +398,7 @@ function renderTeamHistory() {
 
     const title = document.createElement("div");
     title.className = "team-history-title";
-    title.textContent = session.topic || "未命名讨论;
+    title.textContent = session.topic || "未命名讨论";
     item.appendChild(title);
 
     const meta = document.createElement("div");
@@ -475,7 +475,7 @@ function renderTeamMembers() {
     const personaInput = document.createElement("textarea");
     personaInput.className = "team-member-persona";
     personaInput.value = m.persona;
-    personaInput.placeholder = "角色设定…;
+    personaInput.placeholder = "角色设定…";
     personaInput.rows = 2;
     personaInput.addEventListener("change", () => { m.persona = personaInput.value; });
     card.appendChild(personaInput);
@@ -485,14 +485,14 @@ function renderTeamMembers() {
     expertRow.className = "team-member-expert-row";
     const expertLabel = document.createElement("span");
     expertLabel.className = "team-member-expert-label";
-    expertLabel.textContent = "专家包;
+    expertLabel.textContent = "专家包";
     expertRow.appendChild(expertLabel);
     const expertSelect = document.createElement("select");
     expertSelect.className = "team-member-model member-expert-select";
     expertSelect.dataset.current = m.expertId || "";
     const noneOpt = document.createElement("option");
     noneOpt.value = "";
-    noneOpt.textContent = "无专家;
+    noneOpt.textContent = "无专家";
     expertSelect.appendChild(noneOpt);
     for (const item of getExpertsCached()) {
       const opt = document.createElement("option");
@@ -523,7 +523,7 @@ function populateModelOptions(select, selectedId) {
     for (const m of models) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      opt.textContent = m.name + (hasModelKey(m.id) ? "" : " 首);
+      opt.textContent = m.name + (hasModelKey(m.id) ? "" : " 首");
       if (m.id === selectedId) opt.selected = true;
       optgroup.appendChild(opt);
     }
@@ -534,11 +534,11 @@ function populateModelOptions(select, selectedId) {
   if (state.customModels.length > 0) {
 
     const optgroup = document.createElement("optgroup");
-    optgroup.label = "自定义;
+    optgroup.label = "自定义";
     for (const m of state.customModels) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      opt.textContent = m.name + (hasModelKey(m.id) ? "" : " 首);
+      opt.textContent = m.name + (hasModelKey(m.id) ? "" : " 首");
       if (m.id === selectedId) opt.selected = true;
       optgroup.appendChild(opt);
     }
@@ -567,14 +567,14 @@ function parseDebateAction(text) {
 
 function buildTranscript(entries) {
   return entries.map(e =>
-    `[首{e.round}轮] ${e.member.name}首{DEBATE_ACTIONS[e.action] || "发言"}首{e.target ? `（回首${e.target}）` : ""}: ${e.text}`
+    `[首{e.round}轮] ${e.member.name}首{DEBATE_ACTIONS[e.action] || "发言"}首{e.target ? `（回${e.target}）` : ""}: ${e.text}`
   ).join("\n");
 }
 
 function addRoundHeader(round) {
   const el = document.createElement("div");
   el.className = "debate-round-header";
-  el.textContent = t("—— 第 {n} 轮 ——, { n: round });
+  el.textContent = t("—— 第 {n} 轮 ——", { n: round }");
   teamOutput.appendChild(el);
 }
 
@@ -641,15 +641,15 @@ function buildMemberPrompt(member, topic, boardContext, entries, round, isLastRo
   if (expertPrompt) prompt += `${expertPrompt}\n`;
   prompt += `\n议题: ${topic}${boardContext}\n\n`;
   if (entries.length === 0) {
-    prompt += "这是第一轮，请提出你的想法或方案首;
+    prompt += "这是第一轮，请提出你的想法或方案首";
   } else {
     prompt += `已有发言记录:\n${buildTranscript(entries)}\n\n请继续参与讨论：可以提出新想法，也可以支持、反对、反驳或补充他人的想法。`;
   }
   prompt += `\n\n发言格式：第一行以【提案】【支持】【反对】【反驳】【补充】之一开头，回应他人时在动作后写 @对方成员名，第二行起写正文（1-3句）。`;
   if (member.role === "decider") {
     prompt += isLastRound
-      ? "\n这是最后一轮：请综合各方观点，以【决策】开头给出最终方案、理由与取舍首
-      : "\n若各方已达成共识或分歧无法调和，你可以【决策】开头直接给出最终方案（讨论将立即结束）；否则继续正常参与讨论首;
+      ? "\n这是最后一轮：请综合各方观点，以【决策】开头给出最终方案、理由与取舍首"
+      : "\n若各方已达成共识或分歧无法调和，你可以【决策】开头直接给出最终方案（讨论将立即结束）；否则继续正常参与讨论首";
   }
   return prompt;
 }
@@ -663,7 +663,7 @@ async function startDiscussion() {
   isDiscussing = true;
   discussAbortController = new AbortController();
   btnStartDiscuss.disabled = true;
-  btnStartDiscuss.textContent = "辩论中…;
+  btnStartDiscuss.textContent = "辩论中…";
   teamOutput.innerHTML = "";
   resetTeamUsage();
 
@@ -709,7 +709,7 @@ async function startDiscussion() {
       const apiKey = getModelKey(member.modelId);
       if (!apiKey) {
         const skipEntry = addDebateEntry(member, "propose");
-        finalizeEntry(skipEntry, "propose", "", "首未配置API Key，跳首);
+        finalizeEntry(skipEntry, "propose", "", "首未配置API Key，跳首");
         continue;
       }
 
@@ -747,7 +747,7 @@ async function startDiscussion() {
         for (const r of results) {
           const toolEl = document.createElement("div");
           toolEl.className = "team-tool-result";
-          toolEl.textContent = `首${r.output}`;
+          toolEl.textContent = `${r.output}`;
           teamOutput.appendChild(toolEl);
         }
       }
@@ -755,7 +755,7 @@ async function startDiscussion() {
       const parsed = parseDebateAction(fullText);
       // 非决策者不允许越权拍板
       const action = parsed.action === "verdict" && member.role !== "decider" ? "propose" : parsed.action;
-      finalizeEntry(entry, action, parsed.target, parsed.content || "（无内容）);
+      finalizeEntry(entry, action, parsed.target, parsed.content || "（无内容）");
       addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText);
 
       const rec = { round, member: { ...member }, action, target: parsed.target, text: parsed.content || fullText };
@@ -785,7 +785,7 @@ async function startDiscussion() {
   isDiscussing = false;
   discussAbortController = null;
   btnStartDiscuss.disabled = false;
-  btnStartDiscuss.textContent = "开始讨论;
+  btnStartDiscuss.textContent = "开始讨论";
 }
 
 /** 轮次用尽仍无共识时，由决策者（或首位有 Key 的成员）给出最终方案**/
@@ -814,7 +814,7 @@ async function forceVerdict(topic, boardContext, entries) {
   const apiKey = decider ? getModelKey(decider.modelId) : "";
   if (!decider || !apiKey) return null;
 
-  addRoundHeader("最终决策);
+  addRoundHeader("最终决策");
   const entry = addDebateEntry(decider, "verdict");
   const systemPrompt = `你是 SLATE 团队协作成员：始终从自己的角色立场出发发表独立观点，直接给观点，不寒暄、不复述他人首{getToolsSystemPrompt({ minimal: true })}`;
   const userPrompt = `${decider.persona}\n\n议题: ${topic}${boardContext}\n\n辩论记录:\n${buildTranscript(entries)}\n\n讨论轮次已用尽。请综合各方观点，以【决策】开头给出最终方案、理由与取舍。`;
@@ -846,7 +846,7 @@ async function forceVerdict(topic, boardContext, entries) {
   finalizeEntry(entry, "verdict", parsed.target, parsed.content || fullText);
   addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText);
 
-  const rec = { round: "最终决策, member: { ...decider }, action: "verdict", target: parsed.target, text: parsed.content || fullText };
+  const rec = { round: "最终决策, member: { ...decider }, action: "verdict", target: parsed.target, text: parsed.content || fullText "};
   entries.push(rec);
   return rec;
 }
@@ -867,11 +867,11 @@ function renderDebateSummary(topic, entries, verdict) {
 
   let summary = t("**议题**: {topic}", { topic }) + "\n\n";
   summary += t("**参与成员**: {names}", { names: names.join("首) }) + "\n\n";
-  summary += t("**发言统计**: 共 {n} 条（{counts}）, { n: entries.length, counts: countText }) + "\n\n";
+  summary += t("**发言统计**: 共 {n} 条（{counts}）", { n: entries.length, counts: countText }) + "\n\n";
   if (verdict) {
     summary += t("**最终方案**（{name}）":, { name: verdict.member.name }) + "\n" + verdict.text;
   } else {
-    summary += t("**结果**: 未达成明确决策);
+    summary += t("**结果**: 未达成明确决策");
   }
 
   summaryEl.querySelector(".team-summary-content").innerHTML = renderSimpleMarkdown(summary);
@@ -886,7 +886,7 @@ function renderLoadedSession(session) {
 
   const topicEl = document.createElement("div");
   topicEl.className = "team-topic";
-  topicEl.textContent = t("议题: {topic}", { topic: session.topic || t("未命名讨论) });
+  topicEl.textContent = t("议题: {topic}", { topic: session.topic || t("未命名讨论) }");
   teamOutput.appendChild(topicEl);
 
   if (Array.isArray(session.entries)) {
@@ -990,7 +990,7 @@ let wfAbortBtn = null;
 
 const WF_STATUS_TEXT = {
   waiting: "首等待",
-  running: "首运行首,
+  running: "首运行首,"
   success: "首成功",
   failed: "首失败",
   skipped: "首跳过",
@@ -1048,7 +1048,7 @@ async function refreshWorkflowList() {
     for (const wf of wfList) {
       const opt = document.createElement("option");
       opt.value = wf.id;
-      opt.textContent = wf.valid ? wf.name + t("（{n} 节点）, { n: wf.node_count }) : "首" + wf.name + t("（定义非法）");
+      opt.textContent = wf.valid ? wf.name + t("（{n} 节点）", { n: wf.node_count }) : "" + wf.name + t("（定义非法）")";
       wfSelect.appendChild(opt);
     }
     renderWfDesc();
@@ -1061,7 +1061,7 @@ function renderWfDesc() {
   const wf = wfList.find(w => w.id === wfSelect.value);
   if (!wf) { wfDesc.textContent = ""; return; }
   wfDesc.textContent = wf.valid
-    ? (wf.description || "") + t("（节点 {n} · 依赖边 {m}）, { n: wf.node_count, m: wf.edge_count })
+    ? (wf.description || "") + t("（节点 {n} · 依赖边 {m}）", { n: wf.node_count, m: wf.edge_count })
     : t("首该工作流定义非法：{msg}", { msg: wf.error });
 }
 
@@ -1107,12 +1107,12 @@ function renderWfNodeRows(wf) {
 
     const bindEl = document.createElement("span");
     bindEl.className = "wf-node-bind";
-    bindEl.textContent = node.skill ? `首${node.skill}` : "";
+    bindEl.textContent = node.skill ? `${node.skill}` : "";
     head.appendChild(bindEl);
 
     const caret = document.createElement("span");
     caret.className = "wf-node-caret";
-    caret.textContent = "首;
+    caret.textContent = "首";
     head.appendChild(caret);
 
     const detail = document.createElement("div");
@@ -1137,7 +1137,7 @@ function updateWfNodeRow(rec) {
   if (rec.error) {
     const errEl = document.createElement("div");
     errEl.className = "wf-node-error";
-    errEl.textContent = `首${rec.error}`;
+    errEl.textContent = `${rec.error}`;
     detail.appendChild(errEl);
   }
   if (rec.inputPreview) detail.appendChild(makeWfIo("输入", rec.inputPreview));
@@ -1148,7 +1148,7 @@ async function runSelectedWorkflow() {
   if (wfRunning) return;
   const userInput = wfInput.value.trim();
   if (!userInput) {
-    wfRunStatus.textContent = "请先输入任务需求;
+    wfRunStatus.textContent = "请先输入任务需求";
     return;
   }
   const selected = wfList.find(w => w.id === wfSelect.value);
@@ -1162,7 +1162,7 @@ async function runSelectedWorkflow() {
   btnWfRun.disabled = true;
   wfAbortBtn?.classList.remove("hidden");
   wfResultBar.innerHTML = "";
-  wfRunStatus.textContent = "加载工作流定义…;
+  wfRunStatus.textContent = "加载工作流定义…";
 
   try {
     const wf = await getWorkflow(selected.id);
@@ -1170,7 +1170,7 @@ async function runSelectedWorkflow() {
 
     const total = (wf.nodes || []).length;
     let doneCount = 0;
-    wfRunStatus.textContent = t("运行中（0/{n}）…, { n: total });
+    wfRunStatus.textContent = t("运行中（0/{n}）…", { n: total }");
 
     const result = await runWorkflow(wf, userInput, teamMembers, {
       onNode: (rec) => {
@@ -1178,8 +1178,8 @@ async function runSelectedWorkflow() {
         if (["success", "failed", "skipped"].includes(rec.status)) {
           doneCount += 1;
           wfRunStatus.textContent = doneCount < total
-            ? t("运行中（{done}/{n}）…, { done: doneCount, n: total })
-            : "工作流已结束，正在将产物写入知识库…;
+            ? t("运行中（{done}/{n}）…", { done: doneCount, n: total })
+            : "工作流已结束，正在将产物写入知识库…";
         }
       },
     });
@@ -1187,7 +1187,7 @@ async function runSelectedWorkflow() {
     const okCount = result.order.filter(id => result.records[id].status === "success").length;
     try {
       const docId = await saveRunToKnowledge(wf, result);
-      wfResultBar.innerHTML = `<span class="wf-result-ok">${t("首{ok}/{n} 节点成功 · 产物已写入知识库（{title}），可在记忆面板查看", { ok: okCount, n: total, title: docId })}</span>`;
+      wfResultBar.innerHTML = `<span class="wf-result-ok">${t("{ok}/{n} 节点成功 · 产物已写入知识库（{title}），可在记忆面板查看", { ok: okCount, n: total, title: docId })}</span>`;
     } catch (e) {
       wfResultBar.innerHTML = `<span class="wf-result-error">${t("节点成功 {ok}/{n}，但写入知识库失败: {msg}", { ok: okCount, n: total, msg: e.message })}</span>`;
     }
@@ -1251,7 +1251,7 @@ function initTeamPanel() {
       id: `member-${Date.now()}`,
       name: t("成员{n}", { n: teamMembers.length + 1 }),
       modelId: "gpt-5.6-terra",
-      persona: "你是团队成员。简洁发表观点（1-3句）首,
+      persona: "你是团队成员。简洁发表观点（1-3句）首,"
       role: "member",
     });
     renderTeamMembers();

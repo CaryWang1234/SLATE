@@ -139,7 +139,7 @@ function renderFileList(folder) {
   listEl.innerHTML = "";
   const files = currentDetail[folder] || [];
   if (files.length === 0) {
-    listEl.innerHTML = '<div class="exp-file-empty">暂无文件，点击上首+ 添加文件"</div>';
+    listEl.innerHTML = '<div class="exp-file-empty">暂无文件，点击上方 + 添加文件"</div>';
     return;
   }
   for (const f of files) {
@@ -181,7 +181,7 @@ async function handleFileUpload(folder, fileList) {
     try {
       await uploadExpertFile(currentId, folder, file);
     } catch (e) {
-      await toast(t("上传失败: {name}（{msg}）, { name: file.name, msg: e.message }));
+      await toast(t("上传失败: {name}（{msg}）", { name: file.name, msg: e.message })");
     }
   }
   currentDetail = await getExpert(currentId, { force: true });
@@ -193,7 +193,7 @@ async function handleFileUpload(folder, fileList) {
 
 async function handleNew() {
   try {
-    const id = await createExpert({ name: "新专家 });
+    const id = await createExpert({ name: "新专家 }");
     await refreshList();
     await selectExpert(id);
   } catch (e) {
@@ -206,7 +206,7 @@ async function handleImport(file) {
     const id = await importExpertZip(file);
     await refreshList();
     await selectExpert(id);
-    await toast("专家包导入成功);
+    await toast("专家包导入成功");
   } catch (e) {
     await toast(t("导入失败: {msg}", { msg: e.message }));
   }
@@ -216,7 +216,7 @@ async function handleSave() {
   if (!currentId) return;
   try {
     await saveExpert(currentId, {
-      name: nameInput.value.trim() || "未命名专家,
+      name: nameInput.value.trim() || "未命名专家,"
       description: descInput.value.trim(),
       persona: personaInput.value,
       rules: rulesInput.value,
@@ -246,7 +246,7 @@ function handleExport() {
 async function handleDelete() {
   if (!currentId) return;
   const name = currentDetail?.name || currentId;
-  if (!await dlgConfirm(t("确定删除专家包「{name}」？该操作不可恢复。, { name }), { danger: true, okText: "删除" })) return;
+  if (!await dlgConfirm(t("确定删除专家包「{name}」？该操作不可恢复。", { name }), { danger: true, okText: "删除" })) return;
   const id = currentId;
   try {
     await deleteExpert(id);
@@ -266,7 +266,7 @@ function fillExpertOptions(select, selectedId) {
   select.innerHTML = "";
   const none = document.createElement("option");
   none.value = "";
-  none.textContent = "无专家;
+  none.textContent = "无专家";
   select.appendChild(none);
   for (const item of expertsCache) {
     const opt = document.createElement("option");

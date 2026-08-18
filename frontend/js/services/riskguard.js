@@ -11,26 +11,26 @@ import { t } from "./i18n.js?v=20260818-75";
 
 // 高危命令规则（写死）：命中任一条即要求批准
 const HIGH_RISK_PATTERNS = [
-  { re: /\brm\b/i, reason: "删除文件（rm） },
+  { re: /\brm\b/i, reason: "删除文件（rm）" },
   { re: /\b(rmdir|shred|unlink)\b/i, reason: "删除文件/目录" },
-  { re: /\b(del|erase)\b\s/i, reason: "删除文件（del/erase） },
-  { re: /\brd\b\s/i, reason: "删除目录（rd） },
-  { re: /Remove-Item/i, reason: "删除文件（Remove-Item） },
-  { re: /\bdd\b(?=.*\bof=)/i, reason: "磁盘写入（dd） },
+  { re: /\b(del|erase)\b\s/i, reason: "删除文件（del/erase）" },
+  { re: /\brd\b\s/i, reason: "删除目录（rd）" },
+  { re: /Remove-Item/i, reason: "删除文件（Remove-Item）" },
+  { re: /\bdd\b(?=.*\bof=)/i, reason: "磁盘写入（dd）" },
   { re: /\b(fdisk|diskpart|parted)\b/i, reason: "磁盘分区操作" },
   { re: /\b(shutdown|reboot|poweroff|halt)\b/i, reason: "关机/重启" },
   { re: /\binit\s+[06]\b/, reason: "关机/重启" },
-  { re: /\bsudo\b/i, reason: "提权执行（sudo） },
+  { re: /\bsudo\b/i, reason: "提权执行（sudo）" },
   { re: /\b(taskkill|killall)\b/i, reason: "强制结束进程" },
-  { re: /\bkill\s+-9\b/i, reason: "强制结束进程（kill -9） },
-  { re: /reg\s+(delete|add)\b/i, reason: "修改注册表 },
+  { re: /\bkill\s+-9\b/i, reason: "强制结束进程（kill -9）" },
+  { re: /reg\s+(delete|add)\b/i, reason: "修改注册表" },
   { re: /\bsc\s+(delete|stop)\b/i, reason: "管理系统服务" },
   { re: /\bnet\s+user\b/i, reason: "修改用户账户" },
   { re: /\b(takeown|icacls)\b/i, reason: "修改文件所有权/权限" },
-  { re: /\bchmod\s+(-R\s+)?777\b/i, reason: "开放全部权限（chmod 777） },
-  { re: /git\s+push\s+[^;]*(--force\b|-f\b|--force-with-lease)/i, reason: "Git 强制推送 },
-  { re: /git\s+reset\s+--hard/i, reason: "Git 硬重置（丢弃改动） },
-  { re: /git\s+clean\s+-[a-z]*f/i, reason: "Git 清理未跟踪文件 },
+  { re: /\bchmod\s+(-R\s+)?777\b/i, reason: "开放全部权限（chmod 777）" },
+  { re: /git\s+push\s+[^;]*(--force\b|-f\b|--force-with-lease)/i, reason: "Git 强制推送" },
+  { re: /git\s+reset\s+--hard/i, reason: "Git 硬重置（丢弃改动）" },
+  { re: /git\s+clean\s+-[a-z]*f/i, reason: "Git 清理未跟踪文件" },
   { re: /git\s+branch\s+-D\b/i, reason: "Git 强制删除分支" },
   { re: /(drop\s+(database|table|schema)|truncate\s+table)/i, reason: "数据库删除删库" },
   { re: /(npm|pnpm|yarn)\s+(uninstall|remove)\s+(-g|--global)/i, reason: "卸载全局依赖" },
@@ -72,14 +72,14 @@ async function explainCommand(command) {
       temperature: 0.2,
       max_tokens: 200,
       messages: [
-        { role: "system", content: "你是终端命令安全分析器。用一两句话客观解释该命令的目的与潜在影响，不超过60字，不要给出执行建议首 },
+        { role: "system", content: "你是终端命令安全分析器。用一两句话客观解释该命令的目的与潜在影响，不超过60字，不要给出执行建议" },
         { role: "user", content: command },
       ],
     });
     const text = res?.data?.choices?.[0]?.message?.content?.trim();
-    return text || t("（模型未返回说明）);
+    return text || t("（模型未返回说明）");
   } catch (e) {
-    return t("（说明生成失败: {msg}首, { msg: e.message });
+    return t("（说明生成失败: {msg}）", { msg: e.message });
   }
 }
 
@@ -110,7 +110,7 @@ function requestHighRiskApproval(command, reason) {
     pendingResolve = resolve;
     cmdEl.textContent = command;
     reasonEl.textContent = t("触发规则：{reason}", { reason: t(reason) });
-    explainEl.textContent = t("正在用模型分析命令目的…);
+    explainEl.textContent = t("正在用模型分析命令目的…");
     modal.classList.remove("hidden");
     explainCommand(command).then(text => {
       if (pendingResolve === resolve) explainEl.textContent = text;

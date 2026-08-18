@@ -51,25 +51,25 @@ const SKILL_PARAM_DEFS = {
     { key: "body", label: "HTML 内容", type: "textarea", placeholder: "<p>Hello</p>" },
   ],
   css_color: [
-    { key: "description", label: "样式描述", type: "text", placeholder: "高对比度代码编辑器风格 },
+    { key: "description", label: "样式描述", type: "text", placeholder: "高对比度代码编辑器风格 "},
     { key: "component", label: "组件类型", type: "text", placeholder: "page / card / button / nav / form / code" },
   ],
   doc_write: [
-    { key: "title", label: "文档标题", type: "text", placeholder: "项目技术文档 },
+    { key: "title", label: "文档标题", type: "text", placeholder: "项目技术文档 "},
     { key: "doc_type", label: "文档类型", type: "text", placeholder: "technical / requirement / api / readme / changelog" },
-    { key: "sections", label: "章节（逗号分隔）, type: "text", placeholder: "概述,安装,配置,API" },
-    { key: "content_hint", label: "内容提示", type: "textarea", placeholder: "关键信息或要点 },
+    { key: "sections", label: "章节（逗号分隔）, type: "text", placeholder: "概述,安装,配置,API" "},
+    { key: "content_hint", label: "内容提示", type: "textarea", placeholder: "关键信息或要点 "},
   ],
   ppt_create: [
     { key: "title", label: "演示文稿标题", type: "text", placeholder: "Q3 项目汇报" },
-    { key: "subtitle", label: "副标题, type: "text", placeholder: "进展 · 风险 · 计划" },
-    { key: "outline", label: "大纲章节（逗号分隔）, type: "text", placeholder: "背景,方案,实施计划,总结" },
-    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / wine / gray 首6 位色首 },
+    { key: "subtitle", label: "副标题, type: "text", placeholder: "进展 · 风险 · 计划" "},
+    { key: "outline", label: "大纲章节（逗号分隔）, type: "text", placeholder: "背景,方案,实施计划,总结" "},
+    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / wine / gray 首6 位色首 "},
   ],
   word_create: [
-    { key: "title", label: "文档标题", type: "text", placeholder: "项目方案书 },
-    { key: "author", label: "作者, type: "text", placeholder: "SLATE" },
-    { key: "content", label: "正文（支持# 标题 / - 列表标记首, type: "textarea", placeholder: "# 概述\n项目背景说明\n## 目标\n- 目标一" },
+    { key: "title", label: "文档标题", type: "text", placeholder: "项目方案书 "},
+    { key: "author", label: "作者, type: "text", placeholder: "SLATE" "},
+    { key: "content", label: "正文（支持# 标题 / - 列表标记首, type: "textarea", placeholder: "# 概述\n项目背景说明\n## 目标\n- 目标一" "},
   ],
   file_edit: [
     { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/app.js" },
@@ -87,8 +87,8 @@ const SKILL_PARAM_DEFS = {
     { key: "content", label: "文件内容", type: "textarea", placeholder: "文件内容..." },
   ],
   text_summarize: [
-    { key: "text", label: "文本", type: "textarea", placeholder: "粘贴要总结的文本 },
-    { key: "max_points", label: "要点数, type: "number", placeholder: "5" },
+    { key: "text", label: "文本", type: "textarea", placeholder: "粘贴要总结的文本 "},
+    { key: "max_points", label: "要点数, type: "number", placeholder: "5" "},
     { key: "keyword_limit", label: "关键词数", type: "number", placeholder: "12" },
   ],
   json_tool: [
@@ -99,9 +99,9 @@ const SKILL_PARAM_DEFS = {
   ],
   regex_test: [
     { key: "pattern", label: "正则", type: "text", placeholder: "\\bTODO\\b" },
-    { key: "text", label: "测试文本", type: "textarea", placeholder: "输入用于测试的文本 },
+    { key: "text", label: "测试文本", type: "textarea", placeholder: "输入用于测试的文本 "},
     { key: "flags", label: "标志", type: "text", placeholder: "i / m / s" },
-    { key: "limit", label: "最大结果, type: "number", placeholder: "20" },
+    { key: "limit", label: "最大结果, type: "number", placeholder: "20" "},
   ],
   repo_stats: [
     { key: "directory", label: "目录路径", type: "text", placeholder: "C:\\path\\to\\project" },
@@ -110,31 +110,31 @@ const SKILL_PARAM_DEFS = {
   todo_scan: [
     { key: "directory", label: "目录路径", type: "text", placeholder: "C:\\path\\to\\project" },
     { key: "markers", label: "标记", type: "text", placeholder: "TODO,FIXME,待办" },
-    { key: "limit", label: "最大结果, type: "number", placeholder: "100" },
+    { key: "limit", label: "最大结果, type: "number", placeholder: "100" "},
   ],
   web_search: [
-    { key: "query", label: "搜索关键首/ URL", type: "text", placeholder: "FastAPI 最新版本号（fetch 模式首URL首 },
+    { key: "query", label: "搜索关键首/ URL", type: "text", placeholder: "FastAPI 最新版本号（fetch 模式首URL首 "},
     { key: "mode", label: "模式", type: "text", placeholder: "search / fetch" },
-    { key: "max_results", label: "结果数（首0首, type: "number", placeholder: "5" },
+    { key: "max_results", label: "结果数（首0首, type: "number", placeholder: "5" "},
   ],
   web_fetch: [
     { key: "url", label: "网页 URL", type: "text", placeholder: "https://example.com/article" },
     { key: "mode", label: "模式", type: "text", placeholder: "text / html" },
-    { key: "max_chars", label: "截断长度（≤30000）, type: "number", placeholder: "8000" },
+    { key: "max_chars", label: "截断长度（≤30000）, type: "number", placeholder: "8000" "},
   ],
   chart_create: [
     { key: "data", label: "数据（JSON 首标签:值）", type: "textarea", placeholder: "Q1:120, Q2:90, Q3:150" },
     { key: "type", label: "图表类型", type: "text", placeholder: "bar / hbar / line / pie" },
     { key: "title", label: "图表标题", type: "text", placeholder: "季度销售额" },
-    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / warm / gray 或逗号分隔色值 },
+    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / warm / gray 或逗号分隔色值 "},
   ],
   qrcode_create: [
-    { key: "text", label: "二维码内容（文本/URL）, type: "textarea", placeholder: "https://github.com/CaryWang1234/SLATE" },
+    { key: "text", label: "二维码内容（文本/URL）", type: "textarea", placeholder: "https://github.com/CaryWang1234/SLATE" },
     { key: "size", label: "模块像素大小", type: "number", placeholder: "8" },
   ],
   python_api_extract: [
-    { key: "target", label: "目标（包名或 .py 文件/目录路径）, type: "text", placeholder: "requests 首C:/path/to/mylib" },
-    { key: "depth", label: "递归深度首1 不限首, type: "number", placeholder: "1" },
+    { key: "target", label: "目标（包名或 .py 文件/目录路径）, type: "text", placeholder: "requests 首C:/path/to/mylib" "},
+    { key: "depth", label: "递归深度首1 不限首, type: "number", placeholder: "1" "},
     { key: "format", label: "输出格式", type: "text", placeholder: "json / markdown" },
   ],
   html_bundle: [
@@ -299,7 +299,7 @@ function createSkillItem(name, desc, kind) {
 }
 
 async function handleDeleteSkill(name) {
-  if (!await dlgConfirm(t("确定删除技能 {name}首, { name }), { danger: true, okText: "删除" })) return;
+  if (!await dlgConfirm(t("确定删除技能 {name}", { name }), { danger: true, okText: "删除" })) return;
   try {
     const res = await del(`/skills/${encodeURIComponent(name)}`);
     showToast(res.code === 0 ? t("已删除技能 {name}", { name }) : t("删除失败: {msg}", { msg: res.message }));
@@ -379,7 +379,7 @@ async function executeSkill() {
   }
 
   btnRunSkill.disabled = true;
-  btnRunSkill.textContent = "执行中…;
+  btnRunSkill.textContent = "执行中…";
 
   try {
     // 高危命令审批：命中写死规则时弹框请求批准
@@ -427,9 +427,9 @@ async function executeSkill() {
 // ── 上传自定义技术───────────────────────────
 
 async function handleUploadSkill() {
-  const name = await dlgPrompt("技能名称（英文，如 my-skill）：", { title: "新建技能, placeholder: "my-skill" });
+  const name = await dlgPrompt("技能名称（英文，如 my-skill）：", { title: "新建技能, placeholder: "my-skill" }");
   if (!name || !name.trim()) return;
-  const desc = (await dlgPrompt("技能描述：", { title: "新建技能, value: name.trim(), textarea: true })) || name.trim();
+  const desc = (await dlgPrompt("技能描述：", { title: "新建技能, value: name.trim(), textarea: true })) || name.trim(");
 
   // 创建文件选择首
   const input = document.createElement("input");

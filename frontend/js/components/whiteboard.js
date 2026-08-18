@@ -58,7 +58,7 @@ function renderCard(card) {
   if (card.arrows && card.arrows.length > 0) {
     const arrow = document.createElement("div");
     arrow.className = "board-card-arrow";
-    arrow.textContent = `首${card.arrows.join(", ")}`;
+    arrow.textContent = `${card.arrows.join(", ")}`;
     el.appendChild(arrow);
   }
 
@@ -69,7 +69,7 @@ function renderCard(card) {
   deleteBtn.title = t("删除卡片");
   deleteBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
-    if (await dlgConfirm(t('删除卡片"{title}"首, { title: card.title }), { danger: true, okText: "删除" })) {
+    if (await dlgConfirm(t('删除卡片"{title}"", { title: card.title }), { danger: true, okText: "删除" })) {
       const cards = state.boardCards.filter(c => c.id !== card.id);
       setBoardCards(cards);
     }
@@ -404,7 +404,7 @@ function closeCardModal() {
 function saveCard() {
   const title = cardInputTitle.value.trim();
   if (!title) {
-    dlgToast(t("请输入标题));
+    dlgToast(t("请输入标题"));
     return;
   }
 
@@ -497,10 +497,10 @@ function exportBoard() {
   ];
 
   if (cards.length === 0) {
-    lines.push(t("暂无卡片。), "");
+    lines.push(t("暂无卡片。"), "");
   } else {
     for (const card of cards) {
-      lines.push(`### ${card.id} · ${card.title || t("未命名)}`);
+      lines.push(`### ${card.id} · ${card.title || t("未命名")}`);
       if (card.body) lines.push("", card.body);
       if (card.arrows?.length) lines.push("", `${t("关联")}: ${card.arrows.join(", ")}`);
       if (card.color && card.color !== "default") lines.push("", `${t("颜色")}: ${card.color}`);
@@ -590,7 +590,7 @@ async function aiOrganize() {
   }).join("\n");
 
   const prompt = `你是一个结构化思维专家。请分析以下黑板卡片，进行整体重构优化首
-当前卡片首${cardsInfo}
+当前卡片${cardsInfo}
 
 请完成以下工作：
 1. 优化卡片标题，使其简洁明确（不超首10 字）
@@ -665,7 +665,7 @@ function parseCardsFromLLM(text) {
         for (const item of parsed) {
           cards.push({
             id: item.id || `c${Date.now().toString(36)}_${cards.length}`,
-            title: item.title || item.name || t("未命名),
+            title: item.title || item.name || t("未命名"),
             body: item.body || item.description || "",
             arrows: item.arrows || item.depends || [],
             color: item.color || "default",
@@ -716,7 +716,7 @@ function initWhiteboard() {
 
   // 清空黑板
   document.getElementById("btn-clear-board").addEventListener("click", async () => {
-    if (await dlgConfirm(t("确认清空黑板？), { danger: true, okText: t("清空") })) setBoardCards([]);
+    if (await dlgConfirm(t("确认清空黑板？"), { danger: true, okText: t("清空") })) setBoardCards([]);
   });
 
   // 模态框按钮

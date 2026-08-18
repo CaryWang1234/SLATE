@@ -12,8 +12,8 @@ import { t } from "../services/i18n.js?v=20260815-51";
 
 const LEVELS = {
   brief: { label: "简略, tree: "目录深度 2 层, files: "精读 6 个关键文件, out: "输出首900 首 },
-  balanced: { label: "平衡", tree: "目录深度 3 层, files: "精读 16 个关键文件, out: "输出首1800 首 },
-  detailed: { label: "详细", tree: "目录深度 5 层, files: "精读 36 个关键文件, out: "输出首3200 首 },
+  balanced: { label: "平衡", tree: "目录深度 3 层", files: "精读 16 个关键文件", out: "输出约 1800 字" },
+  detailed: { label: "详细", tree: "目录深度 5 层", files: "精读 36 个关键文件", out: "输出约 3200 字" },
 };
 const LEVEL_TOKENS = { brief: 900, balanced: 1800, detailed: 3200 };
 
@@ -36,7 +36,7 @@ function showView(name) {
 function openUnderstandModal() {
   bindUnderstandModal();
   if (!state.project) {
-    import("../app.js?v=20260815-51").then(({ toast }) => toast("请先打开一个项目)).catch(() => {});
+    import("../app.js?v=20260815-51").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
     return;
   }
   currentResult = state.project.config?.understanding || null;
@@ -85,7 +85,7 @@ function setStepStatus(idx, status) {
   if (!step) return;
   step.className = `understand-step ${status}`;
   const icon = step.querySelector(".understand-step-icon");
-  if (icon) icon.textContent = status === "done" ? "首 : status === "running" ? "首 : status === "error" ? "首 : "·";
+  if (icon) icon.textContent = status === "done" ? "\u2705" : status === "running" ? "\ud83d\udd0d" : status === "error" ? "首 : "·";"
 }
 
 function appendLog(text) {
@@ -116,31 +116,31 @@ async function startUnderstanding() {
   try {
     // 首扫描项目
     setStepStatus(0, "running");
-    appendLog(t("开始扫描项目（档位：{level}）…, { level: LEVELS[currentLevel].label }));
+    appendLog(t("开始扫描项目（档位：{level}）…", { level: LEVELS[currentLevel].label }));
     const scanRes = await post("/projects/understand/scan", { level: currentLevel });
     if (scanRes.code !== 0) throw new Error(scanRes.message || "扫描失败");
     const scan = scanRes.data;
-    appendLog(t("扫描完成：{n} 个文件，精读 {h} 个, { n: scan.total_files, h: scan.heads.length }) + (scan.truncated ? t("（目录树已截断）") : ""));
+    appendLog(t("扫描完成：{n} 个文件，精读 {h} 个", { n: scan.total_files, h: scan.heads.length }) + (scan.truncated ? t("（目录树已截断）") : ""));
     setStepStatus(0, "done");
 
     const scanContext = buildScanContext(scan);
 
     // 首生成导览·百科
     setStepStatus(1, "running");
-    appendLog("正在生成导览·百科…);
+    appendLog("正在生成导览·百科…");
     const tour = await generateDoc(model.id, apiKey, buildTourPrompt(scan.project, currentLevel), scanContext);
-    appendLog(t("导览·百科完成（{n} 字符）, { n: tour.length }));
+    appendLog(t("导览·百科完成（{n} 字符）", { n: tour.length }));
     setStepStatus(1, "done");
 
     // 首生成规则手册
     setStepStatus(2, "running");
-    appendLog("正在生成规则手册…);
+    appendLog("正在生成规则手册…");
     const rules = await generateDoc(model.id, apiKey, buildRulesPrompt(scan.project, currentLevel), scanContext);
-    appendLog(t("规则手册完成（{n} 字符）, { n: rules.length }));
+    appendLog(t("规则手册完成（{n} 字符）", { n: rules.length }));
     setStepStatus(2, "done");
 
     // 首保存到项目配置（合并式写入）
-    appendLog("正在保存到项目配置…);
+    appendLog("正在保存到项目配置…");
     currentResult = {
       level: currentLevel,
       generated_at: new Date().toISOString(),
@@ -159,10 +159,10 @@ async function startUnderstanding() {
 
     renderResult();
     showView("result");
-    import("../app.js?v=20260815-51").then(({ toast }) => toast("项目理解已生成)).catch(() => {});
+    import("../app.js?v=20260815-51").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
   } catch (e) {
     if (e.name === "AbortError") {
-      appendLog("已取消);
+      appendLog("已取消");
       showView("setup");
     } else {
       const steps = progressSteps?.children || [];
@@ -194,7 +194,7 @@ async function generateDoc(modelId, apiKey, systemPrompt, scanContext) {
   })) {
     fullText += chunk;
   }
-  if (!fullText.trim()) throw new Error("模型未返回内容);
+  if (!fullText.trim()) throw new Error("模型未返回内容");
   return fullText.trim();
 }
 
@@ -210,7 +210,7 @@ function buildScanContext(scan) {
 
 function buildTourPrompt(projectName, level) {
   const depth = level === "brief"
-    ? "篇幅精炼（约600字），每个小节只写核心结首
+    ? "篇幅精炼（约600字），每个小节只写核心结论"
     : level === "balanced"
       ? "篇幅适中（约1200字），关键模块展开一两句说明"
       : "篇幅详尽（约2000字），每个模块都要展开说明";
@@ -218,7 +218,7 @@ function buildTourPrompt(projectName, level) {
   return `你是资深软件架构师。根据用户提供的项目扫描资料（目录树与关键文件内容），为项目栏{projectName}」撰写一份「导览·百科」文档，帮助新成员或 AI 快速理解该项目栏
 
 要求首
-- 使用 Markdown，只依据扫描资料中的事实撰写，无法确定的内容明确标注"待确定
+- 使用 Markdown，只依据扫描资料中的事实撰写，无法确定的内容明确标注"待确定"
 - ${depth}
 - 章节结构建
 1. 项目概述：一句话定位 + 解决什么问首
@@ -231,10 +231,10 @@ function buildTourPrompt(projectName, level) {
 
 function buildRulesPrompt(projectName, level) {
   const depth = level === "brief"
-    ? "只提炼最关键首5-8 条规范
+    ? "只提炼最关键的 5-8 条规范"
     : level === "balanced"
       ? "提炼 10-15 条规则，覆盖主要约定"
-      : "提炼 15-25 条规则，覆盖所有可观察到的约定，并单列「扩展点与常见坑」小首;
+      : "提炼 15-25 条规则，覆盖所有可观察到的约定，并单列「扩展点与常见坑」小节";
   return `你是资深技术负责人。根据用户提供的项目扫描资料（目录树与关键文件内容），为项目栏{projectName}」编写一份「规则手册」——供新成员与 AI 助手在后续开发中严格遵守的项目规则首
 
 要求首
@@ -255,7 +255,7 @@ let activeTab = "tour";
 
 function renderResult() {
   if (!resultView || !currentResult) return;
-  const levelLabel = LEVELS[currentResult.level]?.label || currentResult.level || "首;
+  const levelLabel = LEVELS[currentResult.level]?.label || currentResult.level || "";
   const time = currentResult.generated_at ? new Date(currentResult.generated_at).toLocaleString() : "";
   if (resultMeta) resultMeta.textContent = t("档位：{level} · 生成于 {date}", { level: t(levelLabel), date: time });
   renderResultTabs();
@@ -282,7 +282,7 @@ async function copyCurrentResult() {
   const text = activeTab === "tour" ? currentResult.tour : currentResult.rules;
   try {
     await navigator.clipboard.writeText(text || "");
-    import("../app.js?v=20260815-51").then(({ toast }) => toast("已复制到剪贴板)).catch(() => {});
+    import("../app.js?v=20260815-51").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
   } catch {
     import("../app.js?v=20260815-51").then(({ toast }) => toast("复制失败")).catch(() => {});
   }

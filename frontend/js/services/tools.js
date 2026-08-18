@@ -56,7 +56,7 @@ const TOOLS = {
 
   project_files: {
     name: "浏览项目文件",
-    description: "浏览当前项目的文件目录，或读取文件内容,
+    description: "浏览当前项目的文件目录，或读取文件内容",
     params: {
       path: { type: "string", description: "相对路径（空=根目录）" },
     },
@@ -88,7 +88,7 @@ const TOOLS = {
 
   project_find_file: {
     name: "查找项目文件",
-    description: "按文件名或相对路径在当前项目中查找文字,
+    description: "按文件名或相对路径在当前项目中查找文字",
     params: {
       query: { type: "string", description: "文件名或路径片段", required: true },
     },
@@ -105,7 +105,7 @@ const TOOLS = {
 
   board_add: {
     name: "添加黑板卡片",
-    description: "在白板上添加一张卡片，支持标题、详情、依赖关系和语义颜色。适合将想首任务/概念可视化首,
+    description: "在白板上添加一张卡片，支持标题、详情、依赖关系和语义颜色。适合将想首任务/概念可视化首,"
     params: {
       title: { type: "string", description: "卡片标题", required: true },
       body: { type: "string", description: "卡片描述/详情" },
@@ -117,7 +117,7 @@ const TOOLS = {
       const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
       const card = {
         id,
-        title: title || "未命名,
+        title: title || "未命名",
         body: body || "",
         arrows: arrows || [],
         color: VALID_COLORS.includes(color) ? color : "default",
@@ -136,21 +136,21 @@ const TOOLS = {
       const lines = state.boardCards.map(c => {
         let s = `[${c.id}] ${c.title}`;
         if (c.color && c.color !== "default") s += ` (${c.color})`;
-        if (c.body) s += ` 首${c.body}`;
-        if (c.arrows?.length) s += ` 首${c.arrows.join(", ")}`;
+        if (c.body) s += ` ${c.body}`;
+        if (c.arrows?.length) s += ` ${c.arrows.join(", ")}`;
         return s;
       });
-      return `黑板首${state.boardCards.length} 张卡片：\n${lines.join("\n")}`;
+      return `黑板${state.boardCards.length} 张卡片：\n${lines.join("\n")}`;
     },
   },
 
   board_update: {
     name: "更新黑板卡片",
-    description: "更新已有卡片的标题、详情、依赖或颜色。只改传入的字段，未传的保持不变首,
+    description: "更新已有卡片的标题、详情、依赖或颜色。只改传入的字段，未传的保持不变首,"
     params: {
       id: { type: "string", description: "目标卡片 ID", required: true },
-      title: { type: "string", description: "新标题 },
-      body: { type: "string", description: "新详细 },
+      title: { type: "string", description: "新标题" },
+      body: { type: "string", description: "新详细" },
       arrows: { type: "array", description: "新依赖列表（覆盖原值）" },
       color: { type: "string", description: "新颜色 default/red/orange/yellow/green/blue/purple" },
     },
@@ -172,12 +172,12 @@ const TOOLS = {
 
   board_batch: {
     name: "批量操作黑板",
-    description: "一次性对黑板执行多个操作（添加更新/删除/清空），适合整体重构黑板结构。操作按顺序执行首,
+    description: "一次性对黑板执行多个操作（添加更新/删除/清空），适合整体重构黑板结构。操作按顺序执行首,"
     params: {
       ops: { type: "array", description: '操作列表，每天 {action:"add",title,body,arrows,color} | {action:"update",id,title,body,arrows,color} | {action:"delete",id} | {action:"clear"}', required: true },
     },
     async execute({ ops }) {
-      if (!Array.isArray(ops) || !ops.length) return "ops 必须是非空数首;
+      if (!Array.isArray(ops) || !ops.length) return "ops 必须是非空数组";
       const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
       const results = [];
       let cards = [...state.boardCards];
@@ -187,12 +187,12 @@ const TOOLS = {
           const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
           cards.push({
             id,
-            title: op.title || "未命名,
+            title: op.title || "未命名,"
             body: op.body || "",
             arrows: op.arrows || [],
             color: VALID_COLORS.includes(op.color) ? op.color : "default",
           });
-          results.push(`+ [${id}] ${op.title || "未命名}`);
+          results.push(`+ [${id}] ${op.title || "未命名"}`);
         } else if (op.action === "update") {
           const idx = cards.findIndex(c => c.id === op.id);
           if (idx === -1) { results.push(`- 跳过 ${op.id}: 不存在`); continue; }
@@ -220,7 +220,7 @@ const TOOLS = {
 
   board_clear: {
     name: "清空黑板",
-    description: "清除黑板上所有卡片,
+    description: "清除黑板上所有卡片",
     params: {},
     async execute() {
       const count = state.boardCards.length;
@@ -233,7 +233,7 @@ const TOOLS = {
     name: "执行工具",
     description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(持久化终端会话：支持多会话管理、状态保持（cd/export跨命令保持）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，高危命令双层拦截), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文纯文本，mode=html时返回原始HTML), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus激活窗口/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键（hotkey逗号分隔、press单键名）、button鼠标按键、region截图区域x,y,w,h、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词模糊匹配，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果)。也可传入 SKILL.md 技能名读取其定义内容",
     params: {
-      skill: { type: "string", description: "工具或技能名称, required: true },
+      skill: { type: "string", description: "工具或技能名称", required: true },
       params: { type: "object", description: "工具参数" },
     },
     async execute({ skill, params }) {
@@ -264,7 +264,7 @@ const TOOLS = {
         const res = await post("/skills/execute", { skill, params: p });
         if (res.code === 0) {
           const data = res.data;
-          if (typeof data === "string") return data.length > 2000 ? data.slice(0, 2000) + "首 : data;
+          if (typeof data === "string") return data.length > 2000 ? data.slice(0, 2000) + "首 : data";
           return JSON.stringify(data, null, 2);
         }
         return `工具执行失败: ${res.message}`;
@@ -278,12 +278,12 @@ const TOOLS = {
     name: "检索知识库",
     description: "从本地轻量向量知识库中检索长期记忆、资料摘录和知识中心内容",
     params: {
-      query: { type: "string", description: "检索问题或关键词, required: true },
+      query: { type: "string", description: "检索问题或关键词, required: true "},
       limit: { type: "number", description: "返回片段数，默认 5" },
     },
     async execute({ query, limit }) {
       const res = await post("/knowledge/search", { query: query || "", limit: limit || 5 });
-      if (res.code !== 0) return res.message || "知识库检索失败;
+      if (res.code !== 0) return res.message || "知识库检索失败";
       const items = res.data || [];
       if (!items.length) return "未检索到相关知识";
       return items.map((item, i) => {
@@ -295,7 +295,7 @@ const TOOLS = {
 
   knowledge_add: {
     name: "添加知识",
-    description: "把稳定、可复用的信息保存到本地知识中心。不要保存临时任务、工具输出或一次性状首,
+    description: "把稳定、可复用的信息保存到本地知识中心。不要保存临时任务、工具输出或一次性状首,"
     params: {
       title: { type: "string", description: "知识标题", required: true },
       content: { type: "string", description: "知识正文", required: true },
@@ -305,47 +305,47 @@ const TOOLS = {
     async execute({ title, content, source, kind }) {
       if (!content) return "缺少 content";
       const res = await post("/knowledge/docs", {
-        title: title || "未命名知识,
+        title: title || "未命名知识",
         content,
         source: source || "assistant",
         kind: kind || "note",
       });
       if (res.code !== 0) return res.message || "添加知识失败";
-      return `已添加知识 ${title || res.data?.id || "未命名知识}`;
+      return `已添加知识 ${title || res.data?.id || "未命名知识"}`;
     },
   },
 
   prompt_gen: {
-    name: "生成提示词,
+    name: "生成提示词",
     description: "用提示词工厂生成结构建Prompt，供外部 Agent 使用",
     params: {
       task: { type: "string", description: "任务描述", required: true },
-      context: { type: "string", description: "相关文件/上下文 },
+      context: { type: "string", description: "相关文件/上下文" },
       constraints: { type: "string", description: "约束条件" },
     },
     async execute({ task, context, constraints }) {
       const parts = [];
       const c = state.constitution;
       if (c?.rules?.length) {
-        parts.push("【项目宪法首);
+        parts.push("【项目宪法】");
         c.rules.forEach((r, i) => parts.push(`  ${i + 1}. ${r}`));
         parts.push("");
       }
       if (context) {
-        parts.push("【相关文件上下文字);
+        parts.push("【相关文件上下文】");
         context.split("\n").forEach(l => parts.push(`  ${l}`));
         parts.push("");
       }
-      parts.push("【任务描述首);
+      parts.push("【任务描述】");
       task.split("\n").forEach(l => parts.push(`  ${l}`));
       parts.push("");
       if (constraints) {
-        parts.push("【约束条件首);
+        parts.push("【约束条件】");
         constraints.split("\n").forEach(l => parts.push(`  ${l}`));
         parts.push("");
       }
-      parts.push("【交付物要求首);
-      parts.push("  输出完整代码文件，含必要注释。如需修改现有文件，标注路径和修改位置首);
+      parts.push("【交付物要求】");
+      parts.push("  输出完整代码文件，含必要注释。如需修改现有文件，标注路径和修改位置首");
       return parts.join("\n");
     },
   },
@@ -461,9 +461,9 @@ const TOOLS = {
         try {
           const applyRes = await post("/projects/apply-edit", { file_path: structured.file, content: structured.new_content });
           if (applyRes.code === 0) structured.applied = "auto";
-          else structured.errors = [t("自动应用失败：{msg}，可手动点「接受」重试, { msg: applyRes.message || t("未知错误") })];
+          else structured.errors = [t("自动应用失败：{msg}，可手动点「接受」重试", { msg: applyRes.message || t("未知错误") })];
         } catch (e) {
-          structured.errors = [t("自动应用失败：{msg}，可手动点「接受」重试, { msg: e.message })];
+          structured.errors = [t("自动应用失败：{msg}，可手动点「接受」重试", { msg: e.message })];
         }
       }
       return structured;
@@ -471,11 +471,11 @@ const TOOLS = {
   },
 
   file_create: {
-    name: "创建新文件,
-    description: "在项目中创建新文件。默认自动写入（用户在设置关闭自动确认时改为 diff 预览后手动确认）。专用格式：第一行写相对路径，第二行起原样写文件内容（不首JSON、不转义）首,
+    name: "创建新文件",
+    description: "在项目中创建新文件。默认自动写入（用户在设置关闭自动确认时改为 diff 预览后手动确认）。专用格式：第一行写相对路径，第二行起原样写文件内容（不首JSON、不转义）首,"
     params: {
       file_path: { type: "string", description: "新文件相对路径（相对于项目根目录），首src/utils/helper.js", required: true },
-      content: { type: "string", description: "文件完整内容（原样写入，不经 JSON 转义）, required: true },
+      content: { type: "string", description: "文件完整内容（原样写入，不经 JSON 转义）", required: true },
     },
     rawContent: true,
     async execute({ file_path, content, _truncated }) {
@@ -564,9 +564,9 @@ const TOOLS = {
         try {
           const applyRes = await post("/projects/create-file", { file_path: structured.file, content: structured.content });
           if (applyRes.code === 0) structured.applied = "auto";
-          else structured.errors = [t("自动创建失败：{msg}，可手动点「创建」重试, { msg: applyRes.message || t("未知错误") })];
+          else structured.errors = [t("自动创建失败：{msg}，可手动点「创建」重试", { msg: applyRes.message || t("未知错误") })];
         } catch (e) {
-          structured.errors = [t("自动创建失败：{msg}，可手动点「创建」重试, { msg: e.message })];
+          structured.errors = [t("自动创建失败：{msg}，可手动点「创建」重试", { msg: e.message })];
         }
       }
       return structured;
@@ -575,10 +575,10 @@ const TOOLS = {
 
   file_append: {
     name: "追加文件内容",
-    description: "向已存在文件的末尾追加内容。用于分段写入超长文件：首file_create 写入前半部分，再用一次或多次 file_append 补齐剩余部分首,
+    description: "向已存在文件的末尾追加内容。用于分段写入超长文件：首file_create 写入前半部分，再用一次或多次 file_append 补齐剩余部分首,"
     params: {
       file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录），文件必须已存在", required: true },
-      content: { type: "string", description: "要追加到文件末尾的内容（原样写入，不首JSON 转义；从上次写入结束的精确位置接续，不要重复已有内容首, required: true },
+      content: { type: "string", description: "要追加到文件末尾的内容（原样写入，不首JSON 转义；从上次写入结束的精确位置接续，不要重复已有内容首, required: true "},
     },
     rawContent: true,
     async execute({ file_path, content, _truncated }) {
@@ -646,8 +646,8 @@ const TOOLS = {
   },
 
   chat_context: {
-    name: "查看对话上下文,
-    description: "查看当前对话的统计信息,
+    name: "查看对话上下文",
+    description: "查看当前对话的统计信息",
     params: {},
     async execute() {
       const msgs = state.messages;
@@ -677,7 +677,7 @@ const TOOLS = {
 
       if (action === "init") {
         const contents = input.filter(i => i && i.content).map(i => String(i.content));
-        if (!contents.length) return "缺少 items：init 需首[{\"content\": \"事项描述\"}] 形式的列首;
+        if (!contents.length) return "缺少 items：init 需首[{\"content\": \"事项描述\""}] 形式的列首;
         list = contents.map((c, i) => ({ id: "t" + (i + 1), content: c, status: "pending" }));
       } else if (action === "add") {
         const contents = input.filter(i => i && i.content).map(i => String(i.content));
@@ -695,7 +695,7 @@ const TOOLS = {
           if (patch.content) target.content = String(patch.content);
           changed++;
         }
-        if (!changed) return `未找到可更新的事项（现有 ID: ${list.map(t => t.id).join(", ") || "首}）`;
+        if (!changed) return `未找到可更新的事项（现有 ID: ${list.map(t => t.id).join(", ") || ""}）`;
       } else if (action === "remove") {
         const ids = input.map(i => String(i?.id || "")).filter(Boolean);
         if (!ids.length) return "缺少 items：remove 需首[{\"id\": \"t1\"}]";
@@ -707,14 +707,14 @@ const TOOLS = {
       }
 
       setConversationTodos(convId, list);
-      if (!list.length) return "TODOLIST 已清空;
+      if (!list.length) return "TODOLIST 已清空";
       const icons = { done: "首, in_progress: "首, blocked: "首, pending: "首 };
       const done = list.filter(t => t.status === "done").length;
-      const lines = list.map(t => `${icons[t.status] || "首} [${t.id}] ${t.content}`);
+      const lines = list.map(t => `${icons[t.status] || ""} [${t.id}] ${t.content}`);
       return `TODOLIST 已更新（${done}/${list.length} 完成）：\n${lines.join("\n")}` +
         (done === list.length
-          ? "\n全部完成，进入验证与汇报阶段首
-          : "\n请继续统筹推进未完成事项（能并行的多项一起处理），每完成一批立即调首todo_manage 批量更新状态，保持清单实时准确定);
+          ? "\n全部完成，进入验证与汇报阶段首"
+          : "\n请继续统筹推进未完成事项（能并行的多项一起处理），每完成一批立即调首todo_manage 批量更新状态，保持清单实时准确定");
     },
   },
 };
@@ -746,7 +746,7 @@ function normalizeFilePathAlias(params) {
 
 /**
  * 解析 file_create / file_append 的参数块，支持两种协议：
- * 新协议（推荐）：第一行是相对路径，其余全部是原样文件内容——无 JSON、无转义首 *   模型写大文件时不再需要转义换首引号，从根本上消首JSON 解析失败导致的丢参首 * 旧协议（兼容）：块内容以 { 开头时仍按 JSON 解析，失败退首salvage 抢救 + 别名映射首 */
+ * 新协议（推荐）：第一行是相对路径，其余全部是原样文件内容——无 JSON、无转义。 *   模型写大文件时不再需要转义换首引号，从根本上消首JSON 解析失败导致的丢参首 * 旧协议（兼容）：块内容以 { 开头时仍按 JSON 解析，失败退首salvage 抢救 + 别名映射首 */
 function parseFileWriteParams(body) {
   const text = String(body || "").replace(/^\uFEFF/, "");
   if (text.trimStart().startsWith("{")) {
@@ -776,7 +776,7 @@ function parseFileWriteParams(body) {
 }
 
 /**
- * 首start 位置（必须是 "）读取一首JSON 字符串，正确处理转义首 * 返回 { value, end, complete }。未闭合首complete=false首 * 不完整的 \uXXXX 转义整体丢弃，避免产生损坏的中文字符首 */
+ * 的 start 位置（必须是 "）读取一段 JSON 字符串，正确处理转义。 * 返回 { value, end, complete }。未闭合；complete=false首 * 不完整的 \uXXXX 转义整体丢弃，避免产生损坏的中文字符首 */
 function readJsonString(raw, start) {
   let out = "";
   let i = start + 1;
@@ -803,7 +803,7 @@ function readJsonString(raw, start) {
 }
 
 /**
- * 首start 位置读取一首JSON 值（数组/对象/数字等）首 * 被截断时自动补齐括号，并剔除末尾不完整的字符串，尽力解析出可用结果首 */
+ * 的 start 位置读取一段 JSON 值（数组/对象/数字等）首 * 被截断时自动补齐括号，并剔除末尾不完整的字符串，尽力解析出可用结果首 */
 function readJsonValueWithRepair(raw, start) {
   const stack = [];
   let i = start;
@@ -940,9 +940,9 @@ async function executeTool(name, params) {
       if (output._type === "file_edit") {
         const s = output.stats;
         const targetPath = output.file_path_rel || output.file_name || output.file || "";
-        summary = `[工具 file_edit] 文件: ${output.file_name}首{targetPath}），首${s.edits_total} 处编辑，${s.edits_applied} 处成功，+${s.lines_added} -${s.lines_removed} 行。`;
+        summary = `[工具 file_edit] 文件: ${output.file_name}首{targetPath}），${s.edits_total} 处编辑，${s.edits_applied} 处成功，+${s.lines_added} -${s.lines_removed} 行。`;
         if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
-        summary += " diff 已展示给用户，尚未写入磁盘，等待用户确认首;
+        summary += " diff 已展示给用户，尚未写入磁盘，等待用户确认首";
       } else if (output._type === "file_create") {
         const s = output.stats;
         const targetPath = output.file_path_rel || output.file_name || output.file || "";
@@ -956,7 +956,7 @@ async function executeTool(name, params) {
         summary = `[工具 file_append] 文件: ${output.file_name}首{targetPath}），本次追加 ${s.lines} 行首{s.chars} 字符。`;
         if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
         if (output.truncated) summary += " 注意：本次追加内容因输出截断可能不完整，请继续用 file_append 补齐剩余内容首";
-        summary += " 追加预览已展示给用户，尚未写入磁盘，等待用户确认首;
+        summary += " 追加预览已展示给用户，尚未写入磁盘，等待用户确认首";
       }
       return { success: true, output: summary, _structured: output };
     }
@@ -1015,7 +1015,7 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
   }
 
   for (const [key, tool] of Object.entries(TOOLS)) {
-    s += `### ${key} 首${tool.description}\n`;
+    s += `### ${key} ${tool.description}\n`;
     if (tool.rawContent) {
       s += "专用格式（不首JSON！内容原样直写，零转义）：\n";
       s += `◈◈首{key}\n`;
@@ -1028,7 +1028,7 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
     if (pEntries.length > 0) {
       s += "参数 (JSON):\n";
       for (const [pk, pv] of pEntries) {
-        s += `  - ${pk}: ${pv.type}${pv.required ? " (必填)" : ""} 首${pv.description}\n`;
+        s += `  - ${pk}: ${pv.type}${pv.required ? " (必填)" : ""} ${pv.description}\n`;
       }
     }
     s += `示例:\n◈◈首{key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;

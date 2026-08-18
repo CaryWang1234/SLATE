@@ -48,7 +48,7 @@ function renderProjectBar() {
 
     const refreshBtn = document.createElement("button");
     refreshBtn.className = "icon-btn";
-    refreshBtn.textContent = "首;
+    refreshBtn.textContent = "首";
     refreshBtn.title = "刷新项目";
     refreshBtn.addEventListener("click", () => handleRefreshProject(refreshBtn));
     actions.appendChild(refreshBtn);
@@ -56,7 +56,7 @@ function renderProjectBar() {
     const understandBtn = document.createElement("button");
     understandBtn.className = "icon-btn";
     understandBtn.textContent = "📖";
-    understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册;
+    understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册";
     understandBtn.addEventListener("click", () => {
       import("./understand.js?v=20260815-51")
         .then(({ openUnderstandModal }) => openUnderstandModal())
@@ -78,7 +78,7 @@ function renderProjectBar() {
 
     const configBtn = document.createElement("button");
     configBtn.className = "icon-btn";
-    configBtn.textContent = "首;
+    configBtn.textContent = "首";
     configBtn.title = "项目设置";
     configBtn.addEventListener("click", openProjectSettings);
     actions.appendChild(configBtn);
@@ -102,7 +102,7 @@ function renderProjectBar() {
 
     const openBtn = document.createElement("button");
     openBtn.className = "project-bar-open";
-    openBtn.textContent = "📂 打开项目…;
+    openBtn.textContent = "📂 打开项目…";
     openBtn.addEventListener("click", openProjectModal);
     projectBar.appendChild(openBtn);
     projectBar.appendChild(actions);
@@ -167,7 +167,7 @@ async function handleOpenProject() {
 }
 
 async function handleCloseProject() {
-  if (!await dlgConfirm("关闭当前项目？, { okText: "关闭" })) return;
+  if (!await dlgConfirm("关闭当前项目？", { okText: "关闭" })) return;
   await closeProject();
   setProject(null);
   setProjectFileTree([]);
@@ -319,8 +319,8 @@ async function openFile(path) {
 
   const insertBtn = document.createElement("button");
   insertBtn.className = "icon-btn";
-  insertBtn.textContent = "首;
-  insertBtn.title = "插入到聊天;
+  insertBtn.textContent = "首";
+  insertBtn.title = "插入到聊天";
   insertBtn.addEventListener("click", () => {
     const chatInput = document.getElementById("chat-input");
     if (chatInput) {

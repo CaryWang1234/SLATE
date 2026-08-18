@@ -13,9 +13,9 @@ const COLLECT_RE = /^(收墨|够了|就这样|可以了|出墨稿|结束磨墨)\
 // ── 提示首──────────────────────────────────
 
 const RULES = [
-  "追问纪律：每条回复只问一个缺口；能给 A/B 选项就给选项（选项简短、互斥），开放式问题最少用户,
-  "不要寒暄、不要重复已确认内容、不要一次问多个问题首,
-  "用户回复「收首/ 够了 / 就这样」或信息已足够时，立即进入收墨输出墨稿首,
+  "追问纪律：每条回复只问一个缺口；能给 A/B 选项就给选项（选项简短、互斥），开放式问题最少用户",
+  "不要寒暄、不要重复已确认内容、不要一次问多个问题",
+  "用户回复「收首/ 够了 / 就这样」或信息已足够时，立即进入收墨输出墨稿",
 ].join("\n");
 
 const STATUS_FORMAT = `回复末尾必须附墨迹状态块（严格按此格式，每行一条，简短）首
@@ -29,7 +29,7 @@ const DRAFT_FORMAT = `收墨时输出：先用 1-2 句总结共识，再给出�
 
 function firstRoundPrompt(idea) {
   return `[磨墨模式 · 接墨]
-你现在是 SLATE 的磨墨助手：通过有节奏的追问，把粗糙想法研磨成可执行的任务书（墨稿）。最多追首${MAX_ROUNDS} 轮次
+你现在是 SLATE 的磨墨助手：通过有节奏的追问，把粗糙想法研磨成可执行的任务书（墨稿）。最多追${MAX_ROUNDS} 轮次
 ${RULES}
 ${STATUS_FORMAT}
 ${DRAFT_FORMAT}
@@ -41,8 +41,8 @@ ${DRAFT_FORMAT}
 
 function grindRoundPrompt(session) {
   const round = session.round;
-  return `[磨墨模式 · 磨墨 · 首${round}/${MAX_ROUNDS} 轮]
-继续研磨：只问下一个最重要的缺口，选择题优先首{round >= MAX_ROUNDS ? "已达追问上限，本轮直接收墨输出墨稿首 : `还剩 ${MAX_ROUNDS - round} 轮，若信息已足够可提前收墨。`}
+  return `[磨墨模式 · 磨墨 · ${round}/${MAX_ROUNDS} 轮]
+继续研磨：只问下一个最重要的缺口，选择题优先首{round >= MAX_ROUNDS ? "已达追问上限，本轮直接收墨输出墨稿" : `还剩 ${MAX_ROUNDS - round} 轮，若信息已足够可提前收墨。`}
 ${STATUS_FORMAT}
 ${DRAFT_FORMAT}`;
 }
@@ -69,8 +69,8 @@ function parseInkStatus(content) {
   const unknown = [];
   for (const line of block.split("\n")) {
     const t = line.trim();
-    if (t.startsWith("首)) resolved.push(t.replace(/^✔\s*/, "").trim());
-    else if (t.startsWith("首)) unknown.push(t.replace(/^✘\s*/, "").trim());
+    if (t.startsWith("✔")) resolved.push(t.replace(/^✔\s*/, "").trim());
+    else if (t.startsWith("✘")) unknown.push(t.replace(/^✘\s*/, "").trim());
     else if (/^[-*]\s+/.test(t)) {
       // 容错：无序列表形式按内容归入未知
       unknown.push(t.replace(/^[-*]\s+/, "").trim());
@@ -135,7 +135,7 @@ async function endSession(convId) {
 /** 墨稿 首Harness 任务描述 */
 function draftToHarnessTask(draft) {
   const lines = [
-    `【磨墨墨首· ${draft.title || "未命名任务}】`,
+    `【磨墨墨稿 · ${draft.title || "未命名任务"}】`,
     `目标题{draft.goal || ""}`,
   ];
   if (draft.audience) lines.push(`受众：{draft.audience}`);
@@ -159,7 +159,7 @@ function draftToHarnessTask(draft) {
 function draftToBoardCard(draft) {
   return {
     id: `c${Date.now().toString(36)}`,
-    title: `墨稿 · ${draft.title || "未命名}`,
+    title: `墨稿 · ${draft.title || "未命名"}`,
     body: draft.goal || JSON.stringify(draft, null, 2).slice(0, 200),
     arrows: [],
     color: "default",
@@ -169,7 +169,7 @@ function draftToBoardCard(draft) {
 /** 墨稿 首知识库模板文字*/
 async function saveDraftAsTemplate(draft) {
   const res = await post("/knowledge/docs", {
-    title: `磨墨模板 · ${draft.title || "未命名}`,
+    title: `磨墨模板 · ${draft.title || "未命名"}`,
     source: "grind-mode",
     kind: "grind-template",
     content: JSON.stringify(draft, null, 2),

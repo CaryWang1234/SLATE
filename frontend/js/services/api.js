@@ -30,7 +30,7 @@ async function request(path, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
     resp = await fetch(url, { ...config, signal: controller.signal });
   } catch (err) {
     clearTimeout(timer);
-    if (controller.signal.aborted) throw new Error(t("请求超时（{s}s），可重试, { s: Math.round(timeoutMs / 1000) }));
+    if (controller.signal.aborted) throw new Error(t("请求超时（{s}s），可重试", { s: Math.round(timeoutMs / 1000) }));
     throw err;
   }
   clearTimeout(timer);

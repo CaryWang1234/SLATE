@@ -78,7 +78,7 @@ function populateModelSelect() {
       opt.value = m.id;
       const hasKey = hasModelKey(m.id);
       const supportsResponses = m.supports_responses === true;
-      opt.textContent = (hasKey ? "首" : "首") + m.name + (supportsResponses ? " 首 : "");
+      opt.textContent = (hasKey ? "、" : "") + m.name + (supportsResponses ? " (Responses)" : "");
       opt.title = m.base_url + (supportsResponses ? " (支持 Responses API)" : "");
       optgroup.appendChild(opt);
     }
@@ -89,7 +89,7 @@ function populateModelSelect() {
   if (state.customModels.length > 0) {
 
     const optgroup = document.createElement("optgroup");
-    optgroup.label = "自定义;
+    optgroup.label = "自定义";
     for (const m of state.customModels) {
       const opt = document.createElement("option");
       opt.value = m.id;
@@ -102,7 +102,7 @@ function populateModelSelect() {
 
   const customOpt = document.createElement("option");
   customOpt.value = "__custom__";
-  customOpt.textContent = "+ 自定义模型…;
+  customOpt.textContent = "+ 自定义模型…";
   select.appendChild(customOpt);
 
   if (state.currentModel) select.value = state.currentModel.id;
@@ -208,7 +208,7 @@ function closeCustomModelModal() {
   document.getElementById("custom-model-url").value = "";
   document.getElementById("custom-model-key").value = "";
   document.getElementById("custom-model-ctx").value = "32768";
-  document.getElementById("custom-model-editor-title").textContent = "添加自定义模型;
+  document.getElementById("custom-model-editor-title").textContent = "添加自定义模型";
   document.getElementById("btn-save-custom-model").textContent = "添加";
 }
 
@@ -226,7 +226,7 @@ function saveCustomModel() {
   const model = { id: name, name, provider: "openai", base_url: baseUrl, context_window: ctx };
   const duplicate = state.customModels.some(m => m.id === name && m.id !== editingCustomModelId);
   if (duplicate) {
-    toast("模型名称已存在);
+    toast("模型名称已存在");
     return;
   }
 
@@ -257,7 +257,7 @@ function renderCustomModelManagement() {
   if (!state.customModels.length) {
     const empty = document.createElement("div");
     empty.className = "custom-model-empty";
-    empty.textContent = "暂无自定义模型;
+    empty.textContent = "暂无自定义模型";
     container.appendChild(empty);
     return;
   }
@@ -282,7 +282,7 @@ function renderCustomModelManagement() {
 
     const editBtn = document.createElement("button");
     editBtn.className = "icon-btn";
-    editBtn.textContent = "首;
+    editBtn.textContent = "✏️";
     editBtn.title = "编辑";
     editBtn.addEventListener("click", () => openCustomModelModal(model));
 
@@ -341,11 +341,11 @@ function renderKeyManagement() {
     input.className = "setting-input key-mgmt-input";
     input.dataset.modelKey = m.id;
     input.value = getModelKey(m.id) || "";
-    input.placeholder = hasModelKey(m.id) ? "已配色(留空删除)" : "未配置;
+    input.placeholder = hasModelKey(m.id) ? "已配色(留空删除)" : "未配置";
 
     const saveBtn = document.createElement("button");
     saveBtn.className = "icon-btn key-mgmt-save";
-    saveBtn.textContent = "首;
+    saveBtn.textContent = "💾";
     saveBtn.title = "保存";
     saveBtn.addEventListener("click", () => {
       const val = input.value.trim();
@@ -476,7 +476,7 @@ function renderResponsesApiHint() {
   }
 
   if (supportedModels.length > 0) {
-    hint.textContent = t("支持 Responses API 的模型：{models}", { models: supportedModels.join("首) });
+    hint.textContent = t("支持 Responses API 的模型：{models}", { models: supportedModels.join("、") });
   } else {
     hint.textContent = t("当前无模型支持 Responses API");
   }
@@ -528,7 +528,7 @@ async function renderLanInfo() {
       <button id="btn-lan-copy" class="send-btn send-btn-sm" type="button">复制地址</button>
     </div>
     <div class="lan-qr-row">
-      <img class="lan-qr" src="/api/lan/qrcode?t=${Date.now()}" alt="遥控地址二维码>
+      <img class="lan-qr" src="/api/lan/qrcode?t=${Date.now()}" alt="遥控地址二维码">
       <div class="lan-qr-tip">手机扫码直接打开<br>（需连入同一局域网）/div>
     </div>
     <p class="lan-tip">首遥控未设密码：同一局域网内的任何人都能完整操作本应用（含终端命令），请勿在不受信任的网络中使用户/p>
@@ -536,7 +536,7 @@ async function renderLanInfo() {
   document.getElementById("btn-lan-copy")?.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(url);
-      toast("遥控地址已复制);
+      toast("遥控地址已复制");
     } catch {
       const el = document.getElementById("lan-url-text");
       const range = document.createRange();
@@ -597,9 +597,9 @@ function initBackupRestore() {
       setTimeout(() => URL.revokeObjectURL(a.href), 500);
       const d = res.data || {};
       if (statusEl) {
-        statusEl.textContent = t("已导出：{a} 会话 / {b} 条消息 / {c} 条记忆 / {d} 条素材, { a: d.conversations?.length || 0, b: d.messages?.length || 0, c: d.memories?.length || 0, d: d.snippets?.length || 0 });
+        statusEl.textContent = t("已导出：{a} 会话 / {b} 条消息 / {c} 条记忆 / {d} 条素材", { a: d.conversations?.length || 0, b: d.messages?.length || 0, c: d.memories?.length || 0, d: d.snippets?.length || 0 });
       }
-      toast("备份已下载);
+      toast("备份已下载");
     } catch (e) {
       toast(t("导出备份失败: {msg}", { msg: e.message }));
     }
@@ -615,9 +615,9 @@ function initBackupRestore() {
       const payload = JSON.parse(await file.text());
       const backend = payload.backend || payload;
       if (!Array.isArray(backend.conversations) && !Array.isArray(backend.messages)) {
-        throw new Error("无法识别的备份文件);
+        throw new Error("无法识别的备份文件");
       }
-      if (!await dlgConfirm("导入备份？已存在的数据会跳过，不会覆盖现有内容。导入后页面将重载。, { okText: "导入" })) return;
+      if (!await dlgConfirm("导入备份？已存在的数据会跳过，不会覆盖现有内容。导入后页面将重载。", { okText: "导入" })) return;
       const res = await post("/chat/import", { backend });
       if (res.code !== 0) throw new Error(res.message || "导入失败");
       if (payload.local && typeof payload.local === "object") {
@@ -625,9 +625,9 @@ function initBackupRestore() {
       }
       const s = res.data || {};
       if (statusEl) {
-        statusEl.textContent = t("已导入：{a} 会话 / {b} 条消息 / {c} 条记忆 / {d} 条素材（已存在的跳过）, { a: s.conversations || 0, b: s.messages || 0, c: s.memories || 0, d: s.snippets || 0 });
+        statusEl.textContent = t("已导入：{a} 会话 / {b} 条消息 / {c} 条记忆 / {d} 条素材（已存在的跳过）", { a: s.conversations || 0, b: s.messages || 0, c: s.memories || 0, d: s.snippets || 0 });
       }
-      toast("恢复完成，正在重载以应用本地设置…);
+      toast("恢复完成，正在重载以应用本地设置…");
       setTimeout(() => location.reload(), 1200);
     } catch (e) {
       toast(t("恢复失败: {msg}", { msg: e.message }));
@@ -722,9 +722,9 @@ async function renderStorageUsage() {
         const clearBtn = document.createElement("button");
         clearBtn.className = "send-btn send-btn-sm btn-danger";
         clearBtn.textContent = "清空对话";
-        clearBtn.title = "删除全部历史会话与消息;
+        clearBtn.title = "删除全部历史会话与消息";
         clearBtn.addEventListener("click", async () => {
-          if (!await dlgConfirm("清空全部对话历史？此操作不可恢复，建议先在「数据备份」里导出备份。, { danger: true, okText: "清空" })) return;
+          if (!await dlgConfirm("清空全部对话历史？此操作不可恢复，建议先在「数据备份」里导出备份。", { danger: true, okText: "清空" })) return;
           await runStorageCleanup("history", clearBtn);
         });
         row.appendChild(clearBtn);
@@ -755,24 +755,24 @@ async function checkUpdateNow(btn) {
   const info = document.getElementById("about-update-info");
   if (!info) return;
   btn.disabled = true;
-  btn.textContent = "检查中…;
+  btn.textContent = "检查中…";
   info.classList.remove("hidden");
-  info.textContent = "正在查询最首Release首;
+  info.textContent = "正在查询最新 Release…";
   try {
     const res = await get("/update/check");
     const d = res?.code === 0 ? res.data : null;
     info.innerHTML = "";
     if (!d?.checked) {
-      info.textContent = "检查更新失败：网络不可用，请稍后重试。;
+      info.textContent = "检查更新失败：网络不可用，请稍后重试。";
       return;
     }
     if (d.current) document.getElementById("about-version").textContent = `v${d.current}`;
     if (!d.hasUpdate) {
-      info.textContent = t("已是最新版本（v{v}）。, { v: d.current });
+      info.textContent = t("已是最新版本（v{v}）。", { v: d.current });
       return;
     }
     const line = document.createElement("div");
-    line.textContent = t("首发现新版首v{latest}（当首v{current}首, { latest: d.latest, current: d.current });
+    line.textContent = t("发现新版 v{latest}（当前 v{current}）", { latest: d.latest, current: d.current });
     info.appendChild(line);
     if (d.notes) {
       const notes = document.createElement("div");
@@ -797,7 +797,7 @@ async function checkUpdateNow(btn) {
     info.textContent = t("检查更新失败：{msg}", { msg: e.message });
   } finally {
     btn.disabled = false;
-    btn.textContent = "检查更新;
+    btn.textContent = "检查更新";
   }
 }
 
@@ -857,7 +857,7 @@ async function renderUsageSummary() {
         title.textContent = item.title || t("对话 {id}", { id: String(item.id || "").slice(0, 6) });
         const tok = document.createElement("span");
         tok.className = "usage-summary-top-tokens";
-        tok.textContent = t("{tokens} tokens · {n} 条消息, { tokens: fmtTokens(item.total_tokens), n: item.message_count || 0 });
+        tok.textContent = t("{tokens} tokens · {n} 条消息", { tokens: fmtTokens(item.total_tokens), n: item.message_count || 0 });
         row.append(title, tok);
         list.appendChild(row);
       }
@@ -965,7 +965,7 @@ async function saveSettings() {
   }
 
   savePersistent();
-  toast("设置已保存);
+  toast("设置已保存");
 }
 
 // ── 标签页切首──────────────────────────────
@@ -1067,7 +1067,7 @@ async function checkAppUpdate() {
 
     const txt = document.createElement("span");
     txt.className = "update-banner-text";
-    txt.textContent = t("首发现新版首v{latest}（当首v{current}首, { latest: d.latest, current: d.current });
+    txt.textContent = t("发现新版 v{latest}（当前 v{current}）", { latest: d.latest, current: d.current });
 
     const openLink = (url) => async () => {
       const r = await post("/update/open-url", { url });
@@ -1086,8 +1086,8 @@ async function checkAppUpdate() {
 
     const close = document.createElement("button");
     close.className = "update-banner-close";
-    close.textContent = "首;
-    close.title = "忽略该版本;
+    close.textContent = "✕";
+    close.title = "忽略该版本";
     close.addEventListener("click", () => {
       banner.classList.add("hidden");
       try { localStorage.setItem("slate-update-dismissed", d.latest); } catch {}
@@ -1114,20 +1114,20 @@ async function init() {
   document.documentElement.setAttribute("data-theme", state.theme);
 
 
-  safeInit("标签页, initTabs);
+  safeInit("标签页", initTabs);
   safeInit("对话", initChat);
   safeInit("黑板", initWhiteboard);
-  safeInit("提示词工厂, initPromptFactory);
+  safeInit("提示词工厂", initPromptFactory);
   safeInit("技能面板", initSkillPanel);
   safeInit("MCP Server", initMcpServerPanel);
   safeInit("AI 团队", initTeamPanel);
-  safeInit("项目栏, initProjectBar);
+  safeInit("项目栏", initProjectBar);
   safeInit("记忆面板", initMemoryPanel);
-  safeInit("专家包, initExpertsPanel);
+  safeInit("专家包", initExpertsPanel);
   safeInit("定时任务", initSchedule);
   safeInit("高危命令守卫", initRiskGuard);
   safeInit("项目理解", initUnderstandPanel);
-  safeInit("快捷键, initKeyboardShortcuts);
+  safeInit("快捷键", initKeyboardShortcuts);
   safeInit("文本复制", initSelectionCopySupport);
 
   // 模型选择
@@ -1150,7 +1150,7 @@ async function init() {
   // 设置弹窗
   document.getElementById("btn-settings").addEventListener("click", openSettings);
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
-  // 顶栏 📡：直达设置页“局域网遥控”区块（明显的网址获取入口首
+  // 顶栏 📡：直达设置页“局域网遥控”区块（明显的网址获取入口
   document.getElementById("btn-lan")?.addEventListener("click", () => openSettings({ focusLan: true }));
 
   document.getElementById("btn-lan-refresh")?.addEventListener("click", renderLanInfo);
@@ -1158,13 +1158,13 @@ async function init() {
   initNotificationPersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
-  // 设置页导航与关于首
+  // 设置页导航与关于
   safeInit("设置导航", initSettingsNav);
 
   document.getElementById("btn-check-update")?.addEventListener("click", (e) => checkUpdateNow(e.currentTarget));
   safeInit("首次启动引导", initOnboarding);
   safeInit("数据备份恢复", initBackupRestore);
-  safeInit("关于区链接, initAboutLinks);
+  safeInit("关于区链接", initAboutLinks);
   safeInit("存储空间管理", initStorageManage);
 
   await loadModels();
@@ -1189,7 +1189,7 @@ async function init() {
   // 启动时自动检查更新（不阻塞初始化，失败静默）
   checkAppUpdate();
 
-  console.log("[SLATE] v3 初始化完成);
+  console.log("[SLATE] v3 初始化完成");
 }
 
 document.addEventListener("DOMContentLoaded", init);

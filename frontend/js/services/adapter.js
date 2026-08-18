@@ -73,7 +73,7 @@ function getMemorySystemPrompt() {
 function getKnowledgeSystemPrompt() {
   const items = Array.isArray(state.knowledgeContext) ? state.knowledgeContext.slice(0, 8) : [];
   if (!items.length) return "";
-  const lines = ["[相关知识库片段]（仅在与当前问题相关时参考，不要生硬引用户];
+  const lines = ["[相关知识库片段]（仅在与当前问题相关时参考，不要生硬引用）"],
   for (const item of items) {
     const title = item.title || item.source || "知识";
     const content = String(item.content || "").slice(0, 700);
@@ -86,7 +86,7 @@ function getKnowledgeSystemPrompt() {
 function getExpertSystemPrompt() {
   const expert = state.activeExpert;
   if (!expert) return "";
-  const parts = [`[专家包· ${expert.name || "未命名}]（本次对话完全采纳以下人格与规则，优先于默认风格）`];
+  const parts = [`[专家包· ${expert.name || "未命名"}]（本次对话完全采纳以下人格与规则，优先于默认风格）`];
   if (String(expert.persona || "").trim()) {
     parts.push("[专家人格]");
     parts.push(String(expert.persona).trim());
@@ -97,7 +97,7 @@ function getExpertSystemPrompt() {
   }
   const knowledgeNames = (expert.knowledge || []).map(f => f.name).slice(0, 20);
   if (knowledgeNames.length) {
-    parts.push(`[专家知识文件] ${knowledgeNames.join("首)}`);
+    parts.push(`[专家知识文件] ${knowledgeNames.join("、")}`);
   }
   return parts.length > 1 ? "\n\n" + parts.join("\n") : "";
 }

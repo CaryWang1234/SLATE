@@ -9,9 +9,9 @@ import { t } from "./i18n.js?v=20260815-51";
 // base 为不带量词的名称，拼接格式统一首"一{unit}{base}" / "{count} {unit}{base}"
 const EQUIV_LADDER = [
   { tokens: 40, base: "《静夜思》, unit: "首 },
-  { tokens: 150, base: "微博", unit: "首 },
-  { tokens: 800, base: "中学作文", unit: "首 },
-  { tokens: 3000, base: "深度长文", unit: "首 },
+  { tokens: 150, base: "微博", unit: "条" },
+  { tokens: 800, base: "中学作文", unit: "字" },
+  { tokens: 3000, base: "深度长文", unit: "篇" },
   { tokens: 23000, base: "《老人与海》, unit: "首 },
   { tokens: 150000, base: "《三体》, unit: "首 },
   { tokens: 500000, base: "《红楼梦》, unit: "首 },
@@ -25,7 +25,7 @@ function fmtTokens(n) {
   return n.toLocaleString();
 }
 
-/** 趣味等价换算首3000 首"约相当于一本《老人与海》；不足返回空串由调用方兜首*/
+/** 趣味等价换算；3000 首"约相当于一本《老人与海》；不足返回空串由调用方兜底" */
 function tokenEquivalence(n) {
   if (!n || n <= 0) return "";
   let ref = null;
@@ -33,7 +33,7 @@ function tokenEquivalence(n) {
     if (n >= item.tokens) ref = item;
     else break;
   }
-  if (!ref) return t("不到一首《静夜思》);
+  if (!ref) return t("不到一首《静夜思》");
   const ratio = n / ref.tokens;
   if (ratio < 1.5) return t("约相当于一{unit}{name}", { unit: t(ref.unit), name: t(ref.base) });
   const count = ratio >= 10 ? Math.round(ratio) : Number(ratio.toFixed(1));

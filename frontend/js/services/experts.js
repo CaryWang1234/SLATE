@@ -10,14 +10,14 @@ const expertCache = new Map();
 
 async function loadExperts() {
   const res = await get("/experts");
-  if (res.code !== 0) throw new Error(res.message || "专家包列表加载失败);
+  if (res.code !== 0) throw new Error(res.message || "专家包列表加载失败");
   return res.data || [];
 }
 
 async function getExpert(id, { force = false } = {}) {
   if (!force && expertCache.has(id)) return expertCache.get(id);
   const res = await get(`/experts/${id}`);
-  if (res.code !== 0) throw new Error(res.message || "专家包加载失败);
+  if (res.code !== 0) throw new Error(res.message || "专家包加载失败");
   expertCache.set(id, res.data);
   return res.data;
 }
@@ -83,7 +83,7 @@ async function readExpertFile(id, folder, name) {
  */
 function buildExpertPrompt(detail) {
   if (!detail) return "";
-  const parts = [`[专家包· ${detail.name || "未命名}]`];
+  const parts = [`[专家包· ${detail.name || "未命名"}]`];
   if (detail.persona?.trim()) {
     parts.push("[专家人格]");
     parts.push(detail.persona.trim());
@@ -94,7 +94,7 @@ function buildExpertPrompt(detail) {
   }
   const knowledgeNames = (detail.knowledge || []).map(f => f.name).slice(0, 20);
   if (knowledgeNames.length) {
-    parts.push(`[专家知识文件] ${knowledgeNames.join("首)}`);
+    parts.push(`[专家知识文件] ${knowledgeNames.join("、")}`);
   }
   return parts.length > 1 ? "\n\n" + parts.join("\n") : "";
 }
