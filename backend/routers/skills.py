@@ -28,15 +28,15 @@ USER_SKILLS_DIR = DATA_DIR / "skills"
 
 # 内置工具注册表（原"MCP 工具"，现统一称"工具"）
 BUILTIN_SKILLS: dict[str, str] = {
-    "file_tree": "扫描目录树（仅第一层）",
-    "file_peek": "读取文件前 N 行（≤50行）",
-    "terminal": "受限终端执行（指定目录沙箱，支持后台执行）",
+    "file_tree": "扫描目录树（支持递归、glob 过滤、快速模式）",
+    "file_peek": "读取文件内容（支持多编码 gbk/gb2312、行范围、tail 模式、自动检测编码）",
+    "terminal": "持久化终端会话：支持多会话管理、状态保持（cd/export）、进程管理，高危命令双层拦截",
     "html_render": "生成纯黑白 HTML 骨架",
     "css_color": "基于描述生成 CSS 配色方案（支持暖色/冷色/自然/深色等多种风格）",
     "doc_write": "生成 Markdown 格式技术文档或需求说明",
     "ppt_create": "生成 .pptx 演示文稿（标题页+内容页，支持主题大纲与自定义配色）",
     "word_create": "生成 .docx Word 文档（标题层级、段落、列表排版）",
-    "file_edit": "基于 diff 精确编辑文件（只改指定内容）",
+    "file_edit": "基于 diff 精确编辑文件（只改指定内容）+ 行操作（insert/delete）+ 剪贴板（copy/paste/cut）",
     "file_create": "创建新文件（预览后确认写入）",
     "text_summarize": "文本摘要与关键词提取",
     "json_tool": "JSON 校验、格式化、压缩与路径读取",
@@ -50,9 +50,13 @@ BUILTIN_SKILLS: dict[str, str] = {
     "python_api_extract": "提取 Python 库/模块的公共 API 文档（函数签名、类方法、属性），输出 JSON/Markdown",
     "html_bundle": "将 html 及相对路径的 css/js 内联合并为单个 html 文件（便携分发）",
     "code_scan": "代码安全扫描（检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等）",
+    "doc_scan": "文档安全扫描（检测文档中的 PII/凭证/财务数据/机密标记/内网信息等，支持 md/docx/pptx/xlsx/pdf）",
     "mcp_factory": "工具工厂：根据描述自动生成新的工具，让 SLATE 自生产适配自身的工具",
     "browser_automation": "浏览器自动化：基于 Playwright 控制 Chromium 浏览器（导航/截图/点击/输入/执行JS）",
-    "computer_use": "桌面自动化：基于 pyautogui 控制鼠标键盘（截图/点击/输入/组合键/图像定位）",
+    "computer_use": "桌面自动化：基于 pyautogui 控制鼠标键盘与窗口（截图/点击/输入/按键/剪贴板/窗口管理/图像定位）",
+    "excel_tool": "Excel/CSV 办公表格：生成 .xlsx、读取表格内容、csv↔xlsx 互转",
+    "pdf_tool": "PDF 办公文档：获取元信息、提取文本内容与表格数据",
+    "git_tool": "Git 仓库只读信息：分支状态/提交日志/diff 统计/分支与远程列表",
     "screenshot_to_code": "截图转代码：读取图片编码为 base64，AI 视觉分析生成 HTML/CSS 还原截图内容",
 }
 

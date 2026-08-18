@@ -35,7 +35,7 @@ It features multi-model chat, tool calling, Harness autonomous execution, Grind 
 - ⚡ **Harness Autonomous Execution** — Six-phase closed-loop with 50 rounds by default; auto-generates TODOLIST for large tasks; stop doesn't quit — only manual stop / rounds exhausted / checklist done ends the session
 - 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Harness
 - 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
-- 🛠️ **26 Built-in Tools** — File read/write/edit/append, terminal sandbox, PPT/Word generation, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, Tool Factory for self-production, screenshot-to-code, browser & desktop automation
+- 🛠️ **30 Built-in Tools** — File read/write/edit/append, terminal sandbox, PPT/Word/Excel generation, PDF text & table extraction, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, Git repo insights, document security scanning, Tool Factory for self-production, screenshot-to-code, browser & desktop automation (incl. window management & clipboard)
 - 🔌 **External MCP Server** — Connect to external MCP Servers (SSE transport) to extend tool capabilities; remote tools appear alongside built-in tools, AI can call them seamlessly
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
@@ -88,7 +88,7 @@ Built-in tools (`backend/skills/`):
 |------|-------------|
 | `file_tree` / `file_peek` | Browse project structure / Read files |
 | `file_create` / `file_edit` | Create files / Diff-preview editing |
-| `terminal` | Sandboxed command execution |
+| `terminal` | Persistent terminal sessions with state preservation (cd/env), multi-session management, process control |
 | `html_render` / `css_color` | HTML skeleton generation / CSS color tuning |
 | `doc_write` / `text_summarize` | Markdown writing / Text summarization |
 | `ppt_create` / `word_create` | .pptx presentations / .docx Word documents |
@@ -97,8 +97,10 @@ Built-in tools (`backend/skills/`):
 | `web_search` / `web_fetch` | Web search (no key needed) / Page content retrieval |
 | `chart_create` / `qrcode_create` | SVG charts (bar/line/pie) / QR codes, inline preview |
 | `python_api_extract` / `html_bundle` | Python library API extraction / Web page bundling |
-| `code_scan` / `mcp_factory` | Code security scanning / tool self-production |
-| `browser_automation` / `computer_use` | Browser automation (Playwright) / Desktop automation (mouse/keyboard) |
+| `code_scan` / `doc_scan` | Code security scanning / document security scanning (PII, credentials, financial data, confidential markers) |
+| `browser_automation` / `computer_use` | Browser automation (Playwright) / Desktop automation (mouse/keyboard, window management, clipboard) |
+| `excel_tool` / `pdf_tool` | Excel & CSV create/read/convert / PDF text & table extraction |
+| `git_tool` | Read-only Git insights: status/log/diff/branches/remotes |
 | `screenshot_to_code` | Screenshot to code — AI reads image and generates HTML/CSS to match |
 
 Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention in chat to auto-inject context.
@@ -256,7 +258,7 @@ SLATE/
 │   │   ├── workflows.py        # Team workflow DAG definition
 │   │   ├── vault.py            # Markdown vault (Obsidian-style knowledge library)
 │   │   └── files.py            # Multimodal file parsing
-│   └── skills/                 # 26 built-in tool implementations (incl. high-risk command dual interception)
+│   └── skills/                 # 30 built-in tool implementations (incl. high-risk command dual interception)
 ├── backend/mcp_client.py       # MCP Client manager (SSE transport)
 ├── frontend/
 │   ├── index.html              # Three-column layout entry (Chat / Whiteboard / Factory+Capabilities)

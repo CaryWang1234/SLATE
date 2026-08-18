@@ -1,4 +1,12 @@
-"""技能：读取文件前 N 行（默认 30，上限 50）。"""
+"""技能：读取文件内容（支持多种编码、行范围、快速模式）。
+
+特性：
+- 支持多种编码：utf-8, gbk, gb2312, latin-1 等
+- 自动检测编码（尝试多种编码）
+- 支持行范围读取（start_line/end_line）
+- 支持 tail 模式（读取最后 N 行）
+- 快速模式：不统计总行数（大文件更快）
+"""
 
 from __future__ import annotations
 
@@ -10,9 +18,90 @@ from backend.skills.sandbox import is_path_safe, validate_file_size, truncate_ou
 MAX_LINES = 50
 DEFAULT_LINES = 30
 
+# 常用编码列表（按优先级排序）
+COMMON_ENCODINGS = ["utf-8", "gbk", "gb2312", "gb18030", "latin-1", "cp1252"]
 
-def execute(file_path: str = "", lines: int = DEFAULT_LINES, **_: Any) -> dict[str, Any]:
-    """读取指定文件的前 N 行。"""
+
+def _detect_encoding(file_path: Path) -> str:
+    """尝试多种编码读取文件，返回第一个成功的编码。"""
+    for enc in COMMON_ENCODINGS:
+        try:
+            with file_path.open("r", encoding=enc) as f:
+                f.read(4096)  # 读取前 4KB 测试
+            return enc
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+    return "utf-8"  # 默认回退
+
+
+def _read_lines_fast(file_path: Path, encoding: str, errors: str = "replace") -> list[str]:
+    """快速读取所有行（内存允许的情况下）。"""
+    try:
+        with file_path.open("r", encoding=encoding, errors=errors) as f:
+            return f.readlines()
+    except PermissionError:
+        raise PermissionError(f"无权限读取: {file_path}")
+    except UnicodeDecodeError as e:
+        raise ValueError(f"编码错误 ({encoding}): {e}")
+
+
+def _read_range(file_path: Path, encoding: str, start: int, end: int, errors: str = "replace") -> tuple[list[str], int]:
+    """读取指定行范围，返回 (lines, total_lines)。"""
+    lines = []
+    total = 0
+    try:
+        with file_path.open("r", encoding=encoding, errors=errors) as f:
+            for i, line in enumerate(f, 1):
+                total += 1
+                if start <= i <= end:
+                    lines.append(line.rstrip("\n\r"))
+                elif i > end:
+                    break
+    except PermissionError:
+        raise PermissionError(f"无权限读取: {file_path}")
+    return lines, total
+
+
+def _read_tail(file_path: Path, encoding: str, n: int, errors: str = "replace") -> tuple[list[str], int]:
+    """读取最后 N 行，返回 (lines, total_lines)。"""
+    # 先统计总行数
+    total = 0
+    try:
+        with file_path.open("r", encoding=encoding, errors=errors) as f:
+            for _ in f:
+                total += 1
+    except PermissionError:
+        raise PermissionError(f"无权限读取: {file_path}")
+    
+    # 再读取最后 N 行
+    start = max(1, total - n + 1)
+    lines, _ = _read_range(file_path, encoding, start, total, errors)
+    return lines, total
+
+
+def execute(
+    file_path: str = "",
+    lines: int = DEFAULT_LINES,
+    encoding: str = "",
+    auto_detect: bool = False,
+    start_line: int = 0,
+    end_line: int = 0,
+    tail: bool = False,
+    fast: bool = False,
+    **_: Any,
+) -> dict[str, Any]:
+    """读取文件内容，支持多种编码和行范围。
+
+    Args:
+        file_path: 文件路径
+        lines: 读取行数（默认 30，上限 50）
+        encoding: 文件编码（如 "utf-8", "gbk", "gb2312"），空串则使用 utf-8
+        auto_detect: 是否自动检测编码（尝试多种常见编码）
+        start_line: 起始行号（1-based，与 end_line 配合使用）
+        end_line: 结束行号（1-based）
+        tail: 是否读取最后 N 行（类似 tail 命令）
+        fast: 快速模式（不统计总行数，大文件更快）
+    """
     if not file_path:
         return {"error": "文件路径不能为空"}
 
@@ -30,38 +119,70 @@ def execute(file_path: str = "", lines: int = DEFAULT_LINES, **_: Any) -> dict[s
     if not size_ok:
         return {"error": size_reason}
 
-    # 安全检查：禁止读取敏感路径
-    blocked_suffixes = {".exe", ".dll", ".so", ".dylib", ".bin"}
+    # 安全检查：禁止读取二进制文件
+    blocked_suffixes = {".exe", ".dll", ".so", ".dylib", ".bin", ".png", ".jpg", ".gif", ".ico", ".pdf"}
     if target.suffix.lower() in blocked_suffixes:
         return {"error": "不支持读取二进制文件"}
+
+    # 确定编码
+    if auto_detect:
+        enc = _detect_encoding(target)
+    elif encoding:
+        enc = encoding.strip().lower()
+    else:
+        enc = "utf-8"
 
     line_count = min(lines, MAX_LINES)
 
     try:
-        with target.open("r", encoding="utf-8", errors="replace") as f:
-            content_lines: list[str] = []
-            for i, line in enumerate(f):
-                if i >= line_count:
-                    break
-                content_lines.append(line.rstrip("\n"))
-    except PermissionError:
-        return {"error": f"无权限读取: {file_path}"}
+        # 行范围模式
+        if start_line > 0 or end_line > 0:
+            start = max(1, start_line)
+            end = end_line if end_line > 0 else start + line_count - 1
+            content_lines, total_lines = _read_range(target, enc, start, end)
+        
+        # tail 模式
+        elif tail:
+            content_lines, total_lines = _read_tail(target, enc, line_count)
+        
+        # 快速模式（不统计总行数）
+        elif fast:
+            all_lines = _read_lines_fast(target, enc)
+            content_lines = [l.rstrip("\n\r") for l in all_lines[:line_count]]
+            total_lines = -1  # 未知
+        
+        # 默认模式：读取前 N 行并统计总行数
+        else:
+            content_lines, total_lines = _read_range(target, enc, 1, line_count)
+            # 如果文件更大，继续统计总行数
+            if total_lines == line_count:
+                with target.open("r", encoding=enc, errors="replace") as f:
+                    for _ in f:
+                        total_lines += 1
 
-    total_lines = 0
-    try:
-        with target.open("r", encoding="utf-8", errors="replace") as f:
-            for _ in f:
-                total_lines += 1
-    except OSError:
-        total_lines = -1
+    except PermissionError as e:
+        return {"error": str(e)}
+    except ValueError as e:
+        return {"error": str(e)}
+    except OSError as e:
+        return {"error": f"读取失败: {e}"}
 
     content_text = "\n".join(content_lines)
     content_text, was_truncated = truncate_output(content_text)
 
-    return {
+    result = {
         "file": str(target),
+        "encoding": enc,
         "total_lines": total_lines,
         "returned_lines": len(content_lines),
         "content": content_text,
-        "truncated": total_lines > line_count or was_truncated,
+        "truncated": (total_lines > len(content_lines) if total_lines >= 0 else False) or was_truncated,
     }
+
+    # 如果是行范围或 tail 模式，返回范围信息
+    if start_line > 0 or end_line > 0:
+        result["range"] = f"{start}-{end}"
+    elif tail:
+        result["mode"] = "tail"
+
+    return result

@@ -13,3 +13,4 @@ qrcode
 playwright
 pyautogui
 pyperclip
+pygetwindow

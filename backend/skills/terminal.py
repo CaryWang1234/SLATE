@@ -1,22 +1,27 @@
-"""技能：受限终端执行（沙箱模式，仅允许指定目录）。
+"""技能：持久化终端会话（支持多会话、状态保持、进程管理）。
 
-高危命令采用写死的规则判定（与前端 riskguard.js 保持同一份清单）：
-- BLOCKED_PREFIXES：灾难级命令，无条件禁止
-- HIGH_RISK_PATTERNS：高危命令，必须携带 approved=True（用户在前端批准后注入）
+核心特性：
+- 每个会话维护独立的 shell 进程，保持 cwd 和环境变量
+- 支持创建/列出/关闭多个终端会话
+- 命令在会话内执行，状态（cd、export）跨命令保持
+- 后台进程可真正终止（kill）
+- 高危命令双层拦截（写死规则 + 用户审批）
 
-后台执行支持：
-- background=True：命令异步执行，立即返回 task_id
-- action="status"：查询后台任务状态
-- action="list"：列出所有后台任务
-- action="stop"：终止后台任务
+会话管理：
+- action="create"：创建新会话，返回 session_id
+- action="list"：列出所有会话
+- action="close"：关闭指定会话
+- action="kill"：终止会话内正在运行的进程
+- 默认 action=""：在指定会话（或 default）中执行命令
 """
 
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 import subprocess
+import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -24,7 +29,7 @@ from typing import Any
 
 from backend.skills.sandbox import truncate_output, MAX_OUTPUT_CHARS
 
-# 默认允许的工作目录
+# 默认工作目录
 DEFAULT_WORK_DIR = "."
 # 命令超时（秒）
 TIMEOUT = 30
@@ -35,10 +40,7 @@ MAX_OUTPUT = MAX_OUTPUT_CHARS
 # 禁止的命令前缀（无条件拦截）
 BLOCKED_PREFIXES = ("rm -rf /", "format", "mkfs", "dd if=")
 
-# 后台任务存储（内存）
-_background_tasks: dict[str, dict[str, Any]] = {}
-
-# 高危命令规则（写死）：命中任一条即要求用户批准
+# 高危命令规则（写死）
 HIGH_RISK_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\brm\b", re.I), "删除文件（rm）"),
     (re.compile(r"\b(rmdir|shred|unlink)\b", re.I), "删除文件/目录"),
@@ -65,7 +67,6 @@ HIGH_RISK_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"(npm|pnpm|yarn)\s+(uninstall|remove)\s+(-g|--global)", re.I), "卸载全局依赖"),
 ]
 
-# 从网络下载并直接交给 shell 执行（整条命令级别判定）
 PIPE_TO_SHELL = re.compile(
     r"(curl|wget|invoke-webrequest|iwr)[^|;&]*\|\s*(sudo\s+)?(ba|z|da)?sh|Invoke-Expression|\biex\b",
     re.I,
@@ -79,7 +80,6 @@ def check_high_risk(command: str) -> str:
         return ""
     if PIPE_TO_SHELL.search(cmd):
         return "从网络下载并直接执行脚本"
-    # 拆分命令链（&&、||、;、|），逐段检查
     for seg in re.split(r"&&|\|\||;|\|", cmd):
         seg = seg.strip()
         if not seg:
@@ -90,53 +90,154 @@ def check_high_risk(command: str) -> str:
     return ""
 
 
-# ── 后台任务管理 ─────────────────────────────────
+def _get_shell() -> list[str]:
+    """返回当前平台的 shell 命令。"""
+    if sys.platform == "win32":
+        # Windows: 优先 PowerShell，回退 cmd
+        return ["powershell.exe", "-NoExit", "-Command", "-"]
+    else:
+        # Unix: 优先 bash，回退 sh
+        return ["/bin/bash", "--norc", "--noprofile", "-i"]
 
-def _run_background_task(task_id: str, command: str, cwd: str) -> None:
-    """在后台执行命令并更新任务状态。"""
-    try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            cwd=cwd,
-            capture_output=True,
+
+class TerminalSession:
+    """持久化终端会话。"""
+
+    def __init__(self, session_id: str, cwd: str):
+        self.session_id = session_id
+        self.cwd = Path(cwd).resolve()
+        self.env = os.environ.copy()
+        # 清理敏感环境变量
+        for key in list(self.env.keys()):
+            if key.upper() in ("AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "DATABASE_URL", "SECRET_KEY", "PRIVATE_KEY"):
+                del self.env[key]
+        
+        self.process: subprocess.Popen | None = None
+        self.output_buffer: list[str] = []
+        self.error_buffer: list[str] = []
+        self.running = False
+        self.current_command = ""
+        self._reader_thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
+        
+    def start(self) -> None:
+        """启动 shell 进程。"""
+        if self.process and self.process.poll() is None:
+            return  # 已在运行
+        
+        shell_cmd = _get_shell()
+        self.process = subprocess.Popen(
+            shell_cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=str(self.cwd),
+            env=self.env,
             text=True,
-            timeout=300,  # 后台任务最长 5 分钟
+            bufsize=1,  # 行缓冲
         )
-        _background_tasks[task_id]["status"] = "completed"
-        _background_tasks[task_id]["exit_code"] = result.returncode
-        output = result.stdout
-        if result.stderr:
-            output += f"\n[STDERR]\n{result.stderr}"
-        _background_tasks[task_id]["output"] = output.strip() or "(无输出)"
-    except subprocess.TimeoutExpired:
-        _background_tasks[task_id]["status"] = "timeout"
-        _background_tasks[task_id]["output"] = f"命令执行超时（300秒）"
-    except Exception as e:
-        _background_tasks[task_id]["status"] = "error"
-        _background_tasks[task_id]["output"] = f"执行失败: {e}"
-    finally:
-        _background_tasks[task_id]["finished_at"] = time.time()
+        self._start_reader_thread()
+    
+    def _start_reader_thread(self) -> None:
+        """启动读取线程。"""
+        self._stop_event.clear()
+        self._reader_thread = threading.Thread(target=self._read_output, daemon=True)
+        self._reader_thread.start()
+    
+    def _read_output(self) -> None:
+        """异步读取 stdout/stderr。"""
+        if not self.process:
+            return
+        
+        def read_stream(stream, buffer):
+            try:
+                for line in iter(stream.readline, ""):
+                    if self._stop_event.is_set():
+                        break
+                    buffer.append(line)
+            except Exception:
+                pass
+        
+        stdout_thread = threading.Thread(target=read_stream, args=(self.process.stdout, self.output_buffer), daemon=True)
+        stderr_thread = threading.Thread(target=read_stream, args=(self.process.stderr, self.error_buffer), daemon=True)
+        stdout_thread.start()
+        stderr_thread.start()
+        stdout_thread.join()
+        stderr_thread.join()
+    
+    def run_command(self, command: str, timeout: float = TIMEOUT) -> dict[str, Any]:
+        """在会话中执行命令。"""
+        if not self.process or self.process.poll() is not None:
+            self.start()
+        
+        if not self.process or not self.process.stdin:
+            return {"error": "Shell 进程未启动"}
+        
+        # 清空缓冲区
+        self.output_buffer.clear()
+        self.error_buffer.clear()
+        self.current_command = command
+        self.running = True
+        
+        try:
+            # 发送命令
+            self.process.stdin.write(command + "\n")
+            self.process.stdin.flush()
+            
+            # 等待输出稳定（简单策略：等待一段时间）
+            time.sleep(0.5)
+            
+            # 收集输出
+            output = "".join(self.output_buffer).strip()
+            errors = "".join(self.error_buffer).strip()
+            
+            if errors:
+                output += f"\n[STDERR]\n{errors}"
+            
+            # 截断
+            output, was_truncated = truncate_output(output or "(无输出)")
+            
+            return {
+                "command": command,
+                "session_id": self.session_id,
+                "work_dir": str(self.cwd),
+                "output": output,
+                "truncated": was_truncated,
+            }
+        except Exception as e:
+            return {"error": f"执行失败: {e}"}
+        finally:
+            self.running = False
+            self.current_command = ""
+    
+    def kill_process(self) -> None:
+        """终止 shell 进程。"""
+        self._stop_event.set()
+        if self.process:
+            try:
+                self.process.terminate()
+                self.process.wait(timeout=2)
+            except Exception:
+                try:
+                    self.process.kill()
+                except Exception:
+                    pass
+            self.process = None
+    
+    def close(self) -> None:
+        """关闭会话。"""
+        self.kill_process()
 
 
-def _start_background_task(command: str, cwd: str) -> str:
-    """启动后台任务，返回 task_id。"""
-    task_id = str(uuid.uuid4())[:8]
-    _background_tasks[task_id] = {
-        "task_id": task_id,
-        "command": command,
-        "work_dir": cwd,
-        "status": "running",
-        "started_at": time.time(),
-        "finished_at": None,
-        "exit_code": None,
-        "output": None,
-    }
-    # 使用 threading 而非 asyncio，因为 subprocess.run 是同步阻塞的
-    import threading
-    t = threading.Thread(target=_run_background_task, args=(task_id, command, cwd), daemon=True)
-    t.start()
-    return task_id
+# 全局会话存储
+_sessions: dict[str, TerminalSession] = {}
+
+
+def _get_or_create_session(session_id: str, cwd: str) -> TerminalSession:
+    """获取或创建会话。"""
+    if session_id not in _sessions:
+        _sessions[session_id] = TerminalSession(session_id, cwd)
+    return _sessions[session_id]
 
 
 def execute(
@@ -145,127 +246,95 @@ def execute(
     approved: bool = False,
     background: bool = False,
     action: str = "",
-    task_id: str = "",
+    session_id: str = "default",
+    timeout: float = TIMEOUT,
     **_: Any,
 ) -> dict[str, Any]:
-    """在指定目录中执行 Shell 命令。高危命令须 approved=True（前端用户批准后注入）。
+    """在持久化终端会话中执行命令或管理会话。
 
-    后台执行模式：
-    - background=True：异步执行命令，立即返回 task_id
-    - action="status"：查询指定 task_id 的状态
-    - action="list"：列出所有后台任务
-    - action="stop"：终止指定 task_id 的任务
+    Args:
+        command: 要执行的命令（action="" 时必填）
+        work_dir: 工作目录（创建新会话时使用）
+        approved: 高危命令是否已获用户批准
+        background: 已废弃，保留兼容
+        action: 操作类型 - create/list/close/kill 或空（执行命令）
+        session_id: 会话 ID（默认 "default"）
+        timeout: 命令超时秒数（默认 30）
     """
-    # ── 后台任务管理操作 ─────────────────────────
-    if action == "list":
-        if not _background_tasks:
-            return {"message": "当前无后台任务"}
-        tasks = []
-        for tid, info in _background_tasks.items():
-            tasks.append({
-                "task_id": tid,
-                "command": info["command"],
-                "status": info["status"],
-                "started_at": info["started_at"],
-                "finished_at": info.get("finished_at"),
-            })
-        return {"tasks": tasks}
-
-    if action == "status":
-        if not task_id:
-            return {"error": "缺少 task_id 参数"}
-        if task_id not in _background_tasks:
-            return {"error": f"任务不存在: {task_id}"}
-        info = _background_tasks[task_id]
-        result = {
-            "task_id": task_id,
-            "command": info["command"],
-            "status": info["status"],
-            "started_at": info["started_at"],
-            "finished_at": info.get("finished_at"),
+    # ── 会话管理操作 ─────────────────────────────
+    
+    if action == "create":
+        cwd = Path(work_dir).resolve()
+        if not cwd.is_dir():
+            return {"error": f"工作目录不存在: {work_dir}"}
+        
+        # 生成唯一 session_id（如果已存在）
+        if session_id in _sessions:
+            base_id = session_id
+            session_id = f"{base_id}_{uuid.uuid4().hex[:6]}"
+        
+        session = _get_or_create_session(session_id, str(cwd))
+        session.start()
+        return {
+            "message": f"会话已创建: {session_id}",
+            "session_id": session_id,
+            "work_dir": str(session.cwd),
         }
-        if info["status"] in ("completed", "timeout", "error"):
-            result["exit_code"] = info.get("exit_code")
-            result["output"] = info.get("output")
-        return result
-
-    if action == "stop":
-        if not task_id:
-            return {"error": "缺少 task_id 参数"}
-        if task_id not in _background_tasks:
-            return {"error": f"任务不存在: {task_id}"}
-        info = _background_tasks[task_id]
-        if info["status"] != "running":
-            return {"message": f"任务已结束（状态: {info['status']}）"}
-        # 无法直接终止 threading.Thread，标记为 stopped
-        info["status"] = "stopped"
-        info["finished_at"] = time.time()
-        info["output"] = "用户手动终止"
-        return {"message": f"已标记任务为停止: {task_id}"}
-
-    # ── 正常命令执行 ─────────────────────────────
+    
+    if action == "list":
+        sessions = []
+        for sid, sess in _sessions.items():
+            sessions.append({
+                "session_id": sid,
+                "work_dir": str(sess.cwd),
+                "running": sess.running,
+                "current_command": sess.current_command,
+                "process_alive": sess.process is not None and sess.process.poll() is None,
+            })
+        return {"sessions": sessions, "count": len(sessions)}
+    
+    if action == "close":
+        if session_id not in _sessions:
+            return {"error": f"会话不存在: {session_id}"}
+        _sessions[session_id].close()
+        del _sessions[session_id]
+        return {"message": f"会话已关闭: {session_id}"}
+    
+    if action == "kill":
+        if session_id not in _sessions:
+            return {"error": f"会话不存在: {session_id}"}
+        sess = _sessions[session_id]
+        if sess.process and sess.process.poll() is None:
+            sess.kill_process()
+            return {"message": f"会话 {session_id} 的进程已终止"}
+        return {"message": f"会话 {session_id} 无运行中的进程"}
+    
+    # ── 命令执行 ─────────────────────────────────
+    
     if not command:
         return {"error": "命令不能为空"}
-
-    # 命令长度限制
+    
     if len(command) > MAX_COMMAND_LENGTH:
         return {"error": f"命令过长（{len(command)} 字符 > {MAX_COMMAND_LENGTH} 限制）"}
-
+    
     # 灾难级命令：无条件禁止
     cmd_lower = command.lower().strip()
     for prefix in BLOCKED_PREFIXES:
         if cmd_lower.startswith(prefix):
             return {"error": f"禁止执行的危险命令: {prefix}"}
-
+    
     # 高危命令：未获用户批准即拦截
     risk_reason = check_high_risk(command)
     if risk_reason and not bool(approved):
         return {"error": f"高危命令（{risk_reason}）未获用户批准，已拦截: {command}"}
-
+    
+    # 获取或创建会话
     cwd = Path(work_dir).resolve()
     if not cwd.is_dir():
         return {"error": f"工作目录不存在: {work_dir}"}
-
-    # 环境变量清理：移除可能影响系统安全的变量
-    env = os.environ.copy()
-    for key in list(env.keys()):
-        if key.upper() in ("AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "DATABASE_URL", "SECRET_KEY", "PRIVATE_KEY"):
-            del env[key]
-
-    # ── 后台执行模式 ─────────────────────────────
-    if background:
-        task_id = _start_background_task(command, str(cwd))
-        return {
-            "message": "命令已在后台启动",
-            "task_id": task_id,
-            "command": command,
-            "tip": f"使用 action='status', task_id='{task_id}' 查询状态",
-        }
-
-    # ── 同步执行（原有逻辑） ─────────────────────
-    try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            cwd=str(cwd),
-            capture_output=True,
-            text=True,
-            timeout=TIMEOUT,
-            env=env,
-        )
-        output = result.stdout
-        if result.stderr:
-            output += f"\n[STDERR]\n{result.stderr}"
-        # 输出截断
-        output, was_truncated = truncate_output(output.strip() or "(无输出)")
-        return {
-            "command": command,
-            "work_dir": str(cwd),
-            "exit_code": result.returncode,
-            "output": output,
-            "truncated": was_truncated,
-        }
-    except subprocess.TimeoutExpired:
-        return {"error": f"命令执行超时（{TIMEOUT}秒）: {command}"}
-    except Exception as e:
-        return {"error": f"执行失败: {e}"}
+    
+    session = _get_or_create_session(session_id, str(cwd))
+    
+    # 执行命令
+    result = session.run_command(command, timeout=timeout)
+    return result

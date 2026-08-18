@@ -33,6 +33,10 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "directory": {"type": "string", "description": "目录路径"},
+                "recursive": {"type": "boolean", "description": "是否递归扫描（默认 false）"},
+                "depth": {"type": "integer", "description": "递归深度（默认 1）"},
+                "pattern": {"type": "string", "description": "glob 模式过滤（如 '*.py'）"},
+                "include_hidden": {"type": "boolean", "description": "是否包含隐藏文件（默认 false）"},
             },
         },
     },
@@ -41,7 +45,13 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "file_path": {"type": "string", "description": "文件路径"},
-                "lines": {"type": "integer", "description": "读取行数（默认 50）"},
+                "lines": {"type": "integer", "description": "读取行数（默认 30，上限 50）"},
+                "encoding": {"type": "string", "description": "文件编码（如 'utf-8', 'gbk', 'gb2312'）"},
+                "auto_detect": {"type": "boolean", "description": "是否自动检测编码"},
+                "start_line": {"type": "integer", "description": "起始行号（1-based）"},
+                "end_line": {"type": "integer", "description": "结束行号（1-based）"},
+                "tail": {"type": "boolean", "description": "是否读取最后 N 行"},
+                "fast": {"type": "boolean", "description": "快速模式（不统计总行数）"},
             },
             "required": ["file_path"],
         },
@@ -61,6 +71,7 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "type": "object",
             "properties": {
                 "file_path": {"type": "string", "description": "目标文件路径"},
+                "action": {"type": "string", "description": "操作类型: edit/read/insert/delete/copy/paste/cut"},
                 "edits": {
                     "type": "array",
                     "items": {
@@ -70,22 +81,25 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                             "new_text": {"type": "string"},
                         },
                     },
-                    "description": "编辑列表，每项含 old_text 和 new_text",
+                    "description": "编辑列表（edit 操作），每项含 old_text 和 new_text",
                 },
+                "content": {"type": "string", "description": "要插入的内容（insert 操作）"},
+                "start_line": {"type": "integer", "description": "起始行号（1-based，用于 insert/delete/copy/paste/cut）"},
+                "end_line": {"type": "integer", "description": "结束行号（1-based，用于 delete/copy/cut）"},
+                "clipboard_name": {"type": "string", "description": "剪贴板名称（默认 'default'）"},
             },
-            "required": ["file_path", "edits"],
         },
     },
     "terminal": {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "要执行的命令"},
-                "work_dir": {"type": "string", "description": "工作目录"},
-                "background": {"type": "boolean", "description": "是否后台执行"},
-                "action": {"type": "string", "description": "后台任务操作: list/status/stop"},
+                "command": {"type": "string", "description": "要执行的命令（action 为空时必填）"},
+                "work_dir": {"type": "string", "description": "工作目录（创建新会话时使用）"},
+                "action": {"type": "string", "description": "操作类型: create 创建会话 / list 列出所有会话 / close 关闭会话 / kill 终止进程 / 空串执行命令"},
+                "session_id": {"type": "string", "description": "会话 ID（默认 'default'，可自定义）"},
+                "timeout": {"type": "number", "description": "命令超时秒数（默认 30）"},
             },
-            "required": ["command"],
         },
     },
     "html_render": {
@@ -261,6 +275,18 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "required": ["directory"],
         },
     },
+    "doc_scan": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "directory": {"type": "string", "description": "扫描目录（递归扫描其中的文档文件）"},
+                "file_path": {"type": "string", "description": "扫描单个文件（与 directory 二选一）"},
+                "severity": {"type": "string", "description": "严重级别过滤 (critical/high/medium/low)"},
+                "category": {"type": "string", "description": "类别过滤（如 '身份证号'、'硬编码密码'）"},
+                "max_files": {"type": "integer", "description": "最大扫描文件数（默认 50）"},
+            },
+        },
+    },
     "mcp_factory": {
         "inputSchema": {
             "type": "object",
@@ -293,18 +319,62 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "description": "操作: screenshot/click/double_click/right_click/type/hotkey/scroll/move/drag/position/screen_size/locate"},
+                "action": {"type": "string", "description": "操作: screenshot/click/double_click/right_click/type/press/hotkey/scroll/move/drag/wait/position/screen_size/locate/clipboard/window_list/window_focus/window_minimize/window_maximize/window_restore/window_close"},
                 "x": {"type": "integer", "description": "X 坐标"},
                 "y": {"type": "integer", "description": "Y 坐标"},
                 "text": {"type": "string", "description": "输入文字"},
-                "keys": {"type": "string", "description": "组合键（逗号分隔）"},
+                "keys": {"type": "string", "description": "按键（hotkey 逗号分隔；press 单个键名）"},
                 "button": {"type": "string", "description": "鼠标按键"},
                 "region": {"type": "string", "description": "截图区域 x,y,w,h"},
+                "seconds": {"type": "number", "description": "等待秒数（wait）"},
+                "repeats": {"type": "integer", "description": "按键重复次数（press）"},
                 "scroll_amount": {"type": "integer", "description": "滚动格数"},
                 "image_path": {"type": "string", "description": "参考图片路径"},
                 "confidence": {"type": "number", "description": "匹配置信度 0-1"},
+                "title": {"type": "string", "description": "窗口标题关键词（window_* 操作，模糊匹配）"},
             },
             "required": ["action"],
+        },
+    },
+    "excel_tool": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "操作: create/read/convert"},
+                "file_path": {"type": "string", "description": "源文件路径（read/convert）"},
+                "title": {"type": "string", "description": "表格标题（create 文件名）"},
+                "sheet": {"type": "string", "description": "工作表名"},
+                "headers": {"type": "string", "description": "表头（JSON 数组或逗号分隔）"},
+                "rows": {"type": "string", "description": "数据行（JSON 二维数组）"},
+                "data": {"type": "string", "description": "CSV 格式文本数据（首行表头）"},
+                "limit": {"type": "integer", "description": "读取预览行数上限"},
+                "out": {"type": "string", "description": "输出路径（convert 可选）"},
+            },
+            "required": ["action"],
+        },
+    },
+    "pdf_tool": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "操作: info/extract/tables"},
+                "file_path": {"type": "string", "description": "PDF 文件路径"},
+                "pages": {"type": "string", "description": "页码范围，如 1-3,5 或 all"},
+                "max_chars": {"type": "integer", "description": "文本提取最大字符数"},
+            },
+            "required": ["action", "file_path"],
+        },
+    },
+    "git_tool": {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "操作: status/log/diff/branches/remotes"},
+                "directory": {"type": "string", "description": "仓库目录路径"},
+                "limit": {"type": "integer", "description": "提交记录条数（log）"},
+                "scope": {"type": "string", "description": "diff 范围: unstaged/staged/all"},
+            },
+            "required": ["action", "directory"],
         },
     },
     "screenshot_to_code": {

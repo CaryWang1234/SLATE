@@ -48,9 +48,13 @@ hiddenimports = [
     'backend.skills.html_bundle',
     'backend.skills.browser_automation',
     'backend.skills.computer_use',
+    'backend.skills.excel_tool',
+    'backend.skills.pdf_tool',
+    'backend.skills.git_tool',
     'backend.skills.screenshot_to_code',
     'backend.skills.mcp_factory',
     'backend.skills.code_scan',
+    'backend.skills.doc_scan',
     'backend.mcp_client',
     # 多模态文件解析依赖（files.py 内函数级延迟导入，需显式声明）
     'openpyxl',
@@ -61,6 +65,8 @@ hiddenimports = [
     'pptx.oxml',
     'docx',
     'docx.oxml',
+    # 桌面自动化窗口管理（computer_use 内函数级延迟导入）
+    'pygetwindow',
     'webview.platforms.edgechromium',
     'uvicorn.lifespan.on',
     'uvicorn.protocols.http.auto',

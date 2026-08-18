@@ -1,11 +1,11 @@
 /**
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除�? */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260817-67";
-import { get, post, del, upload } from "../services/api.js?v=20260817-67";
-import { guardSkillParams } from "../services/riskguard.js?v=20260817-67";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260817-67";
-import { t } from "../services/i18n.js?v=20260817-67";
+import { state, subscribe, setSkills } from "../store.js?v=20260818-69";
+import { get, post, del, upload } from "../services/api.js?v=20260818-69";
+import { guardSkillParams } from "../services/riskguard.js?v=20260818-69";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-69";
+import { t } from "../services/i18n.js?v=20260818-69";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -24,14 +24,27 @@ function showToast(msg) {
 const SKILL_PARAM_DEFS = {
   file_tree: [
     { key: "directory", label: "目录路径", type: "text", placeholder: "C:\\path\\to\\project" },
+    { key: "recursive", label: "递归扫描", type: "text", placeholder: "true / false" },
+    { key: "depth", label: "递归深度", type: "number", placeholder: "1" },
+    { key: "pattern", label: "glob 过滤", type: "text", placeholder: "*.py" },
+    { key: "include_hidden", label: "包含隐藏文件", type: "text", placeholder: "false" },
   ],
   file_peek: [
-    { key: "file_path", label: "文件路径", type: "text", placeholder: "C:\\path\\to\\file.js" },
-    { key: "lines", label: "行数（≤50�?, type: "number", placeholder: "30" },
+    { key: "file_path", label: "文件路径", type: "text", placeholder: "C:\\path\\to\\file.txt" },
+    { key: "lines", label: "行数（上限 50）", type: "number", placeholder: "30" },
+    { key: "encoding", label: "编码", type: "text", placeholder: "utf-8 / gbk / gb2312" },
+    { key: "auto_detect", label: "自动检测编码", type: "text", placeholder: "true / false" },
+    { key: "start_line", label: "起始行号", type: "number", placeholder: "1" },
+    { key: "end_line", label: "结束行号", type: "number", placeholder: "30" },
+    { key: "tail", label: "读取最后 N 行", type: "text", placeholder: "true / false" },
+    { key: "fast", label: "快速模式", type: "text", placeholder: "true / false" },
   ],
   terminal: [
     { key: "command", label: "命令", type: "text", placeholder: "ls -la" },
     { key: "work_dir", label: "工作目录", type: "text", placeholder: "." },
+    { key: "action", label: "操作类型", type: "text", placeholder: "create / list / close / kill / 空串执行命令" },
+    { key: "session_id", label: "会话 ID", type: "text", placeholder: "default" },
+    { key: "timeout", label: "超时秒数", type: "number", placeholder: "30" },
   ],
   html_render: [
     { key: "title", label: "页面标题", type: "text", placeholder: "SLATE 页面" },
@@ -60,7 +73,12 @@ const SKILL_PARAM_DEFS = {
   ],
   file_edit: [
     { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/app.js" },
-    { key: "edits", label: "编辑操作（JSON 数组�?, type: "textarea", placeholder: '[{"old_text": "原内�?, "new_text": "新内�?}]' },
+    { key: "action", label: "操作类型", type: "text", placeholder: "edit / read / insert / delete / copy / paste / cut" },
+    { key: "edits", label: "编辑操作（edit 操作，JSON 数组）", type: "textarea", placeholder: '[{"old_text": "原内容", "new_text": "新内容"}]' },
+    { key: "content", label: "插入内容（insert 操作）", type: "textarea", placeholder: "要插入的文本" },
+    { key: "start_line", label: "起始行号（1-based）", type: "number", placeholder: "1" },
+    { key: "end_line", label: "结束行号（1-based）", type: "number", placeholder: "10" },
+    { key: "clipboard_name", label: "剪贴板名称", type: "text", placeholder: "default" },
   ],
   file_create: [
     { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/new_file.js" },
@@ -138,16 +156,49 @@ const SKILL_PARAM_DEFS = {
     { key: "full_page", label: "全页截图 (true/false)", type: "text", placeholder: "false" },
   ],
   computer_use: [
-    { key: "action", label: "操作类型", type: "text", placeholder: "screenshot/click/double_click/right_click/type/hotkey/scroll/move/drag/position/screen_size/locate" },
+    { key: "action", label: "操作类型", type: "text", placeholder: "screenshot/click/type/press/hotkey/wait/locate/clipboard/window_list/window_focus 等" },
     { key: "x", label: "X 坐标", type: "text", placeholder: "500" },
     { key: "y", label: "Y 坐标", type: "text", placeholder: "300" },
     { key: "text", label: "输入文字", type: "text", placeholder: "Hello World" },
-    { key: "keys", label: "组合键（逗号分隔）", type: "text", placeholder: "ctrl,c" },
+    { key: "keys", label: "按键（hotkey 逗号分隔 / press 单键名）", type: "text", placeholder: "ctrl,c 或 enter" },
     { key: "button", label: "鼠标按键", type: "text", placeholder: "left/right/middle" },
     { key: "region", label: "截图区域 x,y,w,h", type: "text", placeholder: "0,0,800,600" },
+    { key: "seconds", label: "等待秒数（wait）", type: "text", placeholder: "1" },
+    { key: "repeats", label: "按键次数（press）", type: "text", placeholder: "1" },
     { key: "scroll_amount", label: "滚动格数", type: "text", placeholder: "3" },
     { key: "image_path", label: "参考图片路径", type: "text", placeholder: "C:/path/to/image.png" },
     { key: "confidence", label: "匹配置信度 0-1", type: "text", placeholder: "0.8" },
+    { key: "title", label: "窗口标题关键词（window_*）", type: "text", placeholder: "记事本" },
+  ],
+  excel_tool: [
+    { key: "action", label: "操作类型", type: "text", placeholder: "create / read / convert" },
+    { key: "file_path", label: "源文件路径（read/convert）", type: "text", placeholder: "C:/path/to/data.xlsx" },
+    { key: "title", label: "表格标题（create 文件名）", type: "text", placeholder: "季度报表" },
+    { key: "sheet", label: "工作表名", type: "text", placeholder: "Sheet1" },
+    { key: "headers", label: "表头（JSON 数组或逗号分隔）", type: "text", placeholder: "姓名,部门,绩效" },
+    { key: "rows", label: "数据行（JSON 二维数组）", type: "textarea", placeholder: '[["张三","研发",95],["李四","设计",88]]' },
+    { key: "data", label: "CSV 文本数据（首行表头）", type: "textarea", placeholder: "姓名,部门\n张三,研发" },
+    { key: "limit", label: "读取预览行数", type: "number", placeholder: "50" },
+    { key: "out", label: "输出路径（convert 可选）", type: "text", placeholder: "缺省为源同目录同名换扩展名" },
+  ],
+  pdf_tool: [
+    { key: "action", label: "操作类型", type: "text", placeholder: "info / extract / tables" },
+    { key: "file_path", label: "PDF 文件路径", type: "text", placeholder: "C:/path/to/doc.pdf" },
+    { key: "pages", label: "页码范围", type: "text", placeholder: "1-3,5 或 all" },
+    { key: "max_chars", label: "最大提取字符数", type: "number", placeholder: "30000" },
+  ],
+  git_tool: [
+    { key: "action", label: "操作类型", type: "text", placeholder: "status / log / diff / branches / remotes" },
+    { key: "directory", label: "仓库目录路径", type: "text", placeholder: "C:/path/to/repo" },
+    { key: "limit", label: "提交记录条数（log）", type: "number", placeholder: "10" },
+    { key: "scope", label: "diff 范围", type: "text", placeholder: "unstaged / staged / all" },
+  ],
+  doc_scan: [
+    { key: "directory", label: "扫描目录", type: "text", placeholder: "C:/path/to/docs" },
+    { key: "file_path", label: "扫描单个文件（与目录二选一）", type: "text", placeholder: "C:/path/to/file.docx" },
+    { key: "severity", label: "最低严重级别", type: "text", placeholder: "critical / high / medium / low" },
+    { key: "category", label: "类别过滤", type: "text", placeholder: "身份证号 / 硬编码密码 / 手机号" },
+    { key: "max_files", label: "最大扫描文件数", type: "number", placeholder: "50" },
   ],
   screenshot_to_code: [
     { key: "image_path", label: "图片路径", type: "text", placeholder: "C:/path/to/screenshot.png" },
