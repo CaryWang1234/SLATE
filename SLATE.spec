@@ -1,10 +1,28 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
+
+# pythonnet / clr_loader 的原生数据文件（.NET runtime DLLs、配置文件等）
+try:
+    _clr_data = collect_data_files('clr_loader')
+except Exception:
+    _clr_data = []
+try:
+    _cffi_data = collect_data_files('cffi')
+except Exception:
+    _cffi_data = []
+try:
+    _clr_libs = collect_dynamic_libs('clr_loader')
+except Exception:
+    _clr_libs = []
+
 datas = [
     ('frontend', 'frontend'),
     ('backend/skills', 'backend/skills'),
     ('backend/workflows', 'backend/workflows'),
-]
+] + _clr_data + _cffi_data
+
+binaries_extra = _clr_libs
 
 hiddenimports = [
     'backend.main',
@@ -39,6 +57,7 @@ hiddenimports = [
     'backend.skills.text_summarize',
     'backend.skills.todo_scan',
     'backend.skills.terminal',
+    'backend.skills.sandbox',
     'backend.skills.web_fetch',
     'backend.skills.web_search',
     'backend.skills.word_create',
@@ -68,6 +87,17 @@ hiddenimports = [
     # 桌面自动化窗口管理（computer_use 内函数级延迟导入）
     'pygetwindow',
     'webview.platforms.edgechromium',
+    # pythonnet 全链路（pywebview Windows 后端依赖 .NET 互操作）
+    'pythonnet',
+    'clr',
+    'clr_loader',
+    'clr_loader.loader',
+    'clr_loader.netfx',
+    'clr_loader.mono',
+    'clr_loader.coreclr',
+    'clr_loader.ffi',
+    'cffi',
+    '_cffi_backend',
     'uvicorn.lifespan.on',
     'uvicorn.protocols.http.auto',
     'uvicorn.protocols.websockets.auto',
@@ -122,7 +152,7 @@ excludes = [
 a = Analysis(
     ['desktop.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries_extra,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
