@@ -1,21 +1,21 @@
 /**
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输�? */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260818-70";
-import { get, post, del, patch, streamChat, upload, REASONING_PREFIX } from "../services/api.js?v=20260818-70";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260818-70";
-import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail } from "../services/tools.js?v=20260818-70";
-import { renderMarkdown } from "../services/markdown.js?v=20260818-70";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260818-70";
-import { getExpertsCached } from "./experts.js?v=20260818-70";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-70";
-import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260818-70";
-import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260818-70";
-import { fileTypeIcon } from "../services/file_icons.js?v=20260818-70";
-import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260818-70";
-import * as grindSvc from "../services/grind.js?v=20260818-70";
-import { t } from "../services/i18n.js?v=20260818-70";
-import { notifyTaskComplete } from "../services/notify.js?v=20260818-70";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260818-71";
+import { get, post, del, patch, streamChat, upload, REASONING_PREFIX } from "../services/api.js?v=20260818-71";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260818-71";
+import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail } from "../services/tools.js?v=20260818-71";
+import { renderMarkdown } from "../services/markdown.js?v=20260818-71";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260818-71";
+import { getExpertsCached } from "./experts.js?v=20260818-71";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-71";
+import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260818-71";
+import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260818-71";
+import { fileTypeIcon } from "../services/file_icons.js?v=20260818-71";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260818-71";
+import * as grindSvc from "../services/grind.js?v=20260818-71";
+import { t } from "../services/i18n.js?v=20260818-71";
+import { notifyTaskComplete } from "../services/notify.js?v=20260818-71";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -1588,7 +1588,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     if (signal?.aborted || !stuck) break;
     const contPrompt = buildContinuePrompt(content);
     try {
-      const { toast } = await import("../app.js?v=20260818-70");
+      const { toast } = await import("../app.js?v=20260818-71");
       toast(t("输出达到长度上限，自动续写中（{x}/{n}）�?, { x: round, n: MAX_CONTINUE_ROUNDS }));
     } catch {}
 
@@ -1622,7 +1622,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
   // 轮数耗尽仍未闭合：提示用户，后续由工具循环的截断守卫接管（拒执行并要求拆分重试）
   if (!signal?.aborted && hasTruncatedTail(content)) {
     try {
-      const { toast } = await import("../app.js?v=20260818-70");
+      const { toast } = await import("../app.js?v=20260818-71");
       toast("输出仍不完整，已要求模型拆分重试", 3200);
     } catch {}
   }
@@ -1830,7 +1830,7 @@ async function sendMessage(queuedPayload = null) {
   if (isGenerating) {
     if (queuedPayload) inputQueue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260818-70");
+      const { toast } = await import("../app.js?v=20260818-71");
       toast(t("已加入输入队列（{n}�?, { n: inputQueue.length }));
     }
     updateSendState();
@@ -1855,7 +1855,7 @@ async function sendMessage(queuedPayload = null) {
   const grindActive = grindSession && ["grinding", "collecting"].includes(grindSession.state);
   const isFreshConv = !state.currentConversationId || state.messages.length === 0;
   if (!queuedPayload && !grindActive && isFreshConv && isAbstractTask(text)) {
-    const { dlgConfirm } = await import("../services/dialog.js?v=20260818-70");
+    const { dlgConfirm } = await import("../services/dialog.js?v=20260818-71");
     const confirmed = await dlgConfirm(
       t("检测到抽象任务「{text}」，建议先进入磨墨模式细化需求后再执行。是否切换？", { text: text.slice(0, 30) }),
       { title: t("磨墨建议"), okText: t("进入磨墨"), cancelText: t("直接发送") }
@@ -2078,7 +2078,7 @@ async function sendMessage(queuedPayload = null) {
 
   } catch (err) {
     console.error("发送失�?", err);
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输�?· Harness 保持开�? : "已停止输�?) : t("发送失�? {msg}", { msg: err.message }));
   } finally {
   isGenerating = false;
@@ -2122,7 +2122,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     setMessages(newMessages);
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast(t("上下文已压缩：{n} 条消�?�?摘要", { n: compress_count }));
   } catch (e) {
     console.warn("上下文压缩检查失�?", e);
@@ -2202,7 +2202,7 @@ async function handleGrindReply(content, msgEl) {
     renderGrindPanel();
     updateSendState();
     appendDraftActions(msgEl, draft);
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast("墨稿已成：可送入 Harness / 投到白板 / 存为模板");
     return;
   }
@@ -2311,20 +2311,20 @@ function appendDraftActions(msgEl, draft) {
     state.harness.enabled = true;
     btnHarness?.classList.add("active");
     savePersistent();
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast("墨稿已送入 Harness，自主执行中�?);
     await sendMessage({ text: grindSvc.draftToHarnessTask(draft), files: [] });
   }));
 
   bar.appendChild(mkBtn("�?投到白板", "作为白板卡片保存", async () => {
     addBoardCard(grindSvc.draftToBoardCard(draft));
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast("已投到白�?);
   }));
 
   bar.appendChild(mkBtn("�?存为模板", "存入知识库作为可复用任务书模�?, async () => {
     const ok = await grindSvc.saveDraftAsTemplate(draft);
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast(ok ? "已存为磨墨模板（知识中心可见�? : "保存失败");
   }));
 
@@ -2334,7 +2334,7 @@ function appendDraftActions(msgEl, draft) {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260818-70").then(({ toast }) => toast("当前对话还不需要压�?));
+    import("../app.js?v=20260818-71").then(({ toast }) => toast("当前对话还不需要压�?));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -2358,7 +2358,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -2391,7 +2391,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(t("上下文已压缩：{n} 条消�?�?摘要", { n: res.data.compress_count || 0 }));
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -2872,7 +2872,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260818-70");
+      const { toast } = await import("../app.js?v=20260818-71");
       toast(t("文件过大，已跳过: {name}", { name: file.name }));
       continue;
     }
@@ -2887,11 +2887,11 @@ async function handleFiles(fileList) {
         if (res.code === 0 && res.data?.content) {
           pendingFiles.push({ name: file.name, size: file.size, content: res.data.content, type: "text" });
         } else {
-          const { toast } = await import("../app.js?v=20260818-70");
+          const { toast } = await import("../app.js?v=20260818-71");
           toast(res.message || t("解析失败: {name}", { name: file.name }));
         }
       } catch (e) {
-        const { toast } = await import("../app.js?v=20260818-70");
+        const { toast } = await import("../app.js?v=20260818-71");
         toast(t("解析失败: {name}（{msg}�?, { name: file.name, msg: e.message }));
       }
       continue;
@@ -2930,7 +2930,7 @@ async function handleFiles(fileList) {
  * 原地替换内容与工具卡片；完成后照常进入工具调用循环�? */
 async function regenerateMessage(msg, msgEl) {
   if (isGenerating) {
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast("正在生成中，请稍�?);
     return;
   }
@@ -2938,7 +2938,7 @@ async function regenerateMessage(msg, msgEl) {
   if (idx < 0) return;
   const after = state.messages.slice(idx + 1).filter(m => !m.hidden && m.role !== "system");
   if (after.length > 0) {
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast("只能重新生成最后一条助手回�?);
     return;
   }
@@ -2946,7 +2946,7 @@ async function regenerateMessage(msg, msgEl) {
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast("请先在设置中配置该模型的 API Key");
     return;
   }
@@ -2956,7 +2956,7 @@ async function regenerateMessage(msg, msgEl) {
     .filter(m => !m.hidden && m.role !== "system")
     .map(m => ({ role: m.role, content: m.content }));
   if (!history.some(m => m.role === "user")) {
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast("没有可重新生成的上下�?);
     return;
   }
@@ -3057,7 +3057,7 @@ function initChat() {
     markActivity(); // 防止重复触发
     try { activeGenerationController?.abort(); } catch {}
     try {
-      const { toast } = await import("../app.js?v=20260818-70");
+      const { toast } = await import("../app.js?v=20260818-71");
       toast("连接长时间无响应，已自动中断，可重试");
     } catch {}
   }, 15000);
@@ -3085,7 +3085,7 @@ function initChat() {
     state.harness.enabled = !state.harness.enabled;
     btnHarness.classList.toggle("active", state.harness.enabled);
     savePersistent();
-    const { toast } = await import("../app.js?v=20260818-70");
+    const { toast } = await import("../app.js?v=20260818-71");
     toast(state.harness.enabled ? "Harness 已开启：目标→计划→执行→验证→汇报→追�?六阶段自主闭环，大任务自动建�?TODOLIST" : "Harness 已关�?);
     showHarnessIdle();
   });
@@ -3124,18 +3124,18 @@ function initChat() {
     const id = expertSelect.value;
     if (!id) {
       setActiveExpertId("");
-      const { toast } = await import("../app.js?v=20260818-70");
+      const { toast } = await import("../app.js?v=20260818-71");
       toast("已退出专家模�?);
       return;
     }
     try {
-      const { getExpert } = await import("../services/experts.js?v=20260818-70");
+      const { getExpert } = await import("../services/experts.js?v=20260818-71");
       const detail = await getExpert(id, { force: true });
       setActiveExpertId(id, detail);
-      const { toast } = await import("../app.js?v=20260818-70");
+      const { toast } = await import("../app.js?v=20260818-71");
       toast(t("已启用专家包：{name}", { name: detail.name || id }));
     } catch (e) {
-      const { toast } = await import("../app.js?v=20260818-70");
+      const { toast } = await import("../app.js?v=20260818-71");
       toast(t("专家包加载失�? {msg}", { msg: e.message }));
       expertSelect.value = state.activeExpertId || "";
     }
@@ -3279,7 +3279,7 @@ function startVoice(btn) {
   };
   _voiceRecognition.onerror = (e) => {
     if (e.error !== "aborted" && e.error !== "no-speech") {
-      try { import("../app.js?v=20260818-70").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
+      try { import("../app.js?v=20260818-71").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
     }
     stopVoice();
   };

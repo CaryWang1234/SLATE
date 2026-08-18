@@ -11,10 +11,10 @@
  *   文件内容原样（第二行起）
  *   ◈◆�? */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-70";
-import { post } from "../services/api.js?v=20260818-70";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-70";
-import { t } from "./i18n.js?v=20260818-70";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-71";
+import { post } from "../services/api.js?v=20260818-71";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-71";
+import { t } from "./i18n.js?v=20260818-71";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
