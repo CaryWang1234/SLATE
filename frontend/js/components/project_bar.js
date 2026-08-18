@@ -69,7 +69,7 @@ function renderProjectBar() {
     reviewBtn.textContent = "\u{1F50D}";
     reviewBtn.title = "Code Review\uff1aAI \u4ee3\u7801\u5ba1\u67e5\uff08git diff \u00b7 \u56db\u7ef4\u5ea6 \u00b7 \u884c\u7ea7\u8bc4\u8bba\uff09";
     reviewBtn.addEventListener("click", () => {
-      import("./review.js?v=20260818-71")
+      import("./review.js?v=20260818-72")
         .then(({ openReviewModal }) => openReviewModal())
         .catch(() => {});
     });
@@ -93,7 +93,7 @@ function renderProjectBar() {
     projectBar.appendChild(actions);
 
     // 自动浏览根目�?
-    if (!state.projectFileTree?.entries) {
+    if (!state.projectFileTree?.entries) {
       refreshFileTree("");
     }
   } else {
@@ -157,7 +157,7 @@ async function handleOpenProject() {
     setProject(res.data);
     projectOpenModal.classList.add("hidden");
     // 自动浏览根目�?
-    currentBrowsePath = "";
+    currentBrowsePath = "";
     await refreshFileTree("");
   } else {
     dlgToast(res.message || "打开失败", 3200);
@@ -214,7 +214,7 @@ function renderFileTree() {
   }
 
   // 面包屑导�?
-  if (currentBrowsePath && currentBrowsePath !== ".") {
+  if (currentBrowsePath && currentBrowsePath !== ".") {
     const breadcrumb = document.createElement("div");
     breadcrumb.className = "file-tree-breadcrumb";
     const rootLink = document.createElement("span");
@@ -257,7 +257,7 @@ function renderFileTree() {
   }
 
   // 文件和目�?
-  for (const entry of data.entries) {
+  for (const entry of data.entries) {
     const item = document.createElement("div");
     item.className = `file-tree-item ${entry.type === "dir" ? "file-tree-dir" : "file-tree-file"}`;
 
@@ -297,7 +297,7 @@ async function openFile(path) {
   filePreviewEl.classList.remove("hidden");
 
   // 标题�?
-  const header = document.createElement("div");
+  const header = document.createElement("div");
   header.className = "file-preview-header";
 
   const title = document.createElement("span");
@@ -340,7 +340,7 @@ async function openFile(path) {
   filePreviewEl.appendChild(header);
 
   // 文件内容（按扩展名语法高亮，未知类型�?highlightAuto�?
-  const pre = document.createElement("pre");
+  const pre = document.createElement("pre");
   pre.className = "file-preview-content";
   const text = (content || "(空文�?").slice(0, 10000);
   let highlighted = false;
@@ -399,7 +399,7 @@ function initProjectBar() {
   }
 
   // 订阅项目状态变�?
-  subscribe("project", renderProjectBar);
+  subscribe("project", renderProjectBar);
   subscribe("projectFileTree", renderFileTree);
 
   // 初始渲染

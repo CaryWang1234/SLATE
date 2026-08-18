@@ -1,11 +1,11 @@
 /**
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除�? */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260818-71";
-import { get, post, del, upload } from "../services/api.js?v=20260818-71";
-import { guardSkillParams } from "../services/riskguard.js?v=20260818-71";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-71";
-import { t } from "../services/i18n.js?v=20260818-71";
+import { state, subscribe, setSkills } from "../store.js?v=20260818-72";
+import { get, post, del, upload } from "../services/api.js?v=20260818-72";
+import { guardSkillParams } from "../services/riskguard.js?v=20260818-72";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-72";
+import { t } from "../services/i18n.js?v=20260818-72";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -278,7 +278,7 @@ function createSkillItem(name, desc, kind) {
   item.appendChild(info);
 
   // Skill 支持删除；内置工具不可�?
-  if (kind === "Skill") {
+  if (kind === "Skill") {
     const delBtn = document.createElement("button");
     delBtn.className = "skill-item-del";
     delBtn.title = "删除技�?";
@@ -431,7 +431,7 @@ async function handleUploadSkill() {
   const desc = (await dlgPrompt("技能描述：", { title: "新建技�?, value: name.trim(), textarea: true })) || name.trim();
 
   // 创建文件选择�?
-  const input = document.createElement("input");
+  const input = document.createElement("input");
   input.type = "file";
   input.multiple = true;
   input.accept = ".md,.py,.js,.json,.yaml,.yml,.sh,.bat";
@@ -600,7 +600,7 @@ function initSkillPanel() {
   subscribe("skills", renderSkillList);
 
   // 加载技能列�?
-  refreshSkills();
+  refreshSkills();
 }
 
 export { initSkillPanel, refreshSkills };

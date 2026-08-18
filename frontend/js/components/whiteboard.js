@@ -2,10 +2,10 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-71";
-import { streamChat } from "../services/api.js?v=20260818-71";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-71";
-import { t } from "../services/i18n.js?v=20260818-71";
+import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-72";
+import { streamChat } from "../services/api.js?v=20260818-72";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-72";
+import { t } from "../services/i18n.js?v=20260818-72";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -134,7 +134,7 @@ function drawArrows() {
   if (!svgOverlay) return;
 
   // 清空旧箭�?
-  svgOverlay.innerHTML = "";
+  svgOverlay.innerHTML = "";
 
   const containerRect = boardCards.getBoundingClientRect();
   const cards = state.boardCards;
@@ -153,13 +153,13 @@ function drawArrows() {
       const toRect = toEl.getBoundingClientRect();
 
       // 计算连接点（从卡片右侧中心到目标卡片左侧中心�?
-      const x1 = fromRect.right - containerRect.left;
+      const x1 = fromRect.right - containerRect.left;
       const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
       const x2 = toRect.left - containerRect.left;
       const y2 = toRect.top + toRect.height / 2 - containerRect.top;
 
       // 绘制贝塞尔曲�?
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       const midX = (x1 + x2) / 2;
       const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
       path.setAttribute("d", d);
@@ -387,8 +387,7 @@ function openCardModal(card = null) {
   selectedColor = card?.color || "default";
   renderColorOptions();
 
-  // 删除按钮只在编辑时显�?
-  btnCardDelete.style.display = card ? "" : "none";
+  // 删除按钮只在编辑时显�?  btnCardDelete.style.display = card ? "" : "none";
 
   cardModal.classList.remove("hidden");
   cardInputTitle.focus();
@@ -420,7 +419,7 @@ function saveCard() {
     setBoardCards(cards);
   } else {
     // 添加新卡�?
-    const card = {
+    const card = {
       id: `c${Date.now().toString(36)}`,
       title,
       body,
@@ -578,7 +577,7 @@ async function aiOrganize() {
   }
 
   // 构建卡片信息（含颜色�?
-  const cardsInfo = state.boardCards.map(c => {
+  const cardsInfo = state.boardCards.map(c => {
     let info = `- [${c.id}] ${c.title}`;
     if (c.body) info += `: ${c.body}`;
     if (c.color && c.color !== "default") info += ` (颜色: ${c.color})`;

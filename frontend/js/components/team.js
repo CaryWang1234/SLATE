@@ -2,16 +2,16 @@
  * SLATE AI 团队组件：多模型协作讨论
  * 轻量模型初步讨论 �?重型模型最终决�? */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260818-71";
-import { notifyTaskComplete } from "../services/notify.js?v=20260818-71";
-import { streamChat } from "../services/api.js?v=20260818-71";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260818-71";
-import { renderMarkdown } from "../services/markdown.js?v=20260818-71";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260818-71";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260818-71";
-import { getExpertsCached } from "./experts.js?v=20260818-71";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-71";
-import { t } from "../services/i18n.js?v=20260818-71";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260818-72";
+import { notifyTaskComplete } from "../services/notify.js?v=20260818-72";
+import { streamChat } from "../services/api.js?v=20260818-72";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260818-72";
+import { renderMarkdown } from "../services/markdown.js?v=20260818-72";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260818-72";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260818-72";
+import { getExpertsCached } from "./experts.js?v=20260818-72";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-72";
+import { t } from "../services/i18n.js?v=20260818-72";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项�?subscribe("modelRegistry", () => renderTeamMembers());
 
@@ -531,7 +531,7 @@ function populateModelOptions(select, selectedId) {
   }
 
   // 自定义模�?
-  if (state.customModels.length > 0) {
+  if (state.customModels.length > 0) {
     const optgroup = document.createElement("optgroup");
     optgroup.label = "自定�?;
     for (const m of state.customModels) {
@@ -672,7 +672,7 @@ async function startDiscussion() {
   teamOutput.appendChild(topicEl);
 
   // 注入黑板上下�?
-  let boardContext = "";
+  let boardContext = "";
   if (state.boardCards.length > 0) {
     boardContext = "\n\n当前黑板卡片:\n" + state.boardCards.map(c =>
       `[${c.id}] ${c.title}${c.body ? " �?" + c.body : ""}`
@@ -683,7 +683,7 @@ async function startDiscussion() {
   let verdict = null;
 
   // 预加载成员绑定的专家�?
-  const expertDetails = new Map();
+  const expertDetails = new Map();
   for (const member of teamMembers) {
     if (member.expertId && !expertDetails.has(member.expertId)) {
       try {
@@ -695,7 +695,7 @@ async function startDiscussion() {
   }
 
   // 多轮辩论：每轮每位成员可提案或回应他人，直到决策产生或轮次用�?
-  for (let round = 1; round <= maxRounds && !verdict; round++) {
+  for (let round = 1; round <= maxRounds && !verdict; round++) {
     addRoundHeader(round);
     const isLastRound = round === maxRounds;
 
@@ -760,7 +760,7 @@ async function startDiscussion() {
     }
 
     // 轮次用尽仍无决策：决策者强制拍�?
-    if (!verdict && isLastRound) {
+    if (!verdict && isLastRound) {
       verdict = await forceVerdict(topic, boardContext, entries);
     }
   }
@@ -1076,7 +1076,7 @@ function makeWfIo(label, text) {
 function renderWfNodeRows(wf) {
   wfNodeList.innerHTML = "";
   // 按拓扑顺序展示（后端已返�?order�?
-  const orderIndex = new Map((wf.order || []).map((id, i) => [id, i]));
+  const orderIndex = new Map((wf.order || []).map((id, i) => [id, i]));
   const nodes = [...(wf.nodes || [])].sort((a, b) =>
     (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0)
   );
@@ -1261,7 +1261,7 @@ function initTeamPanel() {
   }
 
   // 最大辩论轮�?
-  const maxRoundsSelect = document.getElementById("team-max-rounds");
+  const maxRoundsSelect = document.getElementById("team-max-rounds");
   if (maxRoundsSelect) {
     maxRounds = parseInt(maxRoundsSelect.value, 10) || 5;
     maxRoundsSelect.addEventListener("change", () => {

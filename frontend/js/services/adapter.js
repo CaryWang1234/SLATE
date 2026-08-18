@@ -2,8 +2,8 @@
  * SLATE 模型适配器：System Prompt 模板 + 参数映射
  * 根据不同模型特点优化提示�? */
 
-import { state } from "../store.js?v=20260818-70";
-import { getToolsSystemPrompt } from "./tools.js?v=20260818-70";
+import { state } from "../store.js?v=20260818-72";
+import { getToolsSystemPrompt } from "./tools.js?v=20260818-72";
 
 // ── System Prompt 模板 ──────────────────────
 

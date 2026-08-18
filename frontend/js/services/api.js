@@ -2,8 +2,8 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260818-71";
-import { t } from "./i18n.js?v=20260818-71";
+import { API_BASE } from "../store.js?v=20260818-72";
+import { t } from "./i18n.js?v=20260818-72";
 
 // 思考内容标记前缀（用于在流式输出中区分 reasoning 与 content）
 export const REASONING_PREFIX = "\x00\x01R\x01\x00";
@@ -145,7 +145,7 @@ async function* streamChat(payload) {
       }
 
       // 流结束：flush 解码器内残留字节（跨 chunk 截断的多字节中文字符）并处理缓冲区尾�?
-      if (!done) {
+      if (!done) {
         buffer += decoder.decode();
         for (const chunk of parseLines(buffer.split("\n"))) yield chunk;
       }
@@ -153,7 +153,7 @@ async function* streamChat(payload) {
     } catch (err) {
       if (signal?.aborted) throw err;   // 用户主动停止：保�?AbortError 语义
       // 未产出任何内�?�?自动重试（连接失�?瞬断/服务端无响应�?
-      if (!receivedAny && attempt <= STREAM_MAX_RETRIES) {
+      if (!receivedAny && attempt <= STREAM_MAX_RETRIES) {
         await new Promise(r => setTimeout(r, 700 * attempt));
         continue;
       }

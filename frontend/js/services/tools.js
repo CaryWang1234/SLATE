@@ -11,10 +11,10 @@
  *   文件内容原样（第二行起）
  *   ◈◆�? */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-71";
-import { post } from "../services/api.js?v=20260818-71";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-71";
-import { t } from "./i18n.js?v=20260818-71";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-72";
+import { post } from "../services/api.js?v=20260818-72";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-72";
+import { t } from "./i18n.js?v=20260818-72";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -254,7 +254,7 @@ const TOOLS = {
           }
         }
         // 高危命令审批：写死规则判定，命中后弹框并用模型解释目�?
-        if (skill === "terminal" && p.command) {
+        if (skill === "terminal" && p.command) {
           const risk = isHighRiskCommand(p.command);
           if (risk.risk && !(await guardSkillParams(skill, p))) {
             return `高危命令被用户拒绝执行（${risk.reason}�? ${p.command}`;
@@ -364,7 +364,7 @@ const TOOLS = {
       if (!edits || !edits.length) return "缺少 edits";
 
       // 输出被截断时 edits 列表可能不完整，只应用部分编辑很危险，拒绝执�?
-      if (_truncated) {
+      if (_truncated) {
         return {
           _type: "file_edit",
           file: "",
@@ -557,7 +557,7 @@ const TOOLS = {
       };
 
       // 自动确认：预览无错误时直接创建（截断内容也先写入，由后续 file_append 补齐�?
-      if (fileAutoApplyEnabled() && structured.file && structured.errors.length === 0) {
+      if (fileAutoApplyEnabled() && structured.file && structured.errors.length === 0) {
         try {
           const applyRes = await post("/projects/create-file", { file_path: structured.file, content: structured.content });
           if (applyRes.code === 0) structured.applied = "auto";
@@ -852,8 +852,7 @@ function salvageTruncatedParams(raw) {
       const val = readJsonString(raw, i);
       params[key.value] = val.value;
       i = val.end;
-      if (!val.complete) break; // 字符串值被截断，抢救到此为�?    }
-      else {
+      if (!val.complete) break; // 字符串值被截断，抢救到此为�?    } else {
       const val = readJsonValueWithRepair(raw, i);
       if (val.value !== undefined) params[key.value] = val.value;
       i = val.end;
@@ -886,7 +885,7 @@ function detectToolCalls(text) {
   }
 
   // 处理末尾被截断的工具调用块（缺少闭合标记 ◈◆◆，通常是输出达�?max_tokens 上限�?  // 不能直接丢弃：file_create �?content 往往已输出了大部分内容，应尽力抢�?
-  const rest = text.slice(lastEnd);
+  const rest = text.slice(lastEnd);
   const openMatch = /◈◈◈[ \t]*(\w+)[ \t]*\r?\n([\s\S]*)$/.exec(rest);
   if (openMatch) {
     const name = openMatch[1];
@@ -917,7 +916,7 @@ function detectToolCalls(text) {
 function stripToolCalls(text) {
   const stripped = text.replace(TOOL_RE, "");
   // 同时移除末尾未闭合的截断工具块，避免残缺 JSON 残留在消息正�?
-  return stripped
+  return stripped
     .replace(/◈◈◈[ \t]*\w+[ \t]*\r?\n[\s\S]*$/, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -966,7 +965,7 @@ async function executeToolCalls(calls) {
   const results = [];
   for (const call of calls) {
     // 截断守卫：输出达到长度上限导致工具调用块未闭合、参数不完整�?    // file_create/file_append 截断时已输出�?content 仍是有效前缀，允许执行预览并靠后�?file_append 补齐�?    // 其余工具（尤�?file_edit 的部分编辑）执行残缺参数很危险，拒绝执行并反馈模型拆分重试�?
-    if (call.params?._truncated && call.name !== "file_append" && call.name !== "file_create") {
+    if (call.params?._truncated && call.name !== "file_append" && call.name !== "file_create") {
       results.push({
         ...call,
         success: false,
@@ -999,7 +998,7 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
   s += "（等待工具返回目录列表后，再根据结果回答用户）\n\n";
 
   // 项目上下�?
-  if (state.project) {
+  if (state.project) {
     s += `[当前项目] ${state.project.name} (${state.project.path})\n`;
     if (state.project.constitution?.rules?.length) {
       s += "项目宪法:\n";

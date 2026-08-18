@@ -2,25 +2,25 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-71";
-import { initI18n, t } from "./services/i18n.js?v=20260818-71";
-import { get, post, put } from "./services/api.js?v=20260818-71";
-import { dlgConfirm } from "./services/dialog.js?v=20260818-71";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-71";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-71";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260818-71";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-71";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260818-71";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-71";
-import { initTeamPanel } from "./components/team.js?v=20260818-71";
-import { initProjectBar } from "./components/project_bar.js?v=20260818-71";
-import { initMemoryPanel } from "./components/memory.js?v=20260818-71";
-import { initExpertsPanel } from "./components/experts.js?v=20260818-71";
-import { initSchedule } from "./components/schedule.js?v=20260818-71";
-import { initRiskGuard } from "./services/riskguard.js?v=20260818-71";
-import { initUnderstandPanel } from "./components/understand.js?v=20260818-71";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-71";
-import { setProject, setProjectFileTree } from "./store.js?v=20260818-71";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-72";
+import { initI18n, t } from "./services/i18n.js?v=20260818-72";
+import { get, post, put } from "./services/api.js?v=20260818-72";
+import { dlgConfirm } from "./services/dialog.js?v=20260818-72";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-72";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-72";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260818-72";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-72";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260818-72";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-72";
+import { initTeamPanel } from "./components/team.js?v=20260818-72";
+import { initProjectBar } from "./components/project_bar.js?v=20260818-72";
+import { initMemoryPanel } from "./components/memory.js?v=20260818-72";
+import { initExpertsPanel } from "./components/experts.js?v=20260818-72";
+import { initSchedule } from "./components/schedule.js?v=20260818-72";
+import { initRiskGuard } from "./services/riskguard.js?v=20260818-72";
+import { initUnderstandPanel } from "./components/understand.js?v=20260818-72";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-72";
+import { setProject, setProjectFileTree } from "./store.js?v=20260818-72";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -86,7 +86,7 @@ function populateModelSelect() {
   }
 
   // 自定义模�?
-  if (state.customModels.length > 0) {
+  if (state.customModels.length > 0) {
     const optgroup = document.createElement("optgroup");
     optgroup.label = "自定�?;
     for (const m of state.customModels) {
@@ -145,7 +145,7 @@ function handleModelSelect(e) {
     if (found) {
       if (!hasModelKey(found.id) && found.id !== "local") {
         // 没有 API key，弹出输�?
-        openKeyInputModal(found);
+        openKeyInputModal(found);
       } else {
         setCurrentModel(found);
         resetUsage();
@@ -156,7 +156,7 @@ function handleModelSelect(e) {
   }
 
   // 查找自定义模�?
-  const custom = state.customModels.find(m => m.id === value);
+  const custom = state.customModels.find(m => m.id === value);
   if (custom) {
     if (!hasModelKey(custom.id)) {
       openKeyInputModal(custom);
@@ -439,7 +439,7 @@ function initSettingsNav() {
   });
 
   // 高亮规则：取顶边已越过容器顶�?24px 线的最后一个区�?
-  const onScroll = () => {
+  const onScroll = () => {
     const top = page.getBoundingClientRect().top;
     let activeId = items[0].dataset.target;
     for (const item of items) {
@@ -461,7 +461,7 @@ function renderResponsesApiHint() {
   checkbox.checked = state.useResponses === true;
 
   // 收集支持 Responses API 的模型名�?
-  const supportedModels = [];
+  const supportedModels = [];
   for (const models of Object.values(state.modelRegistry)) {
     for (const m of models) {
       if (m.supports_responses === true) {
@@ -670,7 +670,7 @@ async function runStorageCleanup(target, btn) {
     toast(freed > 0 ? t("已释�?{size}", { size: fmtBytes(freed) }) : "清理完成");
     if (target === "history") {
       // 清空历史后同步侧栏列�?
-      try { await refreshConversationList(); } catch (e) {}
+      try { await refreshConversationList(); } catch (e) {}
     }
     await renderStorageUsage();
   } catch (e) {
@@ -740,7 +740,7 @@ async function renderStorageUsage() {
 function initStorageManage() {
   renderStorageUsage();
   // 打开设置页时刷新一次用�?
-  document.getElementById("btn-settings")?.addEventListener("click", () => setTimeout(renderStorageUsage, 300));
+  document.getElementById("btn-settings")?.addEventListener("click", () => setTimeout(renderStorageUsage, 300));
 }
 
 /** 手动检查更新：结果内嵌展示，下�?说明走后端白名单打开系统浏览�?*/
@@ -900,7 +900,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260818-71").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260818-72").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -946,7 +946,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260818-71");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260818-72");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1096,14 +1096,14 @@ async function checkAppUpdate() {
 // ── 初始�?──────────────────────────────────
 
 async function init() {
-  // i18n 必须最先完成：英文模式要在任何界面渲染前挂好翻译监听
-  await initI18n();
+  // i18n 必须最先完成：英文模式要在任何界面渲染前挂好翻译监�?
+  await initI18n();
 
   loadPersistent();
   await loadSharedPersistent();
 
   // 应用保存的主�?
-  document.documentElement.setAttribute("data-theme", state.theme);
+  document.documentElement.setAttribute("data-theme", state.theme);
 
   safeInit("标签�?, initTabs);
   safeInit("对话", initChat);
@@ -1142,14 +1142,14 @@ async function init() {
   document.getElementById("btn-settings").addEventListener("click", openSettings);
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
   // 顶栏 📡：直达设置页“局域网遥控”区块（明显的网址获取入口�?
-  document.getElementById("btn-lan")?.addEventListener("click", () => openSettings({ focusLan: true }));
+  document.getElementById("btn-lan")?.addEventListener("click", () => openSettings({ focusLan: true }));
   document.getElementById("btn-lan-refresh")?.addEventListener("click", renderLanInfo);
   initAutoReviewPersistence();
   initNotificationPersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
   // 设置页导航与关于�?
-  safeInit("设置导航", initSettingsNav);
+  safeInit("设置导航", initSettingsNav);
   document.getElementById("btn-check-update")?.addEventListener("click", (e) => checkUpdateNow(e.currentTarget));
   safeInit("首次启动引导", initOnboarding);
   safeInit("数据备份恢复", initBackupRestore);
@@ -1159,17 +1159,17 @@ async function init() {
   await loadModels();
 
   // 自动恢复上次打开的项�?
-  if (state._lastProjectPath) {
+  if (state._lastProjectPath) {
     const res = await getCurrentProject();
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260818-71");
+      const { openProject } = await import("./services/project.js?v=20260818-72");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }
     // 确保文件树加�?
-    const browseRes = await browseFiles("");
+    const browseRes = await browseFiles("");
     if (browseRes.code === 0) setProjectFileTree(browseRes.data);
   }
 
