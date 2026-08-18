@@ -137,7 +137,7 @@ function renderShell() {
 
         <label class="factory-field factory-field-main">
           <span class="factory-label">任务描述</span>
-          <textarea id="factory-task" class="factory-input factory-task-input" placeholder="${t("写清楚你首Agent 做什么、为什么做、怎样算完成员)}" rows="7"></textarea>
+          <textarea id="factory-task" class="factory-input factory-task-input" placeholder="${t("写清楚你要 Agent 做什么、为什么做、怎样算完成。}" rows="7"></textarea>
         </label>
 
         <div class="factory-grid">
@@ -301,7 +301,7 @@ async function insertSelectedFiles() {
       return;
     }
     appendToTextarea(fields.context, chunks.join("\n\n"));
-    showToast(t("已插首{n} 个文字, { n: chunks.length }));
+    showToast(t("已插入 {n} 个文件, { n: chunks.length }));
   } finally {
     buttons.insertFiles.disabled = false;
     buttons.insertFiles.textContent = oldText;

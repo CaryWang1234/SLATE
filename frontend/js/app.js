@@ -151,7 +151,7 @@ function handleModelSelect(e) {
       } else {
         setCurrentModel(found);
         resetUsage();
-        toast(t("已切首 {name}", { name: found.name }));
+        toast(t("已切换: {name}", { name: found.name }));
       }
       return;
     }
@@ -166,7 +166,7 @@ function handleModelSelect(e) {
     } else {
       setCurrentModel(custom);
       resetUsage();
-      toast(t("已切首 {name}", { name: custom.name }));
+      toast(t("已切换: {name}", { name: custom.name }));
     }
   }
 }
@@ -478,7 +478,7 @@ function renderResponsesApiHint() {
   if (supportedModels.length > 0) {
     hint.textContent = t("支持 Responses API 的模型：{models}", { models: supportedModels.join("首) });
   } else {
-    hint.textContent = t("当前无模型支持Responses API");
+    hint.textContent = t("当前无模型支持 Responses API");
   }
 
   checkbox.onchange = () => {
@@ -597,7 +597,7 @@ function initBackupRestore() {
       setTimeout(() => URL.revokeObjectURL(a.href), 500);
       const d = res.data || {};
       if (statusEl) {
-        statusEl.textContent = t("已导出：{a} 会话 / {b} 条消首/ {c} 条记首/ {d} 条素首, { a: d.conversations?.length || 0, b: d.messages?.length || 0, c: d.memories?.length || 0, d: d.snippets?.length || 0 });
+        statusEl.textContent = t("已导出：{a} 会话 / {b} 条消息 / {c} 条记忆 / {d} 条素材, { a: d.conversations?.length || 0, b: d.messages?.length || 0, c: d.memories?.length || 0, d: d.snippets?.length || 0 });
       }
       toast("备份已下载);
     } catch (e) {
@@ -625,7 +625,7 @@ function initBackupRestore() {
       }
       const s = res.data || {};
       if (statusEl) {
-        statusEl.textContent = t("已导入：{a} 会话 / {b} 条消首/ {c} 条记首/ {d} 条素材（已存在的跳过首, { a: s.conversations || 0, b: s.messages || 0, c: s.memories || 0, d: s.snippets || 0 });
+        statusEl.textContent = t("已导入：{a} 会话 / {b} 条消息 / {c} 条记忆 / {d} 条素材（已存在的跳过）, { a: s.conversations || 0, b: s.messages || 0, c: s.memories || 0, d: s.snippets || 0 });
       }
       toast("恢复完成，正在重载以应用本地设置…);
       setTimeout(() => location.reload(), 1200);
@@ -671,8 +671,8 @@ async function runStorageCleanup(target, btn) {
     const res = await post("/settings/storage/cleanup", { target });
     if (res.code !== 0) { toast(res.message || "清理失败"); return; }
     const freed = res.data?.freed || 0;
-    if (statusEl) statusEl.textContent = freed > 0 ? t("已释首{size}", { size: fmtBytes(freed) }) : "无可释放空间（文件可能正被占用，关闭应用后重试）";
-    toast(freed > 0 ? t("已释首{size}", { size: fmtBytes(freed) }) : "清理完成");
+    if (statusEl) statusEl.textContent = freed > 0 ? t("已释放 {size}", { size: fmtBytes(freed) }) : "无可释放空间（文件可能正被占用，关闭应用后重试）";
+    toast(freed > 0 ? t("已释放 {size}", { size: fmtBytes(freed) }) : "清理完成");
     if (target === "history") {
       // 清空历史后同步侧栏列首
       try { await refreshConversationList(); } catch (e) {}
@@ -697,7 +697,7 @@ async function renderStorageUsage() {
 
     const totalRow = document.createElement("div");
     totalRow.className = "storage-total";
-    totalRow.textContent = t("总占首{size}", { size: fmtBytes(total) });
+    totalRow.textContent = t("总占用 {size}", { size: fmtBytes(total) });
     box.appendChild(totalRow);
 
     for (const it of items) {

@@ -101,7 +101,7 @@ function renderTodoPanel() {
   header.title = todoPanelCollapsed ? "展开任务清单" : "折叠任务清单";
   const title = document.createElement("span");
   title.className = "todo-panel-title";
-  title.textContent = t("首任务清单 {done}/{total}", { done, total: items.length }) + (blocked ? t(" · 受阻 {n}", { n: blocked }) : "") + (inProgress ? t(" · 进行首{n}", { n: inProgress }) : "");
+  title.textContent = t("首任务清单 {done}/{total}", { done, total: items.length }) + (blocked ? t(" · 受阻 {n}", { n: blocked }) : "") + (inProgress ? t(" · 进行中 {n}", { n: inProgress }) : "");
   const bar = document.createElement("span");
   bar.className = "todo-progress";
   const fill = document.createElement("span");
@@ -811,7 +811,7 @@ function updateSendState() {
     const grindOn = grindSession && ["grinding", "collecting"].includes(grindSession.state);
     const grindDone = grindSession?.state === "done";
     const grindRound = grindOn && grindSession.round
-      ? t(" · 首{x}/{n} 首, { x: Math.min(grindSession.round, grindSvc.MAX_ROUNDS), n: grindSvc.MAX_ROUNDS })
+      ? t(" · 第 {x}/{n} 轮, { x: Math.min(grindSession.round, grindSvc.MAX_ROUNDS), n: grindSvc.MAX_ROUNDS })
       : "";
     chatInput.placeholder = isGenerating
       ? t("继续输入可加入队列，点击停止中断输出") + queueHint
@@ -842,7 +842,7 @@ function stopGeneration() {
   if (!isGenerating) return;
   activeGenerationController?.abort();
   updateSendState();
-  // 停止仅中断本次生成：Harness 开关保持不动，只有手动添加才退首
+  // 停止仅中断本次生成：Harness 开关保持不动，只有手动添加才退出
   showHarnessIdle("本次执行已停止· Harness 保持开启，下一条消息继续自主执行);
 
 }
@@ -1347,7 +1347,7 @@ function renderFileCreateDiff(data) {
   head.className = "file-edit-diff-head";
   const s = data.stats || { lines: 0, chars: 0 };
   head.innerHTML = `<span class="file-edit-file-name">首${data.file_name || "未知文件"}</span>` +
-    `<span class="file-edit-stats file-create-badge">${t("新文字· {lines} 首· {chars} 字符", { lines: s.lines, chars: s.chars })}</span>`;
+    `<span class="file-edit-stats file-create-badge">${t("新文件 · {lines} 行 · {chars} 字符", { lines: s.lines, chars: s.chars })}</span>`;
   wrap.appendChild(head);
 
   const targetPath = data.file_path_rel || data.file;
@@ -1486,7 +1486,7 @@ function renderFileAppendPreview(data) {
   head.className = "file-edit-diff-head";
   const s = data.stats || { lines: 0, chars: 0 };
   head.innerHTML = `<span class="file-edit-file-name">首${data.file_name || "未知文件"}</span>` +
-    `<span class="file-edit-stats file-create-badge">${t("追加 · {lines} 首· {chars} 字符", { lines: s.lines, chars: s.chars })}</span>`;
+    `<span class="file-edit-stats file-create-badge">${t("追加 · {lines} 行 · {chars} 字符", { lines: s.lines, chars: s.chars })}</span>`;
   wrap.appendChild(head);
 
   const targetPath = data.file_path_rel || data.file;
@@ -1710,7 +1710,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
       const todos = getConversationTodos(state.currentConversationId);
       const doneCount = todos.filter(t => t.status === "done").length;
       const todoText = todos.length ? t(" · 清单 {done}/{total}", { done: doneCount, total: todos.length }) : "";
-      setHarnessProgress(t("Harness 自主执行 · 首{x}/{n} 首, { x: round + 1, n: maxRounds }) + todoText);
+      setHarnessProgress(t("Harness 自主执行 · 第 {x}/{n} 轮, { x: round + 1, n: maxRounds }) + todoText);
     }
 
     // 更新最后一首assistant 消息（去掉工具标记）
@@ -2076,7 +2076,7 @@ async function sendMessage(queuedPayload = null) {
 
   // 工具调用循环（默认5 轮；Harness 模式提升首maxRounds，上首50 轮）
   const toolRounds = harnessOn ? Math.max(10, Math.min(50, state.harness?.maxRounds || 50)) : 5;
-  if (harnessOn) setHarnessProgress(t("自主执行已启首· 最首{n} 首· 仅手动停止/ 轮数用完 / 清单了结才退首, { n: toolRounds }));
+  if (harnessOn) setHarnessProgress(t("自主执行已启动 · 最多 {n} 轮 · 仅手动停止/ 轮数用完 / 清单了结才退出, { n: toolRounds }));
   if (!signal.aborted) await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal, toolRounds);
   else if (harnessOn) showHarnessIdle(); // 启动前即被停止：runToolLoop 未运行，保持待机指示
 
@@ -2096,7 +2096,7 @@ async function sendMessage(queuedPayload = null) {
   } catch (err) {
     console.error("发送失败", err);
     const { toast } = await import("../app.js?v=20260818-75");
-    toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输出· Harness 保持开首 : "已停止输出) : t("发送失败 {msg}", { msg: err.message }));
+    toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输出· Harness 保持开首 : "已停止输出) : t("发送失败: {msg}", { msg: err.message }));
   } finally {
   isGenerating = false;
   activeGenerationController = null;
@@ -2252,7 +2252,7 @@ function renderGrindPanel() {
     ? "墨迹 · 已成稿
     : (st === "collecting"
       ? "墨迹 · 收墨中
-      : t("墨迹 · 首{x}/{n} 首, { x: round, n: grindSvc.MAX_ROUNDS }));
+      : t("墨迹 · 第 {x}/{n} 轮, { x: round, n: grindSvc.MAX_ROUNDS }));
   grindPanelEl.appendChild(header);
 
   if (grindSession.idea) {
@@ -2459,7 +2459,7 @@ function renderConvList(conversations) {
     if (msgCount > 0 || totalTokens > 0) {
       const usageInfo = document.createElement("span");
       usageInfo.className = "conv-item-usage";
-      usageInfo.textContent = t("{n}首· ~{tok} tok", { n: msgCount, tok: totalTokens >= 1000 ? (totalTokens / 1000).toFixed(1) + "K" : totalTokens });
+      usageInfo.textContent = t("{n}条 · ~{tok} tok", { n: msgCount, tok: totalTokens >= 1000 ? (totalTokens / 1000).toFixed(1) + "K" : totalTokens });
       titleWrap.appendChild(usageInfo);
     }
 
@@ -2544,7 +2544,7 @@ async function exportConversationMd(conv) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 500);
-  dlgToast("已导入Markdown");
+  dlgToast("已导出 Markdown");
 }
 
 // ── 历史侧栏搜索：标题即时过首+ 内容全文检首──────────
@@ -2626,7 +2626,7 @@ function initConvManage() {
 
   document.getElementById("btn-conv-delete-selected")?.addEventListener("click", async () => {
     const ids = [...convManageChecks.entries()].filter(([, cb]) => cb.checked).map(([id]) => id);
-    if (ids.length === 0) { dlgToast("请先勾选要删除的会首); return; }
+    if (ids.length === 0) { dlgToast("请先勾选要删除的会话"; return; }
     if (!await dlgConfirm(t("删除选中首{n} 个会话？删除后不可恢复制, { n: ids.length }), { danger: true, okText: "删除" })) return;
     await post("/chat/conversations/batch-delete", { ids });
     if (ids.includes(state.currentConversationId)) {
@@ -2635,7 +2635,7 @@ function initConvManage() {
     }
     await refreshConversationList();
     renderConvManageList();
-    dlgToast(t("已删除{n} 个会首, { n: ids.length }));
+    dlgToast(t("已删除 {n} 个会话, { n: ids.length }));
   });
 
   document.getElementById("btn-conv-clear-all")?.addEventListener("click", async () => {
@@ -2645,7 +2645,7 @@ function initConvManage() {
     setMessages([]);
     await refreshConversationList();
     renderConvManageList();
-    dlgToast("已清空全部会首);
+    dlgToast("已清空全部会话");
   });
 }
 
@@ -2687,7 +2687,7 @@ function renderConvManageList() {
     const msgCount = conv.message_count || 0;
     const tokens = conv.total_tokens || 0;
     const dateStr = conv.updated_at ? new Date(conv.updated_at * 1000).toLocaleDateString() : "";
-    meta.textContent = t("{n}首· ~{tok} tok", { n: msgCount, tok: tokens >= 1000 ? (tokens / 1000).toFixed(1) + "K" : tokens }) + (dateStr ? " · " + dateStr : "") + (conv.project ? " · 📁 " + conv.project : "");
+    meta.textContent = t("{n}条 · ~{tok} tok", { n: msgCount, tok: tokens >= 1000 ? (tokens / 1000).toFixed(1) + "K" : tokens }) + (dateStr ? " · " + dateStr : "") + (conv.project ? " · 📁 " + conv.project : "");
     info.append(title, meta);
     row.append(cb, info);
     list.appendChild(row);
@@ -3167,7 +3167,7 @@ function initChat() {
       toast(t("已启用专家包：{name}", { name: detail.name || id }));
     } catch (e) {
       const { toast } = await import("../app.js?v=20260818-75");
-      toast(t("专家包加载失败 {msg}", { msg: e.message }));
+      toast(t("专家包加载失败: {msg}", { msg: e.message }));
       expertSelect.value = state.activeExpertId || "";
     }
   });

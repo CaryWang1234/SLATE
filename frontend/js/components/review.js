@@ -154,7 +154,7 @@ async function startReview() {
       appendLog(t("已取消"));
       showView("setup");
     } else {
-      appendLog(t("❌ 审查失败: {msg}", { msg: e.message }));
+      appendLog(t("✕ 审查失败: {msg}", { msg: e.message }));
       import("../app.js?v=20260818-75").then(({ toast }) => toast(t("代码审查失败: {msg}", { msg: e.message }))).catch(() => {});
     }
   } finally {

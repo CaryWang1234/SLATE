@@ -52,7 +52,7 @@ async function refreshList(keepSelection = true) {
     expertsCache = await loadExperts();
   } catch (e) {
     expertsCache = [];
-    await toast(t("专家包加载失败 {msg}", { msg: e.message }));
+    await toast(t("专家包加载失败: {msg}", { msg: e.message }));
   }
   renderList();
   refreshExpertSelects();

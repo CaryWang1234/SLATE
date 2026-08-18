@@ -299,10 +299,10 @@ function createSkillItem(name, desc, kind) {
 }
 
 async function handleDeleteSkill(name) {
-  if (!await dlgConfirm(t("确定删除技能{name}首, { name }), { danger: true, okText: "删除" })) return;
+  if (!await dlgConfirm(t("确定删除技能 {name}首, { name }), { danger: true, okText: "删除" })) return;
   try {
     const res = await del(`/skills/${encodeURIComponent(name)}`);
-    showToast(res.code === 0 ? t("已删除技能{name}", { name }) : t("删除失败: {msg}", { msg: res.message }));
+    showToast(res.code === 0 ? t("已删除技能 {name}", { name }) : t("删除失败: {msg}", { msg: res.message }));
     if (res.code === 0) refreshSkills();
   } catch (e) {
     showToast(t("删除失败: {msg}", { msg: e.message }));

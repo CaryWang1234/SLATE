@@ -574,7 +574,7 @@ function buildTranscript(entries) {
 function addRoundHeader(round) {
   const el = document.createElement("div");
   el.className = "debate-round-header";
-  el.textContent = t("—5轮{n} 首—首, { n: round });
+  el.textContent = t("—— 第 {n} 轮 ——, { n: round });
   teamOutput.appendChild(el);
 }
 
@@ -788,7 +788,7 @@ async function startDiscussion() {
   btnStartDiscuss.textContent = "开始讨论;
 }
 
-/** 轮次用尽仍无共识时，由决策者（或首位有 Key 的成员）给出最终方首*/
+/** 轮次用尽仍无共识时，由决策者（或首位有 Key 的成员）给出最终方案**/
 
 /** 停止正在进行的讨论 */
 function stopDiscussion() {
@@ -867,9 +867,9 @@ function renderDebateSummary(topic, entries, verdict) {
 
   let summary = t("**议题**: {topic}", { topic }) + "\n\n";
   summary += t("**参与成员**: {names}", { names: names.join("首) }) + "\n\n";
-  summary += t("**发言统计**: 首{n} 条（{counts}首, { n: entries.length, counts: countText }) + "\n\n";
+  summary += t("**发言统计**: 共 {n} 条（{counts}）, { n: entries.length, counts: countText }) + "\n\n";
   if (verdict) {
-    summary += t("**最终方首*（{name}首", { name: verdict.member.name }) + "\n" + verdict.text;
+    summary += t("**最终方案**（{name}）":, { name: verdict.member.name }) + "\n" + verdict.text;
   } else {
     summary += t("**结果**: 未达成明确决策);
   }
@@ -1053,7 +1053,7 @@ async function refreshWorkflowList() {
     }
     renderWfDesc();
   } catch (e) {
-    wfDesc.textContent = t("工作流列表加载失败 {msg}", { msg: e.message });
+    wfDesc.textContent = t("工作流列表加载失败: {msg}", { msg: e.message });
   }
 }
 
@@ -1061,7 +1061,7 @@ function renderWfDesc() {
   const wf = wfList.find(w => w.id === wfSelect.value);
   if (!wf) { wfDesc.textContent = ""; return; }
   wfDesc.textContent = wf.valid
-    ? (wf.description || "") + t("（节首{n} · 依赖首{m}首, { n: wf.node_count, m: wf.edge_count })
+    ? (wf.description || "") + t("（节点 {n} · 依赖边 {m}）, { n: wf.node_count, m: wf.edge_count })
     : t("首该工作流定义非法：{msg}", { msg: wf.error });
 }
 
@@ -1189,14 +1189,14 @@ async function runSelectedWorkflow() {
       const docId = await saveRunToKnowledge(wf, result);
       wfResultBar.innerHTML = `<span class="wf-result-ok">${t("首{ok}/{n} 节点成功 · 产物已写入知识库（{title}），可在记忆面板查看", { ok: okCount, n: total, title: docId })}</span>`;
     } catch (e) {
-      wfResultBar.innerHTML = `<span class="wf-result-error">${t("节点成功 {ok}/{n}，但写入知识库失败 {msg}", { ok: okCount, n: total, msg: e.message })}</span>`;
+      wfResultBar.innerHTML = `<span class="wf-result-error">${t("节点成功 {ok}/{n}，但写入知识库失败: {msg}", { ok: okCount, n: total, msg: e.message })}</span>`;
     }
     wfRunStatus.textContent = "";
     wfAbortBtn?.classList.add("hidden");
     notifyTaskComplete(t("工作流完成"), t("{ok}/{n} 节点成功", { ok: okCount, n: total }));
   } catch (e) {
     wfRunStatus.textContent = "";
-    wfResultBar.innerHTML = `<span class="wf-result-error">${t("首工作流执行失败 {msg}", { msg: e.message })}</span>`;
+    wfResultBar.innerHTML = `<span class="wf-result-error">${t("首工作流执行失败: {msg}", { msg: e.message })}</span>`;
   } finally {
     wfRunning = false;
     btnWfRun.disabled = false;

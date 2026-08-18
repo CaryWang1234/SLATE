@@ -79,7 +79,7 @@ async function explainCommand(command) {
     const text = res?.data?.choices?.[0]?.message?.content?.trim();
     return text || t("（模型未返回说明）);
   } catch (e) {
-    return t("（说明生成失败 {msg}首, { msg: e.message });
+    return t("（说明生成失败: {msg}首, { msg: e.message });
   }
 }
 

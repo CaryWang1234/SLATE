@@ -123,7 +123,7 @@ async function renderList() {
     btnRun.addEventListener("click", async () => {
       const res = await post(`/schedule/tasks/${t.id}/run`);
       if (res.code === 0) {
-        toast("任务已触发，结果稍后归档首[定时] 会话");
+        toast("任务已触发，结果稍后归档到 [定时] 会话");
         startPolling();
       } else {
         toast(res.message || "触发失败");

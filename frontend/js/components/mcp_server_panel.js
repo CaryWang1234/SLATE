@@ -119,7 +119,7 @@ async function loadServers() {
       renderServerList(res.data);
     }
   } catch (e) {
-    showToast("加载 MCP Server 列表失败: " + e.message);
+    showToast("加载 MCP Server 列表失败" + e.message);
   }
 }
 
@@ -133,7 +133,7 @@ async function handleAddServer() {
   });
   if (!url || !url.trim()) return;
 
-  showToast("正在连接 MCP Server...");
+  showToast("正在连接 MCP Server…");
   try {
     const res = await post("/mcp-servers", { name: name.trim(), url: url.trim(), auto_connect: true });
     if (res.code === 0) {
@@ -156,7 +156,7 @@ async function handleAddServer() {
 }
 
 async function handleConnect(serverId) {
-  showToast("正在连接...");
+  showToast("正在连接…");
   try {
     const res = await post(`/mcp-servers/${serverId}/connect`);
     if (res.code === 0) {

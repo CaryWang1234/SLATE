@@ -257,7 +257,7 @@ function renderResult() {
   if (!resultView || !currentResult) return;
   const levelLabel = LEVELS[currentResult.level]?.label || currentResult.level || "首;
   const time = currentResult.generated_at ? new Date(currentResult.generated_at).toLocaleString() : "";
-  if (resultMeta) resultMeta.textContent = t("档位：{level} · 生成员{date}", { level: t(levelLabel), date: time });
+  if (resultMeta) resultMeta.textContent = t("档位：{level} · 生成于 {date}", { level: t(levelLabel), date: time });
   renderResultTabs();
   renderResultBody();
 }
