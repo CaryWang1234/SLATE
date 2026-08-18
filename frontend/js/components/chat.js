@@ -838,7 +838,8 @@ function stopGeneration() {
   if (!isGenerating) return;
   activeGenerationController?.abort();
   updateSendState();
-  // 停止仅中断本次生成：Harness 开关保持不动，只有手动�?�?才退�?  showHarnessIdle("本次执行已停�?· Harness 保持开启，下一条消息继续自主执�?);
+  // 停止仅中断本次生成：Harness 开关保持不动，只有手动�?�?才退�?
+  showHarnessIdle("本次执行已停�?· Harness 保持开启，下一条消息继续自主执�?);
 }
 
 function clearInputQueue() {
@@ -2041,7 +2042,8 @@ async function sendMessage(queuedPayload = null) {
   const estimatedCompletion = Math.ceil(fullContent.length / 3);
   addUsage({ prompt_tokens: estimatedPrompt, completion_tokens: estimatedCompletion });
 
-  // 同步用量到后�?  syncUsageToBackend();
+  // 同步用量到后�?
+  syncUsageToBackend();
 
   const contentEl = msgEl.querySelector(".msg-content");
   renderAssistantContent(contentEl, fullContent);
@@ -2116,7 +2118,8 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     const summaryMsg = { role: "system", content: `[历史摘要]: ${summary}` };
     const newMessages = [summaryMsg, ...keep_messages.map(m => ({ ...m, model: "" }))];
 
-    // 更新前端状�?    setMessages(newMessages);
+    // 更新前端状�?
+    setMessages(newMessages);
 
     // 通知用户
     const { toast } = await import("../app.js?v=20260818-70");
@@ -2689,7 +2692,8 @@ async function switchConversation(convId) {
   const res = await get(`/chat/conversations/${convId}/messages`);
   if (res.code === 0) setMessages((res.data || []).map(normalizeMessageForRender));
 
-  // 磨墨会话恢复（刷新页�?/ 切换对话后重建状态与面板�?  grindSession =
+  // 磨墨会话恢复（刷新页�?/ 切换对话后重建状态与面板�?
+  grindSession =
   await grindSvc.getSession(convId);
   if (grindSession) {
     for (const m of state.messages) {
@@ -2965,7 +2969,8 @@ async function regenerateMessage(msg, msgEl) {
   const signal = activeGenerationController.signal;
   updateSendState();
 
-  // 重置消息与卡�?  msg.content = "";
+  // 重置消息与卡�?
+  msg.content = "";
   msg.toolResults = [];
   msg.model = state.currentModel?.name || msg.model;
   setMessages([...state.messages]);
@@ -3057,7 +3062,8 @@ function initChat() {
     } catch {}
   }, 15000);
 
-  // 智能滚动跟随：用户向上滚动浏览历史时不强制拉�?  chatScroll.addEventListener("scroll", () => {
+  // 智能滚动跟随：用户向上滚动浏览历史时不强制拉�?
+  chatScroll.addEventListener("scroll", () => {
     stickToBottom = isNearBottom();
   });
 
@@ -3071,7 +3077,8 @@ function initChat() {
   document.getElementById("btn-grind")?.addEventListener("click", () => startGrindConversation(""));
   grindPanelEl = document.getElementById("grind-panel");
 
-  // Harness 自主执行开�?  btnHarness = document.getElementById("btn-harness");
+  // Harness 自主执行开�?
+  btnHarness = document.getElementById("btn-harness");
   btnHarness?.classList.toggle("active", state.harness?.enabled === true);
   btnHarness?.addEventListener("click", async () => {
     state.harness = state.harness || { enabled: false, maxRounds: 50 };
@@ -3176,7 +3183,8 @@ function initChat() {
   });
 
   chatInput.addEventListener("blur", () => {
-    // 延迟隐藏，保证弹�?mousedown 先触�?    setTimeout(hideMentionPopup, 150);
+    // 延迟隐藏，保证弹�?mousedown 先触�?
+    setTimeout(hideMentionPopup, 150);
   });
 
   try {

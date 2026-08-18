@@ -599,7 +599,8 @@ function initSkillPanel() {
 
   subscribe("skills", renderSkillList);
 
-  // 加载技能列�?  refreshSkills();
+  // 加载技能列�?
+  refreshSkills();
 }
 
 export { initSkillPanel, refreshSkills };

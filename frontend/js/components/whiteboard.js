@@ -133,7 +133,8 @@ function drawArrows() {
   if (!svgOverlay) initSvgOverlay();
   if (!svgOverlay) return;
 
-  // 清空旧箭�?  svgOverlay.innerHTML = "";
+  // 清空旧箭�?
+  svgOverlay.innerHTML = "";
 
   const containerRect = boardCards.getBoundingClientRect();
   const cards = state.boardCards;
@@ -386,7 +387,8 @@ function openCardModal(card = null) {
   selectedColor = card?.color || "default";
   renderColorOptions();
 
-  // 删除按钮只在编辑时显�?  btnCardDelete.style.display = card ? "" : "none";
+  // 删除按钮只在编辑时显�?
+  btnCardDelete.style.display = card ? "" : "none";
 
   cardModal.classList.remove("hidden");
   cardInputTitle.focus();

@@ -156,7 +156,8 @@ async function handleOpenProject() {
   if (res.code === 0) {
     setProject(res.data);
     projectOpenModal.classList.add("hidden");
-    // 自动浏览根目�?    currentBrowsePath = "";
+    // 自动浏览根目�?
+    currentBrowsePath = "";
     await refreshFileTree("");
   } else {
     dlgToast(res.message || "打开失败", 3200);
@@ -397,7 +398,8 @@ function initProjectBar() {
     });
   }
 
-  // 订阅项目状态变�?  subscribe("project", renderProjectBar);
+  // 订阅项目状态变�?
+  subscribe("project", renderProjectBar);
   subscribe("projectFileTree", renderFileTree);
 
   // 初始渲染

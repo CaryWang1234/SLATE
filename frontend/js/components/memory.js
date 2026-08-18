@@ -682,7 +682,8 @@ function initMemoryPanel() {
     }
   });
 
-  // 监听状态变�?  subscribe("memories", renderMemoryList);
+  // 监听状态变�?
+  subscribe("memories", renderMemoryList);
   subscribe("userProfile", loadProfileToForm);
   subscribe("promptSnippets", renderSnippetList);
 

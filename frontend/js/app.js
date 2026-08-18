@@ -144,7 +144,8 @@ function handleModelSelect(e) {
     const found = models.find(m => m.id === value);
     if (found) {
       if (!hasModelKey(found.id) && found.id !== "local") {
-        // 没有 API key，弹出输�?        openKeyInputModal(found);
+        // 没有 API key，弹出输�?
+        openKeyInputModal(found);
       } else {
         setCurrentModel(found);
         resetUsage();
@@ -1147,7 +1148,8 @@ async function init() {
   initNotificationPersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
-  // 设置页导航与关于�?  safeInit("设置导航", initSettingsNav);
+  // 设置页导航与关于�?
+  safeInit("设置导航", initSettingsNav);
   document.getElementById("btn-check-update")?.addEventListener("click", (e) => checkUpdateNow(e.currentTarget));
   safeInit("首次启动引导", initOnboarding);
   safeInit("数据备份恢复", initBackupRestore);
