@@ -155,7 +155,8 @@ async function extractMemoriesFromConversation() {
     .join("\n");
 
   try {
-    // 获取提取提示�?    const res = await post("/chat/extract-memories", {
+    // 获取提取提示�?
+    const res = await post("/chat/extract-memories", {
       text: dialogText,
       existing_memories: state.memories.map(m => ({ id: m.id, category: m.category, content: m.content })),
     });
@@ -670,7 +671,8 @@ function initMemoryPanel() {
   document.getElementById("knowledge-enabled")?.addEventListener("change", saveKnowledgeSettingsFromForm);
   document.getElementById("knowledge-topk")?.addEventListener("change", saveKnowledgeSettingsFromForm);
 
-  // 素材的添加按�?  const btnAddSnippet = document.getElementById("btn-add-snippet");
+  // 素材的添加按�?
+  const btnAddSnippet = document.getElementById("btn-add-snippet");
   if (btnAddSnippet) btnAddSnippet.addEventListener("click", async () => {
     const text = await dlgPrompt("粘贴或输入提示词素材�?, { title: "添加素材", textarea: true, rows: 6 });
     if (text && text.trim()) {

@@ -267,7 +267,8 @@ async function resolveMentions(text) {
   return context;
 }
 
-// 提及专家包：注入 persona + rules，并附带�?6 个知识文件内容（每个 �?000 字符�?async function resolveExpertMention(name) {
+// 提及专家包：注入 persona + rules，并附带�?6 个知识文件内容（每个 �?000 字符�?async
+function resolveExpertMention(name) {
   let experts = [];
   try {
     experts = getExpertsCached() || [];
@@ -350,7 +351,8 @@ function isHiddenContextMessage(msg) {
 let convProjectEl;
 
 function currentProjectLabel() {
-  // 已保存对话取创建时记录的项目名；新对话实时跟随当前打开的项�?  if (state.currentConversationId) {
+  // 已保存对话取创建时记录的项目名；新对话实时跟随当前打开的项�?
+  if (state.currentConversationId) {
     const conv = state.conversations.find(c => c.id === state.currentConversationId);
     return conv?.project || "";
   }
@@ -437,7 +439,8 @@ function renderMessage(msg, index) {
   div.className = `msg msg-${msg.role}`;
   div.dataset.index = index;
 
-  // 磨墨会话中的消息加墨痕样�?  if (grindSession && state.currentConversationId === grindSession.conversation_id) {
+  // 磨墨会话中的消息加墨痕样�?
+  if (grindSession && state.currentConversationId === grindSession.conversation_id) {
     div.classList.add("msg-grind");
   }
 
@@ -498,7 +501,8 @@ function renderMessage(msg, index) {
     });
     actions.appendChild(copyBtn);
 
-    // 重新生成按钮（仅助手消息�?    if (msg.role === "assistant") {
+    // 重新生成按钮（仅助手消息�?
+    if (msg.role === "assistant") {
       const regenBtn = document.createElement("button");
       regenBtn.className = "msg-action-btn";
       regenBtn.textContent = "�?;
@@ -507,7 +511,8 @@ function renderMessage(msg, index) {
       actions.appendChild(regenBtn);
     }
 
-    // 编辑/删除（仅已持久化到后端的消息�?    if (msg.id) {
+    // 编辑/删除（仅已持久化到后端的消息�?
+    if (msg.id) {
       const editBtn = document.createElement("button");
       editBtn.className = "msg-action-btn";
       editBtn.textContent = "�?;
@@ -549,7 +554,8 @@ function renderMessage(msg, index) {
 
 function renderAllMessages() {
   chatScroll.innerHTML = "";
-  // 无可见消息时展示欢迎页（替代 :empty 占位提示�?  const hasVisible = state.messages.some(m => !isHiddenContextMessage(m));
+  // 无可见消息时展示欢迎页（替代 :empty 占位提示�?
+  const hasVisible = state.messages.some(m => !isHiddenContextMessage(m));
   if (!hasVisible) {
     chatScroll.appendChild(buildWelcomeEl());
     return;
@@ -1303,7 +1309,8 @@ function renderFileEditDiff(data) {
 
   if (!data.file) btnAccept.disabled = true;
 
-  // 已自动应用：展示已落盘状态，不再提供接受/拒绝（拒绝也无法回滚已写入的内容�?  if (data.applied === "auto") {
+  // 已自动应用：展示已落盘状态，不再提供接受/拒绝（拒绝也无法回滚已写入的内容�?
+  if (data.applied === "auto") {
     btnAccept.textContent = "�?已自动应�?;
     btnAccept.classList.add("done");
     btnAccept.disabled = true;
@@ -1584,7 +1591,8 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
       toast(t("输出达到长度上限，自动续写中（{x}/{n}）�?, { x: round, n: MAX_CONTINUE_ROUNDS }));
     } catch {}
 
-    // 历史 + 被截断的助手消息原文 + 续写指令（模型需看到断点才能接续�?    const history = state.messages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+    // 历史 + 被截断的助手消息原文 + 续写指令（模型需看到断点才能接续�?
+    const history = state.messages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
     history.push({ role: "assistant", content });
     history.push({ role: "user", content: contPrompt });
     history._modelId = modelId;
@@ -1625,7 +1633,8 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
   const harnessOn = state.harness?.enabled === true;
   // Harness 循环仅三种退出：手动停止 / 轮数用完 / TODO 全部了结；模型侧异常不再中断循环
   let todoNudges = 0;
-  let prevCallsSig = ""; // 上一轮工具调用指纹，用于拦截原地打转的相同调�?  let dupRounds = 0;
+  let prevCallsSig = ""; // 上一轮工具调用指纹，用于拦截原地打转的相同调�?
+  let dupRounds = 0;
   let exitReason = "";
   for (let round = 0; round < maxRounds; round++) {
     if (signal?.aborted) { exitReason = "已手动停�?; break; }
@@ -1634,9 +1643,11 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
 
     const calls = detectToolCalls(lastMsg.content);
     let nudged = false;
-    // 上一轮生成异常：失败报错或零输出（Harness 下不退出，催其重新生成继续推进�?    const replyFailed = !(lastMsg.content || "").trim() || /^�?(续写失败|请求失败)/.test(lastMsg.content);
+    // 上一轮生成异常：失败报错或零输出（Harness 下不退出，催其重新生成继续推进�?
+    const replyFailed = !(lastMsg.content || "").trim() || /^�?(续写失败|请求失败)/.test(lastMsg.content);
 
-    // 相同调用去重：本轮调用与上一轮完全一致时不重复执行（避免无效副作用与空转耗尽轮数�?    if (calls.length > 0) {
+    // 相同调用去重：本轮调用与上一轮完全一致时不重复执行（避免无效副作用与空转耗尽轮数�?
+    if (calls.length > 0) {
       const sig = JSON.stringify(calls.map(c => [c.name, c.params]));
       if (sig === prevCallsSig) {
         dupRounds++;
@@ -1794,7 +1805,8 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     updateLastAssistantMessage(followContent2);
     renderAssistantContent(followContent, followContent2);
 
-    // 持久�?    if (state.currentConversationId) {
+    // 持久�?
+    if (state.currentConversationId) {
       const saved = await post(`/chat/conversations/${state.currentConversationId}/messages`, { role: "assistant", content: followContent2, model: modelId });
       if (saved.code === 0 && saved.data?.id) followUp.id = saved.data.id;
     }
@@ -1828,7 +1840,8 @@ async function sendMessage(queuedPayload = null) {
   const filesForMessage = queuedPayload?.files ?? [...pendingFiles];
   if (!text && filesForMessage.length === 0) return;
 
-  // /grind 命令：开启磨墨会�?  const grindMatch = !queuedPayload && text.match(/^\/grind\s+([\s\S]+)/);
+  // /grind 命令：开启磨墨会�?
+  const grindMatch = !queuedPayload && text.match(/^\/grind\s+([\s\S]+)/);
   if (grindMatch) {
     chatInput.value = "";
     chatInput.style.height = "auto";
@@ -1875,13 +1888,15 @@ async function sendMessage(queuedPayload = null) {
     }
   }
 
-  // TODOLIST：若对话建立前产生了临时清单（_scratch），迁移到正式对�?  const scratchTodos = getConversationTodos(null);
+  // TODOLIST：若对话建立前产生了临时清单（_scratch），迁移到正式对�?
+  const scratchTodos = getConversationTodos(null);
   if (state.currentConversationId && scratchTodos.length) {
     setConversationTodos(state.currentConversationId, [...getConversationTodos(state.currentConversationId), ...scratchTodos]);
     setConversationTodos(null, []);
   }
 
-  // 磨墨：待启磨的想法在对话创建后开启会�?  if (grindPendingIdea && state.currentConversationId) {
+  // 磨墨：待启磨的想法在对话创建后开启会�?
+  if (grindPendingIdea && state.currentConversationId) {
     grindSession = await grindSvc.startSession(state.currentConversationId, grindPendingIdea);
     grindPendingIdea = null;
     if (grindSession) {
@@ -1919,7 +1934,8 @@ async function sendMessage(queuedPayload = null) {
   const harnessOn = state.harness?.enabled === true;
   const fullText = (harnessOn ? HARNESS_PREFIX : "") + text + mentionContext + fileContext;
   await refreshKnowledgeContext(fullText);
-  // display：气泡只展示用户输入的原文；注入�?Skill 定义 / Harness 指令 / 文件内容只进模型上下文，与后端持久化的干净文本保持一�?  const userMsg = { role: "user", content: fullText, display: text, model: "", files: fileMeta.length > 0 ? fileMeta : undefined };
+  // display：气泡只展示用户输入的原文；注入�?Skill 定义 / Harness 指令 / 文件内容只进模型上下文，与后端持久化的干净文本保持一�?
+  const userMsg = { role: "user", content: fullText, display: text, model: "", files: fileMeta.length > 0 ? fileMeta : undefined };
   addMessage(userMsg);
 
   if (state.currentConversationId) {
@@ -2020,7 +2036,8 @@ async function sendMessage(queuedPayload = null) {
   }
   updateLastAssistantMessage(fullContent);
 
-  // 估算并记录用�?  const estimatedPrompt = estimateContextTokens(state.messages.slice(0, -1));
+  // 估算并记录用�?
+  const estimatedPrompt = estimateContextTokens(state.messages.slice(0, -1));
   const estimatedCompletion = Math.ceil(fullContent.length / 3);
   addUsage({ prompt_tokens: estimatedPrompt, completion_tokens: estimatedCompletion });
 
@@ -2051,7 +2068,8 @@ async function sendMessage(queuedPayload = null) {
     autoRefineMemoryAndProfile({ silent: true });
   }
 
-  // 磨墨：本轮结束后解析墨迹 / 检测墨稿，更新面板与会话状�?  if (!signal.aborted && grindSession && grindSession.state !== "done"
+  // 磨墨：本轮结束后解析墨迹 / 检测墨稿，更新面板与会话状�?
+  if (!signal.aborted && grindSession && grindSession.state !== "done"
       && state.currentConversationId === grindSession.conversation_id) {
     await handleGrindReply(fullContent, msgEl);
   }
@@ -2186,7 +2204,8 @@ async function handleGrindReply(content, msgEl) {
     return;
   }
 
-  // 未完成：推进轮数（收墨阶段不追问，不计轮�?  const round = (grindSession.round || 0) + (grindSession.state === "collecting" ? 0 : 1);
+  // 未完成：推进轮数（收墨阶段不追问，不计轮�?
+  const round = (grindSession.round || 0) + (grindSession.state === "collecting" ? 0 : 1);
   grindSession = (await grindSvc.patchSession(convId, { round, resolved: grindSession.resolved || [] })) || grindSession;
   renderGrindPanel();
 }
@@ -2198,7 +2217,8 @@ function renderGrindPanel() {
   const st = grindSession?.state;
   const active = grindSession && ["grinding", "collecting", "done"].includes(st);
   grindPanelEl.classList.toggle("hidden", !active);
-  // 磨墨按钮高亮：研磨进行中才亮，成�?结束后恢�?  document.getElementById("btn-grind")?.classList.toggle("active", !!active && st !== "done");
+  // 磨墨按钮高亮：研磨进行中才亮，成�?结束后恢�?
+  document.getElementById("btn-grind")?.classList.toggle("active", !!active && st !== "done");
   if (!active) return;
 
   grindPanelEl.innerHTML = "";
@@ -2225,14 +2245,16 @@ function renderGrindPanel() {
   const resolved = grindSession.resolved || [];
   const unknown = st === "done" ? [] : (lastInkStatus?.unknown || []);
 
-  // 进度统计：已�?N �?· 待定 M �?  if (resolved.length || unknown.length) {
+  // 进度统计：已�?N �?· 待定 M �?
+  if (resolved.length || unknown.length) {
     const stats = document.createElement("div");
     stats.className = "grind-panel-stats";
     stats.textContent = t("已定 {n} �?, { n: resolved.length }) + (unknown.length ? t(" · 待定 {n} �?, { n: unknown.length }) : "");
     body.appendChild(stats);
   }
 
-  // 成稿后展示墨稿标题，未知项已无意�?  if (st === "done" && grindSession.draft?.title) {
+  // 成稿后展示墨稿标题，未知项已无意�?
+  if (st === "done" && grindSession.draft?.title) {
     const draftRow = document.createElement("div");
     draftRow.className = "grind-item draft";
     draftRow.textContent = `📜 ${grindSession.draft.title}`;
@@ -2399,7 +2421,8 @@ function renderConvList(conversations) {
     title.textContent = conv.title || conv.id;
     titleWrap.appendChild(title);
 
-    // 发起时打开的项�?    const projTag = document.createElement("span");
+    // 发起时打开的项�?
+    const projTag = document.createElement("span");
     projTag.className = "conv-item-project" + (conv.project ? "" : " none");
     projTag.textContent = conv.project ? `📁 ${conv.project}` : "无项�?;
     titleWrap.appendChild(projTag);
@@ -2666,7 +2689,8 @@ async function switchConversation(convId) {
   const res = await get(`/chat/conversations/${convId}/messages`);
   if (res.code === 0) setMessages((res.data || []).map(normalizeMessageForRender));
 
-  // 磨墨会话恢复（刷新页�?/ 切换对话后重建状态与面板�?  grindSession = await grindSvc.getSession(convId);
+  // 磨墨会话恢复（刷新页�?/ 切换对话后重建状态与面板�?  grindSession =
+  await grindSvc.getSession(convId);
   if (grindSession) {
     for (const m of state.messages) {
       if (m.role !== "assistant") continue;
@@ -2680,7 +2704,8 @@ async function switchConversation(convId) {
   }
   updateSendState();
 
-  // 从后端对话列表获取用量数�?  const conv = state.conversations.find(c => c.id === convId);
+  // 从后端对话列表获取用量数�?
+  const conv = state.conversations.find(c => c.id === convId);
   if (conv && (conv.total_tokens || conv.message_count)) {
     const backendUsage = {
       totalTokens: conv.total_tokens || 0,
@@ -2848,7 +2873,8 @@ async function handleFiles(fileList) {
       continue;
     }
 
-    // Office / PDF：浏览器无法直接读取，交后端解析为文�?    const extName = file.name.split(".").pop().toLowerCase();
+    // Office / PDF：浏览器无法直接读取，交后端解析为文�?
+    const extName = file.name.split(".").pop().toLowerCase();
     if (["docx", "xlsx", "pdf"].includes(extName)) {
       try {
         const fd = new FormData();
@@ -2878,7 +2904,8 @@ async function handleFiles(fileList) {
       continue;
     }
 
-    // 文本文件：直接读取内�?    try {
+    // 文本文件：直接读取内�?
+    try {
       const text = await file.text();
       const ext = file.name.split(".").pop().toLowerCase();
       const fileType = (ext === "csv" || ext === "tsv") ? "csv" : "text";
@@ -3040,7 +3067,8 @@ function initChat() {
   });
   btnBrainstorm?.addEventListener("click", toggleBrainstormMode);
 
-  // 磨墨模式入口：备�?/grind 输入，等待用户写下粗糙想�?  document.getElementById("btn-grind")?.addEventListener("click", () => startGrindConversation(""));
+  // 磨墨模式入口：备�?/grind 输入，等待用户写下粗糙想�?
+  document.getElementById("btn-grind")?.addEventListener("click", () => startGrindConversation(""));
   grindPanelEl = document.getElementById("grind-panel");
 
   // Harness 自主执行开�?  btnHarness = document.getElementById("btn-harness");
@@ -3083,7 +3111,8 @@ function initChat() {
     fileInput.value = "";
   });
 
-  // 专家包选择：注入专�?persona + rules 到系统提�?  const expertSelect = document.getElementById("expert-select");
+  // 专家包选择：注入专�?persona + rules 到系统提�?
+  const expertSelect = document.getElementById("expert-select");
   expertSelect?.addEventListener("change", async () => {
     const id = expertSelect.value;
     if (!id) {

@@ -85,7 +85,8 @@ function populateModelSelect() {
     select.appendChild(optgroup);
   }
 
-  // 自定义模�?  if (state.customModels.length > 0) {
+  // 自定义模�?
+  if (state.customModels.length > 0) {
     const optgroup = document.createElement("optgroup");
     optgroup.label = "自定�?;
     for (const m of state.customModels) {
@@ -153,7 +154,8 @@ function handleModelSelect(e) {
     }
   }
 
-  // 查找自定义模�?  const custom = state.customModels.find(m => m.id === value);
+  // 查找自定义模�?
+  const custom = state.customModels.find(m => m.id === value);
   if (custom) {
     if (!hasModelKey(custom.id)) {
       openKeyInputModal(custom);
@@ -435,7 +437,8 @@ function initSettingsNav() {
     });
   });
 
-  // 高亮规则：取顶边已越过容器顶�?24px 线的最后一个区�?  const onScroll = () => {
+  // 高亮规则：取顶边已越过容器顶�?24px 线的最后一个区�?
+  const onScroll = () => {
     const top = page.getBoundingClientRect().top;
     let activeId = items[0].dataset.target;
     for (const item of items) {
@@ -456,7 +459,8 @@ function renderResponsesApiHint() {
 
   checkbox.checked = state.useResponses === true;
 
-  // 收集支持 Responses API 的模型名�?  const supportedModels = [];
+  // 收集支持 Responses API 的模型名�?
+  const supportedModels = [];
   for (const models of Object.values(state.modelRegistry)) {
     for (const m of models) {
       if (m.supports_responses === true) {
@@ -664,7 +668,8 @@ async function runStorageCleanup(target, btn) {
     if (statusEl) statusEl.textContent = freed > 0 ? t("已释�?{size}", { size: fmtBytes(freed) }) : "无可释放空间（文件可能正被占用，关闭应用后重试）";
     toast(freed > 0 ? t("已释�?{size}", { size: fmtBytes(freed) }) : "清理完成");
     if (target === "history") {
-      // 清空历史后同步侧栏列�?      try { await refreshConversationList(); } catch (e) {}
+      // 清空历史后同步侧栏列�?
+      try { await refreshConversationList(); } catch (e) {}
     }
     await renderStorageUsage();
   } catch (e) {
@@ -733,7 +738,8 @@ async function renderStorageUsage() {
 
 function initStorageManage() {
   renderStorageUsage();
-  // 打开设置页时刷新一次用�?  document.getElementById("btn-settings")?.addEventListener("click", () => setTimeout(renderStorageUsage, 300));
+  // 打开设置页时刷新一次用�?
+  document.getElementById("btn-settings")?.addEventListener("click", () => setTimeout(renderStorageUsage, 300));
 }
 
 /** 手动检查更新：结果内嵌展示，下�?说明走后端白名单打开系统浏览�?*/
@@ -1089,12 +1095,14 @@ async function checkAppUpdate() {
 // ── 初始�?──────────────────────────────────
 
 async function init() {
-  // i18n 必须最先完成：英文模式要在任何界面渲染前挂好翻译监�?  await initI18n();
+  // i18n 必须最先完成：英文模式要在任何界面渲染前挂好翻译监听
+  await initI18n();
 
   loadPersistent();
   await loadSharedPersistent();
 
-  // 应用保存的主�?  document.documentElement.setAttribute("data-theme", state.theme);
+  // 应用保存的主�?
+  document.documentElement.setAttribute("data-theme", state.theme);
 
   safeInit("标签�?, initTabs);
   safeInit("对话", initChat);
@@ -1132,7 +1140,8 @@ async function init() {
   // 设置弹窗
   document.getElementById("btn-settings").addEventListener("click", openSettings);
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
-  // 顶栏 📡：直达设置页“局域网遥控”区块（明显的网址获取入口�?  document.getElementById("btn-lan")?.addEventListener("click", () => openSettings({ focusLan: true }));
+  // 顶栏 📡：直达设置页“局域网遥控”区块（明显的网址获取入口�?
+  document.getElementById("btn-lan")?.addEventListener("click", () => openSettings({ focusLan: true }));
   document.getElementById("btn-lan-refresh")?.addEventListener("click", renderLanInfo);
   initAutoReviewPersistence();
   initNotificationPersistence();
@@ -1147,7 +1156,8 @@ async function init() {
 
   await loadModels();
 
-  // 自动恢复上次打开的项�?  if (state._lastProjectPath) {
+  // 自动恢复上次打开的项�?
+  if (state._lastProjectPath) {
     const res = await getCurrentProject();
     if (res.code === 0 && res.data) {
       setProject(res.data);
@@ -1156,7 +1166,8 @@ async function init() {
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }
-    // 确保文件树加�?    const browseRes = await browseFiles("");
+    // 确保文件树加�?
+    const browseRes = await browseFiles("");
     if (browseRes.code === 0) setProjectFileTree(browseRes.data);
   }
 

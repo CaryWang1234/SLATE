@@ -277,7 +277,8 @@ function createSkillItem(name, desc, kind) {
   info.appendChild(descEl);
   item.appendChild(info);
 
-  // Skill 支持删除；内置工具不可�?  if (kind === "Skill") {
+  // Skill 支持删除；内置工具不可�?
+  if (kind === "Skill") {
     const delBtn = document.createElement("button");
     delBtn.className = "skill-item-del";
     delBtn.title = "删除技�?";
@@ -429,7 +430,8 @@ async function handleUploadSkill() {
   if (!name || !name.trim()) return;
   const desc = (await dlgPrompt("技能描述：", { title: "新建技�?, value: name.trim(), textarea: true })) || name.trim();
 
-  // 创建文件选择�?  const input = document.createElement("input");
+  // 创建文件选择�?
+  const input = document.createElement("input");
   input.type = "file";
   input.multiple = true;
   input.accept = ".md,.py,.js,.json,.yaml,.yml,.sh,.bat";

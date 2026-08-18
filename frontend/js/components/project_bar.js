@@ -92,7 +92,8 @@ function renderProjectBar() {
 
     projectBar.appendChild(actions);
 
-    // 自动浏览根目�?    if (!state.projectFileTree?.entries) {
+    // 自动浏览根目�?
+    if (!state.projectFileTree?.entries) {
       refreshFileTree("");
     }
   } else {
@@ -211,7 +212,8 @@ function renderFileTree() {
     return;
   }
 
-  // 面包屑导�?  if (currentBrowsePath && currentBrowsePath !== ".") {
+  // 面包屑导�?
+  if (currentBrowsePath && currentBrowsePath !== ".") {
     const breadcrumb = document.createElement("div");
     breadcrumb.className = "file-tree-breadcrumb";
     const rootLink = document.createElement("span");
@@ -253,7 +255,8 @@ function renderFileTree() {
     fileTreeContainer.appendChild(parentBtn);
   }
 
-  // 文件和目�?  for (const entry of data.entries) {
+  // 文件和目�?
+  for (const entry of data.entries) {
     const item = document.createElement("div");
     item.className = `file-tree-item ${entry.type === "dir" ? "file-tree-dir" : "file-tree-file"}`;
 
@@ -292,7 +295,8 @@ async function openFile(path) {
   filePreviewEl.innerHTML = "";
   filePreviewEl.classList.remove("hidden");
 
-  // 标题�?  const header = document.createElement("div");
+  // 标题�?
+  const header = document.createElement("div");
   header.className = "file-preview-header";
 
   const title = document.createElement("span");
@@ -334,7 +338,8 @@ async function openFile(path) {
   header.appendChild(actions);
   filePreviewEl.appendChild(header);
 
-  // 文件内容（按扩展名语法高亮，未知类型�?highlightAuto�?  const pre = document.createElement("pre");
+  // 文件内容（按扩展名语法高亮，未知类型�?highlightAuto�?
+  const pre = document.createElement("pre");
   pre.className = "file-preview-content";
   const text = (content || "(空文�?").slice(0, 10000);
   let highlighted = false;

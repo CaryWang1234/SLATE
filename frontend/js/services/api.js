@@ -144,14 +144,16 @@ async function* streamChat(payload) {
         for (const chunk of parseLines(lines)) yield chunk;
       }
 
-      // 流结束：flush 解码器内残留字节（跨 chunk 截断的多字节中文字符）并处理缓冲区尾�?      if (!done) {
+      // 流结束：flush 解码器内残留字节（跨 chunk 截断的多字节中文字符）并处理缓冲区尾�?
+      if (!done) {
         buffer += decoder.decode();
         for (const chunk of parseLines(buffer.split("\n"))) yield chunk;
       }
       return;
     } catch (err) {
       if (signal?.aborted) throw err;   // 用户主动停止：保�?AbortError 语义
-      // 未产出任何内�?�?自动重试（连接失�?瞬断/服务端无响应�?      if (!receivedAny && attempt <= STREAM_MAX_RETRIES) {
+      // 未产出任何内�?�?自动重试（连接失�?瞬断/服务端无响应�?
+      if (!receivedAny && attempt <= STREAM_MAX_RETRIES) {
         await new Promise(r => setTimeout(r, 700 * attempt));
         continue;
       }

@@ -151,12 +151,14 @@ function drawArrows() {
       const fromRect = fromEl.getBoundingClientRect();
       const toRect = toEl.getBoundingClientRect();
 
-      // 计算连接点（从卡片右侧中心到目标卡片左侧中心�?      const x1 = fromRect.right - containerRect.left;
+      // 计算连接点（从卡片右侧中心到目标卡片左侧中心�?
+      const x1 = fromRect.right - containerRect.left;
       const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
       const x2 = toRect.left - containerRect.left;
       const y2 = toRect.top + toRect.height / 2 - containerRect.top;
 
-      // 绘制贝塞尔曲�?      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      // 绘制贝塞尔曲�?
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       const midX = (x1 + x2) / 2;
       const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
       path.setAttribute("d", d);
@@ -415,7 +417,8 @@ function saveCard() {
     );
     setBoardCards(cards);
   } else {
-    // 添加新卡�?    const card = {
+    // 添加新卡�?
+    const card = {
       id: `c${Date.now().toString(36)}`,
       title,
       body,
@@ -572,7 +575,8 @@ async function aiOrganize() {
     return;
   }
 
-  // 构建卡片信息（含颜色�?  const cardsInfo = state.boardCards.map(c => {
+  // 构建卡片信息（含颜色�?
+  const cardsInfo = state.boardCards.map(c => {
     let info = `- [${c.id}] ${c.title}`;
     if (c.body) info += `: ${c.body}`;
     if (c.color && c.color !== "default") info += ` (颜色: ${c.color})`;

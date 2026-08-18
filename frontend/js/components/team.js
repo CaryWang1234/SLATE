@@ -530,7 +530,8 @@ function populateModelOptions(select, selectedId) {
     select.appendChild(optgroup);
   }
 
-  // 自定义模�?  if (state.customModels.length > 0) {
+  // 自定义模�?
+  if (state.customModels.length > 0) {
     const optgroup = document.createElement("optgroup");
     optgroup.label = "自定�?;
     for (const m of state.customModels) {
@@ -670,7 +671,8 @@ async function startDiscussion() {
   topicEl.textContent = t("议题: {topic}", { topic });
   teamOutput.appendChild(topicEl);
 
-  // 注入黑板上下�?  let boardContext = "";
+  // 注入黑板上下�?
+  let boardContext = "";
   if (state.boardCards.length > 0) {
     boardContext = "\n\n当前黑板卡片:\n" + state.boardCards.map(c =>
       `[${c.id}] ${c.title}${c.body ? " �?" + c.body : ""}`
@@ -680,7 +682,8 @@ async function startDiscussion() {
   const entries = [];
   let verdict = null;
 
-  // 预加载成员绑定的专家�?  const expertDetails = new Map();
+  // 预加载成员绑定的专家�?
+  const expertDetails = new Map();
   for (const member of teamMembers) {
     if (member.expertId && !expertDetails.has(member.expertId)) {
       try {
@@ -691,7 +694,8 @@ async function startDiscussion() {
     }
   }
 
-  // 多轮辩论：每轮每位成员可提案或回应他人，直到决策产生或轮次用�?  for (let round = 1; round <= maxRounds && !verdict; round++) {
+  // 多轮辩论：每轮每位成员可提案或回应他人，直到决策产生或轮次用�?
+  for (let round = 1; round <= maxRounds && !verdict; round++) {
     addRoundHeader(round);
     const isLastRound = round === maxRounds;
 
@@ -755,7 +759,8 @@ async function startDiscussion() {
       if (action === "verdict") verdict = rec;
     }
 
-    // 轮次用尽仍无决策：决策者强制拍�?    if (!verdict && isLastRound) {
+    // 轮次用尽仍无决策：决策者强制拍�?
+    if (!verdict && isLastRound) {
       verdict = await forceVerdict(topic, boardContext, entries);
     }
   }
@@ -1070,7 +1075,8 @@ function makeWfIo(label, text) {
 
 function renderWfNodeRows(wf) {
   wfNodeList.innerHTML = "";
-  // 按拓扑顺序展示（后端已返�?order�?  const orderIndex = new Map((wf.order || []).map((id, i) => [id, i]));
+  // 按拓扑顺序展示（后端已返�?order�?
+  const orderIndex = new Map((wf.order || []).map((id, i) => [id, i]));
   const nodes = [...(wf.nodes || [])].sort((a, b) =>
     (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0)
   );
@@ -1254,7 +1260,8 @@ function initTeamPanel() {
     btnStopDiscuss.classList.add("hidden");
   }
 
-  // 最大辩论轮�?  const maxRoundsSelect = document.getElementById("team-max-rounds");
+  // 最大辩论轮�?
+  const maxRoundsSelect = document.getElementById("team-max-rounds");
   if (maxRoundsSelect) {
     maxRounds = parseInt(maxRoundsSelect.value, 10) || 5;
     maxRoundsSelect.addEventListener("change", () => {
