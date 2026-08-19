@@ -1,21 +1,21 @@
 /**
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输入 */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260818-75";
-import { get, post, del, patch, streamChat, upload, REASONING_PREFIX } from "../services/api.js?v=20260818-75";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260818-75";
-import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail } from "../services/tools.js?v=20260818-75";
-import { renderMarkdown } from "../services/markdown.js?v=20260818-75";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260818-75";
-import { getExpertsCached } from "./experts.js?v=20260818-75";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-75";
-import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260818-75";
-import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260818-75";
-import { fileTypeIcon } from "../services/file_icons.js?v=20260818-75";
-import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260818-75";
-import * as grindSvc from "../services/grind.js?v=20260818-75";
-import { t } from "../services/i18n.js?v=20260818-75";
-import { notifyTaskComplete } from "../services/notify.js?v=20260818-75";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260818-77";
+import { get, post, del, patch, streamChat, upload, REASONING_PREFIX } from "../services/api.js?v=20260818-77";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260818-77";
+import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail } from "../services/tools.js?v=20260818-77";
+import { renderMarkdown } from "../services/markdown.js?v=20260818-77";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260818-77";
+import { getExpertsCached } from "./experts.js?v=20260818-77";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-77";
+import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260818-77";
+import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260818-77";
+import { fileTypeIcon } from "../services/file_icons.js?v=20260818-77";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260818-77";
+import * as grindSvc from "../services/grind.js?v=20260818-77";
+import { t } from "../services/i18n.js?v=20260818-77";
+import { notifyTaskComplete } from "../services/notify.js?v=20260818-77";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -52,12 +52,22 @@ function autoScroll(force = false) {
   if (force || stickToBottom) chatScroll.scrollTop = chatScroll.scrollHeight;
 }
 
-// ── Harness 自主执行（六阶段闭环：目标→计划→执行→验证→汇报→追溯首──
+// ── Harness 自主执行（六阶段闭环：目标→计划→执行→验证→汇报→追溯） ──
 // 开启后：发送时注入六阶段指令，大任务强制建议TODOLIST，工具循环轮数上限提升到 maxRounds
 let harnessStatusEl = null;
 let btnHarness = null;
 
-const HARNESS_PREFIX = "[Harness 自主执行模式 · 六阶段闭环]\n请自主完成以下任务，不要向我提问，严格按六阶段推进：\n首目标：开篇用一句话明确本次任务的目标与验收标准；\n首计划：面临大任务（多步骤 / 多文字/ 复杂修改）必须先调用 todo_manage(action=init") 建立 TODOLIST，拆解为可执行、可验证的步骤；简单任务可跳过；\n首执行：统筹清单全局推进，能并行的多项一起处理，不要机械地一项一项磨；每完成一项或一批事项，立即调用 todo_manage(action=update) 批量更新状态，让清单随时反映真实进度；受阻项标题blocked 并说明原因；需要信息或操作时直接调首MCP 工具；\n首验证：每步完成后自行验证结果（重新读取文字/ 执行命令 / 核对输出），失败则修复后重新验证；\n首汇报：全部完成后输出完结报告，逐条核对 TODOLIST（done / blocked+原因），未全部了结不得宣称任务完成；\n首追溯：用 1-3 句总结本次任务的关键决策、踩坑与可复用经验。\n注意：系统会在每轮工具结果开头标注当前轮次（[Harness · 首x/N 轮]），请留意剩余轮数预算，临近上限时优先收尾并输出汇报与追溯。\n\n任务首;
+const HARNESS_PREFIX = `[Harness 自主执行模式 · 六阶段闭环]
+请自主完成以下任务，不要向我提问，严格按六阶段推进：
+1. 目标：开篇用一句话明确本次任务的目标与验收标准。
+2. 计划：面临大任务（多步骤 / 多文件 / 复杂修改）必须先调用 todo_manage(action=init) 建立 TODOLIST，拆解为可执行、可验证的步骤；简单任务可跳过。
+3. 执行：统筹清单全局推进，能并行的多项一起处理；每完成一项或一批事项，立即调用 todo_manage(action=update) 批量更新状态，让清单随时反映真实进度；受阻项标为 blocked 并说明原因；需要信息或操作时直接调用 MCP 工具。
+4. 验证：每步完成后自行验证结果（重新读取文件 / 执行命令 / 核对输出），失败则修复后重新验证。
+5. 汇报：全部完成后输出完结报告，逐条核对 TODOLIST（done / blocked + 原因），未全部了结不得宣称任务完成。
+6. 追溯：用 1-3 句总结本次任务的关键决策、踩坑与可复用经验。
+注意：系统会在每轮工具结果开头标注当前轮次（[Harness · x/N 轮]），请留意剩余轮数预算，临近上限时优先收尾并输出汇报与追溯。
+
+任务：`;
 
 function setHarnessProgress(text) {
   if (!harnessStatusEl) return;
@@ -66,16 +76,17 @@ function setHarnessProgress(text) {
     harnessStatusEl.textContent = "";
     return;
   }
-  harnessStatusEl.textContent = "首" + text;
+  harnessStatusEl.textContent = "⚡ " + text;
   harnessStatusEl.classList.remove("hidden");
 }
 
-// Harness 待机指示：停止轮次结束后保持「仍开启」提示，仅在手动关闭 首时清空function showHarnessIdle(note = "") {
+// Harness 待机指示：停止轮次结束后保持「仍开启」提示，仅在手动关闭时清空
+function showHarnessIdle(note = "") {
   if (state.harness?.enabled !== true) {
     setHarnessProgress(null);
     return;
   }
-  setHarnessProgress(note || "Harness 已开首· 待命自主执行（点右上 首手动退出）");
+  setHarnessProgress(note || "Harness 已开启 · 待命自主执行（点右上 ⚡ 手动退出）");
 }
 
 // ── TODOLIST 实时面板（消息区右侧栏，按对话隔离） ─────────────
@@ -101,7 +112,7 @@ function renderTodoPanel() {
   header.title = todoPanelCollapsed ? "展开任务清单" : "折叠任务清单";
   const title = document.createElement("span");
   title.className = "todo-panel-title";
-  title.textContent = t("首任务清单 {done}/{total}", { done, total: items.length }) + (blocked ? t(" · 受阻 {n}", { n: blocked }) : "") + (inProgress ? t(" · 进行中 {n}", { n: inProgress }) : "");
+  title.textContent = t("任务清单 {done}/{total}", { done, total: items.length }) + (blocked ? t(" · 受阻 {n}", { n: blocked }) : "") + (inProgress ? t(" · 进行中 {n}", { n: inProgress }) : "");
   const bar = document.createElement("span");
   bar.className = "todo-progress";
   const fill = document.createElement("span");
@@ -110,7 +121,7 @@ function renderTodoPanel() {
   bar.appendChild(fill);
   const toggle = document.createElement("span");
   toggle.className = "todo-toggle";
-  toggle.textContent = todoPanelCollapsed ? "首 : "首;
+  toggle.textContent = todoPanelCollapsed ? "▸" : "▾";
   header.append(title, bar, toggle);
   header.addEventListener("click", () => {
     todoPanelCollapsed = !todoPanelCollapsed;
@@ -121,7 +132,7 @@ function renderTodoPanel() {
 
   const body = document.createElement("div");
   body.className = "todo-panel-body";
-  const icons = { done: "首, in_progress: "首, blocked: "首, pending: "首 };
+  const icons = { done: "✓", in_progress: "…", blocked: "!", pending: "·" };
   for (const t of items) {
     const status = ["done", "in_progress", "blocked"].includes(t.status) ? t.status : "pending";
     const row = document.createElement("div");
@@ -267,7 +278,8 @@ async function resolveMentions(text) {
   return context;
 }
 
-// 提及专家包：注入 persona + rules，并附带首6 个知识文件内容（每个 首000 字符首async function resolveExpertMention(name) {
+// 提及专家包：注入 persona + rules，并附带前 6 个知识文件内容（每个 4000 字符）
+async function resolveExpertMention(name) {
   let experts = [];
   try {
     experts = getExpertsCached() || [];
@@ -289,7 +301,7 @@ async function resolveMentions(text) {
     }
     return parts.join("\n\n");
   } catch (e) {
-    return `\n\n[提及专家包 ${name}] ${expert.description || "专家包内容加载失败}`;
+    return `\n\n[提及专家包 ${name}] ${expert.description || "专家包内容加载失败"}`;
   }
 }
 
@@ -330,7 +342,7 @@ function normalizeMessageForRender(msg) {
           call,
           result: {
             success: true,
-            output: "这是从历史记录中恢复的工具调用。diff 预览结果未保存在旧历史中，请重新发起编辑以生成可接受首diff首,"
+            output: "这是从历史记录中恢复的工具调用。diff 预览结果未保存在旧历史中，请重新发起编辑以生成可接受的 diff。",
             historical: true,
           },
         })),
@@ -374,10 +386,10 @@ function buildWelcomeEl() {
   el.className = "chat-welcome";
   el.innerHTML = `
     <img class="chat-welcome-logo" src="./icon.png" alt="SLATE">
-    <h1 class="chat-welcome-title">研磨灵感，落笔成章/h1>
+    <h1 class="chat-welcome-title">研磨灵感，落笔成章</h1>
     <span class="chat-welcome-sep"></span>
-    <p class="chat-welcome-sub">本地 AI 协作调度首· 数据不出本机 · 原生零构建/p>
-    <p class="chat-welcome-hint">输入消息开始对话，@ 可提及文件或技能/p>
+    <p class="chat-welcome-sub">本地 AI 协作调度台 · 数据不出本机 · 原生零构建</p>
+    <p class="chat-welcome-hint">输入消息开始对话，@ 可提及文件或技能</p>
   `;
   return el;
 }
@@ -491,34 +503,34 @@ function renderMessage(msg, index) {
     // 复制按钮
     const copyBtn = document.createElement("button");
     copyBtn.className = "msg-action-btn";
-    copyBtn.textContent = "首";
+    copyBtn.textContent = "⧉";
     copyBtn.title = "复制";
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(msg.display ?? msg.content);
-        copyBtn.textContent = "首";
-        setTimeout(() => { copyBtn.textContent = "首; }, 1200");
+        copyBtn.textContent = "✓";
+        setTimeout(() => { copyBtn.textContent = "⧉"; }, 1200);
       } catch (e) {}
     });
     actions.appendChild(copyBtn);
 
-    // 重新生成按钮（仅助手消息首
+    // 重新生成按钮（仅助手消息）
     if (msg.role === "assistant") {
 
       const regenBtn = document.createElement("button");
       regenBtn.className = "msg-action-btn";
-      regenBtn.textContent = "首";
+      regenBtn.textContent = "↻";
       regenBtn.title = "重新生成";
       regenBtn.addEventListener("click", () => regenerateMessage(msg, div));
       actions.appendChild(regenBtn);
     }
 
-    // 编辑/删除（仅已持久化到后端的消息首
+    // 编辑/删除（仅已持久化到后端的消息）
     if (msg.id) {
 
       const editBtn = document.createElement("button");
       editBtn.className = "msg-action-btn";
-      editBtn.textContent = "首";
+      editBtn.textContent = "✎";
       editBtn.title = "编辑内容";
       editBtn.addEventListener("click", () => startInlineEdit(div, content, msg));
       actions.appendChild(editBtn);
@@ -581,7 +593,7 @@ function renderAllMessages() {
 function addStreamingCursor(msgEl) {
   const cursor = document.createElement("span");
   cursor.className = "streaming-cursor thinking-indicator";
-  cursor.setAttribute("aria-label", t("研墨中)");
+  cursor.setAttribute("aria-label", t("研墨中"));
   cursor.innerHTML = `<span class="thinking-text">${t("研墨中")}</span><span class="thinking-dots"><span></span><span></span><span></span></span>`;
   msgEl.querySelector(".msg-content")?.appendChild(cursor);
   return cursor;
@@ -599,16 +611,17 @@ function updateStreamingCursor(cursor, content) {
     cursor.removeAttribute("aria-label");
     cursor.textContent = "";
   } else if (!cursor.querySelector(".thinking-text")) {
-    cursor.setAttribute("aria-label", t("研墨中)");
+    cursor.setAttribute("aria-label", t("研墨中"));
     cursor.innerHTML = `<span class="thinking-text">${t("研墨中")}</span><span class="thinking-dots"><span></span><span></span><span></span></span>`;
   }
 }
 
-// 为代码块右上角添加一键复制按钮（每次渲染重建，无需去重置function attachCodeCopyButtons(container) {
+// 为代码块右上角添加一键复制按钮（每次渲染重建，无需去重）
+function attachCodeCopyButtons(container) {
   container?.querySelectorAll("pre").forEach(pre => {
     const btn = document.createElement("button");
     btn.className = "code-copy-btn";
-    btn.textContent = "首复制";
+    btn.textContent = "复制";
     btn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(pre.querySelector("code")?.innerText ?? pre.innerText);
@@ -616,7 +629,7 @@ function updateStreamingCursor(cursor, content) {
       } catch (e) {
         btn.textContent = "复制失败";
       }
-      setTimeout(() => { btn.textContent = "首复制"; }, 1500);
+      setTimeout(() => { btn.textContent = "复制"; }, 1500);
     });
     pre.appendChild(btn);
   });
@@ -724,9 +737,9 @@ function formatToolResultForModel(call, result) {
 function looksLikeInspectionStall(content) {
   if (!content || detectToolCalls(content).length > 0) return false;
   const text = content.replace(/```[\s\S]*?```/g, " ");
-  const offerOrQuestion = /(需要我|要我|是否需要|要不要|你需要|如果你需要|我可首?:直接)?(?:动手|继续|帮你|给出)|是否要|吗[首]?|呢[首]?)/;
+  const offerOrQuestion = /(需要我|要我|是否需要|要不要|你需要|如果你需要|我可以(?:直接)?(?:动手|继续|帮你|给出)|是否要|吗[？?]?|呢[？?]?)/;
   if (offerOrQuestion.test(text)) return false;
-  const intent = /(首?:先|再|来|会|需要|可以)?(?:查看|看看|看一下|看一眼|浏览|读取|检查|了解|确认|分析)|让我(?:查看|看看|看一下|浏览|读取|检查|了解)|需首?:查看|看看|看一下|浏览|读取|检查|了解|确认)|(?:先|首(?:查看|看看|看一下|浏览|读取|检查|了解)|I'll\s+(?:check|inspect|look|read)|I\s+need\s+to\s+(?:check|inspect|look|read))/i;
+  const intent = /(?:先|再|来|会|需要|可以)?(?:查看|看看|看一下|看一眼|浏览|读取|检查|了解|确认|分析)|让我(?:查看|看看|看一下|浏览|读取|检查|了解)|需要(?:查看|看看|看一下|浏览|读取|检查|了解|确认)|(?:先(?:查看|看看|看一下|浏览|读取|检查|了解)|I'll\s+(?:check|inspect|look|read)|I\s+need\s+to\s+(?:check|inspect|look|read))/i;
   const target = /(项目|文件|目录|代码|路径|仓库|工程|结构|数据模型|管理器|核心|黑板|技能|上下文|project|file|directory|repo|code|path|folder|context|model|manager|schema)/i;
   const waiting = /(稍等|等一下|接下来|下一步|然后|之后|before|first|next)/i;
   return intent.test(text) && (target.test(text) || waiting.test(text));
@@ -734,17 +747,17 @@ function looksLikeInspectionStall(content) {
 
 function extractInspectionPath(content) {
   const text = String(content || "").replace(/```[\s\S]*?```/g, " ");
-  const quoted = text.match(/[首']([^首']+\.[A-Za-z0-9]{1,12})[首']/);
+  const quoted = text.match(/["']([^"']+\.[A-Za-z0-9]{1,12})["']/);
   const pathLike = quoted?.[1] || text.match(/([A-Za-z0-9_.@-]+(?:[\\/][A-Za-z0-9_.@ -]+)*\.[A-Za-z0-9]{1,12})/)?.[1];
   if (!pathLike) return null;
-  return pathLike.replace(/\\/g, "/").replace(/[，。；：首.!?;:]+$/g, "");
+  return pathLike.replace(/\\/g, "/").replace(/[，。；：.!?;:]+$/g, "");
 }
 
 function looksLikeFileOutputStall(content) {
   if (!content || detectToolCalls(content).length > 0) return false;
   const text = String(content || "");
   const noCode = text.replace(/```[\s\S]*?```/g, " ");
-  const offerOrQuestion = /(需要我|要我|是否需要|要不要|你需要|如果你需要|我可首?:直接)?(?:动手|继续|帮你|给出)|是否要|吗[首]?|呢[首]?)/;
+  const offerOrQuestion = /(需要我|要我|是否需要|要不要|你需要|如果你需要|我可以(?:直接)?(?:动手|继续|帮你|给出)|是否要|吗[？?]?|呢[？?]?)/;
   if (offerOrQuestion.test(noCode)) return false;
   const intent = /(生成|创建|输出|保存|写入).{0,24}(文件|文档|代码|\.md|\.txt|\.json|\.py|\.js|\.html)|(?:文件|文档|代码).{0,24}(生成|创建|输出|保存|写入)/i;
   const hasUsableContent = /```[\s\S]{80,}?```/.test(text) || (text.length > 500 && /(^|\n)#{1,3}\s|\n[-*]\s|\n\d+\.\s/.test(text));
@@ -803,7 +816,7 @@ function updateSendState() {
     queueStatus.classList.toggle("hidden", !isGenerating && inputQueue.length === 0);
     const statusText = queueStatus.querySelector(".queue-status-text");
     if (statusText) {
-      statusText.textContent = t(isGenerating ? "正在生成" : "待发送") + (inputQueue.length ? t(" · 队列 {n}", { n: inputQueue.length }) : "")";
+      statusText.textContent = t(isGenerating ? "正在生成" : "待发送") + (inputQueue.length ? t(" · 队列 {n}", { n: inputQueue.length }) : "");
     }
   }
   if (chatInput) {
@@ -816,12 +829,12 @@ function updateSendState() {
     chatInput.placeholder = isGenerating
       ? t("继续输入可加入队列，点击停止中断输出") + queueHint
       : (grindOn
-        ? t("磨墨中) + grindRound + t(" · 直接回复问题即可（输「收墨」立即出墨稿）)
+        ? t("磨墨中") + grindRound + t(" · 直接回复问题即可（输「收墨」立即出墨稿）")
         : (grindDone
           ? "墨稿已成 · 可在下方选择「送入 Harness / 投到白板 / 存为模板」，或继续对话"
           : (brainstormMode
             ? "灵感发散模式：输入想法、问题、素材或方向…"
-            : "输入想法、问题、素材或方向首(Enter 发言 Shift+Enter 换行)")));
+            : "输入想法、问题、素材或方向（Enter 发言，Shift+Enter 换行）")));
   }
 }
 
@@ -880,7 +893,7 @@ function isShortReviewCandidate(content) {
   const cfg = state.autoReview || {};
   if (cfg.enabled === false) return false;
   if (!content || detectToolCalls(content).length > 0) return false;
-  if (/^首.test(String(content).trim())) return false;
+  if (/^◈/.test(String(content).trim())) return false;
   const clean = stripToolCalls(content).replace(/```[\s\S]*?```/g, " ").trim();
   const minChars = Math.max(20, Math.min(800, parseInt(cfg.minChars) || 120));
   return clean.length > 0 && clean.length <= minChars;
@@ -891,27 +904,28 @@ function looksLikeLongStall(content) {
   const cfg = state.autoReview || {};
   if (cfg.enabled === false || cfg.reviewLongStall === false) return false;
   if (!content || detectToolCalls(content).length > 0) return false;
-  if (/^首.test(String(content).trim())) return false;
+  if (/^◈/.test(String(content).trim())) return false;
   const text = String(content).replace(/```[\s\S]*?```/g, " ");
   const minChars = Math.max(20, Math.min(800, parseInt(cfg.minChars) || 120));
   if (text.trim().length <= minChars) return false; // 短回复走原有短回复通道
   if (text.length > 4000) return false; // 超长回复通常是完整答复，不审查以控制成本
-  const offerOrQuestion = /(需要我|要我|是否需要|要不要|你需要|如果你需要|我可首?:直接)?(?:动手|继续|帮你|给出)|是否要|吗[首]?|呢[首]?)/;
+  const offerOrQuestion = /(需要我|要我|是否需要|要不要|你需要|如果你需要|我可以(?:直接)?(?:动手|继续|帮你|给出)|是否要|吗[？?]?|呢[？?]?)/;
   if (offerOrQuestion.test(text)) return false;
   if (/(全部完成|全部搞定|已完成所有|都已处理)/.test(text)) return false;
-  const intent = /(首?:先|再|来|会|开始|继续|现在)?\s?(?:去|动手)?\s?(?:查看|看看|看一下|浏览|读取|检查|了解|确认|分析|修改|创建|写入|生成|执行|整理|继续|开首|下一步|下面我将|接下来我|现在我将|我将(?:先|会|直接)?|让我|I'll(?:\s+(?:check|inspect|look|read|modify|create|start|continue))?|I\s+(?:need|am going)\s+to)/i;
+  const intent = /(?:先|再|来|会|开始|继续|现在)?\s?(?:去|动手)?\s?(?:查看|看看|看一下|浏览|读取|检查|了解|确认|分析|修改|创建|写入|生成|执行|整理|继续|开启|下一步|下面我将|接下来我|现在我将|我将(?:先|会|直接)?|让我|I'll(?:\s+(?:check|inspect|look|read|modify|create|start|continue))?|I\s+(?:need|am going)\s+to)/i;
   return intent.test(text);
 }
 
-// 自动推进审查候选：短回复（原有）或长回复停顿（新增首function isReviewCandidate(content) {
+// 自动推进审查候选：短回复（原有）或长回复停顿（新增）
+function isReviewCandidate(content) {
   return isShortReviewCandidate(content) || looksLikeLongStall(content);
 }
 
 function looksLikeContinuationStall(content) {
   if (!isShortReviewCandidate(content)) return false;
   const text = String(content || "").replace(/```[\s\S]*?```/g, " ").trim();
-  if (/(需要我|要我|是否需要|要不要|你需要|如果你需要|吗[首]?|呢[首]?)/.test(text)) return false;
-  return /(首?:来|会|先|首?(?:整理|分析|构思|展开|推演|发散|梳理|想想)|接下来|下面|继续|开首/.test(text);
+  if (/(需要我|要我|是否需要|要不要|你需要|如果你需要|吗[？?]?|呢[？?]?)/.test(text)) return false;
+  return /(?:来|会|先|(?:整理|分析|构思|展开|推演|发散|梳理|想想)|接下来|下面|继续|开启)/.test(text);
 }
 
 function getLastVisibleUserContent() {
@@ -981,7 +995,7 @@ async function reviewStalledReplyForToolCalls(lastContent, modelId, apiKey, base
 function appendSyntheticToolCalls(msgEl, calls) {
   const lastMsg = state.messages[state.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return false;
-  const blocks = calls.map(call => `◈◈首{call.name}\n${JSON.stringify(call.params)}\n◈◆◆`).join("\n\n");
+  const blocks = calls.map(call => `◈◈${call.name}\n${JSON.stringify(call.params)}\n◈◆◆`).join("\n\n");
   lastMsg.content = `${lastMsg.content.trim()}\n\n${blocks}`;
   const contentEl = msgEl?.querySelector(".msg-content");
   renderAssistantContent(contentEl, lastMsg.content);
@@ -1076,9 +1090,9 @@ function getToolCallLabel(call) {
 function getToolCallStatus(result) {
   if (result?.success === false) return "失败";
   const s = result?._structured;
-  if (s?._type === "file_edit") return s.applied === "auto" ? "已应用 : "diff 预览";"
-  if (s?._type === "file_create") return s.applied === "auto" ? "已创建 : "文件预览";"
-  if (s?._type === "file_append") return s.applied === "auto" ? "已追加 : "追加预览";"
+  if (s?._type === "file_edit") return s.applied === "auto" ? "已应用" : "diff 预览";
+  if (s?._type === "file_create") return s.applied === "auto" ? "已创建" : "文件预览";
+  if (s?._type === "file_append") return s.applied === "auto" ? "已追加" : "追加预览";
   return "已执行";
 }
 
@@ -1229,7 +1243,7 @@ function renderFileEditDiff(data) {
   head.className = "file-edit-diff-head";
   const s = data.stats || { lines_added: 0, lines_removed: 0 };
   head.innerHTML = `<span class="file-edit-file-name">${data.file_name || "未知文件"}</span>` +
-    `<span class="file-edit-stats">+${s.lines_added} 首{s.lines_removed}</span>`;
+    `<span class="file-edit-stats">+${s.lines_added} -${s.lines_removed}</span>`;
   wrap.appendChild(head);
 
   const targetPath = data.file_path_rel || data.file;
@@ -1594,8 +1608,8 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     if (signal?.aborted || !stuck) break;
     const contPrompt = buildContinuePrompt(content);
     try {
-      const { toast } = await import("../app.js?v=20260818-75");
-      toast(t("输出达到长度上限，自动续写中（{x}/{n}）…", { x: round, n: MAX_CONTINUE_ROUNDS })");
+      const { toast } = await import("../app.js?v=20260818-77");
+      toast(t("输出达到长度上限，自动续写中（{x}/{n}）…", { x: round, n: MAX_CONTINUE_ROUNDS }));
     } catch {}
 
     // 历史 + 被截断的助手消息原文 + 续写指令（模型需看到断点才能接续首
@@ -1629,7 +1643,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
   // 轮数耗尽仍未闭合：提示用户，后续由工具循环的截断守卫接管（拒执行并要求拆分重试）
   if (!signal?.aborted && hasTruncatedTail(content)) {
     try {
-      const { toast } = await import("../app.js?v=20260818-75");
+      const { toast } = await import("../app.js?v=20260818-77");
       toast("输出仍不完整，已要求模型拆分重试", 3200);
     } catch {}
   }
@@ -1645,14 +1659,17 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
   let dupRounds = 0;
   let exitReason = "";
   for (let round = 0; round < maxRounds; round++) {
-    if (signal?.aborted) { exitReason = "已手动停止; break; "}
+    if (signal?.aborted) {
+      exitReason = "已手动停止";
+      break;
+    }
     const lastMsg = state.messages[state.messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") break;
 
     const calls = detectToolCalls(lastMsg.content);
     let nudged = false;
     // 上一轮生成异常：失败报错或零输出（Harness 下不退出，催其重新生成继续推进首
-    const replyFailed = !(lastMsg.content || "").trim() || /^首(续写失败|请求失败)/.test(lastMsg.content);
+    const replyFailed = !(lastMsg.content || "").trim() || /^(续写失败|请求失败)/.test(lastMsg.content);
 
 
     // 相同调用去重：本轮调用与上一轮完全一致时不重复执行（避免无效副作用与空转耗尽轮数首
@@ -1661,9 +1678,11 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
       const sig = JSON.stringify(calls.map(c => [c.name, c.params]));
       if (sig === prevCallsSig) {
         dupRounds++;
-        if (dupRounds >= 2 && !harnessOn) break; // 首Harness：连续三轮相同调用判定卡死；Harness 下仅拦截并催其换思路，不退首        addMessage({
+        if (dupRounds >= 2 && !harnessOn) break;
+        // Harness 下仅拦截重复调用并催其换思路，不直接退出。
+        addMessage({
           role: "user",
-          content: `[系统] ${round + 1}/${maxRounds} 轮：你本轮发出的工具调用与上一轮完全相同，已拦截未重复执行。" + (dupRounds >= 2 ? "已连续多轮相同调用，必须换思路" : ""}若上轮结果不符合预期，请换思路（拆分任务、改用其他工具、或先用 project_read_file 查看现状）；若任务已推进，直接继续剩余工作或输出结论。`,
+          content: `[系统] ${round + 1}/${maxRounds} 轮：你本轮发出的工具调用与上一轮完全相同，已拦截未重复执行。${dupRounds >= 2 ? "已连续多轮相同调用，必须换思路。" : ""}若上轮结果不符合预期，请换思路（拆分任务、改用其他工具、或先用 project_read_file 查看现状）；若任务已推进，直接继续剩余工作或输出结论。`,
           model: "[dedup]",
           hidden: true,
         });
@@ -1710,7 +1729,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
       const todos = getConversationTodos(state.currentConversationId);
       const doneCount = todos.filter(t => t.status === "done").length;
       const todoText = todos.length ? t(" · 清单 {done}/{total}", { done: doneCount, total: todos.length }) : "";
-      setHarnessProgress(t("Harness 自主执行 · 第 {x}/{n} 轮", { x: round + 1, n: maxRounds }) + todoText");
+      setHarnessProgress(t("Harness 自主执行 · 第 {x}/{n} 轮", { x: round + 1, n: maxRounds }) + todoText);
     }
 
     // 更新最后一首assistant 消息（去掉工具标记）
@@ -1826,13 +1845,14 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     msgEl = await autoAdvanceIfStalled(followEl, modelId, apiKey, baseUrl, params);
     msgEl = await autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal);
   }
-  if (harnessOn && !exitReason && !(signal?.aborted)) exitReason = t("已达 {n} 轮上限", { n: maxRounds }");
-  if (maxRounds > 5) showHarnessIdle(exitReason ? exitReason + t(" · Harness 保持开启，下一条消息继续自主执行（5轮手动退出）") : "");
+  if (harnessOn && !exitReason && !(signal?.aborted)) exitReason = t("已达 {n} 轮上限", { n: maxRounds });
+  if (maxRounds > 5) showHarnessIdle(exitReason ? exitReason + t(" · Harness 保持开启，下一条消息继续自主执行（点 ⚡ 手动退出）") : "");
 
   // 任务完成通知（非手动停止时触发）
   if (harnessOn && exitReason && !exitReason.includes("手动停止")) {
     notifyTaskComplete(t("Harness 任务完成"), exitReason);
-  }}
+  }
+}
 
 // ── 发送消首────────────────────────────────
 
@@ -1840,8 +1860,8 @@ async function sendMessage(queuedPayload = null) {
   if (isGenerating) {
     if (queuedPayload) inputQueue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260818-75");
-      toast(t("已加入输入队列（{n}）", { n: inputQueue.length })");
+      const { toast } = await import("../app.js?v=20260818-77");
+      toast(t("已加入输入队列（{n}）", { n: inputQueue.length }));
     }
     updateSendState();
     return;
@@ -1866,7 +1886,7 @@ async function sendMessage(queuedPayload = null) {
   const grindActive = grindSession && ["grinding", "collecting"].includes(grindSession.state);
   const isFreshConv = !state.currentConversationId || state.messages.length === 0;
   if (!queuedPayload && !grindActive && isFreshConv && isAbstractTask(text)) {
-    const { dlgConfirm } = await import("../services/dialog.js?v=20260818-75");
+    const { dlgConfirm } = await import("../services/dialog.js?v=20260818-77");
     const confirmed = await dlgConfirm(
       t("检测到抽象任务「{text}」，建议先进入磨墨模式细化需求后再执行。是否切换？", { text: text.slice(0, 30) }),
       { title: t("磨墨建议"), okText: t("进入磨墨"), cancelText: t("直接发送") }
@@ -1996,7 +2016,7 @@ async function sendMessage(queuedPayload = null) {
     const lastUser = historyForAdapter[historyForAdapter.length - 1];
     if (lastUser?.role === "user") {
       if (grindSession.state === "collecting") {
-        lastUser.content = `${grindSvc.collectingPrompt()}\n\n用户输入首{lastUser.content}`;
+        lastUser.content = `${grindSvc.collectingPrompt()}\n\n用户输入：${lastUser.content}`;
       } else if ((grindSession.round || 0) === 0) {
         lastUser.content = grindSvc.firstRoundPrompt(lastUser.content);
       } else {
@@ -2005,9 +2025,9 @@ async function sendMessage(queuedPayload = null) {
         if (isCollect || reachedLimit) {
           await grindSvc.collectSession(grindSession.conversation_id);
           grindSession.state = "collecting";
-          lastUser.content = `${grindSvc.collectingPrompt()}\n\n用户输入首{lastUser.content}`;
+          lastUser.content = `${grindSvc.collectingPrompt()}\n\n用户输入：${lastUser.content}`;
         } else {
-          lastUser.content = `${grindSvc.grindRoundPrompt(grindSession)}\n\n用户本轮回复制{lastUser.content}`;
+          lastUser.content = `${grindSvc.grindRoundPrompt(grindSession)}\n\n用户本轮回复：${lastUser.content}`;
         }
       }
     }
@@ -2076,7 +2096,7 @@ async function sendMessage(queuedPayload = null) {
 
   // 工具调用循环（默认5 轮；Harness 模式提升首maxRounds，上首50 轮）
   const toolRounds = harnessOn ? Math.max(10, Math.min(50, state.harness?.maxRounds || 50)) : 5;
-  if (harnessOn) setHarnessProgress(t("自主执行已启动 · 最多 {n} 轮 · 仅手动停止/ 轮数用完 / 清单了结才退出", { n: toolRounds });
+  if (harnessOn) setHarnessProgress(t("自主执行已启动 · 最多 {n} 轮 · 仅手动停止 / 轮数用完 / 清单了结才退出", { n: toolRounds }));
   if (!signal.aborted) await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal, toolRounds);
   else if (harnessOn) showHarnessIdle(); // 启动前即被停止：runToolLoop 未运行，保持待机指示
 
@@ -2095,8 +2115,8 @@ async function sendMessage(queuedPayload = null) {
 
   } catch (err) {
     console.error("发送失败", err);
-    const { toast } = await import("../app.js?v=20260818-75");
-    toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输出· Harness 保持开首 : "已停止输出) : t("发送失败: {msg}", { msg: err.message }));
+    const { toast } = await import("../app.js?v=20260818-77");
+    toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输出 · Harness 保持开启" : "已停止输出") : t("发送失败: {msg}", { msg: err.message }));
   } finally {
   isGenerating = false;
   activeGenerationController = null;
@@ -2140,7 +2160,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
 
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast(t("上下文已压缩：{n} 条消5轮摘要", { n: compress_count }));
   } catch (e) {
     console.warn("上下文压缩检查失败", e);
@@ -2220,7 +2240,7 @@ async function handleGrindReply(content, msgEl) {
     renderGrindPanel();
     updateSendState();
     appendDraftActions(msgEl, draft);
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast("墨稿已成：可送入 Harness / 投到白板 / 存为模板");
     return;
   }
@@ -2252,7 +2272,7 @@ function renderGrindPanel() {
     ? "墨迹 · 已成稿"
     : (st === "collecting"
       ? "墨迹 · 收墨中"
-      : t("墨迹 · 第 {x}/{n} 轮", { x: round, n: grindSvc.MAX_ROUNDS })");
+      : t("墨迹 · 第 {x}/{n} 轮", { x: round, n: grindSvc.MAX_ROUNDS }));
   grindPanelEl.appendChild(header);
 
   if (grindSession.idea) {
@@ -2328,26 +2348,26 @@ function appendDraftActions(msgEl, draft) {
     return btn;
   };
 
-  bar.appendChild(mkBtn("首送入 Harness", "把墨稿作者Harness 任务自主执行", async () => {
+  bar.appendChild(mkBtn("送入 Harness", "把墨稿作为 Harness 任务自主执行", async () => {
     state.harness = state.harness || { enabled: false, maxRounds: 50 };
     state.harness.enabled = true;
     btnHarness?.classList.add("active");
     savePersistent();
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast("墨稿已送入 Harness，自主执行中…");
     await sendMessage({ text: grindSvc.draftToHarnessTask(draft), files: [] });
   }));
 
-  bar.appendChild(mkBtn("首投到白板", "作为白板卡片保存", async () => {
+  bar.appendChild(mkBtn("投到白板", "作为白板卡片保存", async () => {
     addBoardCard(grindSvc.draftToBoardCard(draft));
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast("已投到白板");
   }));
 
-  bar.appendChild(mkBtn("首存为模板", "存入知识库作为可复用任务书模板, async (") => {
+  bar.appendChild(mkBtn("存为模板", "存入知识库作为可复用任务书模板", async () => {
     const ok = await grindSvc.saveDraftAsTemplate(draft);
-    const { toast } = await import("../app.js?v=20260818-75");
-    toast(ok ? "已存为磨墨模板（知识中心可见） : "保存失败")";
+    const { toast } = await import("../app.js?v=20260818-77");
+    toast(ok ? "已存为磨墨模板（知识中心可见）" : "保存失败");
   }));
 
   msgEl.appendChild(bar);
@@ -2356,7 +2376,7 @@ function appendDraftActions(msgEl, draft) {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260818-75").then(({ toast }) => toast("当前对话还不需要压缩)");
+    import("../app.js?v=20260818-77").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -2380,7 +2400,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -2413,7 +2433,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(t("上下文已压缩：{n} 条消5轮摘要", { n: res.data.compress_count || 0 }));
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -2517,17 +2537,17 @@ function renderConvList(conversations) {
   }
 }
 
-// 导出单个会话首Markdown 文件
+// 导出单个会话 Markdown 文件
 async function exportConversationMd(conv) {
   const res = await get(`/chat/conversations/${conv.id}/messages`);
   if (res.code !== 0) { dlgToast("导出失败"); return; }
   const msgs = (res.data || []).filter(m => m.role === "user" || m.role === "assistant");
-  if (msgs.length === 0) { dlgToast("该会话没有可导出的消息); return; "}
+  if (msgs.length === 0) { dlgToast("该会话没有可导出的消息"); return; }
   const title = conv.title || conv.id;
   const lines = [
     `# ${title}`,
     "",
-    `> 导出首SLATE · ${new Date().toLocaleString()}`,
+    `> 导出自 SLATE · ${new Date().toLocaleString()}`,
     "",
   ];
   for (const m of msgs) {
@@ -2586,7 +2606,7 @@ function renderConvSearchResults(box, hits, q) {
   if (!hits.length) { box.classList.add("hidden"); return; }
   const header = document.createElement("div");
   header.className = "conv-search-hits-title";
-  header.textContent = t("内容命中 · {n} 条", { n: hits.length }");
+  header.textContent = t("内容命中 · {n} 条", { n: hits.length });
   box.appendChild(header);
   for (const h of hits) {
     const item = document.createElement("div");
@@ -2600,7 +2620,7 @@ function renderConvSearchResults(box, hits, q) {
     item.append(t, s);
     item.addEventListener("click", async () => {
       await switchConversation(h.conversation_id);
-      dlgToast(t("已跳转到「{title}」", { title: h.conversation_title })");
+      dlgToast(t("已跳转到「{title}」", { title: h.conversation_title }));
     });
     box.appendChild(item);
   }
@@ -2626,8 +2646,8 @@ function initConvManage() {
 
   document.getElementById("btn-conv-delete-selected")?.addEventListener("click", async () => {
     const ids = [...convManageChecks.entries()].filter(([, cb]) => cb.checked).map(([id]) => id);
-    if (ids.length === 0) { dlgToast("请先勾选要删除的会话"; return; }
-    if (!await dlgConfirm(t("删除选中 {n} 个会话？删除后不可恢复制", { n: ids.length }), { danger: true, okText: "删除" })) return;
+    if (ids.length === 0) { dlgToast("请先勾选要删除的会话"); return; }
+    if (!await dlgConfirm(t("删除选中 {n} 个会话？删除后不可恢复。", { n: ids.length }), { danger: true, okText: "删除" })) return;
     await post("/chat/conversations/batch-delete", { ids });
     if (ids.includes(state.currentConversationId)) {
       state.currentConversationId = null;
@@ -2635,7 +2655,7 @@ function initConvManage() {
     }
     await refreshConversationList();
     renderConvManageList();
-    dlgToast(t("已删除 {n} 个会话", { n: ids.length })");
+    dlgToast(t("已删除 {n} 个会话", { n: ids.length }));
   });
 
   document.getElementById("btn-conv-clear-all")?.addEventListener("click", async () => {
@@ -2699,7 +2719,7 @@ function updateConvManageCount() {
   const countEl = document.getElementById("conv-manage-count");
   if (!countEl) return;
   const checked = [...convManageChecks.values()].filter(cb => cb.checked).length;
-  countEl.textContent = t("{total} 个会话，已查 {n} ", { total: convManageChecks.size, n: checked }");
+  countEl.textContent = t("{total} 个会话，已选 {n} 个", { total: convManageChecks.size, n: checked });
 }
 
 async function switchConversation(convId) {
@@ -2770,7 +2790,7 @@ function renderUsageBar() {
   const fmtTok = fmtTokens;
 
   usageBar.innerHTML = `
-    <span class="usage-model" title="${state.currentModel?.base_url || ''}">${modelName}${hasKey ? "" : " 首"}</span>
+    <span class="usage-model" title="${state.currentModel?.base_url || ''}">${modelName}${hasKey ? "" : " ⚠"}</span>
     <span class="usage-sep">|</span>
     <span class="usage-stat">${t("消息 {n}", { n: u.messageCount })}</span>
     <span class="usage-sep">|</span>
@@ -2782,14 +2802,14 @@ function renderUsageBar() {
     ${ctxLimit > 0 ? `
       <span class="usage-sep">|</span>
       <span class="usage-ctx" title="${t("上下文{a} / {b} tokens", { a: fmtTok(ctxTokens), b: fmtTok(ctxLimit) })}">
-        <span class="usage-stat">上下文/span>
+        <span class="usage-stat">上下文</span>
         <span class="usage-ctx-track"><span class="usage-ctx-fill${ctxPercent >= 95 ? " usage-ctx-danger" : ""}" style="width:${ctxPercent}%"></span></span>
         <span class="usage-stat${ctxPercent > 80 ? " usage-warn" : ""}">${ctxPercent}%</span>
       </span>` : ""}
   `;
 }
 
-// 用量条悬浮弹窗：如 token + 趣味等价换算（如"相当于一本《老人与海》";
+  // 用量条悬浮弹窗：token + 趣味等价换算（如“相当于一本《老人与海》”）
 let usagePopup = null;
 
 function showUsagePopup() {
@@ -2805,7 +2825,7 @@ function showUsagePopup() {
   const ctxLimit = state.currentModel?.context_window || 0;
   const ctxPercent = ctxLimit > 0 ? Math.min(100, Math.round((ctxTokens / ctxLimit) * 100)) : 0;
   usagePopup.innerHTML = `
-    <div class="usage-popup-main">${fmtTokens(u.totalTokens)} tokens${equiv ? "首 + equiv : ""}</div>"
+    <div class="usage-popup-main">${fmtTokens(u.totalTokens)} tokens${equiv ? " · " + equiv : ""}</div>
     <div class="usage-popup-detail">
       <span>${t("输入 {n}", { n: fmtTokens(u.promptTokens) })}</span>
       <span>${t("输出 {n}", { n: fmtTokens(u.completionTokens) })}</span>
@@ -2897,7 +2917,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260818-75");
+      const { toast } = await import("../app.js?v=20260818-77");
       toast(t("文件过大，已跳过: {name}", { name: file.name }));
       continue;
     }
@@ -2913,12 +2933,12 @@ async function handleFiles(fileList) {
         if (res.code === 0 && res.data?.content) {
           pendingFiles.push({ name: file.name, size: file.size, content: res.data.content, type: "text" });
         } else {
-          const { toast } = await import("../app.js?v=20260818-75");
+          const { toast } = await import("../app.js?v=20260818-77");
           toast(res.message || t("解析失败: {name}", { name: file.name }));
         }
       } catch (e) {
-        const { toast } = await import("../app.js?v=20260818-75");
-        toast(t("解析失败: {name}（{msg}）", { name: file.name, msg: e.message })");
+        const { toast } = await import("../app.js?v=20260818-77");
+        toast(t("解析失败: {name}（{msg}）", { name: file.name, msg: e.message }));
       }
       continue;
     }
@@ -2957,7 +2977,7 @@ async function handleFiles(fileList) {
  * 原地替换内容与工具卡片；完成后照常进入工具调用循环首 */
 async function regenerateMessage(msg, msgEl) {
   if (isGenerating) {
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast("正在生成中，请稍候");
     return;
   }
@@ -2965,7 +2985,7 @@ async function regenerateMessage(msg, msgEl) {
   if (idx < 0) return;
   const after = state.messages.slice(idx + 1).filter(m => !m.hidden && m.role !== "system");
   if (after.length > 0) {
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast("只能重新生成最后一条助手回复");
     return;
   }
@@ -2973,7 +2993,7 @@ async function regenerateMessage(msg, msgEl) {
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast("请先在设置中配置该模型的 API Key");
     return;
   }
@@ -2983,7 +3003,7 @@ async function regenerateMessage(msg, msgEl) {
     .filter(m => !m.hidden && m.role !== "system")
     .map(m => ({ role: m.role, content: m.content }));
   if (!history.some(m => m.role === "user")) {
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast("没有可重新生成的上下文");
     return;
   }
@@ -3085,7 +3105,7 @@ function initChat() {
     markActivity(); // 防止重复触发
     try { activeGenerationController?.abort(); } catch {}
     try {
-      const { toast } = await import("../app.js?v=20260818-75");
+      const { toast } = await import("../app.js?v=20260818-77");
       toast("连接长时间无响应，已自动中断，可重试");
     } catch {}
   }, 15000);
@@ -3116,7 +3136,7 @@ function initChat() {
     state.harness.enabled = !state.harness.enabled;
     btnHarness.classList.toggle("active", state.harness.enabled);
     savePersistent();
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast(state.harness.enabled ? "Harness 已开启：目标→计划→执行→验证→汇报→追首六阶段自主闭环，大任务自动建议TODOLIST" : "Harness 已关闭");
     showHarnessIdle();
   });
@@ -3156,18 +3176,18 @@ function initChat() {
     const id = expertSelect.value;
     if (!id) {
       setActiveExpertId("");
-      const { toast } = await import("../app.js?v=20260818-75");
+      const { toast } = await import("../app.js?v=20260818-77");
       toast("已退出专家模式");
       return;
     }
     try {
-      const { getExpert } = await import("../services/experts.js?v=20260818-75");
+      const { getExpert } = await import("../services/experts.js?v=20260818-77");
       const detail = await getExpert(id, { force: true });
       setActiveExpertId(id, detail);
-      const { toast } = await import("../app.js?v=20260818-75");
+      const { toast } = await import("../app.js?v=20260818-77");
       toast(t("已启用专家包：{name}", { name: detail.name || id }));
     } catch (e) {
-      const { toast } = await import("../app.js?v=20260818-75");
+      const { toast } = await import("../app.js?v=20260818-77");
       toast(t("专家包加载失败: {msg}", { msg: e.message }));
       expertSelect.value = state.activeExpertId || "";
     }
@@ -3312,7 +3332,7 @@ function startVoice(btn) {
   };
   _voiceRecognition.onerror = (e) => {
     if (e.error !== "aborted" && e.error !== "no-speech") {
-      try { import("../app.js?v=20260818-75").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
+      try { import("../app.js?v=20260818-77").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
     }
     stopVoice();
   };

@@ -3,7 +3,7 @@
  * 提示词注入、墨迹解析、墨稿检测与三个动作（送入 Harness / 投到白板 / 存为模板）首
  */
 
-import { get, post, del, patch } from "./api.js?v=20260818-75";
+import { get, post, del, patch } from "./api.js?v=20260818-77";
 
 const MAX_ROUNDS = 10;
 
@@ -42,7 +42,7 @@ ${DRAFT_FORMAT}
 function grindRoundPrompt(session) {
   const round = session.round;
   return `[磨墨模式 · 磨墨 · ${round}/${MAX_ROUNDS} 轮]
-继续研磨：只问下一个最重要的缺口，选择题优先首{round >= MAX_ROUNDS ? "已达追问上限，本轮直接收墨输出墨稿" : `还剩 ${MAX_ROUNDS - round} 轮，若信息已足够可提前收墨。`}
+继续研磨：只问下一个最重要的缺口，选择题优先。${round >= MAX_ROUNDS ? "已达追问上限，本轮直接收墨输出墨稿。" : `还剩 ${MAX_ROUNDS - round} 轮，若信息已足够可提前收墨。`}
 ${STATUS_FORMAT}
 ${DRAFT_FORMAT}`;
 }
@@ -61,7 +61,7 @@ ${DRAFT_FORMAT}`;
  */
 function parseInkStatus(content) {
   const text = String(content || "");
-  const m = text.match(/【墨迹首[\s\S]*?)(?=\n\s*\n[^✔✘\-\*\s]|\n```|$)/);
+  const m = text.match(/【墨迹】([\s\S]*?)(?=\n\s*\n[^✔✘\-\*\s]|\n```|$)/);
   const block = m ? m[1] : text;
   if (!m && !/[✔✘]/.test(text)) return null;
 

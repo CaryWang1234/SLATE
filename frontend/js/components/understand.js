@@ -11,7 +11,7 @@ import { renderMarkdown } from "../services/markdown.js?v=20260815-51";
 import { t } from "../services/i18n.js?v=20260815-51";
 
 const LEVELS = {
-  brief: { label: "简略, tree: "目录深度 2 层, files: "精读 6 个关键文件, out: "输出首900 首 },
+  brief: { label: "简略", tree: "目录深度 2 层", files: "精读 6 个关键文件", out: "输出约 900 字" },
   balanced: { label: "平衡", tree: "目录深度 3 层", files: "精读 16 个关键文件", out: "输出约 1800 字" },
   detailed: { label: "详细", tree: "目录深度 5 层", files: "精读 36 个关键文件", out: "输出约 3200 字" },
 };
@@ -85,7 +85,7 @@ function setStepStatus(idx, status) {
   if (!step) return;
   step.className = `understand-step ${status}`;
   const icon = step.querySelector(".understand-step-icon");
-  if (icon) icon.textContent = status === "done" ? "\u2705" : status === "running" ? "\ud83d\udd0d" : status === "error" ? "首 : "·";"
+  if (icon) icon.textContent = status === "done" ? "\u2705" : status === "running" ? "\ud83d\udd0d" : status === "error" ? "!" : "·";
 }
 
 function appendLog(text) {

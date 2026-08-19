@@ -2,8 +2,8 @@
  * SLATE 模型适配器：System Prompt 模板 + 参数映射
  * 根据不同模型特点优化提示首 */
 
-import { state } from "../store.js?v=20260818-75";
-import { getToolsSystemPrompt } from "./tools.js?v=20260818-75";
+import { state } from "../store.js?v=20260818-77";
+import { getToolsSystemPrompt } from "./tools.js?v=20260818-77";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -73,7 +73,7 @@ function getMemorySystemPrompt() {
 function getKnowledgeSystemPrompt() {
   const items = Array.isArray(state.knowledgeContext) ? state.knowledgeContext.slice(0, 8) : [];
   if (!items.length) return "";
-  const lines = ["[相关知识库片段]（仅在与当前问题相关时参考，不要生硬引用）"],
+  const lines = ["[相关知识库片段]（仅在与当前问题相关时参考，不要生硬引用）"];
   for (const item of items) {
     const title = item.title || item.source || "知识";
     const content = String(item.content || "").slice(0, 700);

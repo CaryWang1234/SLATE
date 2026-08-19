@@ -2,16 +2,16 @@
  * SLATE AI 团队组件：多模型协作讨论
  * 轻量模型初步讨论 首重型模型最终决策 */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260818-75";
-import { notifyTaskComplete } from "../services/notify.js?v=20260818-75";
-import { streamChat } from "../services/api.js?v=20260818-75";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260818-75";
-import { renderMarkdown } from "../services/markdown.js?v=20260818-75";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260818-75";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260818-75";
-import { getExpertsCached } from "./experts.js?v=20260818-75";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-75";
-import { t } from "../services/i18n.js?v=20260818-75";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260818-77";
+import { notifyTaskComplete } from "../services/notify.js?v=20260818-77";
+import { streamChat } from "../services/api.js?v=20260818-77";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260818-77";
+import { renderMarkdown } from "../services/markdown.js?v=20260818-77";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260818-77";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260818-77";
+import { getExpertsCached } from "./experts.js?v=20260818-77";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-77";
+import { t } from "../services/i18n.js?v=20260818-77";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项目subscribe("modelRegistry", () => renderTeamMembers());
 
@@ -28,10 +28,10 @@ const TEAM_HISTORY_KEY = "slate_team_history";
 // ── 默认团队成员 ────────────────────────────
 
 const DEFAULT_MEMBERS = [
-  { id: "member-1", name: "分析师, modelId: "deepseek-v4-flash", persona: "你是务实派分析师。关注可行性和成本，回答简洁（1-3句）首, role: "analyst" },
-  { id: "member-2", name: "创意官, modelId: "gemini-3.6-flash", persona: "你是创意导向的思考者。关注创新可能性和用户体验，回答简洁（1-3句）首, role: "creative" },
-  { id: "member-3", name: "决策者, modelId: "gpt-5.6-sol", persona: "你是最终决策者。综合各方观点给出明确建议和理由，回答简洁（1-3句）首, role: "decider" },
-];];
+  { id: "member-1", name: "分析师", modelId: "deepseek-v4-flash", persona: "你是务实派分析师。关注可行性和成本，回答简洁（1-3句）。", role: "analyst" },
+  { id: "member-2", name: "创意官", modelId: "gemini-3.6-flash", persona: "你是创意导向的思考者。关注创新可能性和用户体验，回答简洁（1-3句）。", role: "creative" },
+  { id: "member-3", name: "决策者", modelId: "gpt-5.6-sol", persona: "你是最终决策者。综合各方观点给出明确建议和理由，回答简洁（1-3句）。", role: "decider" },
+];
 
 // ── 团队预设 ────────────────────────────
 
@@ -439,7 +439,7 @@ function renderTeamMembers() {
 
     const avatar = document.createElement("span");
     avatar.className = "team-member-avatar";
-    avatar.textContent = m.role === "analyst" ? "首 : m.role === "creative" ? "首 : m.role === "decider" ? "首 : "首;
+    avatar.textContent = m.role === "analyst" ? "A" : m.role === "creative" ? "C" : m.role === "decider" ? "D" : "M";
     header.appendChild(avatar);
 
     const info = document.createElement("div");
@@ -559,7 +559,7 @@ const DEBATE_ACTIONS = {
 
 /** 解析发言的动作前缀与回应对象：【动作】@成员{n}*/
 function parseDebateAction(text) {
-  const m = String(text || "").match(/^\s*首提案|支持|反对|反驳|补充|决策)】\s*(?:@([^\s【】@]+))?/);
+  const m = String(text || "").match(/^\s*【(提案|支持|反对|反驳|补充|决策)】\s*(?:@([^\s【】@]+))?/);
   if (!m) return { action: "propose", target: "", content: String(text || "").trim() };
   const action = Object.keys(DEBATE_ACTIONS).find(k => DEBATE_ACTIONS[k] === m[1]) || "propose";
   return { action, target: m[2] || "", content: String(text || "").slice(m[0].length).trim() };
@@ -567,14 +567,14 @@ function parseDebateAction(text) {
 
 function buildTranscript(entries) {
   return entries.map(e =>
-    `[首{e.round}轮] ${e.member.name}首{DEBATE_ACTIONS[e.action] || "发言"}首{e.target ? `（回${e.target}）` : ""}: ${e.text}`
+    `[${e.round}轮] ${e.member.name} ${DEBATE_ACTIONS[e.action] || "发言"}${e.target ? `（回${e.target}）` : ""}: ${e.text}`
   ).join("\n");
 }
 
 function addRoundHeader(round) {
   const el = document.createElement("div");
   el.className = "debate-round-header";
-  el.textContent = t("—— 第 {n} 轮 ——", { n: round }");
+  el.textContent = t("—— 第 {n} 轮 ——", { n: round });
   teamOutput.appendChild(el);
 }
 
@@ -846,7 +846,7 @@ async function forceVerdict(topic, boardContext, entries) {
   finalizeEntry(entry, "verdict", parsed.target, parsed.content || fullText);
   addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText);
 
-  const rec = { round: "最终决策, member: { ...decider }, action: "verdict", target: parsed.target, text: parsed.content || fullText "};
+  const rec = { round: "最终决策", member: { ...decider }, action: "verdict", target: parsed.target, text: parsed.content || fullText };
   entries.push(rec);
   return rec;
 }
@@ -866,10 +866,10 @@ function renderDebateSummary(topic, entries, verdict) {
     .map(([k, n]) => `${t(DEBATE_ACTIONS[k] || k)} ${n}`).join(" · ");
 
   let summary = t("**议题**: {topic}", { topic }) + "\n\n";
-  summary += t("**参与成员**: {names}", { names: names.join("首) }) + "\n\n";
+  summary += t("**参与成员**: {names}", { names: names.join("、") }) + "\n\n";
   summary += t("**发言统计**: 共 {n} 条（{counts}）", { n: entries.length, counts: countText }) + "\n\n";
   if (verdict) {
-    summary += t("**最终方案**（{name}）":, { name: verdict.member.name }) + "\n" + verdict.text;
+    summary += t("**最终方案**（{name}）:", { name: verdict.member.name }) + "\n" + verdict.text;
   } else {
     summary += t("**结果**: 未达成明确决策");
   }
@@ -886,7 +886,7 @@ function renderLoadedSession(session) {
 
   const topicEl = document.createElement("div");
   topicEl.className = "team-topic";
-  topicEl.textContent = t("议题: {topic}", { topic: session.topic || t("未命名讨论) }");
+  topicEl.textContent = t("议题: {topic}", { topic: session.topic || t("未命名讨论") });
   teamOutput.appendChild(topicEl);
 
   if (Array.isArray(session.entries)) {
@@ -989,11 +989,11 @@ let wfRunning = false;
 let wfAbortBtn = null;
 
 const WF_STATUS_TEXT = {
-  waiting: "首等待",
-  running: "首运行首,"
-  success: "首成功",
-  failed: "首失败",
-  skipped: "首跳过",
+  waiting: "等待",
+  running: "运行中",
+  success: "成功",
+  failed: "失败",
+  skipped: "跳过",
 };
 
 async function initWorkflowView() {
@@ -1048,7 +1048,7 @@ async function refreshWorkflowList() {
     for (const wf of wfList) {
       const opt = document.createElement("option");
       opt.value = wf.id;
-      opt.textContent = wf.valid ? wf.name + t("（{n} 节点）", { n: wf.node_count }) : "" + wf.name + t("（定义非法）")";
+      opt.textContent = wf.valid ? wf.name + t("（{n} 节点）", { n: wf.node_count }) : wf.name + t("（定义非法）");
       wfSelect.appendChild(opt);
     }
     renderWfDesc();
@@ -1170,7 +1170,7 @@ async function runSelectedWorkflow() {
 
     const total = (wf.nodes || []).length;
     let doneCount = 0;
-    wfRunStatus.textContent = t("运行中（0/{n}）…", { n: total }");
+    wfRunStatus.textContent = t("运行中（0/{n}）…", { n: total });
 
     const result = await runWorkflow(wf, userInput, teamMembers, {
       onNode: (rec) => {
@@ -1251,7 +1251,7 @@ function initTeamPanel() {
       id: `member-${Date.now()}`,
       name: t("成员{n}", { n: teamMembers.length + 1 }),
       modelId: "gpt-5.6-terra",
-      persona: "你是团队成员。简洁发表观点（1-3句）首,"
+      persona: "你是团队成员。简洁发表观点（1-3句）。",
       role: "member",
     });
     renderTeamMembers();

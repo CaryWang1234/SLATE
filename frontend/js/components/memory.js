@@ -9,11 +9,11 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260818-75";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260818-75";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-75";
-import { t } from "../services/i18n.js?v=20260818-75";
-import { initVaultPanel, openVaultPanel } from "./vault.js?v=20260818-75";
+} from "../store.js?v=20260818-77";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260818-77";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-77";
+import { t } from "../services/i18n.js?v=20260818-77";
+import { initVaultPanel, openVaultPanel } from "./vault.js?v=20260818-77";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -94,7 +94,7 @@ function renderMemoryList() {
     content.className = "memory-item-content";
     content.textContent = mem.content;
     content.addEventListener("dblclick", async () => {
-      const newText = await dlgPrompt("编辑记忆内容：", { title: "编辑记忆", value: mem.content, textarea: true }");
+      const newText = await dlgPrompt("编辑记忆内容：", { title: "编辑记忆", value: mem.content, textarea: true });
       if (newText !== null && newText.trim()) {
         updateMemory(mem.id, { content: newText.trim() });
         patch(`/chat/memories/${mem.id}`, { content: newText.trim() }).catch(() => {});
@@ -107,12 +107,12 @@ function renderMemoryList() {
     actions.className = "memory-item-actions";
 
     const editBtn = document.createElement("button");
-    editBtn.textContent = "首";
+    editBtn.textContent = "✎";
     editBtn.title = "编辑分类";
     editBtn.addEventListener("click", async () => {
       const known = CATEGORY_OPTIONS.some(o => o.value === mem.category);
       const options = known ? CATEGORY_OPTIONS : [{ value: mem.category, label: mem.category }, ...CATEGORY_OPTIONS];
-      const newCat = await dlgPrompt("编辑分类：", { title: "编辑分类", options, value: mem.category }");
+      const newCat = await dlgPrompt("编辑分类：", { title: "编辑分类", options, value: mem.category });
       if (newCat !== null && newCat.trim()) {
         updateMemory(mem.id, { category: newCat.trim() });
         patch(`/chat/memories/${mem.id}`, { category: newCat.trim() }).catch(() => {});
@@ -140,12 +140,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260818-75");
+  const { toast } = await import("../app.js?v=20260818-77");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -386,7 +386,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || overwritten || deleted || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260818-75");
+      const { toast } = await import("../app.js?v=20260818-77");
       let msg = "";
       if (added) msg += t("新增 {n} 条", { n: added });
       if (overwritten) msg += (msg ? "，" : "") + t("覆盖 {n} 条", { n: overwritten });
@@ -489,18 +489,18 @@ async function searchKnowledge() {
 }
 
 async function addKnowledgeDialog() {
-  const title = await dlgPrompt("知识标题：", { title: "添加知识" }");
+  const title = await dlgPrompt("知识标题：", { title: "添加知识" });
   if (title === null) return;
-  const content = await dlgPrompt("知识内容：", { title: "添加知识", textarea: true, rows: 8 }");
+  const content = await dlgPrompt("知识内容：", { title: "添加知识", textarea: true, rows: 8 });
   if (!content || !content.trim()) return;
   const res = await post("/knowledge/docs", {
-    title: title.trim() || "未命名知识,"
+    title: title.trim() || "未命名知识",
     source: "manual",
     kind: "note",
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260818-75");
+    const { toast } = await import("../app.js?v=20260818-77");
     toast("知识已添加");
     await loadKnowledgeDocs();
   }
@@ -577,13 +577,13 @@ function renderSnippetList() {
     actions.className = "snippet-item-actions";
 
     const copyBtn = document.createElement("button");
-    copyBtn.textContent = "首";
+    copyBtn.textContent = "⧉";
     copyBtn.title = "复制";
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(snip.text);
-        copyBtn.textContent = "首";
-        setTimeout(() => { copyBtn.textContent = "首; }, 1200");
+        copyBtn.textContent = "✓";
+        setTimeout(() => { copyBtn.textContent = "⧉"; }, 1200);
       } catch (e) {}
     });
     actions.appendChild(copyBtn);
@@ -656,7 +656,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260818-75").then(({ toast }) => toast("资料已保存)");
+    import("../app.js?v=20260818-77").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗？", { danger: true, okText: "重置" })) {
@@ -676,7 +676,7 @@ function initMemoryPanel() {
   const btnAddSnippet = document.getElementById("btn-add-snippet");
 
   if (btnAddSnippet) btnAddSnippet.addEventListener("click", async () => {
-    const text = await dlgPrompt("粘贴或输入提示词素材：", { title: "添加素材", textarea: true, rows: 6 }");
+    const text = await dlgPrompt("粘贴或输入提示词素材：", { title: "添加素材", textarea: true, rows: 6 });
     if (text && text.trim()) {
       const snip = { text: text.trim(), source: "手动添加" };
       addPromptSnippet(snip);
@@ -799,7 +799,7 @@ async function captureConversationSpark() {
     }
 
     if (count > 0) {
-      const { toast } = await import("../app.js?v=20260818-75");
+      const { toast } = await import("../app.js?v=20260818-77");
       toast(t("已捕获 {n} 条灵光", { n: count }));
     }
   } catch (e) {

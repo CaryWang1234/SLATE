@@ -5,19 +5,19 @@
 
 import { t } from "./i18n.js?v=20260815-51";
 
-// 等价物阶梯（token 数为约值）：中文按 1 5轮1 token 粗估
-// base 为不带量词的名称，拼接格式统一首"一{unit}{base}" / "{count} {unit}{base}"
+// 等价物阶梯（token 数为约值）：中文按 1.5 字约 1 token 粗估
+// base 为不带量词的名称，拼接格式统一为 "一{unit}{base}" / "{count} {unit}{base}"
 const EQUIV_LADDER = [
-  { tokens: 40, base: "《静夜思》, unit: "首 },
+  { tokens: 40, base: "《静夜思》", unit: "首" },
   { tokens: 150, base: "微博", unit: "条" },
   { tokens: 800, base: "中学作文", unit: "字" },
   { tokens: 3000, base: "深度长文", unit: "篇" },
-  { tokens: 23000, base: "《老人与海》, unit: "首 },
-  { tokens: 150000, base: "《三体》, unit: "首 },
-  { tokens: 500000, base: "《红楼梦》, unit: "首 },
+  { tokens: 23000, base: "《老人与海》", unit: "本" },
+  { tokens: 150000, base: "《三体》", unit: "本" },
+  { tokens: 500000, base: "《红楼梦》", unit: "本" },
 ];
 
-/** token 数格式化首234 首1.2K，百万级 首1.5M */
+/** token 数格式化：1234 -> 1.2K，百万级 -> 1.5M */
 function fmtTokens(n) {
   n = Math.max(0, Math.round(n || 0));
   if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
@@ -25,7 +25,7 @@ function fmtTokens(n) {
   return n.toLocaleString();
 }
 
-/** 趣味等价换算；3000 首"约相当于一本《老人与海》；不足返回空串由调用方兜底" */
+/** 趣味等价换算；不足一个参照物时返回短提示，由调用方展示 */
 function tokenEquivalence(n) {
   if (!n || n <= 0) return "";
   let ref = null;

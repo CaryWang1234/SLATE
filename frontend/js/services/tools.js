@@ -11,10 +11,10 @@
  *   文件内容原样（第二行起）
  *   ◈◆首 */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-75";
-import { post } from "../services/api.js?v=20260818-75";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-75";
-import { t } from "./i18n.js?v=20260818-75";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-77";
+import { post } from "../services/api.js?v=20260818-77";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-77";
+import { t } from "./i18n.js?v=20260818-77";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -105,7 +105,7 @@ const TOOLS = {
 
   board_add: {
     name: "添加黑板卡片",
-    description: "在白板上添加一张卡片，支持标题、详情、依赖关系和语义颜色。适合将想首任务/概念可视化首,"
+    description: "在白板上添加一张卡片，支持标题、详情、依赖关系和语义颜色。适合将想法、任务或概念可视化。",
     params: {
       title: { type: "string", description: "卡片标题", required: true },
       body: { type: "string", description: "卡片描述/详情" },
@@ -146,7 +146,7 @@ const TOOLS = {
 
   board_update: {
     name: "更新黑板卡片",
-    description: "更新已有卡片的标题、详情、依赖或颜色。只改传入的字段，未传的保持不变首,"
+    description: "更新已有卡片的标题、详情、依赖或颜色。只改传入的字段，未传的保持不变。",
     params: {
       id: { type: "string", description: "目标卡片 ID", required: true },
       title: { type: "string", description: "新标题" },
@@ -172,7 +172,7 @@ const TOOLS = {
 
   board_batch: {
     name: "批量操作黑板",
-    description: "一次性对黑板执行多个操作（添加更新/删除/清空），适合整体重构黑板结构。操作按顺序执行首,"
+    description: "一次性对黑板执行多个操作（添加、更新、删除、清空），适合整体重构黑板结构。操作按顺序执行。",
     params: {
       ops: { type: "array", description: '操作列表，每天 {action:"add",title,body,arrows,color} | {action:"update",id,title,body,arrows,color} | {action:"delete",id} | {action:"clear"}', required: true },
     },
@@ -187,7 +187,7 @@ const TOOLS = {
           const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
           cards.push({
             id,
-            title: op.title || "未命名,"
+            title: op.title || "未命名",
             body: op.body || "",
             arrows: op.arrows || [],
             color: VALID_COLORS.includes(op.color) ? op.color : "default",
@@ -264,7 +264,7 @@ const TOOLS = {
         const res = await post("/skills/execute", { skill, params: p });
         if (res.code === 0) {
           const data = res.data;
-          if (typeof data === "string") return data.length > 2000 ? data.slice(0, 2000) + "首 : data";
+          if (typeof data === "string") return data.length > 2000 ? data.slice(0, 2000) + "…" : data;
           return JSON.stringify(data, null, 2);
         }
         return `工具执行失败: ${res.message}`;
@@ -295,7 +295,7 @@ const TOOLS = {
 
   knowledge_add: {
     name: "添加知识",
-    description: "把稳定、可复用的信息保存到本地知识中心。不要保存临时任务、工具输出或一次性状首,"
+    description: "把稳定、可复用的信息保存到本地知识中心。不要保存临时任务、工具输出或一次性状态。",
     params: {
       title: { type: "string", description: "知识标题", required: true },
       content: { type: "string", description: "知识正文", required: true },
@@ -472,9 +472,9 @@ const TOOLS = {
 
   file_create: {
     name: "创建新文件",
-    description: "在项目中创建新文件。默认自动写入（用户在设置关闭自动确认时改为 diff 预览后手动确认）。专用格式：第一行写相对路径，第二行起原样写文件内容（不首JSON、不转义）首,"
+    description: "在项目中创建新文件。默认自动写入（用户在设置关闭自动确认时改为 diff 预览后手动确认）。专用格式：第一行写相对路径，第二行起原样写文件内容（不是 JSON、不转义）。",
     params: {
-      file_path: { type: "string", description: "新文件相对路径（相对于项目根目录），首src/utils/helper.js", required: true },
+      file_path: { type: "string", description: "新文件相对路径（相对于项目根目录），如 src/utils/helper.js", required: true },
       content: { type: "string", description: "文件完整内容（原样写入，不经 JSON 转义）", required: true },
     },
     rawContent: true,
@@ -575,10 +575,10 @@ const TOOLS = {
 
   file_append: {
     name: "追加文件内容",
-    description: "向已存在文件的末尾追加内容。用于分段写入超长文件：首file_create 写入前半部分，再用一次或多次 file_append 补齐剩余部分首,"
+    description: "向已存在文件的末尾追加内容。用于分段写入超长文件：先用 file_create 写入前半部分，再用一次或多次 file_append 补齐剩余部分。",
     params: {
       file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录），文件必须已存在", required: true },
-      content: { type: "string", description: "要追加到文件末尾的内容（原样写入，不首JSON 转义；从上次写入结束的精确位置接续，不要重复已有内容首, required: true "},
+      content: { type: "string", description: "要追加到文件末尾的内容（原样写入，不经 JSON 转义；从上次写入结束的精确位置接续，不要重复已有内容）", required: true },
     },
     rawContent: true,
     async execute({ file_path, content, _truncated }) {
@@ -677,11 +677,11 @@ const TOOLS = {
 
       if (action === "init") {
         const contents = input.filter(i => i && i.content).map(i => String(i.content));
-        if (!contents.length) return "缺少 items：init 需首[{\"content\": \"事项描述\""}] 形式的列首;
+        if (!contents.length) return '缺少 items：init 需要 [{"content": "事项描述"}] 形式的列表';
         list = contents.map((c, i) => ({ id: "t" + (i + 1), content: c, status: "pending" }));
       } else if (action === "add") {
         const contents = input.filter(i => i && i.content).map(i => String(i.content));
-        if (!contents.length) return "缺少 items：add 需首[{\"content\": \"事项描述\"}]";
+        if (!contents.length) return '缺少 items：add 需要 [{"content": "事项描述"}]';
         let seq = list.reduce((m, t) => Math.max(m, parseInt(String(t.id || "").slice(1), 10) || 0), 0);
         for (const c of contents) list.push({ id: "t" + (++seq), content: c, status: "pending" });
       } else if (action === "update") {
@@ -703,17 +703,17 @@ const TOOLS = {
       } else if (action === "clear") {
         list = [];
       } else {
-        return `未知 action: ${action}（可首init/add/update/remove/clear）`;
+        return `未知 action: ${action}（可用 init/add/update/remove/clear）`;
       }
 
       setConversationTodos(convId, list);
       if (!list.length) return "TODOLIST 已清空";
-      const icons = { done: "首, in_progress: "首, blocked: "首, pending: "首 };
+      const icons = { done: "✓", in_progress: "…", blocked: "!", pending: "·" };
       const done = list.filter(t => t.status === "done").length;
       const lines = list.map(t => `${icons[t.status] || ""} [${t.id}] ${t.content}`);
       return `TODOLIST 已更新（${done}/${list.length} 完成）：\n${lines.join("\n")}` +
         (done === list.length
-          ? "\n全部完成，进入验证与汇报阶段首"
+          ? "\n全部完成，进入验证与汇报阶段。"
           : "\n请继续统筹推进未完成事项（能并行的多项一起处理），每完成一批立即调首todo_manage 批量更新状态，保持清单实时准确定");
     },
   },
@@ -792,7 +792,8 @@ function readJsonString(raw, start) {
         out += String.fromCharCode(parseInt(hex, 16));
         i += 6;
       } else {
-        break; // 不完整的 unicode 转义，丢弃以防乱首      }
+        break; // 不完整的 unicode 转义，丢弃以防乱码
+      }
     } else {
       const map = { n: "\n", t: "\t", r: "\r", b: "\b", f: "\f", '"': '"', "\\": "\\", "/": "/" };
       out += map[next] !== undefined ? map[next] : next;
@@ -855,11 +856,13 @@ function salvageTruncatedParams(raw) {
       const val = readJsonString(raw, i);
       params[key.value] = val.value;
       i = val.end;
-      if (!val.complete) break; // 字符串值被截断，抢救到此为首    } else {
+      if (!val.complete) break; // 字符串值被截断，抢救到此为止
+    } else {
       const val = readJsonValueWithRepair(raw, i);
       if (val.value !== undefined) params[key.value] = val.value;
       i = val.end;
-      break; // 非字符串值通常是最后一项，且可能不完整，停止抢首    }
+      break; // 非字符串值通常是最后一项，且可能不完整，停止抢救
+    }
   }
   return params;
 }
@@ -887,7 +890,8 @@ function detectToolCalls(text) {
     calls.push({ name, params });
   }
 
-  // 处理末尾被截断的工具调用块（缺少闭合标记 ◈◆◆，通常是输出达首max_tokens 上限首  // 不能直接丢弃：file_create 首content 往往已输出了大部分内容，应尽力抢首
+  // 处理末尾被截断的工具调用块（缺少闭合标记 ◈◆◆，通常是输出达到 max_tokens 上限）
+  // 不能直接丢弃：file_create 的 content 往往已输出了大部分内容，应尽力抢救。
   const rest = text.slice(lastEnd);
 
   const openMatch = /◈◈◈[ \t]*(\w+)[ \t]*\r?\n([\s\S]*)$/.exec(rest);
@@ -911,7 +915,8 @@ function detectToolCalls(text) {
   return calls;
 }
 
-// 末尾是否存在被截断的工具调用块（缺少闭合标记 ◈◆◆，通常是输出达首max_tokens 上限首function hasTruncatedTail(text) {
+// 末尾是否存在被截断的工具调用块（缺少闭合标记 ◈◆◆，通常是输出达到 max_tokens 上限）
+function hasTruncatedTail(text) {
   if (!text) return false;
   const calls = detectToolCalls(text);
   return calls.length > 0 && calls[calls.length - 1].params._truncated === true;

@@ -1,5 +1,6 @@
 /**
- * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交首Prompt首 */
+ * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交付 Prompt
+ */
 
 import { state, subscribe, addPromptSnippet } from "../store.js?v=20260815-51";
 import { get, post } from "../services/api.js?v=20260815-51";
@@ -9,46 +10,46 @@ import { t } from "../services/i18n.js?v=20260815-51";
 const FACTORY_PRESETS = {
   codex: {
     label: "Codex",
-    goal: "交给 Codex 在当前代码库中实现、验证并说明结果首,"
-    output: "请直接完成修改，并在最后简要说明改动文件、验证方式和剩余风险首,"
+    goal: "交给 Codex 在当前代码库中实现、验证并说明结果。",
+    output: "请直接完成修改，并在最后简要说明改动文件、验证方式和剩余风险。",
   },
   claude: {
     label: "Claude Code",
-    goal: "交给 Claude Code 按现有工程风格完成代码修改首,"
-    output: "请先阅读相关文件，再执行最小必要修改，最后给出测试结果首,"
+    goal: "交给 Claude Code 按现有工程风格完成代码修改。",
+    output: "请先阅读相关文件，再执行最小必要修改，最后给出测试结果。",
   },
   cursor: {
     label: "Cursor",
-    goal: "交给 Cursor 作为编辑器内任务指令使用户,"
-    output: "请给出清晰的编辑步骤、目标文件和需要保留的行为首,"
+    goal: "交给 Cursor 作为编辑器内任务指令使用。",
+    output: "请给出清晰的编辑步骤、目标文件和需要保留的行为。",
   },
   generic: {
     label: "通用 Agent",
-    goal: "交给任意 Coding Agent 执行首,"
-    output: "请输出可执行方案、必要修改和验证清单次,"
+    goal: "交给任意 Coding Agent 执行。",
+    output: "请输出可执行方案、必要修改和验证清单。",
   },
 };
 
 const FACTORY_TEMPLATES = {
   feature: {
     label: "功能实现",
-    task: "实现：\n\n期望行为：\n\n验收标准首,"
-    constraints: "遵循现有架构和代码风格。\n保持改动范围尽量小。\n完成后运行相关检查首,"
+    task: "实现：\n\n期望行为：\n\n验收标准：",
+    constraints: "遵循现有架构和代码风格。\n保持改动范围尽量小。\n完成后运行相关检查。",
   },
   bugfix: {
     label: "Bug 修复",
-    task: "问题现象：\n\n复现路径：\n\n期望结果首,"
-    constraints: "先定位根因，再修改。\n不要回滚无关改动。\n补充或运行能覆盖该问题的验证首,"
+    task: "问题现象：\n\n复现路径：\n\n期望结果：",
+    constraints: "先定位根因，再修改。\n不要回滚无关改动。\n补充或运行能覆盖该问题的验证。",
   },
   review: {
     label: "代码审查",
-    task: "请审查以下变更或模块：\n\n重点关注首,"
-    constraints: "按严重程度列出问题。\n每条问题包含文件位置、风险和建议修复方式首,"
+    task: "请审查以下变更或模块：\n\n重点关注：",
+    constraints: "按严重程度列出问题。\n每条问题包含文件位置、风险和建议修复方式。",
   },
   refactor: {
     label: "重构整理",
     task: "重构目标：\n\n保持不变的行为：\n\n希望改善的问题：",
-    constraints: "保持外部行为兼容。\n避免引入大型新依赖。\n优先沿用项目已有模式首,"
+    constraints: "保持外部行为兼容。\n避免引入大型新依赖。\n优先沿用项目已有模式。",
   },
 };
 
@@ -137,17 +138,17 @@ function renderShell() {
 
         <label class="factory-field factory-field-main">
           <span class="factory-label">任务描述</span>
-          <textarea id="factory-task" class="factory-input factory-task-input" placeholder="${t("写清楚你要 Agent 做什么、为什么做、怎样算完成。}" rows="7"></textarea>"
+          <textarea id="factory-task" class="factory-input factory-task-input" placeholder="${t("写清楚你要 Agent 做什么、为什么做、怎样算完成。")}" rows="7"></textarea>
         </label>
 
         <div class="factory-grid">
           <label class="factory-field">
-            <span class="factory-label">相关上下文/span>
-            <textarea id="factory-context" class="factory-input" placeholder="${t("粘贴文件路径、报错、接口约定、关键代码片段。)}" rows="7"></textarea>"
+            <span class="factory-label">相关上下文</span>
+            <textarea id="factory-context" class="factory-input" placeholder="${t("粘贴文件路径、报错、接口约定、关键代码片段。")}" rows="7"></textarea>
           </label>
           <label class="factory-field">
             <span class="factory-label">约束条件</span>
-            <textarea id="factory-constraints" class="factory-input" placeholder="${t("不能改什么、必须保留什么、需要遵守哪些风格或流程。)}" rows="7"></textarea>"
+            <textarea id="factory-constraints" class="factory-input" placeholder="${t("不能改什么、必须保留什么、需要遵守哪些风格或流程。")}" rows="7"></textarea>
           </label>
         </div>
 
@@ -301,7 +302,7 @@ async function insertSelectedFiles() {
       return;
     }
     appendToTextarea(fields.context, chunks.join("\n\n"));
-    showToast(t("已插入 {n} 个文件", { n: chunks.length })");
+    showToast(t("已插入 {n} 个文件", { n: chunks.length }));
   } finally {
     buttons.insertFiles.disabled = false;
     buttons.insertFiles.textContent = oldText;
@@ -391,7 +392,7 @@ function renderChecklist() {
 
   checklistEl.innerHTML = checks.map(check => `
     <div class="factory-check ${check.ok ? "ok" : ""}">
-      <span>${check.ok ? "首 : "·"}</span>"
+      <span>${check.ok ? "✓" : "·"}</span>
       ${check.label}
     </div>
   `).join("");
@@ -406,9 +407,9 @@ function buildPrompt() {
   const selected = [...selectedFiles.keys()];
 
   const toneMap = {
-    direct: "请直接进入执行，不需要长篇方案铺垫首,"
-    careful: "请先审计风险和边界，再做修改首,"
-    explore: "请先给出 2-3 个可行方向，再选择最稳妥方案执行首,"
+    direct: "请直接进入执行，不需要长篇方案铺垫。",
+    careful: "请先审计风险和边界，再做修改。",
+    explore: "请先给出 2-3 个可行方向，再选择最稳妥方案执行。",
   };
 
   const sections = [
@@ -443,8 +444,8 @@ function buildPrompt() {
     "",
     "# 交付要求",
     preset.output,
-    "不要修改与任务无关的文件；遇到已有未提交改动时，先理解并兼容它们首,"
-    "完成后说明验证命令或无法验证的原因首"
+    "不要修改与任务无关的文件；遇到已有未提交改动时，先理解并兼容它们。",
+    "完成后说明验证命令或无法验证的原因。"
   );
 
   return sections.join("\n").replace(/\n{3,}/g, "\n\n").trim();

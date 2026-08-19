@@ -2,10 +2,10 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-75";
-import { streamChat } from "../services/api.js?v=20260818-75";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-75";
-import { t } from "../services/i18n.js?v=20260818-75";
+import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-77";
+import { streamChat } from "../services/api.js?v=20260818-77";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-77";
+import { t } from "../services/i18n.js?v=20260818-77";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -69,7 +69,7 @@ function renderCard(card) {
   deleteBtn.title = t("删除卡片");
   deleteBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
-    if (await dlgConfirm(t('删除卡片"{title}"", { title: card.title }), { danger: true, okText: "删除" })) {
+    if (await dlgConfirm(t('删除卡片 "{title}"？', { title: card.title }), { danger: true, okText: "删除" })) {
       const cards = state.boardCards.filter(c => c.id !== card.id);
       setBoardCards(cards);
     }

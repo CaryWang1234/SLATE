@@ -3,10 +3,10 @@
  * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话首
  */
 
-import { state } from "../store.js?v=20260818-75";
-import { get, post, del, patch } from "../services/api.js?v=20260818-75";
-import { dlgConfirm } from "../services/dialog.js?v=20260818-75";
-import { t as tr } from "../services/i18n.js?v=20260818-75"; // 任务变量也叫 t，此处别名避免遮首
+import { state } from "../store.js?v=20260818-77";
+import { get, post, del, patch } from "../services/api.js?v=20260818-77";
+import { dlgConfirm } from "../services/dialog.js?v=20260818-77";
+import { t as tr } from "../services/i18n.js?v=20260818-77"; // 任务变量也叫 t，此处别名避免遮首
 
 let modal, listEl;
 let pollTimer = null;
@@ -26,7 +26,7 @@ function formatTs(ts) {
 
 async function toast(msg) {
   try {
-    const app = await import("../app.js?v=20260818-75");
+    const app = await import("../app.js?v=20260818-77");
     app.toast(msg);
   } catch {}
 }
@@ -39,7 +39,7 @@ function fillModelOptions() {
     ["国产模型", state.modelRegistry?.domestic],
     ["国际模型", state.modelRegistry?.international],
     ["本地模型", state.modelRegistry?.local],
-    ["自定义模型, state.customModels],"
+    ["自定义模型", state.customModels],
   ];
   for (const [label, models] of groups) {
     if (!Array.isArray(models) || !models.length) continue;

@@ -195,7 +195,7 @@ export const EN_DICT = {
   "磨墨模式": "Grind Mode",
   "输入 /grind 想法：AI 三段式追问，把粗糙想法研磨成结构化任务书，一键送入 Harness。": "Type /grind with an idea: AI asks focused follow-ups to grind rough ideas into a structured brief, one click into Harness.",
   "内置工具": "Built-in Tools",
-  "文件读写编辑、终端沙箱、联网搜索、PPT/Word 生成等 17 个工具，高危命令需审批。": "17 tools: file read/write/edit, terminal sandbox, web search, PPT/Word generation and more; high-risk commands need approval.",
+  "文件读写编辑、终端沙箱、联网搜索、PPT/Word/Excel 生成等 30 个工具，高危命令需审批。": "30 tools: file read/write/edit, terminal sandbox, web search, PPT/Word/Excel generation and more; high-risk commands need approval.",
   "记忆与知识库": "Memory & Knowledge",
   "🧠 按钮管理长期记忆与用户画像；左侧项目栏可扫描生成项目导览与规则手册。": "The 🧠 button manages long-term memory and user profile; the project bar on the left can scan and generate a project tour and rulebook.",
   "更多面板": "More Panels",

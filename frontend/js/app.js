@@ -1,26 +1,26 @@
-/**
+﻿/**
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-75";
-import { initI18n, t } from "./services/i18n.js?v=20260818-75";
-import { get, post, put } from "./services/api.js?v=20260818-75";
-import { dlgConfirm } from "./services/dialog.js?v=20260818-75";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-75";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-75";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260818-75";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-75";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260818-75";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-75";
-import { initTeamPanel } from "./components/team.js?v=20260818-75";
-import { initProjectBar } from "./components/project_bar.js?v=20260818-75";
-import { initMemoryPanel } from "./components/memory.js?v=20260818-75";
-import { initExpertsPanel } from "./components/experts.js?v=20260818-75";
-import { initSchedule } from "./components/schedule.js?v=20260818-75";
-import { initRiskGuard } from "./services/riskguard.js?v=20260818-75";
-import { initUnderstandPanel } from "./components/understand.js?v=20260818-75";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-75";
-import { setProject, setProjectFileTree } from "./store.js?v=20260818-75";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-77";
+import { initI18n, t } from "./services/i18n.js?v=20260818-77";
+import { get, post, put } from "./services/api.js?v=20260818-77";
+import { dlgConfirm } from "./services/dialog.js?v=20260818-77";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-77";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-77";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260818-77";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-77";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260818-77";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-77";
+import { initTeamPanel } from "./components/team.js?v=20260818-77";
+import { initProjectBar } from "./components/project_bar.js?v=20260818-77";
+import { initMemoryPanel } from "./components/memory.js?v=20260818-77";
+import { initExpertsPanel } from "./components/experts.js?v=20260818-77";
+import { initSchedule } from "./components/schedule.js?v=20260818-77";
+import { initRiskGuard } from "./services/riskguard.js?v=20260818-77";
+import { initUnderstandPanel } from "./components/understand.js?v=20260818-77";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-77";
+import { setProject, setProjectFileTree } from "./store.js?v=20260818-77";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -64,7 +64,7 @@ function safeInit(name, fn) {
 
 function populateModelSelect() {
   const select = document.getElementById("model-select");
-  select.innerHTML = '<option value="">选择模型…/option>';
+  select.innerHTML = '<option value="">选择模型…</option>';
 
   const groups = { international: "国外", domestic: "国内", local: "本地" };
 
@@ -121,7 +121,7 @@ function populateAutoReviewModelSelect() {
   const select = document.getElementById("setting-auto-review-model");
   if (!select) return;
   const currentValue = state.autoReview?.modelId || "";
-  select.innerHTML = '<option value="">跟随当前主模型/option>';
+  select.innerHTML = '<option value="">跟随当前主模型</option>';
   for (const m of getAllModels()) {
     const opt = document.createElement("option");
     opt.value = m.id;
@@ -191,7 +191,9 @@ function openCustomModelModal(model = null) {
   renderKeyManagement();
   editingCustomModelId = model?.id || null;
   const editor = document.getElementById("custom-model-editor");
-  document.getElementById("custom-model-editor-title").textContent = model ? "编辑自定义模型 : "添加自定义模型;
+  document.getElementById("custom-model-editor-title").textContent = model
+    ? `编辑自定义模型: ${model.name || model.id}`
+    : "添加自定义模型";
   document.getElementById("btn-save-custom-model").textContent = model ? "保存" : "添加";
   document.getElementById("custom-model-name").value = model?.id || "";
   document.getElementById("custom-model-url").value = model?.base_url || "";
@@ -511,14 +513,14 @@ async function renderAbout() {
 async function renderLanInfo() {
   const box = document.getElementById("lan-info");
   if (!box) return;
-  box.innerHTML = '<div class="lan-info-loading">正在获取遥控地址…/div>';
+  box.innerHTML = '<div class="lan-info-loading">正在获取遥控地址…</div>';
   let data = null;
   try {
     const res = await get("/lan/info");
     if (res?.code === 0) data = res.data;
   } catch {}
   if (!data || !data.enabled) {
-    box.innerHTML = `<div class="lan-info-error">${t("遥控服务未启动)}${data?.error ? "首 + data.error : t("，请重启应用")}</div>`;
+    box.innerHTML = `<div class="lan-info-error">${t("遥控服务未启动")}${data?.error ? ": " + data.error : t("，请重启应用")}</div>`;
     return;
   }
   const url = data.urls[0];
@@ -529,7 +531,7 @@ async function renderLanInfo() {
     </div>
     <div class="lan-qr-row">
       <img class="lan-qr" src="/api/lan/qrcode?t=${Date.now()}" alt="遥控地址二维码">
-      <div class="lan-qr-tip">手机扫码直接打开<br>（需连入同一局域网）/div>
+      <div class="lan-qr-tip">手机扫码直接打开<br>（需连入同一局域网）</div>
     </div>
     <p class="lan-tip">首遥控未设密码：同一局域网内的任何人都能完整操作本应用（含终端命令），请勿在不受信任的网络中使用户/p>
   `;
@@ -806,7 +808,7 @@ async function checkUpdateNow(btn) {
 async function renderUsageSummary() {
   const box = document.getElementById("usage-summary");
   if (!box) return;
-  box.innerHTML = '<div class="usage-summary-loading">加载中…/div>';
+    box.innerHTML = '<div class="usage-summary-loading">加载中…</div>';
   try {
     const res = await get("/chat/usage/summary");
     if (res.code !== 0) throw new Error(res.message || "加载失败");
@@ -819,16 +821,16 @@ async function renderUsageSummary() {
     grid.innerHTML = `
       <div class="usage-summary-card usage-summary-main">
         <div class="usage-summary-num">${fmtTokens(d.total_tokens)}</div>
-        <div class="usage-summary-label">首tokens</div>
+        <div class="usage-summary-label">总 Tokens</div>
         ${equiv ? `<div class="usage-summary-equiv">${equiv}</div>` : ""}
       </div>
       <div class="usage-summary-card">
         <div class="usage-summary-num">${fmtTokens(d.prompt_tokens)}</div>
-        <div class="usage-summary-label">总输入/div>
+        <div class="usage-summary-label">总输入</div>
       </div>
       <div class="usage-summary-card">
         <div class="usage-summary-num">${fmtTokens(d.completion_tokens)}</div>
-        <div class="usage-summary-label">总输入/div>
+        <div class="usage-summary-label">总输出</div>
       </div>
       <div class="usage-summary-card">
         <div class="usage-summary-num">${(d.message_count || 0).toLocaleString()}</div>
@@ -836,7 +838,7 @@ async function renderUsageSummary() {
       </div>
       <div class="usage-summary-card">
         <div class="usage-summary-num">${d.conversation_count || 0}</div>
-        <div class="usage-summary-label">对话数/div>
+        <div class="usage-summary-label">对话数</div>
       </div>
     `;
     box.appendChild(grid);
@@ -868,7 +870,8 @@ async function renderUsageSummary() {
   }
 }
 
-// 自动推进设置：变更后立即持久化，无需点保存按首function applyAutoReviewSettings() {
+// 自动推进设置：变更后立即持久化，无需点保存按钮
+function applyAutoReviewSettings() {
   state.autoReview = {
     enabled: document.getElementById("setting-auto-review-enabled").checked,
     modelId: document.getElementById("setting-auto-review-model").value || "",
@@ -907,7 +910,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260818-75").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260818-77").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -953,7 +956,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260818-75");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260818-77");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1176,7 +1179,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260818-75");
+      const { openProject } = await import("./services/project.js?v=20260818-77");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

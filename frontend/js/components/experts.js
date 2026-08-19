@@ -3,13 +3,13 @@
  * 对话模式通过 #expert-select 注入；团队模式通过成员{n}expertId 注入
  */
 
-import { state, setActiveExpertId } from "../store.js?v=20260818-75";
+import { state, setActiveExpertId } from "../store.js?v=20260818-77";
 import {
   loadExperts, getExpert, createExpert, saveExpert, deleteExpert,
   importExpertZip, expertExportUrl, uploadExpertFile, deleteExpertFile,
-} from "../services/experts.js?v=20260818-75";
-import { dlgConfirm } from "../services/dialog.js?v=20260818-75";
-import { t } from "../services/i18n.js?v=20260818-75";
+} from "../services/experts.js?v=20260818-77";
+import { dlgConfirm } from "../services/dialog.js?v=20260818-77";
+import { t } from "../services/i18n.js?v=20260818-77";
 
 let modal, expertListEl, detailEmpty, detailForm;
 let nameInput, descInput, personaInput, rulesInput;
@@ -26,7 +26,7 @@ function fmtSize(n) {
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260818-75");
+    const { toast: showToast } = await import("../app.js?v=20260818-77");
     showToast(msg);
   } catch {
     console.warn(msg);
@@ -181,7 +181,7 @@ async function handleFileUpload(folder, fileList) {
     try {
       await uploadExpertFile(currentId, folder, file);
     } catch (e) {
-      await toast(t("上传失败: {name}（{msg}）", { name: file.name, msg: e.message })");
+      await toast(t("上传失败: {name}（{msg}）", { name: file.name, msg: e.message }));
     }
   }
   currentDetail = await getExpert(currentId, { force: true });
@@ -193,7 +193,7 @@ async function handleFileUpload(folder, fileList) {
 
 async function handleNew() {
   try {
-    const id = await createExpert({ name: "新专家 }");
+    const id = await createExpert({ name: "新专家" });
     await refreshList();
     await selectExpert(id);
   } catch (e) {
@@ -216,7 +216,7 @@ async function handleSave() {
   if (!currentId) return;
   try {
     await saveExpert(currentId, {
-      name: nameInput.value.trim() || "未命名专家,"
+      name: nameInput.value.trim() || "未命名专家",
       description: descInput.value.trim(),
       persona: personaInput.value,
       rules: rulesInput.value,

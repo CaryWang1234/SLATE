@@ -30,7 +30,7 @@
 
 ### 1. SLATE 是什么？
 
-SLATE（砚）是一款**本地优先**的 AI 协作调度台。它把主流大模型、26 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。
+SLATE（砚）是一款**本地优先**的 AI 协作调度台。它把主流大模型、30 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。
 
 核心理念：**让灵感直达行动，中间不隔工具摩擦。**
 
@@ -51,7 +51,7 @@ pip install -r requirements.txt
 python desktop.py
 ```
 
-启动后浏览器自动打开 `http://localhost:8630`。
+源码启动后访问 `http://127.0.0.1:8000`。
 
 #### 首次配置
 
@@ -164,7 +164,7 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 
 ### 8. MCP 工具箱
 
-SLATE 内置 26 个 MCP 工具，模型在对话中自主决定何时使用。
+SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 
 **使用方式：**
 - 直接描述需求（如"帮我搜索 xxx"）
@@ -339,7 +339,7 @@ SLATE 内置 26 个 MCP 工具，模型在对话中自主决定何时使用。
 
 ### 1. What is SLATE?
 
-SLATE is a **local-first** AI collaboration studio. It integrates mainstream LLMs, 26 built-in tools, team debates, DAG workflows, whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.
+SLATE is a **local-first** AI collaboration studio. It integrates mainstream LLMs, 30 built-in tools, team debates, DAG workflows, whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.
 
 Core philosophy: **Let ideas go straight to action, without tool friction in between.**
 
@@ -360,7 +360,7 @@ pip install -r requirements.txt
 python desktop.py
 ```
 
-Browser opens `http://localhost:8630` automatically.
+After starting from source, visit `http://127.0.0.1:8000`.
 
 #### First-Time Setup
 
@@ -473,7 +473,7 @@ Visual cards + connections system for reasoning and planning.
 
 ### 8. MCP Toolbox
 
-SLATE includes 26 built-in MCP tools. The model decides when to use them during conversations.
+SLATE includes 30 built-in MCP tools. The model decides when to use them during conversations.
 
 **Usage:**
 - Describe your need naturally (e.g., "search for xxx")

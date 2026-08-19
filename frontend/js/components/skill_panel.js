@@ -1,11 +1,11 @@
 /**
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除首 */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260818-75";
-import { get, post, del, upload } from "../services/api.js?v=20260818-75";
-import { guardSkillParams } from "../services/riskguard.js?v=20260818-75";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-75";
-import { t } from "../services/i18n.js?v=20260818-75";
+import { state, subscribe, setSkills } from "../store.js?v=20260818-77";
+import { get, post, del, upload } from "../services/api.js?v=20260818-77";
+import { guardSkillParams } from "../services/riskguard.js?v=20260818-77";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-77";
+import { t } from "../services/i18n.js?v=20260818-77";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -57,19 +57,19 @@ const SKILL_PARAM_DEFS = {
   doc_write: [
     { key: "title", label: "文档标题", type: "text", placeholder: "项目技术文档 "},
     { key: "doc_type", label: "文档类型", type: "text", placeholder: "technical / requirement / api / readme / changelog" },
-    { key: "sections", label: "章节（逗号分隔）, type: "text", placeholder: "概述,安装,配置,API" "},
+    { key: "sections", label: "章节（逗号分隔）", type: "text", placeholder: "概述,安装,配置,API" },
     { key: "content_hint", label: "内容提示", type: "textarea", placeholder: "关键信息或要点 "},
   ],
   ppt_create: [
     { key: "title", label: "演示文稿标题", type: "text", placeholder: "Q3 项目汇报" },
-    { key: "subtitle", label: "副标题, type: "text", placeholder: "进展 · 风险 · 计划" "},
-    { key: "outline", label: "大纲章节（逗号分隔）, type: "text", placeholder: "背景,方案,实施计划,总结" "},
-    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / wine / gray 首6 位色首 "},
+    { key: "subtitle", label: "副标题", type: "text", placeholder: "进展 · 风险 · 计划" },
+    { key: "outline", label: "大纲章节（逗号分隔）", type: "text", placeholder: "背景,方案,实施计划,总结" },
+    { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / wine / gray / #RRGGBB" },
   ],
   word_create: [
     { key: "title", label: "文档标题", type: "text", placeholder: "项目方案书 "},
-    { key: "author", label: "作者, type: "text", placeholder: "SLATE" "},
-    { key: "content", label: "正文（支持# 标题 / - 列表标记首, type: "textarea", placeholder: "# 概述\n项目背景说明\n## 目标\n- 目标一" "},
+    { key: "author", label: "作者", type: "text", placeholder: "SLATE" },
+    { key: "content", label: "正文（支持 # 标题 / - 列表标记）", type: "textarea", placeholder: "# 概述\n项目背景说明\n## 目标\n- 目标一" },
   ],
   file_edit: [
     { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/app.js" },
@@ -88,7 +88,7 @@ const SKILL_PARAM_DEFS = {
   ],
   text_summarize: [
     { key: "text", label: "文本", type: "textarea", placeholder: "粘贴要总结的文本 "},
-    { key: "max_points", label: "要点数, type: "number", placeholder: "5" "},
+    { key: "max_points", label: "要点数", type: "number", placeholder: "5" },
     { key: "keyword_limit", label: "关键词数", type: "number", placeholder: "12" },
   ],
   json_tool: [
@@ -101,7 +101,7 @@ const SKILL_PARAM_DEFS = {
     { key: "pattern", label: "正则", type: "text", placeholder: "\\bTODO\\b" },
     { key: "text", label: "测试文本", type: "textarea", placeholder: "输入用于测试的文本 "},
     { key: "flags", label: "标志", type: "text", placeholder: "i / m / s" },
-    { key: "limit", label: "最大结果, type: "number", placeholder: "20" "},
+    { key: "limit", label: "最大结果", type: "number", placeholder: "20" },
   ],
   repo_stats: [
     { key: "directory", label: "目录路径", type: "text", placeholder: "C:\\path\\to\\project" },
@@ -110,17 +110,17 @@ const SKILL_PARAM_DEFS = {
   todo_scan: [
     { key: "directory", label: "目录路径", type: "text", placeholder: "C:\\path\\to\\project" },
     { key: "markers", label: "标记", type: "text", placeholder: "TODO,FIXME,待办" },
-    { key: "limit", label: "最大结果, type: "number", placeholder: "100" "},
+    { key: "limit", label: "最大结果", type: "number", placeholder: "100" },
   ],
   web_search: [
-    { key: "query", label: "搜索关键首/ URL", type: "text", placeholder: "FastAPI 最新版本号（fetch 模式首URL首 "},
+    { key: "query", label: "搜索关键词 / URL", type: "text", placeholder: "FastAPI 最新版本号（fetch 模式填 URL）" },
     { key: "mode", label: "模式", type: "text", placeholder: "search / fetch" },
-    { key: "max_results", label: "结果数（首0首, type: "number", placeholder: "5" "},
+    { key: "max_results", label: "结果数（≤10）", type: "number", placeholder: "5" },
   ],
   web_fetch: [
     { key: "url", label: "网页 URL", type: "text", placeholder: "https://example.com/article" },
     { key: "mode", label: "模式", type: "text", placeholder: "text / html" },
-    { key: "max_chars", label: "截断长度（≤30000）, type: "number", placeholder: "8000" "},
+    { key: "max_chars", label: "截断长度（≤30000）", type: "number", placeholder: "8000" },
   ],
   chart_create: [
     { key: "data", label: "数据（JSON 首标签:值）", type: "textarea", placeholder: "Q1:120, Q2:90, Q3:150" },
@@ -133,14 +133,14 @@ const SKILL_PARAM_DEFS = {
     { key: "size", label: "模块像素大小", type: "number", placeholder: "8" },
   ],
   python_api_extract: [
-    { key: "target", label: "目标（包名或 .py 文件/目录路径）, type: "text", placeholder: "requests 首C:/path/to/mylib" "},
-    { key: "depth", label: "递归深度首1 不限首, type: "number", placeholder: "1" "},
+    { key: "target", label: "目标（包名或 .py 文件/目录路径）", type: "text", placeholder: "requests 或 C:/path/to/mylib" },
+    { key: "depth", label: "递归深度（-1 不限）", type: "number", placeholder: "1" },
     { key: "format", label: "输出格式", type: "text", placeholder: "json / markdown" },
   ],
   html_bundle: [
-    { key: "src", label: "首html 文件路径", type: "text", placeholder: "C:/path/to/page/index.html" },
-    { key: "out", label: "输出路径（可选）", type: "text", placeholder: "缺省为源同目首<原名>.bundled.html" },
-  ,
+    { key: "src", label: "HTML 文件路径", type: "text", placeholder: "C:/path/to/page/index.html" },
+    { key: "out", label: "输出路径（可选）", type: "text", placeholder: "缺省为源同目录 <原名>.bundled.html" },
+  ],
   mcp_factory: [
     { key: "tool_name", label: "工具名称（英文）", type: "text", placeholder: "my_tool" },
     { key: "description", label: "工具描述", type: "text", placeholder: "我的自定义工具功能描述" },
@@ -205,7 +205,7 @@ const SKILL_PARAM_DEFS = {
   screenshot_to_code: [
     { key: "image_path", label: "图片路径", type: "text", placeholder: "C:/path/to/screenshot.png" },
     { key: "style", label: "风格偏好（可选）", type: "text", placeholder: "tailwind / plain css / responsive" },
-  ],],
+  ],
 };
 
 // ── 列表渲染：工具首+ SKILL.md 技能区 ────────────
@@ -427,11 +427,11 @@ async function executeSkill() {
 // ── 上传自定义技术───────────────────────────
 
 async function handleUploadSkill() {
-  const name = await dlgPrompt("技能名称（英文，如 my-skill）：", { title: "新建技能, placeholder: "my-skill" }");
+  const name = await dlgPrompt("技能名称（英文，如 my-skill）：", { title: "新建技能", placeholder: "my-skill" });
   if (!name || !name.trim()) return;
-  const desc = (await dlgPrompt("技能描述：", { title: "新建技能, value: name.trim(), textarea: true })) || name.trim(");
+  const desc = (await dlgPrompt("技能描述：", { title: "新建技能", value: name.trim(), textarea: true })) || name.trim();
 
-  // 创建文件选择首
+  // 创建文件选择器
   const input = document.createElement("input");
 
   input.type = "file";
