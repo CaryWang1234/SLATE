@@ -186,12 +186,21 @@ SLATE/
 ## 10\. 提交前自检清单
 
 1. Python：`python -m py_compile <改动文件>`；路由级改动用直接调用端点函数验证（本机 TestClient 有兼容问题）。
-2. JavaScript：`node --check <改动文件>`。
-3. 前端版本号已统一 bump，且全仓库 grep 无旧版本号残留。
-4. 涉及后端时，`SLATE.spec` 的 `hiddenimports` / `datas` 已同步。
-5. 涉及新设置项时，确认 change 即时保存 + 后端白名单 + 合并式写入语义未被破坏。
-6. 新增界面文案时，`i18n_dict.js` 的 `EN_DICT` 已同步添加英文翻译。
-7. 不要提交 `data/` 下的用户数据、`desktop_backend.log`、`.tmp-*` 临时目录、`outputs/`。
+2. 前端完整性：`check_frontend.bat`（或 `node scripts/check_frontend_integrity.mjs`）。必须通过 JS ES module 解析、HTML 残片扫描、乱码/残缺标签扫描与缓存版本号一致性检查。
+3. JavaScript：若只想快速检查单文件，可补充运行 `node --check <改动文件>`；最终仍以 `check_frontend.bat` 为准。
+4. 前端版本号已统一 bump，且全仓库 grep 无旧版本号残留。
+5. 涉及后端时，`SLATE.spec` 的 `hiddenimports` / `datas` 已同步。
+6. 涉及新设置项时，确认 change 即时保存 + 后端白名单 + 合并式写入语义未被破坏。
+7. 新增界面文案时，`i18n_dict.js` 的 `EN_DICT` 已同步添加英文翻译。
+8. 不要提交 `data/` 下的用户数据、`desktop_backend.log`、`.tmp-*` 临时目录、`outputs/`。
+
+### 10.1 Agent 防回归护栏
+
+* 禁止对 `frontend/`、`docs/`、`README*.md`、`RULES.md` 做未经验证的批量重编码、批量转码或跨编码保存；所有文本文件保持 UTF-8。
+* 编辑 `frontend/index.html` 或任何拼接 `innerHTML` 的 JS 后，必须运行 `check_frontend.bat`。
+* 若检查报告出现裸露 `/div>`、`/span>`、`/button>`、`/option>`、`/small>`、`title="...type="button`，必须先修复再继续提交。
+* 若检查报告出现疑似 mojibake（如 `锛`、`绛`、`涓`、`鍚`、`棣`、`閫`、`鈥` 等连续乱码），必须回到上下文或旧版本核对原文，不得用猜测批量替换。
+* 可运行 `powershell -ExecutionPolicy Bypass -File scripts/install_pre_commit.ps1` 安装本地 Git pre-commit hook；安装后每次提交会自动执行前端完整性检查。
 
 ## 11\. 代码风格
 

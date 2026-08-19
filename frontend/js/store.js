@@ -524,6 +524,7 @@ function resetUserProfile() {
 
 function setPromptSnippets(list) {
   state.promptSnippets = list;
+  savePersistent();
   notify("promptSnippets", list);
 }
 
@@ -539,11 +540,13 @@ function addPromptSnippet(snip) {
     ...snip,
   };
   state.promptSnippets.push(newSnip);
+  savePersistent();
   notify("promptSnippets", state.promptSnippets);
 }
 
 function removePromptSnippet(id) {
   state.promptSnippets = state.promptSnippets.filter(s => s.id !== id);
+  savePersistent();
   notify("promptSnippets", state.promptSnippets);
 }
 
