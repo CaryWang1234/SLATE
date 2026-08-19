@@ -242,7 +242,11 @@ select:focus {
   border-color: var(--border-hover);
 }
 
-#model-select { max-width: 170px; }
+#model-select {
+  width: clamp(180px, 24vw, 320px);
+  max-width: 320px;
+  font-variant-numeric: tabular-nums;
+}
 #conversation-select { max-width: 140px; }
 
 /* ── 通用按钮 ─────────────────────────── */
@@ -2260,7 +2264,10 @@ textarea::-webkit-scrollbar-thumb {
 @media (max-width: 640px) {
   .logo-sub { display: none; }
   .tab-btn { padding: 8px 10px; font-size: 11px; }
-  #model-select { max-width: 110px; }
+  #model-select {
+    width: clamp(112px, 30vw, 170px);
+    max-width: 170px;
+  }
   .modal-content { width: 95vw; }
   #topbar { padding: 0 8px; gap: 6px; }
   .topbar-left { min-width: auto; }
@@ -7013,4 +7020,3 @@ html.i18n-pending body {
   opacity: 0.8;
   border-bottom-style: solid;
 }
-

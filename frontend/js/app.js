@@ -60,26 +60,60 @@ function safeInit(name, fn) {
   }
 }
 
-// ── 模型选择首──────────────────────────────
+// ── 模型选择 ──────────────────────────────
+
+const MODEL_GROUP_LABELS = {
+  international: "国际模型",
+  domestic: "国产模型",
+  local: "本地模型",
+};
+
+const PROVIDER_LABELS = {
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  google: "Google",
+};
+
+function formatContextWindow(tokens) {
+  const n = Number(tokens || 0);
+  if (!n) return "";
+  if (n >= 1000000) return `${Math.round(n / 1000000)}M`;
+  if (n >= 1024) return `${Math.round(n / 1024)}K`;
+  return String(n);
+}
+
+function modelNeedsKey(model) {
+  return model?.id !== "local";
+}
+
+function formatModelOption(model) {
+  const hasKey = !modelNeedsKey(model) || hasModelKey(model.id);
+  const status = hasKey ? "●" : "○";
+  const provider = PROVIDER_LABELS[model.provider] || model.provider || "";
+  const ctx = formatContextWindow(model.context_window);
+  const badges = [provider, ctx, model.supports_responses === true ? "Responses" : ""].filter(Boolean);
+  return `${status} ${model.name || model.id}${badges.length ? ` · ${badges.join(" · ")}` : ""}`;
+}
 
 function populateModelSelect() {
   const select = document.getElementById("model-select");
   select.innerHTML = '<option value="">选择模型…</option>';
 
-  const groups = { international: "国外", domestic: "国内", local: "本地" };
-
-  for (const [cat, label] of Object.entries(groups)) {
+  for (const [cat, label] of Object.entries(MODEL_GROUP_LABELS)) {
     const models = state.modelRegistry[cat];
     if (!models || models.length === 0) continue;
     const optgroup = document.createElement("optgroup");
-    optgroup.label = label;
+    optgroup.label = `${label} (${models.length})`;
     for (const m of models) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      const hasKey = hasModelKey(m.id);
-      const supportsResponses = m.supports_responses === true;
-      opt.textContent = (hasKey ? "、" : "") + m.name + (supportsResponses ? " (Responses)" : "");
-      opt.title = m.base_url + (supportsResponses ? " (支持 Responses API)" : "");
+      opt.textContent = formatModelOption(m);
+      opt.title = [
+        m.name || m.id,
+        m.id,
+        m.base_url,
+        modelNeedsKey(m) ? (hasModelKey(m.id) ? "API Key 已配置" : "API Key 未配置") : "本地模型",
+      ].filter(Boolean).join(" · ");
       optgroup.appendChild(opt);
     }
     select.appendChild(optgroup);
@@ -93,8 +127,13 @@ function populateModelSelect() {
     for (const m of state.customModels) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      const hasKey = hasModelKey(m.id);
-      opt.textContent = (hasKey ? "首" : "首") + m.name;
+      opt.textContent = formatModelOption({ ...m, provider: m.provider || "custom" });
+      opt.title = [
+        m.name || m.id,
+        m.id,
+        m.base_url,
+        hasModelKey(m.id) ? "API Key 已配置" : "API Key 未配置",
+      ].filter(Boolean).join(" · ");
       optgroup.appendChild(opt);
     }
     select.appendChild(optgroup);
@@ -343,7 +382,7 @@ function renderKeyManagement() {
     input.className = "setting-input key-mgmt-input";
     input.dataset.modelKey = m.id;
     input.value = getModelKey(m.id) || "";
-    input.placeholder = hasModelKey(m.id) ? "已配色(留空删除)" : "未配置";
+    input.placeholder = hasModelKey(m.id) ? "已配置（留空删除）" : "未配置";
 
     const saveBtn = document.createElement("button");
     saveBtn.className = "icon-btn key-mgmt-save";
