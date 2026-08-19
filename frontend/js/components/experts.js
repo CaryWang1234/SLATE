@@ -67,7 +67,7 @@ function renderList() {
   if (!expertListEl) return;
   expertListEl.innerHTML = "";
   if (expertsCache.length === 0) {
-    expertListEl.innerHTML = '<div class="exp-list-empty">暂无专家包/div>';
+    expertListEl.innerHTML = '<div class="exp-list-empty">暂无专家包</div>';
     return;
   }
   for (const item of expertsCache) {

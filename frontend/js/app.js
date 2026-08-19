@@ -533,7 +533,7 @@ async function renderLanInfo() {
       <img class="lan-qr" src="/api/lan/qrcode?t=${Date.now()}" alt="遥控地址二维码">
       <div class="lan-qr-tip">手机扫码直接打开<br>（需连入同一局域网）</div>
     </div>
-    <p class="lan-tip">首遥控未设密码：同一局域网内的任何人都能完整操作本应用（含终端命令），请勿在不受信任的网络中使用户/p>
+    <p class="lan-tip">遥控未设密码：同一局域网内的任何人都能完整操作本应用（含终端命令），请勿在不受信任的网络中使用。</p>
   `;
   document.getElementById("btn-lan-copy")?.addEventListener("click", async () => {
     try {

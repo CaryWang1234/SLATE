@@ -109,7 +109,7 @@ function renderProjectBar() {
 
     // 清空文件树，显示占位
     if (fileTreeContainer) {
-      fileTreeContainer.innerHTML = '<div class="file-tree-empty">打开项目以浏览文件/div>';
+      fileTreeContainer.innerHTML = '<div class="file-tree-empty">打开项目以浏览文件</div>';
     }
   }
 }
@@ -211,7 +211,7 @@ function renderFileTree() {
 
   const data = state.projectFileTree;
   if (!data || !data.entries) {
-    fileTreeContainer.innerHTML = '<div class="file-tree-empty">未浏览目录/div>';
+    fileTreeContainer.innerHTML = '<div class="file-tree-empty">未浏览目录</div>';
     return;
   }
 

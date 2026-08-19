@@ -104,10 +104,10 @@ function renderShell() {
         <div class="factory-strip">
           <div>
             <div class="factory-kicker">Prompt Factory</div>
-            <h1 class="factory-heading">把零散意图整理成可执行任务/h1>
+            <h1 class="factory-heading">把零散意图整理成可执行任务</h1>
           </div>
           <div class="factory-strip-actions">
-            <button id="factory-btn-from-chat" class="factory-ghost-btn" type="button">引用最近对话/button>
+            <button id="factory-btn-from-chat" class="factory-ghost-btn" type="button">引用最近对话</button>
             <button id="factory-btn-clear" class="factory-ghost-btn" type="button">清空</button>
           </div>
         </div>
@@ -122,7 +122,7 @@ function renderShell() {
           <label class="factory-field">
             <span class="factory-label">任务类型</span>
             <select id="factory-template" class="factory-select">
-              <option value="">从空白开始/option>
+              <option value="">从空白开始</option>
               ${Object.entries(FACTORY_TEMPLATES).map(([key, tpl]) => `<option value="${key}">${tpl.label}</option>`).join("")}
             </select>
           </label>
@@ -154,7 +154,7 @@ function renderShell() {
 
         <div class="factory-context-bar">
           <button id="factory-btn-insert-constitution" class="factory-ghost-btn" type="button">插入项目宪法</button>
-          <button id="factory-btn-insert-files" class="factory-ghost-btn" type="button">插入勾选文件/button>
+          <button id="factory-btn-insert-files" class="factory-ghost-btn" type="button">插入勾选文件</button>
           <button id="btn-generate-prompt" class="generate-btn factory-primary-btn" type="button">生成 Prompt</button>
         </div>
       </section>
@@ -170,7 +170,7 @@ function renderShell() {
 
         <section class="factory-side-section">
           <div class="factory-side-head">
-            <span class="factory-label">可引用文件/span>
+            <span class="factory-label">可引用文件</span>
             <span id="factory-file-count" class="factory-count">0</span>
           </div>
           <div id="factory-file-list" class="factory-file-list"></div>
@@ -178,7 +178,7 @@ function renderShell() {
 
         <section class="factory-side-section">
           <div class="factory-side-head">
-            <span class="factory-label">质量检查/span>
+            <span class="factory-label">质量检查</span>
           </div>
           <div id="factory-checklist" class="factory-checklist"></div>
         </section>
@@ -189,9 +189,9 @@ function renderShell() {
       <div class="prompt-output-header">
         <span>生成结果</span>
         <div class="factory-output-actions">
-          <button id="factory-btn-save-snippet" class="icon-btn" title="保存为素材 type="button">首/button>"
-          <button id="factory-btn-download" class="icon-btn" title="下载 Markdown" type="button">首/button>
-          <button id="btn-copy-prompt" class="icon-btn" title="复制" type="button">首/button>
+          <button id="factory-btn-save-snippet" class="icon-btn" title="保存为素材" type="button">☆</button>
+          <button id="factory-btn-download" class="icon-btn" title="下载 Markdown" type="button">⬇</button>
+          <button id="btn-copy-prompt" class="icon-btn" title="复制" type="button">⧉</button>
         </div>
       </div>
       <pre id="prompt-result" class="prompt-result"></pre>
@@ -348,7 +348,7 @@ function renderFilePicker() {
     return;
   }
   if (files.length === 0) {
-    fileListEl.innerHTML = '<div class="factory-empty">当前目录没有可引用文件/div>';
+    fileListEl.innerHTML = '<div class="factory-empty">当前目录没有可引用文件</div>';
     return;
   }
 

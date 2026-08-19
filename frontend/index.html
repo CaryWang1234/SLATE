@@ -35,7 +35,7 @@
       </select>
       <button id="btn-manage-keys" class="icon-btn" title="管理模型密钥">🔑</button>
       <button id="btn-lan" class="icon-btn" title="局域网遥控地址">📡</button>
-      <button id="btn-theme" class="theme-btn" title="切换主题">🌙</button>
+      <button id="btn-theme" class="theme-btn" title="切换主题">◐</button>
       <button id="btn-settings" class="icon-btn" title="设置">⚙</button>
     </div>
   </header>
@@ -67,14 +67,14 @@
             </div>
             <div class="panel-actions">
               <button id="btn-brainstorm" class="icon-btn" title="头脑风暴模式">💡</button>
-              <button id="btn-grind" class="icon-btn" title="磨墨模式：把粗糙想法研磨成结构化任务书（也可输入 /grind 想法）>🖌</button>
-              <button id="btn-harness" class="icon-btn" title="Harness 自主执行：模型自主多轮调用工具直至任务完成">🤖</button>
+              <button id="btn-grind" class="icon-btn" title="磨墨模式：把粗糙想法研磨成结构化任务书（也可输入 /grind 想法）">🖌</button>
+              <button id="btn-harness" class="icon-btn" title="Harness 自主执行：模型自主多轮调用工具直至任务完成">⚡</button>
               <button id="btn-schedule" class="icon-btn" title="定时任务">⏰</button>
-              <button id="btn-compress" class="icon-btn" title="手动压缩上下文">⬇</button>
+              <button id="btn-compress" class="icon-btn" title="手动压缩上下文">⟲</button>
               <button id="btn-memory" class="icon-btn" title="记忆与画像">🧠</button>
               <button id="btn-experts" class="icon-btn" title="专家包管理">🎓</button>
-              <button id="btn-snippets" class="icon-btn" title="提示词素材">📑</button>
-              <button id="btn-toggle-history" class="icon-btn active" title="显示/隐藏历史">📜</button>
+              <button id="btn-snippets" class="icon-btn" title="提示词素材">✂</button>
+              <button id="btn-toggle-history" class="icon-btn active" title="显示/隐藏历史">☰</button>
               <button id="btn-new-chat" class="icon-btn" title="新建对话 (Ctrl+N)">+</button>
             </div>
           </div>
@@ -87,7 +87,7 @@
             <div id="conv-sidebar" class="conv-sidebar">
               <div class="conv-sidebar-header">
                 <span class="conv-sidebar-title">历史</span>
-                <button id="btn-conv-manage" class="icon-btn conv-manage-btn" title="批量管理历史会话">🗂管理</button>
+                <button id="btn-conv-manage" class="icon-btn conv-manage-btn" title="批量管理历史会话">✦ 管理</button>
               </div>
               <div class="conv-search-wrap">
                 <input id="conv-search" class="conv-search" type="text" placeholder="🔍 搜索历史会" autocomplete="off">
@@ -164,7 +164,7 @@
                 </div>
                 <div class="wf-input-row">
                   <textarea id="wf-input" class="wf-input" rows="3" placeholder="输入交给工作流的任务需求（作为 $input 传入各节点）"></textarea>
-                  <button id="btn-wf-run" class="send-btn">🚀运行工作流</button>
+                  <button id="btn-wf-run" class="send-btn">▶ 运行工作流</button>
                 </div>
                 <div id="wf-run-status" class="wf-run-status"></div>
                 <div id="wf-node-list" class="wf-node-list"></div>
@@ -183,9 +183,9 @@
         <div class="panel-actions">
           <button id="btn-add-card" class="icon-btn" title="添加卡片">+</button>
                     <button id="btn-wf-stop" class="send-btn stop-btn hidden">停止</button>
-          <button id="btn-ai-organize" class="icon-btn" title="AI 整理成流程图">📊</button>
+          <button id="btn-ai-organize" class="icon-btn" title="AI 整理成流程图">◇</button>
           <button id="btn-toggle-mermaid" class="icon-btn" title="显示/隐藏流程图">📊</button>
-          <button id="btn-export-board" class="icon-btn" title="导出黑板">📤</button>
+          <button id="btn-export-board" class="icon-btn" title="导出黑板">⇩</button>
           <button id="btn-clear-board" class="icon-btn" title="清空黑板">×</button>
         </div>
       </div>
@@ -196,7 +196,7 @@
         <button class="board-tool-btn" data-mode="draw" title="画笔">✏️</button>
         <button class="board-tool-btn" data-mode="text" title="文字">T</button>
         <span class="board-toolbar-sep"></span>
-        <button id="btn-undo-stroke" class="icon-btn" title="撤销笔画">↩️</button>
+        <button id="btn-undo-stroke" class="icon-btn" title="撤销笔画">↩</button>
         <button id="btn-clear-strokes" class="icon-btn" title="清除所有笔">🗑</button>
       </div>
       <!-- 画布区域 -->
@@ -286,7 +286,7 @@
         <div id="prompt-output" class="prompt-output hidden">
           <div class="prompt-output-header">
             <span>输出</span>
-            <button id="btn-copy-prompt" class="icon-btn" title="复制">📋</button>
+            <button id="btn-copy-prompt" class="icon-btn" title="复制">⧉</button>
           </div>
           <pre id="prompt-result" class="prompt-result"></pre>
         </div>
@@ -365,7 +365,7 @@
           <div class="setting-section">
             <label class="setting-check">
               <input id="setting-use-responses" type="checkbox">
-              <span>启用 Responses API 模式（仅部分模型支持，开启后将使用新的 API 格式</span>
+              <span>启用 Responses API 模式（仅部分模型支持，开启后将使用新的 API 格式）</span>
             </label>
             <div id="responses-models-hint" class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);"></div>
           </div>
@@ -425,7 +425,7 @@
           </label>
           <label class="setting-check">
             <input id="setting-auto-review-long-stall" type="checkbox" checked>
-            <span>长回复停顿也审查（回复不短但通篇只描述下一步计划、未调用工具</span>
+            <span>长回复停顿也审查（回复不短但通篇只描述下一步计划、未调用工具）</span>
           </label>
           <div class="setting-group">
             <label class="setting-label">审阅模型</label>
@@ -468,7 +468,7 @@
             <div class="skill-upload">
               <button id="btn-discover-plugins" class="icon-btn" title="扫描 Codex/Claude 标准目录发现已安装插件"> 发现插件</button>
               <button id="btn-github-import" class="icon-btn" title="从 GitHub 仓库导入 SKILL.md 技能">🌐 GitHub</button>
-              <button id="btn-import-skill" class="icon-btn" title="从本地路径导入 SKILL.md 技能"> 导入技能</button>
+              <button id="btn-import-skill" class="icon-btn" title="从本地路径导入 SKILL.md 技能">⤣ 导入技能</button>
               <button id="btn-upload-skill" class="icon-btn" title="上传文件新建 SKILL.md 技能">+ 新建技能</button>
             </div>
           </div>
@@ -498,12 +498,12 @@
           <div class="about-row">
             <label class="setting-label" style="margin-bottom:0;">备份</label>
             <span class="setting-hint">导出为单个 JSON 文件，包含后端数据库与本地设置</span>
-            <button id="btn-backup-export" class="send-btn send-btn-sm" type="button">📥 下载备份</button>
+            <button id="btn-backup-export" class="send-btn send-btn-sm" type="button">⬇ 下载备份</button>
           </div>
           <div class="about-row">
             <label class="setting-label" style="margin-bottom:0;">恢复</label>
             <span class="setting-hint">📤 与 ID 合并导入，已存在的数据不会被覆盖</span>
-            <button id="btn-backup-import" class="send-btn send-btn-sm" type="button">📤 导入备份</button>
+            <button id="btn-backup-import" class="send-btn send-btn-sm" type="button">⤣ 导入备份</button>
             <input type="file" id="backup-file-input" accept=".json,application/json" hidden>
           </div>
           <div id="backup-status" class="setting-hint"></div>
@@ -541,14 +541,14 @@
           </div>
           <div class="about-row">
             <label class="setting-label" style="margin-bottom:0;">当前版本</label>
-            <span id="about-version" class="about-version">/span>
+            <span id="about-version" class="about-version"></span>
             <button id="btn-check-update" class="send-btn send-btn-sm" type="button">检查更新</button>
             <button id="btn-view-onboarding" class="send-btn send-btn-sm" type="button" title="重新查看首次启动引导">新手引导</button>
           </div>
           <div class="about-row">
             <label class="setting-label" style="margin-bottom:0;">项目链接</label>
             <button id="btn-open-website" class="send-btn send-btn-sm" type="button" title="在系统浏览器打开官网">🌐 官网</button>
-            <button id="btn-open-github" class="send-btn send-btn-sm" type="button" title="在系统浏览器打开 GitHub 仓库">🐙 GitHub</button>
+            <button id="btn-open-github" class="send-btn send-btn-sm" type="button" title="在系统浏览器打开 GitHub 仓库">⭐ GitHub</button>
           </div>
           <div id="about-update-info" class="about-update-info hidden"></div>
         </section>
@@ -1040,7 +1040,7 @@
             </div>
           </div>
           <div class="onboarding-card">
-            <span class="onboarding-icon">/span>
+            <span class="onboarding-icon">⚡</span>
             <div class="onboarding-card-body">
               <b>Harness 自主执行</b>
               <p>输入 / 按钮开启：模型自主多轮调用工具直至任务完成，大任务自动分 TODOLIST</p>

@@ -422,7 +422,7 @@ function renderKnowledgeList(items = []) {
   if (!knowledgeList) return;
   knowledgeList.innerHTML = "";
   if (!items.length) {
-    knowledgeList.innerHTML = '<div class="memory-empty">暂无知识条目<br><small>可以添加笔记、项目背景、资料摘录等长期可复用内容/small></div>';
+    knowledgeList.innerHTML = '<div class="memory-empty">暂无知识条目<br><small>可以添加笔记、项目背景、资料摘录等长期可复用内容</small></div>';
     return;
   }
   for (const item of items) {
