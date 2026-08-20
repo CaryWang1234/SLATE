@@ -6,10 +6,10 @@
  * - 支持 AbortController 中断
  */
 
-import { get, post } from "./api.js?v=20260818-80";
-import { state, getModelKey } from "../store.js?v=20260818-80";
-import { guardSkillParams } from "./riskguard.js?v=20260818-80";
-import { t } from "./i18n.js?v=20260818-80";
+import { get, post } from "./api.js?v=20260818-81";
+import { state, getModelKey } from "../store.js?v=20260818-81";
+import { guardSkillParams } from "./riskguard.js?v=20260818-81";
+import { t } from "./i18n.js?v=20260818-81";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 

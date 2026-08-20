@@ -2,11 +2,24 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260818-80";
-import { t } from "./i18n.js?v=20260818-80";
+import { API_BASE } from "../store.js?v=20260818-81";
+import { t } from "./i18n.js?v=20260818-81";
 
 // 思考内容标记前缀（用于在流式输出中区分 reasoning 与 content）
 export const REASONING_PREFIX = "\x00\x01R\x01\x00";
+export const REASONING_INLINE_PREFIX = "\x01R\x01";
+
+function normalizeReasoningChunk(value) {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value
+      .map(item => typeof item === "string" ? item : (item?.text || item?.content || ""))
+      .filter(Boolean)
+      .join("");
+  }
+  return value.text || value.content || "";
+}
 
 // ── 超时与重试常量（参考主 Agent：idle watchdog + 零内容自动重试） ──
 const REQUEST_TIMEOUT_MS = 180000;      // 普通请求（含工具）总超时
@@ -127,7 +140,7 @@ async function* streamChat(payload) {
             const content = delta.content;
             if (content) chunks.push(content);
             // 提取 reasoning 字段（DeepSeek/OpenAI o-series/Anthropic thinking）
-            const reasoning = delta.reasoning;
+            const reasoning = normalizeReasoningChunk(delta.reasoning ?? delta.reasoning_content ?? delta.thinking ?? delta.reasoning_details);
             if (reasoning) chunks.push(REASONING_PREFIX + reasoning);
           } catch (e) {
             // 非 JSON 行，跳过
