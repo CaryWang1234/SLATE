@@ -2,25 +2,25 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-81";
-import { initI18n, t } from "./services/i18n.js?v=20260818-81";
-import { get, post, put } from "./services/api.js?v=20260818-81";
-import { dlgConfirm } from "./services/dialog.js?v=20260818-81";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-81";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-81";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260818-81";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-81";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260818-81";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-81";
-import { initTeamPanel } from "./components/team.js?v=20260818-81";
-import { initProjectBar } from "./components/project_bar.js?v=20260818-81";
-import { initMemoryPanel } from "./components/memory.js?v=20260818-81";
-import { initExpertsPanel } from "./components/experts.js?v=20260818-81";
-import { initSchedule } from "./components/schedule.js?v=20260818-81";
-import { initRiskGuard } from "./services/riskguard.js?v=20260818-81";
-import { initUnderstandPanel } from "./components/understand.js?v=20260818-81";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-81";
-import { setProject, setProjectFileTree } from "./store.js?v=20260818-81";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-82";
+import { initI18n, t } from "./services/i18n.js?v=20260818-82";
+import { get, post, put } from "./services/api.js?v=20260818-82";
+import { dlgConfirm } from "./services/dialog.js?v=20260818-82";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-82";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-82";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260818-82";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-82";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260818-82";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-82";
+import { initTeamPanel } from "./components/team.js?v=20260818-82";
+import { initProjectBar } from "./components/project_bar.js?v=20260818-82";
+import { initMemoryPanel } from "./components/memory.js?v=20260818-82";
+import { initExpertsPanel } from "./components/experts.js?v=20260818-82";
+import { initSchedule } from "./components/schedule.js?v=20260818-82";
+import { initRiskGuard } from "./services/riskguard.js?v=20260818-82";
+import { initUnderstandPanel } from "./components/understand.js?v=20260818-82";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-82";
+import { setProject, setProjectFileTree } from "./store.js?v=20260818-82";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -272,7 +272,7 @@ function saveCustomModel() {
   toast(t(wasEditing ? "已更新自定义模型: {name}" : "已添加自定义模型: {name}", { name }));
 }
 
-// ── 密钥管理面板（设置弹窗内首──────────────
+// ── 密钥管理面板（设置弹窗内）──────────────
 
 function renderCustomModelManagement() {
   const container = document.getElementById("custom-model-list");
@@ -450,7 +450,7 @@ function openSettings(options = {}) {
 
 function closeSettings() { switchPanel("chat"); }
 
-// ── 设置页：左侧锚点导航（点击滚首+ 滚动高亮首──────────────
+// ── 设置页：左侧锚点导航（点击滚动 + 滚动高亮）──────────────
 
 function initSettingsNav() {
   const page = document.querySelector(".settings-page");
@@ -466,7 +466,7 @@ function initSettingsNav() {
     });
   });
 
-  // 高亮规则：取顶边已越过容器顶首24px 线的最后一个区首
+  // 高亮规则：取顶边已越过容器顶部 24px 线的最后一个区块
   const onScroll = () => {
 
     const top = page.getBoundingClientRect().top;
@@ -512,11 +512,11 @@ function renderResponsesApiHint() {
   };
 }
 
-// ── 设置页：关于与更新检首──────────────
+// ── 设置页：关于与更新检查 ──────────────
 
 let aboutVersionShown = false;
 
-/** 展示当前版本号（首次打开设置页时拉取，失败保留占位符首*/
+/** 展示当前版本号（首次打开设置页时拉取，失败保留占位符） */
 async function renderAbout() {
   const verEl = document.getElementById("about-version");
   if (!verEl || aboutVersionShown) return;
@@ -699,7 +699,7 @@ async function runStorageCleanup(target, btn) {
     if (statusEl) statusEl.textContent = freed > 0 ? t("已释放 {size}", { size: fmtBytes(freed) }) : "无可释放空间（文件可能正被占用，关闭应用后重试）";
     toast(freed > 0 ? t("已释放 {size}", { size: fmtBytes(freed) }) : "清理完成");
     if (target === "history") {
-      // 清空历史后同步侧栏列首
+      // 清空历史后同步侧栏列表
       try { await refreshConversationList(); } catch (e) {}
 
     }
@@ -775,7 +775,7 @@ function initStorageManage() {
 
 }
 
-/** 手动检查更新：结果内嵌展示，下首说明走后端白名单打开系统浏览首*/
+/** 手动检查更新：结果内嵌展示，下载说明走后端白名单打开系统浏览器 */
 async function checkUpdateNow(btn) {
   const info = document.getElementById("about-update-info");
   if (!info) return;
@@ -809,7 +809,7 @@ async function checkUpdateNow(btn) {
     actions.className = "about-update-actions";
     const dlBtn = document.createElement("button");
     dlBtn.className = "send-btn send-btn-sm";
-    dlBtn.textContent = "首下载更新";
+    dlBtn.textContent = "下载更新";
     dlBtn.addEventListener("click", () => post("/update/open-url", { url: d.downloadUrl }));
     const relBtn = document.createElement("button");
     relBtn.className = "icon-btn";
@@ -933,7 +933,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260818-81").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260818-82").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -979,7 +979,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260818-81");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260818-82");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -994,12 +994,12 @@ async function saveSettings() {
   toast("设置已保存");
 }
 
-// ── 标签页切首──────────────────────────────
+// ── 标签页切换 ─────────────────────────────
 
 function initTabs() {
   const tabs = document.querySelectorAll(".tab-btn");
   tabs.forEach(tab => tab.addEventListener("click", () => {
-    // 设置页须首openSettings 渲染模型列表/用量等内容，否则首入为空
+    // 设置页需通过 openSettings 渲染模型列表/用量等内容，否则直接切入为空
     if (tab.dataset.panel === "settings") openSettings();
     else switchPanel(tab.dataset.panel);
   }));
@@ -1078,7 +1078,7 @@ async function loadModels() {
 
 // ── 启动时自动检查更新────────────────
 
-/** 查询 GitHub 最首Release，有新版本时展示金色横幅；失败静默，不打扰用户*/
+/** 查询 GitHub 最新 Release，有新版本时展示金色横幅；失败静默，不打扰用户 */
 async function checkAppUpdate() {
   try {
     const res = await get("/update/check");
@@ -1102,7 +1102,7 @@ async function checkAppUpdate() {
 
     const dl = document.createElement("button");
     dl.className = "update-banner-btn";
-    dl.textContent = "首下载更新";
+    dl.textContent = "下载更新";
     dl.addEventListener("click", openLink(d.downloadUrl));
 
     const rel = document.createElement("button");
@@ -1126,17 +1126,17 @@ async function checkAppUpdate() {
   }
 }
 
-// ── 初始首──────────────────────────────────
+// ── 初始化 ─────────────────────────────────
 
 async function init() {
-  // i18n 必须最先完成：英文模式要在任何界面渲染前挂好翻译监首
+  // i18n 必须最先完成：英文模式要在任何界面渲染前挂好翻译监听
   await initI18n();
 
 
   loadPersistent();
   await loadSharedPersistent();
 
-  // 应用保存的主首
+  // 应用保存的主题
   document.documentElement.setAttribute("data-theme", state.theme);
 
 
@@ -1202,11 +1202,11 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260818-81");
+      const { openProject } = await import("./services/project.js?v=20260818-82");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }
-    // 确保文件树加首
+    // 确保文件树加载
     const browseRes = await browseFiles("");
 
     if (browseRes.code === 0) setProjectFileTree(browseRes.data);

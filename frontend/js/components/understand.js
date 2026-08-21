@@ -1,14 +1,14 @@
 /**
  * SLATE Better Project Understanding 组件
- * AI 全量扫描项目 首生成「导览·百科」与「规则手册首
+ * AI 全量扫描项目，生成「导览·百科」与「规则手册」。
  * 三档深度：简略/ 平衡 / 详细（扫描预算与输出长度随档位变化）
  */
 
-import { state, setProject, getModelKey } from "../store.js?v=20260818-81";
-import { post, streamChat } from "../services/api.js?v=20260818-81";
-import { updateProjectConfig } from "../services/project.js?v=20260818-81";
-import { renderMarkdown } from "../services/markdown.js?v=20260818-81";
-import { t } from "../services/i18n.js?v=20260818-81";
+import { state, setProject, getModelKey } from "../store.js?v=20260818-82";
+import { post, streamChat } from "../services/api.js?v=20260818-82";
+import { updateProjectConfig } from "../services/project.js?v=20260818-82";
+import { renderMarkdown } from "../services/markdown.js?v=20260818-82";
+import { t } from "../services/i18n.js?v=20260818-82";
 
 const LEVELS = {
   brief: { label: "简略", tree: "目录深度 2 层", files: "精读 6 个关键文件", out: "输出约 900 字" },
@@ -36,7 +36,7 @@ function showView(name) {
 function openUnderstandModal() {
   bindUnderstandModal();
   if (!state.project) {
-    import("../app.js?v=20260818-81").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
+    import("../app.js?v=20260818-82").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
     return;
   }
   currentResult = state.project.config?.understanding || null;
@@ -103,7 +103,7 @@ async function startUnderstanding() {
   const model = state.currentModel;
   const apiKey = model?.id ? getModelKey(model.id) : "";
   if (!model?.id || !apiKey) {
-    import("../app.js?v=20260818-81").then(({ toast }) => toast("请先选择模型并配色API Key")).catch(() => {});
+    import("../app.js?v=20260818-82").then(({ toast }) => toast("请先选择模型并配色API Key")).catch(() => {});
     return;
   }
 
@@ -114,7 +114,7 @@ async function startUnderstanding() {
   showView("progress");
 
   try {
-    // 首扫描项目
+    // 扫描项目
     setStepStatus(0, "running");
     appendLog(t("开始扫描项目（档位：{level}）…", { level: LEVELS[currentLevel].label }));
     const scanRes = await post("/projects/understand/scan", { level: currentLevel });
@@ -125,21 +125,21 @@ async function startUnderstanding() {
 
     const scanContext = buildScanContext(scan);
 
-    // 首生成导览·百科
+    // 生成导览·百科
     setStepStatus(1, "running");
     appendLog("正在生成导览·百科…");
     const tour = await generateDoc(model.id, apiKey, buildTourPrompt(scan.project, currentLevel), scanContext);
     appendLog(t("导览·百科完成（{n} 字符）", { n: tour.length }));
     setStepStatus(1, "done");
 
-    // 首生成规则手册
+    // 生成规则手册
     setStepStatus(2, "running");
     appendLog("正在生成规则手册…");
     const rules = await generateDoc(model.id, apiKey, buildRulesPrompt(scan.project, currentLevel), scanContext);
     appendLog(t("规则手册完成（{n} 字符）", { n: rules.length }));
     setStepStatus(2, "done");
 
-    // 首保存到项目配置（合并式写入）
+    // 保存到项目配置（合并式写入）
     appendLog("正在保存到项目配置…");
     currentResult = {
       level: currentLevel,
@@ -159,7 +159,7 @@ async function startUnderstanding() {
 
     renderResult();
     showView("result");
-    import("../app.js?v=20260818-81").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
+    import("../app.js?v=20260818-82").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
   } catch (e) {
     if (e.name === "AbortError") {
       appendLog("已取消");
@@ -169,8 +169,8 @@ async function startUnderstanding() {
       for (let i = 0; i < steps.length; i++) {
         if (steps[i].classList.contains("running")) setStepStatus(i, "error");
       }
-      appendLog(t("首失败: {msg}", { msg: e.message }));
-      import("../app.js?v=20260818-81").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
+      appendLog(t("失败: {msg}", { msg: e.message }));
+      import("../app.js?v=20260818-82").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
     }
   } finally {
     running = false;
@@ -198,10 +198,10 @@ async function generateDoc(modelId, apiKey, systemPrompt, scanContext) {
   return fullText.trim();
 }
 
-// ── 提示首────────────────────────────────────
+// ── 提示词 ───────────────────────────────────
 
 function buildScanContext(scan) {
-  const parts = [`项目名：${scan.project}`, "", "== 目录首==", scan.tree, "", "== 关键文件内容（截取开头） =="];
+  const parts = [`项目名：${scan.project}`, "", "== 目录树 ==", scan.tree, "", "== 关键文件内容（截取开头） =="];
   for (const h of scan.heads) {
     parts.push("", `### ${h.path}`, "```", h.content, "```");
   }
@@ -215,17 +215,17 @@ function buildTourPrompt(projectName, level) {
       ? "篇幅适中（约1200字），关键模块展开一两句说明"
       : "篇幅详尽（约2000字），每个模块都要展开说明";
   const extraSection = level === "detailed" ? "\n7. 数据流与调用链：梳理主要数据如何在模块间流转" : "";
-  return `你是资深软件架构师。根据用户提供的项目扫描资料（目录树与关键文件内容），为项目栏{projectName}」撰写一份「导览·百科」文档，帮助新成员或 AI 快速理解该项目栏
+  return `你是资深软件架构师。根据用户提供的项目扫描资料（目录树与关键文件内容），为项目「${projectName}」撰写一份「导览·百科」文档，帮助新成员或 AI 快速理解该项目。
 
-要求首
+要求：
 - 使用 Markdown，只依据扫描资料中的事实撰写，无法确定的内容明确标注"待确定"
 - ${depth}
-- 章节结构建
-1. 项目概述：一句话定位 + 解决什么问首
+- 章节结构：
+1. 项目概述：一句话定位 + 解决什么问题
 2. 技术栈：语言/框架/依赖/构建方式
 3. 目录结构解读：每个顶层目录的职责
-4. 核心模块：职责、关键文件、对外接首
-5. 入口与启动方首{extraSection}
+4. 核心模块：职责、关键文件、对外接口
+5. 入口与启动方式${extraSection}
 - 直接输出文档正文，不要任何前言或解释`;
 }
 
@@ -235,17 +235,17 @@ function buildRulesPrompt(projectName, level) {
     : level === "balanced"
       ? "提炼 10-15 条规则，覆盖主要约定"
       : "提炼 15-25 条规则，覆盖所有可观察到的约定，并单列「扩展点与常见坑」小节";
-  return `你是资深技术负责人。根据用户提供的项目扫描资料（目录树与关键文件内容），为项目栏{projectName}」编写一份「规则手册」——供新成员与 AI 助手在后续开发中严格遵守的项目规则首
+  return `你是资深技术负责人。根据用户提供的项目扫描资料（目录树与关键文件内容），为项目「${projectName}」编写一份「规则手册」——供新成员与 AI 助手在后续开发中严格遵守的项目规则。
 
-要求首
-- 使用 Markdown，规则必须从扫描资料中真实存在的证据推导（如依赖文件、配置文件、代码风格、既有文档），禁止凭空捏首
+要求：
+- 使用 Markdown，规则必须从扫描资料中真实存在的证据推导（如依赖文件、配置文件、代码风格、既有文档），禁止凭空捏造
 - ${depth}
-- 章节结构建
+- 章节结构：
 1. 技术边界：允许的依赖、构建方式、禁用的做法
 2. 代码规范：从现有代码中观察到的命令结构/风格约定
-3. 架构约束：模块划分、分层关系、扩展方首
+3. 架构约束：模块划分、分层关系、扩展方式
 4. 运行与构建命令：如何启动、测试、打开
-- 每条规则一行，写成可直接执行的祈使首
+- 每条规则一行，写成可直接执行的祈使句
 - 直接输出文档正文，不要任何前言或解释`;
 }
 
@@ -282,13 +282,13 @@ async function copyCurrentResult() {
   const text = activeTab === "tour" ? currentResult.tour : currentResult.rules;
   try {
     await navigator.clipboard.writeText(text || "");
-    import("../app.js?v=20260818-81").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
+    import("../app.js?v=20260818-82").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
   } catch {
-    import("../app.js?v=20260818-81").then(({ toast }) => toast("复制失败")).catch(() => {});
+    import("../app.js?v=20260818-82").then(({ toast }) => toast("复制失败")).catch(() => {});
   }
 }
 
-// ── 初始首────────────────────────────────────
+// ── 初始化 ───────────────────────────────────
 
 let bound = false;
 

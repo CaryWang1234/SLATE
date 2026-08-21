@@ -2,10 +2,10 @@
  * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交付 Prompt
  */
 
-import { state, subscribe, addPromptSnippet } from "../store.js?v=20260818-81";
-import { get, post } from "../services/api.js?v=20260818-81";
-import { browseFiles } from "../services/project.js?v=20260818-81";
-import { t } from "../services/i18n.js?v=20260818-81";
+import { state, subscribe, addPromptSnippet } from "../store.js?v=20260818-82";
+import { get, post } from "../services/api.js?v=20260818-82";
+import { browseFiles } from "../services/project.js?v=20260818-82";
+import { t } from "../services/i18n.js?v=20260818-82";
 
 const FACTORY_PRESETS = {
   codex: {
@@ -294,7 +294,7 @@ async function insertSelectedFiles() {
       const res = await browseFiles(path);
       if (res.code === 0 && res.data?.type === "file") {
         const content = (res.data.content || "").slice(0, 6000);
-        chunks.push(`文件首{res.data.path || path}\n\`\`\`\n${content}\n\`\`\``);
+        chunks.push(`文件：${res.data.path || path}\n\`\`\`\n${content}\n\`\`\``);
       }
     }
     if (chunks.length === 0) {
@@ -421,7 +421,7 @@ function buildPrompt() {
     "",
     "# 工作方式",
     toneMap[fields.tone.value] || toneMap.direct,
-    "阅读现有代码后再行动，优先沿用项目已有模式首,"
+    "阅读现有代码后再行动，优先沿用项目已有模式。",
   ];
 
   if (rules.length) {

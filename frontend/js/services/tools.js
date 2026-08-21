@@ -4,17 +4,18 @@
  * 工具调用格式（AI 输出）：
  *   ◈◈◈tool_name
  *   {"param1":"value1"}
- *   ◈◆首 *
- * 例外：file_create / file_append 使用原样格式（内容不首JSON 转义，根治转义损坏与参数丢失）：
+ *   ◈◆◆
+ * 例外：file_create / file_append 使用原样格式（内容不经 JSON 转义，根治转义损坏与参数丢失）：
  *   ◈◈◈file_create
  *   相对路径（第一行）
  *   文件内容原样（第二行起）
- *   ◈◆首 */
+ *   ◈◆◆
+ */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-81";
-import { post } from "../services/api.js?v=20260818-81";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-81";
-import { t } from "./i18n.js?v=20260818-81";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-82";
+import { post } from "../services/api.js?v=20260818-82";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-82";
+import { t } from "./i18n.js?v=20260818-82";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -34,7 +35,7 @@ function normalizeProjectRelativePath(rawPath) {
   };
 }
 
-// ── 工具注册首────────────────────────────────
+// ── 工具注册 ────────────────────────────────
 
 const TOOLS = {
 
@@ -98,7 +99,7 @@ const TOOLS = {
       const res = await post("/projects/find", { query, limit: 30 });
       if (res.code !== 0) return res.message || "查找失败";
       const matches = res.data?.matches || [];
-      if (!matches.length) return `未找首 ${query}`;
+      if (!matches.length) return `未找到 ${query}`;
       return matches.map(item => `${item.type === "dir" ? "📁" : "📄"} ${item.path}${item.size ? ` (${item.size}B)` : ""}`).join("\n");
     },
   },
@@ -129,7 +130,7 @@ const TOOLS = {
 
   board_read: {
     name: "读取黑板",
-    description: "获取当前黑板上所有卡片内容（首ID、标题、详情、依赖、颜色）",
+    description: "获取当前黑板上所有卡片内容（含 ID、标题、详情、依赖、颜色）",
     params: {},
     async execute() {
       if (state.boardCards.length === 0) return "黑板为空";
@@ -253,12 +254,12 @@ const TOOLS = {
             p.file_path = target.abs;
           }
         }
-        // 高危命令审批：写死规则判定，命中后弹框并用模型解释目首
+        // 高危命令审批：写死规则判定，命中后弹框并用模型解释目的
         if (skill === "terminal" && p.command) {
 
           const risk = isHighRiskCommand(p.command);
           if (risk.risk && !(await guardSkillParams(skill, p))) {
-            return `高危命令被用户拒绝执行（${risk.reason}首 ${p.command}`;
+            return `高危命令被用户拒绝执行（${risk.reason}）：${p.command}`;
           }
         }
         const res = await post("/skills/execute", { skill, params: p });
@@ -345,7 +346,7 @@ const TOOLS = {
         parts.push("");
       }
       parts.push("【交付物要求】");
-      parts.push("  输出完整代码文件，含必要注释。如需修改现有文件，标注路径和修改位置首");
+      parts.push("  输出完整代码文件，含必要注释。如需修改现有文件，标注路径和修改位置。");
       return parts.join("\n");
     },
   },
@@ -443,7 +444,7 @@ const TOOLS = {
         };
       }
 
-      // 返回结构化数据，chat.js 会检首_type 渲染 diff UI
+      // 返回结构化数据，chat.js 会按 _type 渲染 diff UI
       const structured = {
         _type: "file_edit",
         file: data.file,
@@ -480,8 +481,8 @@ const TOOLS = {
     rawContent: true,
     async execute({ file_path, content, _truncated }) {
       if (!state.project) return "未打开项目";
-      if (!file_path) return "缺少 file_path：请按专用格式重发——◈◈◈file_create 后第一行写相对路径（如 src/utils/helper.js），第二行起原样写文件内容，不要 JSON 包裹首";
-      if (content === undefined || content === null) return "缺少 content：第一行路径之后应原样输出完整文件内容（不首JSON、不转义、不加代码围栏）首";
+      if (!file_path) return "缺少 file_path：请按专用格式重发——◈◈◈file_create 后第一行写相对路径（如 src/utils/helper.js），第二行起原样写文件内容，不要 JSON 包裹。";
+      if (content === undefined || content === null) return "缺少 content：第一行路径之后应原样输出完整文件内容（不是 JSON、不转义、不加代码围栏）。";
       const truncated = Boolean(_truncated);
 
       const target = normalizeProjectRelativePath(file_path);
@@ -558,7 +559,7 @@ const TOOLS = {
         truncated,
       };
 
-      // 自动确认：预览无错误时直接创建（截断内容也先写入，由后续 file_append 补齐首
+      // 自动确认：预览无错误时直接创建（截断内容也先写入，由后续 file_append 补齐）
       if (fileAutoApplyEnabled() && structured.file && structured.errors.length === 0) {
 
         try {
@@ -583,8 +584,8 @@ const TOOLS = {
     rawContent: true,
     async execute({ file_path, content, _truncated }) {
       if (!state.project) return "未打开项目";
-      if (!file_path) return "缺少 file_path：请按专用格式重发——◈◈◈file_append 后第一行写相对路径，第二行起原样写要追加的内容，不首JSON 包裹首";
-      if (content === undefined || content === null) return "缺少 content：第一行路径之后应原样输出要追加的内容（不首JSON、不转义、不加代码围栏）首";
+      if (!file_path) return "缺少 file_path：请按专用格式重发——◈◈◈file_append 后第一行写相对路径，第二行起原样写要追加的内容，不要 JSON 包裹。";
+      if (content === undefined || content === null) return "缺少 content：第一行路径之后应原样输出要追加的内容（不是 JSON、不转义、不加代码围栏）。";
       const truncated = Boolean(_truncated);
 
       const target = normalizeProjectRelativePath(file_path);
@@ -654,9 +655,9 @@ const TOOLS = {
       const ctxTokens = msgs.reduce((sum, m) => sum + Math.ceil((m.content || "").length / 3) + 4, 0);
       return [
         `模型: ${state.currentModel?.name || "未选择"}`,
-        `消息首 ${msgs.length}`,
-        `上下文估首 ~${ctxTokens.toLocaleString()} tokens`,
-        `上下文限首 ${state.currentModel?.context_window || "未知"}`,
+        `消息数: ${msgs.length}`,
+        `上下文估算: ~${ctxTokens.toLocaleString()} tokens`,
+        `上下文上限: ${state.currentModel?.context_window || "未知"}`,
         `黑板卡片: ${state.boardCards.length}`,
       ].join("\n");
     },
@@ -664,10 +665,10 @@ const TOOLS = {
 
   todo_manage: {
     name: "任务清单",
-    description: "为当前任务创建并推进 TODOLIST。面临大任务（多步骤、多文件、复杂修改）时必须先 action=init 拆解计划；执行中有意识地主动同步进度：每完成一项或一批事项立首action=update 批量标记 done，受阻标题blocked，不要等全部做完才一次性更新。任务结束前所有项必须首done 首blocked。status 取消 pending/in_progress/done/blocked",
+    description: "为当前任务创建并推进 TODOLIST。面临大任务（多步骤、多文件、复杂修改）时必须先 action=init 拆解计划；执行中有意识地主动同步进度：每完成一项或一批事项立即 action=update 批量标记 done，受阻标记 blocked，不要等全部做完才一次性更新。任务结束前所有项必须为 done 或 blocked。status 可取 pending/in_progress/done/blocked",
     params: {
       action: { type: "string", description: "init(创建或整体替换清空 / add(追加事项) / update(更新状态或描述) / remove(删除事项) / clear(清空)", required: true },
-      items: { type: "array", description: 'init/add: [{"content":"事项描述"}]；update: [{"id":"t1","status":"done"}]（可首content 改描述）；remove: [{"id":"t1"}]' },
+      items: { type: "array", description: 'init/add: [{"content":"事项描述"}]；update: [{"id":"t1","status":"done"}]（可附 content 改描述）；remove: [{"id":"t1"}]' },
     },
     async execute({ action, items }) {
       const convId = state.currentConversationId;
@@ -685,7 +686,7 @@ const TOOLS = {
         let seq = list.reduce((m, t) => Math.max(m, parseInt(String(t.id || "").slice(1), 10) || 0), 0);
         for (const c of contents) list.push({ id: "t" + (++seq), content: c, status: "pending" });
       } else if (action === "update") {
-        if (!input.length) return "缺少 items：update 需首[{\"id\": \"t1\", \"status\": \"done\"}]";
+        if (!input.length) return "缺少 items：update 需要 [{\"id\": \"t1\", \"status\": \"done\"}]";
         let changed = 0;
         for (const patch of input) {
           if (!patch?.id) continue;
@@ -698,7 +699,7 @@ const TOOLS = {
         if (!changed) return `未找到可更新的事项（现有 ID: ${list.map(t => t.id).join(", ") || ""}）`;
       } else if (action === "remove") {
         const ids = input.map(i => String(i?.id || "")).filter(Boolean);
-        if (!ids.length) return "缺少 items：remove 需首[{\"id\": \"t1\"}]";
+        if (!ids.length) return "缺少 items：remove 需要 [{\"id\": \"t1\"}]";
         list = list.filter(t => !ids.includes(t.id));
       } else if (action === "clear") {
         list = [];
@@ -714,24 +715,24 @@ const TOOLS = {
       return `TODOLIST 已更新（${done}/${list.length} 完成）：\n${lines.join("\n")}` +
         (done === list.length
           ? "\n全部完成，进入验证与汇报阶段。"
-          : "\n请继续统筹推进未完成事项（能并行的多项一起处理），每完成一批立即调首todo_manage 批量更新状态，保持清单实时准确定");
+          : "\n请继续统筹推进未完成事项（能并行的多项一起处理），每完成一批立即调用 todo_manage 批量更新状态，保持清单实时准确。");
     },
   },
 };
 
-// ── 工具调用检首────────────────────────────────
+// ── 工具调用检测 ──────────────────────────────
 
 const TOOL_RE = /◈◈◈\s*(\w+)\s*\r?\n([\s\S]*?)(?:◈◆◆|◆◆)/g;
 
-// file_create / file_append 走原样围栏协议：内容不经 JSON 转义，根治大内容转义损坏首file_path 丢失
+// file_create / file_append 走原样围栏协议：内容不经 JSON 转义，根治大内容转义损坏与 file_path 丢失
 const FILE_RAW_TOOLS = new Set(["file_create", "file_append"]);
 
-/** 自动确认开关（设置页可调，默认开）：开启时文件创建/修改直接落盘，不再等用户手动点「接受首*/
+/** 自动确认开关（设置页可调，默认开）：开启时文件创建/修改直接落盘，不再等用户手动点「接受」 */
 function fileAutoApplyEnabled() {
   return state.fileOutput?.autoApply !== false;
 }
 
-/** 参数名别名归一：模型常首file_path 写成 path / file 等，映射首file_path 而不是报首*/
+/** 参数名别名归一：模型常把 file_path 写成 path / file 等，映射为 file_path 而不是报错 */
 function normalizeFilePathAlias(params) {
   if (params && !params.file_path) {
     for (const alias of ["path", "file", "filepath", "file_name", "filename", "relative_path", "target_path", "target"]) {
@@ -746,7 +747,10 @@ function normalizeFilePathAlias(params) {
 
 /**
  * 解析 file_create / file_append 的参数块，支持两种协议：
- * 新协议（推荐）：第一行是相对路径，其余全部是原样文件内容——无 JSON、无转义。 *   模型写大文件时不再需要转义换首引号，从根本上消首JSON 解析失败导致的丢参首 * 旧协议（兼容）：块内容以 { 开头时仍按 JSON 解析，失败退首salvage 抢救 + 别名映射首 */
+ * 新协议（推荐）：第一行是相对路径，其余全部是原样文件内容——无 JSON、无转义。
+ * 模型写大文件时不再需要转义换行/引号，从根本上消除 JSON 解析失败导致的丢参。
+ * 旧协议（兼容）：块内容以 { 开头时仍按 JSON 解析，失败退回 salvage 抢救 + 别名映射。
+ */
 function parseFileWriteParams(body) {
   const text = String(body || "").replace(/^\uFEFF/, "");
   if (text.trimStart().startsWith("{")) {
@@ -761,9 +765,10 @@ function parseFileWriteParams(body) {
   const lines = text.split(/\r?\n/);
   while (lines.length && !lines[0].trim()) lines.shift(); // 跳过前导空行
   const filePath = (lines.shift() || "").trim();
-  // 容忍模型在路径与内容之间加一行分隔符（◈──首/ --- / === 之类），跳过
+  // 容忍模型在路径与内容之间加一行分隔符（◈── / --- / === 之类），跳过
   if (lines.length && /^[◈─—\-=:*]{2,}\s*$/.test(lines[0].trim())) lines.shift();
-  // 防御：模型偶尔无视规则把内容包进 ``` 代码围栏，剥掉外层围栏还原真实内首  // （末尾可能带协议性空行，需在最后一个非空行上判断闭合围栏）
+  // 防御：模型偶尔无视规则把内容包进 ``` 代码围栏，剥掉外层围栏还原真实内容。
+  // 末尾可能带协议性空行，需在最后一个非空行上判断闭合围栏。
   let lastIdx = lines.length - 1;
   while (lastIdx >= 0 && !lines[lastIdx].trim()) lastIdx--;
   if (lastIdx >= 1 && /^``/.test(lines[0].trim()) && /^```\s*$/.test(lines[lastIdx].trim())) {
@@ -776,7 +781,10 @@ function parseFileWriteParams(body) {
 }
 
 /**
- * 的 start 位置（必须是 "）读取一段 JSON 字符串，正确处理转义。 * 返回 { value, end, complete }。未闭合；complete=false首 * 不完整的 \uXXXX 转义整体丢弃，避免产生损坏的中文字符首 */
+ * 从 start 位置（必须是 "）读取一段 JSON 字符串，正确处理转义。
+ * 返回 { value, end, complete }。未闭合时 complete=false。
+ * 不完整的 \uXXXX 转义整体丢弃，避免产生损坏的中文字符。
+ */
 function readJsonString(raw, start) {
   let out = "";
   let i = start + 1;
@@ -804,7 +812,9 @@ function readJsonString(raw, start) {
 }
 
 /**
- * 的 start 位置读取一段 JSON 值（数组/对象/数字等）首 * 被截断时自动补齐括号，并剔除末尾不完整的字符串，尽力解析出可用结果首 */
+ * 从 start 位置读取一段 JSON 值（数组/对象/数字等）。
+ * 被截断时自动补齐括号，并剔除末尾不完整的字符串，尽力解析出可用结果。
+ */
 function readJsonValueWithRepair(raw, start) {
   const stack = [];
   let i = start;
@@ -812,7 +822,8 @@ function readJsonValueWithRepair(raw, start) {
     const c = raw[i];
     if (c === '"') {
       const s = readJsonString(raw, i);
-      if (!s.complete) break; // 截断点位于字符串内部，到此为首      i = s.end;
+      if (!s.complete) break; // 截断点位于字符串内部，到此为止
+      i = s.end;
       continue;
     }
     if (c === "{" || c === "[") stack.push(c);
@@ -834,7 +845,9 @@ function readJsonValueWithRepair(raw, start) {
 }
 
 /**
- * 从被截断的工具调用参数文本中尽力抢救出参数对象首 * 典型场景：输出长度达首max_tokens 上限，JSON 缺少闭合引号/括号首 */
+ * 从被截断的工具调用参数文本中尽力抢救出参数对象。
+ * 典型场景：输出长度达到 max_tokens 上限，JSON 缺少闭合引号/括号。
+ */
 function salvageTruncatedParams(raw) {
   const params = {};
   let i = raw.indexOf("{");
@@ -939,29 +952,29 @@ async function executeTool(name, params) {
   if (!tool) return { success: false, output: `未知工具: ${name}` };
   try {
     const output = await tool.execute(params || {});
-    // 结构化结果（首file_edit / file_create）直接传递，同时生成文本摘要首AI
+    // 结构化结果（如 file_edit / file_create）直接传递，同时生成文本摘要给 AI
     if (output && typeof output === "object" && output._type) {
       let summary = `[工具 ${name}] `;
       if (output._type === "file_edit") {
         const s = output.stats;
         const targetPath = output.file_path_rel || output.file_name || output.file || "";
-        summary = `[工具 file_edit] 文件: ${output.file_name}首{targetPath}），${s.edits_total} 处编辑，${s.edits_applied} 处成功，+${s.lines_added} -${s.lines_removed} 行。`;
+        summary = `[工具 file_edit] 文件: ${output.file_name}（${targetPath}），${s.edits_total} 处编辑，${s.edits_applied} 处成功，+${s.lines_added} -${s.lines_removed} 行。`;
         if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
-        summary += " diff 已展示给用户，尚未写入磁盘，等待用户确认首";
+        summary += " diff 已展示给用户，尚未写入磁盘，等待用户确认。";
       } else if (output._type === "file_create") {
         const s = output.stats;
         const targetPath = output.file_path_rel || output.file_name || output.file || "";
-        summary = `[工具 file_create] 新文字 ${output.file_name}首{targetPath}），${s.lines} 行，${s.chars} 字符。`;
+        summary = `[工具 file_create] 新文件 ${output.file_name}（${targetPath}），${s.lines} 行，${s.chars} 字符。`;
         if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
-        if (output.truncated) summary += " 注意：本次内容因输出截断可能不完整；若用户接受预览，请立即用 file_append 从断点补齐剩余内容首";
-        summary += " 预览已展示给用户，尚未写入磁盘，等待用户确认首";
+        if (output.truncated) summary += " 注意：本次内容因输出截断可能不完整；若用户接受预览，请立即用 file_append 从断点补齐剩余内容。";
+        summary += " 预览已展示给用户，尚未写入磁盘，等待用户确认。";
       } else if (output._type === "file_append") {
         const s = output.stats;
         const targetPath = output.file_path_rel || output.file_name || output.file || "";
-        summary = `[工具 file_append] 文件: ${output.file_name}首{targetPath}），本次追加 ${s.lines} 行首{s.chars} 字符。`;
+        summary = `[工具 file_append] 文件: ${output.file_name}（${targetPath}），本次追加 ${s.lines} 行，${s.chars} 字符。`;
         if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
-        if (output.truncated) summary += " 注意：本次追加内容因输出截断可能不完整，请继续用 file_append 补齐剩余内容首";
-        summary += " 追加预览已展示给用户，尚未写入磁盘，等待用户确认首";
+        if (output.truncated) summary += " 注意：本次追加内容因输出截断可能不完整，请继续用 file_append 补齐剩余内容。";
+        summary += " 追加预览已展示给用户，尚未写入磁盘，等待用户确认。";
       }
       return { success: true, output: summary, _structured: output };
     }
@@ -974,13 +987,15 @@ async function executeTool(name, params) {
 async function executeToolCalls(calls) {
   const results = [];
   for (const call of calls) {
-    // 截断守卫：输出达到长度上限导致工具调用块未闭合、参数不完整首    // file_create/file_append 截断时已输出首content 仍是有效前缀，允许执行预览并靠后首file_append 补齐首    // 其余工具（尤首file_edit 的部分编辑）执行残缺参数很危险，拒绝执行并反馈模型拆分重试首
+    // 截断守卫：输出达到长度上限导致工具调用块未闭合、参数不完整。
+    // file_create/file_append 截断时已输出的 content 仍是有效前缀，允许执行预览并靠后续 file_append 补齐。
+    // 其余工具（尤其 file_edit 的部分编辑）执行残缺参数很危险，拒绝执行并反馈模型拆分重试。
     if (call.params?._truncated && call.name !== "file_append" && call.name !== "file_create") {
 
       results.push({
         ...call,
         success: false,
-        output: `[工具 ${call.name}] 未执行：该工具调用因输出长度达到上限被截断，参数不完整。请拆分后重试：超长文件先用 file_create 写入前半部分，再首file_append 分一次或多次补齐剩余内容；单次调用的内容量宁小勿大。`,
+        output: `[工具 ${call.name}] 未执行：该工具调用因输出长度达到上限被截断，参数不完整。请拆分后重试：超长文件先用 file_create 写入前半部分，再用 file_append 分一次或多次补齐剩余内容；单次调用的内容量宁小勿大。`,
       });
       continue;
     }
@@ -995,12 +1010,12 @@ async function executeToolCalls(calls) {
 function getToolsSystemPrompt({ minimal = false } = {}) {
   let s = "\n\n[可用工具]\n";
   s += "你拥有工具，可以直接操作用户的工作环境。\n\n";
-  s += "**调用纪律首*\n";
+  s += "**调用纪律**\n";
   s += "1. 必须使用下方格式实际发出调用，不要只描述意图；禁止说“我先看看”“我需要查看”后停住。\n";
   s += "2. 任务需要查看文件、目录、项目结构或执行操作时，当前回复必须包含工具调用块；不要回答“我无法查看”——你可以。\n";
   s += "3. 你只是在问用户是否继续、是否要你动手时，不要调用工具，等待用户确认。\n";
-  s += "4. 只知道文件名但不知道相对路径时，先调首project_find_file；拿到匹配路径后再调首project_read_file 读取目标文件。\n\n";
-  s += "**调用格式**：每次调用独占一块，◈◈5轮◈◆首是固定标记，不可省略；一次回复可多次调用：\n";
+  s += "4. 只知道文件名但不知道相对路径时，先调用 project_find_file；拿到匹配路径后再调用 project_read_file 读取目标文件。\n\n";
+  s += "**调用格式**：每次调用独占一块，◈◈◈ 与 ◈◆◆ 是固定标记，不可省略；一次回复可多次调用：\n";
   s += "◈◈◈tool_name\n{JSON参数}\n◈◆◆\n\n";
 
   // 具体示例
@@ -1022,9 +1037,9 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
   for (const [key, tool] of Object.entries(TOOLS)) {
     s += `### ${key} ${tool.description}\n`;
     if (tool.rawContent) {
-      s += "专用格式（不首JSON！内容原样直写，零转义）：\n";
-      s += `◈◈首{key}\n`;
-      s += "相对路径（第一行，首src/utils/helper.js）\n";
+      s += "专用格式（不是 JSON！内容原样直写，零转义）：\n";
+      s += `◈◈◈${key}\n`;
+      s += "相对路径（第一行，如 src/utils/helper.js）\n";
       s += "文件内容（第二行起原样直写，不要 JSON、不要代码围栏、不要任何转义）\n";
       s += "◈◆◆\n\n";
       continue;
@@ -1036,7 +1051,7 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
         s += `  - ${pk}: ${pv.type}${pv.required ? " (必填)" : ""} ${pv.description}\n`;
       }
     }
-    s += `示例:\n◈◈首{key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
+    s += `示例:\n◈◈◈${key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
   }
 
   // 远程 MCP 工具（动态注入）
@@ -1053,58 +1068,58 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
   if (minimal) return s;
 
   // 黑板策略
-  s += "[黑板策略 首board_* 工具]\n";
+  s += "[黑板策略 / board_* 工具]\n";
   s += "黑板是你的可视化工作区，卡片是结构化的思维单元。主动利用黑板帮助用户思考和组织信息。\n\n";
-  s += "**何时主动使用黑板首*\n";
+  s += "**何时主动使用黑板**\n";
   s += "- 用户讨论复杂问题、多步骤任务、系统设计时，主动用 board_batch 将拆解结果投到黑板\n";
   s += "- 用户头脑风暴时，将想法整理成卡片并按逻辑关系连接\n";
-  s += "- 任务拆解时，用卡片表示每个步骤，首arrows 表示依赖关系\n";
+  s += "- 任务拆解时，用卡片表示每个步骤，用 arrows 表示依赖关系\n";
   s += "- 用户说“整理一下”“梳理一下”“画个流程图”时，直接操作黑板\n\n";
-  s += "**颜色语义（主动使用）首*\n";
+  s += "**颜色语义（主动使用）**\n";
   s += "- red: 问题/风险/阻塞项\n";
-  s += "- orange: 进行首待处理\n";
+  s += "- orange: 进行中/待处理\n";
   s += "- yellow: 想法/待讨论\n";
   s += "- green: 已完成通过/确认\n";
   s += "- blue: 信息/数据/资源\n";
   s += "- purple: 创意/设计/灵感\n\n";
   s += "**最佳实践：**\n";
   s += "1. 批量操作优先：用 board_batch 一次性构建完整结构，而非逐个 board_add\n";
-  s += "2. 先读后改：修改前首board_read 了解现有结构\n";
+  s += "2. 先读后改：修改前用 board_read 了解现有结构\n";
   s += "3. 建立连接：用 arrows 明确卡片间的依赖/数据流关系\n";
   s += "4. 语义着色：根据卡片性质主动分配颜色，让用户一目了然\n";
-  s += "5. 保持简洁：卡片标题不超首10 字，详情不超首3 行\n\n";
+  s += "5. 保持简洁：卡片标题不超过 10 字，详情不超过 3 行\n\n";
 
   // file_edit 专项指导
-  s += "[文件编辑规则 首file_edit 工具]\n";
+  s += "[文件编辑规则 / file_edit 工具]\n";
   s += "当用户要求修改、编辑、修复项目中的已有文件时，你必须使用 file_edit 工具。\n";
   s += "核心原则：你说改它就真改，你不说它绝不碰。\n";
   s += "- file_path: 相对于项目根目录的路径\n";
-  s += "- file_path 只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 首..\n";
-  s += "- edits: JSON 数组，每项包首old_text（要替换的原文）首new_text（替换后的内容）\n";
+  s += "- file_path 只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
+  s += "- edits: JSON 数组，每项包含 old_text（要替换的原文）和 new_text（替换后的内容）\n";
   s += "- old_text 必须在文件中唯一出现，否则会报错\n";
   s += "- 只包含你要修改的部分，不要包含整个文件内容\n";
   s += "- 可以包含多组编辑，一次性完成所有修改\n";
-  s += "- 用户会看首diff 预览，并可以选择「接受」「拒绝」或「复制」\n";
+  s += "- 用户会看到 diff 预览，并可以选择「接受」「拒绝」或「复制」\n";
   s += "- 编辑完成后，等待用户确认，不要自动继续修改\n";
 
   // file_create 专项指导
-  s += "\n[文件创建规则 首file_create 工具]\n";
-  s += "当用户要求创建新文件时，你必须使首file_create 工具。\n";
-  s += "专用格式（重要，不是 JSON）：◈◈◈file_create 后第一行写相对路径，第二行起原样直写文件完整内容，最首◈◆首闭合。\n";
-  s += "内容区严重JSON 包裹、严禁转义换首引号、严禁代码围栏（```）——像平常写代码一样直接写。\n";
-  s += "- 路径只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 首..\n";
-  s += "- 如果用户只要求输出文件但没有指定位置，默认放首outputs/ 下，并使用清晰的文件名\n";
-  s += "- 内容必须输出完整，绝不允许用“…其余省略”首/ 同上”等方式缩写\n";
-  s += "- 超长文件（预计超首300 行）必须分段写入：先首file_create 写入前半部分（在完整行边界截断），再用一次或多次 file_append 从断点精确接续补齐剩余部分；单次调用宁小勿大，避免输出被截断\n";
-  s += "- 如果收到“输出被截断”相关的工具结果反馈，不要重复已写入的内容，立即首file_append 从断点接续补齐\n";
-  s += "- 如果文件已存在，应使首file_edit 工具而非 file_create\n";
+  s += "\n[文件创建规则 / file_create 工具]\n";
+  s += "当用户要求创建新文件时，你必须使用 file_create 工具。\n";
+  s += "专用格式（重要，不是 JSON）：◈◈◈file_create 后第一行写相对路径，第二行起原样直写文件完整内容，最后用 ◈◆◆ 闭合。\n";
+  s += "内容区严禁 JSON 包裹、严禁转义换行/引号、严禁代码围栏（```）——像平常写代码一样直接写。\n";
+  s += "- 路径只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
+  s += "- 如果用户只要求输出文件但没有指定位置，默认放到 outputs/ 下，并使用清晰的文件名\n";
+  s += "- 内容必须输出完整，绝不允许用“…其余省略” / “同上”等方式缩写\n";
+  s += "- 超长文件（预计超过 300 行）必须分段写入：先用 file_create 写入前半部分（在完整行边界截断），再用一次或多次 file_append 从断点精确接续补齐剩余部分；单次调用宁小勿大，避免输出被截断\n";
+  s += "- 如果收到“输出被截断”相关的工具结果反馈，不要重复已写入的内容，立即用 file_append 从断点接续补齐\n";
+  s += "- 如果文件已存在，应使用 file_edit 工具而非 file_create\n";
   s += "- 用户会看到内容预览，并可以选择「接受」「拒绝」或「复制」\n";
   s += "- 创建完成后，等待用户确认\n";
 
   // file_append 专项指导
-  s += "\n[文件追加规则 首file_append 工具]\n";
-  s += "向已存在文件末尾追加内容，用于分段写入超长文件。格式与 file_create 相同：第一行路径，第二行起原样直写内容，不首JSON。\n";
-  s += "- 路径对应的文件必须已存在（先 file_create 首file_append）\n";
+  s += "\n[文件追加规则 / file_append 工具]\n";
+  s += "向已存在文件末尾追加内容，用于分段写入超长文件。格式与 file_create 相同：第一行路径，第二行起原样直写内容，不是 JSON。\n";
+  s += "- 路径对应的文件必须已存在（先 file_create 后 file_append）\n";
   s += "- 内容从上次写入结束的精确位置接续，绝不重复已有内容\n";
   s += "- 输出被截断时，系统会要求你用 file_append 补齐；每次追加控制在 300 行以内\n";
 

@@ -1,15 +1,15 @@
 /**
- * 国际化引擎：语言在安装时选定（安装程序写首data/language.txt），应用内不切换首
+ * 国际化引擎：语言在安装时选定（安装程序写入 data/language.txt），应用内不切换。
  *
- * 机制首
- * - initI18n() 启动时从后端取语言；en 时先全量翻译当前 DOM，再首MutationObserver
+ * 机制：
+ * - initI18n() 启动时从后端取语言；en 时先全量翻译当前 DOM，再启动 MutationObserver
  *   捕获后续动态插入的内容（toast、弹窗、生成的面板），做到界面文字全覆盖；
  * - 词典以中文原文为键（i18n_dict.js），命中即替换，未命中保持原文；
  * - t(key, vars) 供带变量的动态字符串在调用处使用，支持{var} 占位符；
- * - 模型生成内容与用户输入不翻译（SKIP_SELECTOR / data-i18n-skip 标记）首
+ * - 模型生成内容与用户输入不翻译（SKIP_SELECTOR / data-i18n-skip 标记）。
  */
 
-import { EN_DICT } from "./i18n_dict.js?v=20260818-81";
+import { EN_DICT } from "./i18n_dict.js?v=20260818-82";
 
 let LANG = "zh";
 let observer = null;
@@ -28,7 +28,7 @@ const ZH_RE = /[\u4e00-\u9fff]/;
 export const getLang = () => LANG;
 export const isEn = () => LANG === "en";
 
-/** 带变量翻译：zh 原样返回；en 查词典并替换 {var} 占位首*/
+/** 带变量翻译：zh 原样返回；en 查词典并替换 {var} 占位符 */
 export function t(key, vars) {
   let s = LANG === "en" ? (EN_DICT[key] ?? key) : key;
   if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
@@ -48,7 +48,7 @@ function skipped(el) {
   return el.matches(SKIP_SELECTOR) || !!el.closest(SKIP_SELECTOR);
 }
 
-/** 翻译元素子树：文本节首+ 可翻译属首*/
+/** 翻译元素子树：文本节点 + 可翻译属性 */
 function translateNode(root) {
   if (!root) return;
   if (root.nodeType === 3) {
@@ -59,7 +59,7 @@ function translateNode(root) {
   }
   if (root.nodeType !== 1 || skipped(root)) return;
 
-  // 元素自身属首
+  // 元素自身属性
   for (const a of TRANS_ATTRS) {
     const v = root.getAttribute(a);
     if (v && ZH_RE.test(v)) {
@@ -79,7 +79,7 @@ function translateNode(root) {
     if (nv !== n.data) n.data = nv;
   }
 
-  // 子元素属首
+  // 子元素属性
   const els = root.querySelectorAll("[title], [placeholder], [alt], [aria-label]");
   for (const el of els) {
     if (skipped(el)) continue;

@@ -1,19 +1,19 @@
 /**
- * SLATE 定时任务组件：创首管理定时对话任务首
- * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话首
+ * SLATE 定时任务组件：创建和管理定时对话任务。
+ * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话。
  */
 
-import { state } from "../store.js?v=20260818-81";
-import { get, post, del, patch } from "../services/api.js?v=20260818-81";
-import { dlgConfirm } from "../services/dialog.js?v=20260818-81";
-import { t as tr } from "../services/i18n.js?v=20260818-81"; // 任务变量也叫 t，此处别名避免遮首
+import { state } from "../store.js?v=20260818-82";
+import { get, post, del, patch } from "../services/api.js?v=20260818-82";
+import { dlgConfirm } from "../services/dialog.js?v=20260818-82";
+import { t as tr } from "../services/i18n.js?v=20260818-82"; // 任务变量也叫 t，此处别名避免遮蔽
 
 let modal, listEl;
 let pollTimer = null;
 
 function scheduleSummary(t) {
   if (t.mode === "once") return tr("单次 · {time}", { time: t.time || "" });
-  if (t.mode === "interval") return tr("首{n} 分钟", { n: t.every_minutes || 60 });
+  if (t.mode === "interval") return tr("每 {n} 分钟", { n: t.every_minutes || 60 });
   return tr("每天 · {time}", { time: t.time || "09:00" });
 }
 
@@ -26,7 +26,7 @@ function formatTs(ts) {
 
 async function toast(msg) {
   try {
-    const app = await import("../app.js?v=20260818-81");
+    const app = await import("../app.js?v=20260818-82");
     app.toast(msg);
   } catch {}
 }
@@ -96,7 +96,7 @@ async function renderList() {
     const meta = document.createElement("div");
     meta.className = "schedule-item-meta";
     const status = t.last_status
-      ? (t.last_status === "ok" ? tr("首上次运行 {time}", { time: formatTs(t.last_run) }) : `${t.last_status}`)
+      ? (t.last_status === "ok" ? tr("上次运行 {time}", { time: formatTs(t.last_run) }) : `${t.last_status}`)
       : "尚未运行";
     meta.textContent = `${scheduleSummary(t)} · ${t.model_id} · ${status}`;
     info.appendChild(name);
@@ -118,7 +118,7 @@ async function renderList() {
 
     const btnRun = document.createElement("button");
     btnRun.className = "msg-action-btn";
-    btnRun.textContent = "首";
+    btnRun.textContent = "▶";
     btnRun.title = "立即运行";
     btnRun.addEventListener("click", async () => {
       const res = await post(`/schedule/tasks/${t.id}/run`);
@@ -133,7 +133,7 @@ async function renderList() {
 
     const btnDel = document.createElement("button");
     btnDel.className = "msg-action-btn";
-    btnDel.textContent = "首";
+    btnDel.textContent = "×";
     btnDel.title = "删除任务";
     btnDel.addEventListener("click", async () => {
       if (!await dlgConfirm(tr("删除定时任务「{name}」？", { name: t.name }), { danger: true, okText: "删除" })) return;

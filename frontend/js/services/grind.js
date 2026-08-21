@@ -1,27 +1,27 @@
 /**
- * SLATE 磨墨模式服务：把粗糙想法研磨为结构化墨稿（任务书）首
- * 提示词注入、墨迹解析、墨稿检测与三个动作（送入 Harness / 投到白板 / 存为模板）首
+ * SLATE 磨墨模式服务：把粗糙想法研磨为结构化墨稿（任务书）。
+ * 提示词注入、墨迹解析、墨稿检测与三个动作（送入 Harness / 投到白板 / 存为模板）。
  */
 
-import { get, post, del, patch } from "./api.js?v=20260818-81";
+import { get, post, del, patch } from "./api.js?v=20260818-82";
 
 const MAX_ROUNDS = 10;
 
 // 收墨触发词（用户输入命中即终止追问）
-const COLLECT_RE = /^(收墨|够了|就这样|可以了|出墨稿|结束磨墨)\s*[。！!.首]*\s*$/;
+const COLLECT_RE = /^(收墨|够了|就这样|可以了|出墨稿|结束磨墨)\s*[。！!.]*\s*$/;
 
-// ── 提示首──────────────────────────────────
+// ── 提示词 ─────────────────────────────────
 
 const RULES = [
   "追问纪律：每条回复只问一个缺口；能给 A/B 选项就给选项（选项简短、互斥），开放式问题最少用户",
   "不要寒暄、不要重复已确认内容、不要一次问多个问题",
-  "用户回复「收首/ 够了 / 就这样」或信息已足够时，立即进入收墨输出墨稿",
+  "用户回复「收墨 / 够了 / 就这样」或信息已足够时，立即进入收墨输出墨稿",
 ].join("\n");
 
-const STATUS_FORMAT = `回复末尾必须附墨迹状态块（严格按此格式，每行一条，简短）首
-【墨迹首
-首已定项内首
-首未知项内容`;
+const STATUS_FORMAT = `回复末尾必须附墨迹状态块（严格按此格式，每行一条，简短）：
+【墨迹】
+✔ 已定项内容
+✘ 未知项内容`;
 
 const DRAFT_FIELDS = "title, goal, audience, deliverables, acceptance, boundaries, suggested_path, open_questions";
 
@@ -29,14 +29,14 @@ const DRAFT_FORMAT = `收墨时输出：先用 1-2 句总结共识，再给出�
 
 function firstRoundPrompt(idea) {
   return `[磨墨模式 · 接墨]
-你现在是 SLATE 的磨墨助手：通过有节奏的追问，把粗糙想法研磨成可执行的任务书（墨稿）。最多追${MAX_ROUNDS} 轮次
+你现在是 SLATE 的磨墨助手：通过有节奏的追问，把粗糙想法研磨成可执行的任务书（墨稿）。最多追问 ${MAX_ROUNDS} 轮。
 ${RULES}
 ${STATUS_FORMAT}
 ${DRAFT_FORMAT}
 
-本轮是接墨，请：5轮1-2 句复述想法核心；首列出需厘清的缺口清单（3-5 项，编号）；首只针对第一个缺口提问首
+本轮是接墨，请：先用 1-2 句复述想法核心；再列出需厘清的缺口清单（3-5 项，编号）；最后只针对第一个缺口提问。
 
-用户原始想法首{idea}`;
+用户原始想法：${idea}`;
 }
 
 function grindRoundPrompt(session) {
@@ -49,15 +49,15 @@ ${DRAFT_FORMAT}`;
 
 function collectingPrompt() {
   return `[磨墨模式 · 收墨]
-停止追问。基于以上所有对话信息，输出最终墨稿：首1-2 句总结共识，再给出完整 JSON。未知项放入 open_questions首
+停止追问。基于以上所有对话信息，输出最终墨稿：先用 1-2 句总结共识，再给出完整 JSON。未知项放入 open_questions。
 ${DRAFT_FORMAT}`;
 }
 
 // ── 墨迹解析 ────────────────────────────────
 
 /**
- * 从助手回复中解析【墨迹】状态块首
- * 返回 { resolved: string[], unknown: string[] }；无状态块返回 null首
+ * 从助手回复中解析【墨迹】状态块。
+ * 返回 { resolved: string[], unknown: string[] }；无状态块返回 null。
  */
 function parseInkStatus(content) {
   const text = String(content || "");
@@ -81,8 +81,8 @@ function parseInkStatus(content) {
 }
 
 /**
- * 检测回复中的墨首JSON（代码块优先，回退首JSON）首
- * 要求首goal 首title 字段才认定为墨稿首
+ * 检测回复中的墨 JSON（代码块优先，回退 JSON）。
+ * 要求 goal、title 字段才认定为墨稿。
  */
 function detectDraft(content) {
   const text = String(content || "");
@@ -132,13 +132,13 @@ async function endSession(convId) {
 
 // ── 墨稿动作 ────────────────────────────────
 
-/** 墨稿 首Harness 任务描述 */
+/** 墨稿转 Harness 任务描述 */
 function draftToHarnessTask(draft) {
   const lines = [
     `【磨墨墨稿 · ${draft.title || "未命名任务"}】`,
-    `目标题{draft.goal || ""}`,
+    `目标：${draft.goal || ""}`,
   ];
-  if (draft.audience) lines.push(`受众：{draft.audience}`);
+  if (draft.audience) lines.push(`受众：${draft.audience}`);
   if (Array.isArray(draft.deliverables) && draft.deliverables.length) {
     lines.push(`交付物：\n${draft.deliverables.map(d => `  - ${d}`).join("\n")}`);
   }
@@ -148,14 +148,14 @@ function draftToHarnessTask(draft) {
   if (Array.isArray(draft.boundaries) && draft.boundaries.length) {
     lines.push(`边界与限制：\n${draft.boundaries.map(d => `  - ${d}`).join("\n")}`);
   }
-  if (draft.suggested_path) lines.push(`建议路径：{draft.suggested_path}`);
+  if (draft.suggested_path) lines.push(`建议路径：${draft.suggested_path}`);
   if (Array.isArray(draft.open_questions) && draft.open_questions.length) {
     lines.push(`开放问题（自行合理假设并注明）：\n${draft.open_questions.map(d => `  - ${d}`).join("\n")}`);
   }
   return lines.join("\n");
 }
 
-/** 墨稿 首白板卡片（结构与 whiteboard.js saveCard 一致） */
+/** 墨稿转白板卡片（结构与 whiteboard.js saveCard 一致） */
 function draftToBoardCard(draft) {
   return {
     id: `c${Date.now().toString(36)}`,
@@ -166,7 +166,7 @@ function draftToBoardCard(draft) {
   };
 }
 
-/** 墨稿 首知识库模板文字*/
+/** 墨稿转知识库模板文字 */
 async function saveDraftAsTemplate(draft) {
   const res = await post("/knowledge/docs", {
     title: `磨墨模板 · ${draft.title || "未命名"}`,

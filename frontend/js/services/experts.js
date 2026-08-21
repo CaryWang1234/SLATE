@@ -1,11 +1,11 @@
 /**
- * SLATE 专家包服务：zip 导入/导出、增删改查、文件管首
+ * SLATE 专家包服务：zip 导入/导出、增删改查、文件管理。
  * 专家包结构：persona.md + rules.md + data.json + knowledge/ + skills/
  */
 
-import { get, post, put, del, upload } from "./api.js?v=20260818-81";
+import { get, post, put, del, upload } from "./api.js?v=20260818-82";
 
-/** 专家详情缓存（expertId 首detail），供对话团队注入时免重复请求 */
+/** 专家详情缓存（expertId -> detail），供对话团队注入时免重复请求 */
 const expertCache = new Map();
 
 async function loadExperts() {
@@ -48,7 +48,7 @@ async function importExpertZip(file) {
   return res.data.id;
 }
 
-/** 导出 zip 的下载地址（浏览器直接下载首*/
+/** 导出 zip 的下载地址（浏览器直接下载） */
 function expertExportUrl(id) {
   const origin = window.location.port === "8000" || window.location.protocol === "file:"
     ? `${window.location.protocol}//${window.location.hostname}:8000`
@@ -78,8 +78,8 @@ async function readExpertFile(id, folder, name) {
 }
 
 /**
- * 构建专家注入提示词（persona + rules + 知识文件清单次
- * detail 首getExpert 返回的完整结首
+  * 构建专家注入提示词（persona + rules + 知识文件清单）。
+  * detail 为 getExpert 返回的完整结果。
  */
 function buildExpertPrompt(detail) {
   if (!detail) return "";

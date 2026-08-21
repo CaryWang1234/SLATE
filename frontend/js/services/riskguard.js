@@ -1,13 +1,13 @@
 /**
  * SLATE 终端高危命令守卫
- * - 高危判定为写死规则（与后首backend/skills/terminal.py 同一份清单）
+ * - 高危判定为写死规则（与后端 backend/skills/terminal.py 同一份清单）
  * - 命中后弹出审批框，并调用当前模型解释命令目的
- * - 用户批准 首注入 approved 参数放行；拒5轮返回拒绝结果给模式
+ * - 用户批准后注入 approved 参数放行；拒绝后返回拒绝结果给模型
  */
 
-import { state, getModelKey } from "../store.js?v=20260818-81";
-import { post } from "./api.js?v=20260818-81";
-import { t } from "./i18n.js?v=20260818-81";
+import { state, getModelKey } from "../store.js?v=20260818-82";
+import { post } from "./api.js?v=20260818-82";
+import { t } from "./i18n.js?v=20260818-82";
 
 // 高危命令规则（写死）：命中任一条即要求批准
 const HIGH_RISK_PATTERNS = [
@@ -40,13 +40,13 @@ const HIGH_RISK_PATTERNS = [
 const PIPE_TO_SHELL = /(curl|wget|invoke-webrequest|iwr)[^|;&]*\|\s*(sudo\s+)?(ba|z|da)?sh|Invoke-Expression|\biex\b/i;
 
 /**
- * 判断命令是否高危：返首{ risk, reason }
+ * 判断命令是否高危：返回 { risk, reason }
  */
 function isHighRiskCommand(command) {
   const cmd = String(command || "").trim();
   if (!cmd) return { risk: false, reason: "" };
   if (PIPE_TO_SHELL.test(cmd)) return { risk: true, reason: "从网络下载并直接执行脚本" };
-  // 拆分命令链（&&、||首、|），逐段检首
+  // 拆分命令链（&&、||、;、|），逐段检测
   for (const seg of cmd.split(/&&|\|\||;|\|/)) {
     const s = seg.trim();
     if (!s) continue;
@@ -63,7 +63,7 @@ function isHighRiskCommand(command) {
 async function explainCommand(command) {
   const modelId = state.currentModel?.id;
   const apiKey = modelId ? getModelKey(modelId) : "";
-  if (!modelId || !apiKey) return "（当前未配置模型首API Key，无法生成目的说明）";
+  if (!modelId || !apiKey) return "（当前未配置模型 API Key，无法生成目的说明）";
   try {
     const res = await post("/proxy/chat", {
       model: modelId,
@@ -96,8 +96,8 @@ function settle(approved) {
 }
 
 /**
- * 请求用户批准高危命令。返首Promise<boolean>首
- * 弹窗展示命令、命中规则与模型生成的目的说明首
+ * 请求用户批准高危命令。返回 Promise<boolean>。
+ * 弹窗展示命令、命中规则与模型生成的目的说明。
  */
 function requestHighRiskApproval(command, reason) {
   if (!modal) return Promise.resolve(false);
@@ -119,8 +119,8 @@ function requestHighRiskApproval(command, reason) {
 }
 
 /**
- * 统一守卫入口：若首terminal 且命令高危则弹框审批首
- * 批准 5轮params 注入 approved 并返首true；拒5轮返回 false
+ * 统一守卫入口：若为 terminal 且命令高危则弹框审批。
+ * 批准后向 params 注入 approved 并返回 true；拒绝后返回 false。
  */
 async function guardSkillParams(skill, params) {
   if (skill !== "terminal" || !params?.command) return true;

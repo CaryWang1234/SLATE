@@ -1,11 +1,12 @@
 /**
- * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除首 */
+ * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）。
+ */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260818-81";
-import { get, post, del, upload } from "../services/api.js?v=20260818-81";
-import { guardSkillParams } from "../services/riskguard.js?v=20260818-81";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-81";
-import { t } from "../services/i18n.js?v=20260818-81";
+import { state, subscribe, setSkills } from "../store.js?v=20260818-82";
+import { get, post, del, upload } from "../services/api.js?v=20260818-82";
+import { guardSkillParams } from "../services/riskguard.js?v=20260818-82";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-82";
+import { t } from "../services/i18n.js?v=20260818-82";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -19,7 +20,7 @@ function showToast(msg) {
   setTimeout(() => { el.classList.add("out"); el.addEventListener("animationend", () => el.remove()); }, 2200);
 }
 
-// ── 技能参数定首─────────────────────────────
+// ── 技能参数定义 ────────────────────────────
 
 const SKILL_PARAM_DEFS = {
   file_tree: [
@@ -123,7 +124,7 @@ const SKILL_PARAM_DEFS = {
     { key: "max_chars", label: "截断长度（≤30000）", type: "number", placeholder: "8000" },
   ],
   chart_create: [
-    { key: "data", label: "数据（JSON 首标签:值）", type: "textarea", placeholder: "Q1:120, Q2:90, Q3:150" },
+    { key: "data", label: "数据（JSON 或 标签:值）", type: "textarea", placeholder: "Q1:120, Q2:90, Q3:150" },
     { key: "type", label: "图表类型", type: "text", placeholder: "bar / hbar / line / pie" },
     { key: "title", label: "图表标题", type: "text", placeholder: "季度销售额" },
     { key: "theme", label: "配色", type: "text", placeholder: "slate / blue / green / warm / gray 或逗号分隔色值 "},
@@ -208,7 +209,7 @@ const SKILL_PARAM_DEFS = {
   ],
 };
 
-// ── 列表渲染：工具首+ SKILL.md 技能区 ────────────
+// ── 列表渲染：工具 + SKILL.md 技能区 ───────────
 
 function createSectionHeader(text, count) {
   const head = document.createElement("div");
@@ -277,7 +278,7 @@ function createSkillItem(name, desc, kind) {
   info.appendChild(descEl);
   item.appendChild(info);
 
-  // Skill 支持删除；内置工具不可首
+  // Skill 支持删除；内置工具不可删除
   if (kind === "Skill") {
 
     const delBtn = document.createElement("button");
@@ -565,7 +566,7 @@ async function handleGithubImport() {
   }
 }
 
-// ── 刷新技能列首─────────────────────────────
+// ── 刷新技能列表 ────────────────────────────
 
 async function refreshSkills() {
   const res = await get("/skills");
@@ -574,7 +575,7 @@ async function refreshSkills() {
   }
 }
 
-// ── 初始首───────────────────────────────────
+// ── 初始化 ──────────────────────────────────
 
 function initSkillPanel() {
   skillList = document.getElementById("skill-list");
@@ -601,7 +602,7 @@ function initSkillPanel() {
 
   subscribe("skills", renderSkillList);
 
-  // 加载技能列首
+  // 加载技能列表
   refreshSkills();
 
 }

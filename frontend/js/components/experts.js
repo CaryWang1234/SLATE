@@ -1,15 +1,15 @@
 /**
  * SLATE 专家包管理组件：列表 / 新建 / 导入导出 zip / 编辑 persona·rules / knowledge·skills 文件管理
- * 对话模式通过 #expert-select 注入；团队模式通过成员{n}expertId 注入
+ * 对话模式通过 #expert-select 注入；团队模式通过成员 expertId 注入
  */
 
-import { state, setActiveExpertId } from "../store.js?v=20260818-81";
+import { state, setActiveExpertId } from "../store.js?v=20260818-82";
 import {
   loadExperts, getExpert, createExpert, saveExpert, deleteExpert,
   importExpertZip, expertExportUrl, uploadExpertFile, deleteExpertFile,
-} from "../services/experts.js?v=20260818-81";
-import { dlgConfirm } from "../services/dialog.js?v=20260818-81";
-import { t } from "../services/i18n.js?v=20260818-81";
+} from "../services/experts.js?v=20260818-82";
+import { dlgConfirm } from "../services/dialog.js?v=20260818-82";
+import { t } from "../services/i18n.js?v=20260818-82";
 
 let modal, expertListEl, detailEmpty, detailForm;
 let nameInput, descInput, personaInput, rulesInput;
@@ -26,14 +26,14 @@ function fmtSize(n) {
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260818-81");
+    const { toast: showToast } = await import("../app.js?v=20260818-82");
     showToast(msg);
   } catch {
     console.warn(msg);
   }
 }
 
-// ── 弹窗开首────────────────────────────────
+// ── 弹窗开关 ───────────────────────────────
 
 function openExpertModal() {
   if (!modal) return;
@@ -57,7 +57,7 @@ async function refreshList(keepSelection = true) {
   renderList();
   refreshExpertSelects();
   if (keepSelection && currentId && expertsCache.some(x => x.id === currentId)) {
-    // 保持当前选中（保存后刷新场景首
+    // 保持当前选中（保存后刷新场景）
   } else if (!keepSelection) {
     showEmpty();
   }
@@ -277,7 +277,7 @@ function fillExpertOptions(select, selectedId) {
   }
 }
 
-/** 刷新对话输入区与团队成员卡中的所有专家下首*/
+/** 刷新对话输入区与团队成员卡中的所有专家下拉框 */
 function refreshExpertSelects() {
   const chatSelect = document.getElementById("expert-select");
   if (chatSelect) fillExpertOptions(chatSelect, state.activeExpertId);
@@ -290,7 +290,7 @@ function getExpertsCached() {
   return expertsCache;
 }
 
-// ── 初始首──────────────────────────────────
+// ── 初始化 ─────────────────────────────────
 
 function initExpertsPanel() {
   modal = document.getElementById("expert-modal");

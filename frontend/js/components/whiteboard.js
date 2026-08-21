@@ -2,10 +2,10 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-81";
-import { streamChat } from "../services/api.js?v=20260818-81";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-81";
-import { t } from "../services/i18n.js?v=20260818-81";
+import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-82";
+import { streamChat } from "../services/api.js?v=20260818-82";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-82";
+import { t } from "../services/i18n.js?v=20260818-82";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -133,7 +133,7 @@ function drawArrows() {
   if (!svgOverlay) initSvgOverlay();
   if (!svgOverlay) return;
 
-  // 清空旧箭首
+  // 清空旧箭头
   svgOverlay.innerHTML = "";
 
 
@@ -153,14 +153,14 @@ function drawArrows() {
       const fromRect = fromEl.getBoundingClientRect();
       const toRect = toEl.getBoundingClientRect();
 
-      // 计算连接点（从卡片右侧中心到目标卡片左侧中心首
+      // 计算连接点（从卡片右侧中心到目标卡片左侧中心）
       const x1 = fromRect.right - containerRect.left;
 
       const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
       const x2 = toRect.left - containerRect.left;
       const y2 = toRect.top + toRect.height / 2 - containerRect.top;
 
-      // 绘制贝塞尔曲首
+      // 绘制贝塞尔曲线
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
 
       const midX = (x1 + x2) / 2;
@@ -390,7 +390,8 @@ function openCardModal(card = null) {
   selectedColor = card?.color || "default";
   renderColorOptions();
 
-  // 删除按钮只在编辑时显首  btnCardDelete.style.display = card ? "" : "none";
+  // 删除按钮只在编辑时显示
+  btnCardDelete.style.display = card ? "" : "none";
 
   cardModal.classList.remove("hidden");
   cardInputTitle.focus();
@@ -580,7 +581,7 @@ async function aiOrganize() {
     return;
   }
 
-  // 构建卡片信息（含颜色首
+  // 构建卡片信息（含颜色）
   const cardsInfo = state.boardCards.map(c => {
 
     let info = `- [${c.id}] ${c.title}`;
@@ -589,19 +590,24 @@ async function aiOrganize() {
     return info;
   }).join("\n");
 
-  const prompt = `你是一个结构化思维专家。请分析以下黑板卡片，进行整体重构优化首
+  const prompt = `你是一个结构化思维专家。请分析以下黑板卡片，进行整体重构优化。
 当前卡片${cardsInfo}
 
 请完成以下工作：
-1. 优化卡片标题，使其简洁明确（不超首10 字）
+1. 优化卡片标题，使其简洁明确（不超过 10 字）
 2. 补充/精炼卡片详情（不超过 3 行）
-3. 根据逻辑关系建立 arrows 连接（指向目标卡片ID首4. 按语义分配颜色：
+3. 根据逻辑关系建立 arrows 连接（指向目标卡片 ID）
+4. 按语义分配颜色：
    - red = 问题/风险/阻塞
-   - orange = 进行首待处首   - yellow = 想法/待讨首   - green = 已完成通过
+   - orange = 进行中/待处理
+   - yellow = 想法/待讨论
+   - green = 已完成/通过
    - blue = 信息/数据/资源
    - purple = 创意/设计
-   - default = 未分首
-输出首JSON 数组，每项包首id、title、body、arrows、color。保持原有卡片ID 不变首示例：[{"id":"c1","title":"需求分首,"body":"收集并整理用户需首,"arrows":["c2"],"color":"blue"}]`;
+   - default = 未分类
+
+只输出 JSON 数组，不要 Markdown，不要解释。每项包含 id、title、body、arrows、color。保持原有卡片 ID 不变。
+示例：[{"id":"c1","title":"需求分析","body":"收集并整理用户需求","arrows":["c2"],"color":"blue"}]`;
 
   const messages = [{ role: "user", content: prompt }];
   let response = "";
@@ -633,7 +639,7 @@ async function aiOrganize() {
 
     const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
 
-    // 全量更新：保留原首ID 匹配，应首title/body/arrows/color 全部字段
+    // 全量更新：保留原 ID 匹配，应用 title/body/arrows/color 全部字段
     const updatedCards = state.boardCards.map(card => {
       const aiCard = newCards.find(c => c.id === card.id);
       if (!aiCard) return card;
@@ -653,7 +659,7 @@ async function aiOrganize() {
   }
 }
 
-// ── 首LLM 输出解析卡片 ─────────────────────
+// ── LLM 输出解析卡片 ───────────────────────
 
 function parseCardsFromLLM(text) {
   const cards = [];
@@ -672,12 +678,12 @@ function parseCardsFromLLM(text) {
           });
         }
       }
-    } catch (e) { /* 首JSON */ }
+    } catch (e) { /* ignore invalid JSON */ }
   }
   return cards;
 }
 
-// ── 初始首───────────────────────────────────
+// ── 初始化 ──────────────────────────────────
 
 function initWhiteboard() {
   boardCanvas = document.getElementById("whiteboard-canvas");
@@ -745,7 +751,7 @@ function initWhiteboard() {
     window.addEventListener("resize", resizeDrawCanvas);
   }
 
-  // 初始首Mermaid
+  // 初始化 Mermaid
   function initMermaidTheme() {
     if (window.mermaid) {
       const isDark = document.documentElement.getAttribute("data-theme") === "dark";
