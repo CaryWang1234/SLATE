@@ -1,7 +1,9 @@
-﻿/**
+/**
  * SLATE 全局状态管理 v3
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
+
+import { makeId } from "./services/utils.js?v=20260818-88";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -484,7 +486,7 @@ function setMemories(list) {
 }
 
 function addMemory(mem) {
-  const newMem = { ...mem, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), createdAt: Date.now() };
+  const newMem = { ...mem, id: makeId(), createdAt: Date.now() };
   state.memories.push(newMem);
   savePersistent();
   notify("memories", state.memories);
@@ -535,7 +537,7 @@ function setKnowledgeContext(items) {
 
 function addPromptSnippet(snip) {
   const newSnip = {
-    id: snip.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    id: snip.id || makeId(),
     createdAt: snip.createdAt || Date.now(),
     ...snip,
   };

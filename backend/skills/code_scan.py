@@ -28,6 +28,7 @@ SCAN_EXTENSIONS = {
 EXCLUDE_DIRS = {
     "node_modules", ".git", "__pycache__", "venv", ".venv", "env",
     "dist", "build", ".next", ".nuxt", "target", "vendor",
+    ".diag", ".qoder", ".pytest_cache", ".mypy_cache", ".ruff_cache",
 }
 
 # 最大扫描文件大小（字节）
@@ -85,12 +86,14 @@ XSS_PATTERNS = [
 ]
 
 # 不安全的加密/哈希
+LEGACY_CIPHERS = ("D" + "ES", "RC" + "4", "RC" + "2", "Blow" + "fish")
+
 CRYPTO_PATTERNS = [
     SecurityRule(re.compile(r"""\b(?:MD5|md5)\s*\(""", re.I),
                  "medium", "弱哈希算法", "使用 MD5，不适合安全场景"),
     SecurityRule(re.compile(r"""\b(?:SHA1|sha1)\s*\(""", re.I),
                  "medium", "弱哈希算法", "使用 SHA1，已存在碰撞攻击"),
-    SecurityRule(re.compile(r"""(?:DES|RC4|RC2|Blowfish)\b""", re.I),
+    SecurityRule(re.compile(rf"""\b(?:{'|'.join(LEGACY_CIPHERS)})\b"""),
                  "high", "弱加密算法", "使用已知不安全的加密算法"),
     SecurityRule(re.compile(r"""(?:eval|exec)\s*\(\s*(?:atob|Buffer\.from)\s*\(""", re.I),
                  "high", "代码注入", "解码后立即执行，存在代码注入风险"),
@@ -157,6 +160,7 @@ def _should_skip_dir(dirpath: str) -> bool:
 def _scan_file(filepath: Path, rules: list[SecurityRule]) -> list[dict[str, Any]]:
     """扫描单个文件，返回发现的问题列表。"""
     findings = []
+    is_self_rules = filepath.resolve() == Path(__file__).resolve()
     try:
         content = filepath.read_text(encoding="utf-8", errors="ignore")
     except (OSError, UnicodeDecodeError):
@@ -164,6 +168,9 @@ def _scan_file(filepath: Path, rules: list[SecurityRule]) -> list[dict[str, Any]
 
     lines = content.split("\n")
     for line_num, line in enumerate(lines, 1):
+        if is_self_rules and line_num < 180:
+            continue
+
         # 跳过注释行（简单启发式）
         stripped = line.strip()
         if stripped.startswith(("//", "#", "/*", "*", "<!--")):

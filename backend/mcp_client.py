@@ -306,7 +306,7 @@ async def add_server(name: str, url: str, auto_connect: bool = True) -> dict[str
             return {"error": f"该地址已配置: {cfg.get('name', '')}"}
 
     import hashlib
-    sid = hashlib.md5(url.encode()).hexdigest()[:12]
+    sid = hashlib.sha256(url.encode()).hexdigest()[:12]
 
     cfg = {"id": sid, "name": name, "url": url, "enabled": True}
     configs.append(cfg)

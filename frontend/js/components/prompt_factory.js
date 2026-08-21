@@ -2,10 +2,11 @@
  * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交付 Prompt
  */
 
-import { state, subscribe, addPromptSnippet } from "../store.js?v=20260818-82";
-import { get, post } from "../services/api.js?v=20260818-82";
-import { browseFiles } from "../services/project.js?v=20260818-82";
-import { t } from "../services/i18n.js?v=20260818-82";
+import { state, subscribe, addPromptSnippet } from "../store.js?v=20260818-88";
+import { get, post } from "../services/api.js?v=20260818-88";
+import { browseFiles } from "../services/project.js?v=20260818-88";
+import { t } from "../services/i18n.js?v=20260818-88";
+import { makeId } from "../services/utils.js?v=20260818-88";
 
 const FACTORY_PRESETS = {
   codex: {
@@ -94,7 +95,7 @@ function getPromptText() {
 }
 
 function makeSnippetId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  return makeId();
 }
 
 function renderShell() {
@@ -286,7 +287,7 @@ async function insertSelectedFiles() {
 
   buttons.insertFiles.disabled = true;
   const oldText = buttons.insertFiles.textContent;
-  buttons.insertFiles.textContent = "读取消..";
+  buttons.insertFiles.textContent = "读取中...";
 
   try {
     const chunks = [];

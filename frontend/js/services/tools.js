@@ -12,10 +12,11 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-82";
-import { post } from "../services/api.js?v=20260818-82";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-82";
-import { t } from "./i18n.js?v=20260818-82";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-88";
+import { post } from "../services/api.js?v=20260818-88";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-88";
+import { t } from "./i18n.js?v=20260818-88";
+import { makeId } from "./utils.js?v=20260818-88";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -83,13 +84,13 @@ const TOOLS = {
       const res = await post("/projects/browse", { path });
       if (res.code !== 0) return res.message || "读取失败";
       if (res.data.type !== "file") return "路径不是文件";
-      return res.data.content?.slice(0, 10000) || "(空文字";
+      return res.data.content?.slice(0, 10000) || "(空文件)";
     },
   },
 
   project_find_file: {
     name: "查找项目文件",
-    description: "按文件名或相对路径在当前项目中查找文字",
+    description: "按文件名或相对路径在当前项目中查找文件",
     params: {
       query: { type: "string", description: "文件名或路径片段", required: true },
     },
@@ -115,7 +116,7 @@ const TOOLS = {
     },
     async execute({ title, body, arrows, color }) {
       const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
-      const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+      const id = makeId("c");
       const card = {
         id,
         title: title || "未命名",
@@ -185,7 +186,7 @@ const TOOLS = {
 
       for (const op of ops) {
         if (op.action === "add") {
-          const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
+          const id = makeId("c");
           cards.push({
             id,
             title: op.title || "未命名",

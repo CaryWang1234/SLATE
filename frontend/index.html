@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260818-82">
+  <link rel="stylesheet" href="./css/style.css?v=20260818-88">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏    document.documentElement.classList.add("i18n-pending");
     setTimeout(function () { document.documentElement.classList.remove("i18n-pending"); }, 2500);
@@ -98,7 +98,7 @@
               <div id="chat-messages" class="chat-scroll"></div>
               <!-- TODOLIST 任务清单（Harness，右侧栏） -->
               <div id="todo-panel" class="todo-panel hidden"></div>
-              <!-- 磨墨模式：墨迹面板（墨已定 / 步未知代 -->
+              <!-- 磨墨模式：墨迹面板（已定 / 未知项） -->
               <div id="grind-panel" class="grind-panel hidden"></div>
             </div>
             <!-- 文件附件预览区 -->
@@ -1043,7 +1043,7 @@
             <span class="onboarding-icon">⚡</span>
             <div class="onboarding-card-body">
               <b>Harness 自主执行</b>
-              <p>输入 / 按钮开启：模型自主多轮调用工具直至任务完成，大任务自动分 TODOLIST</p>
+              <p>输入区 ⚡ 按钮开启：模型自主多轮调用工具直至任务完成，大任务自动分 TODOLIST</p>
             </div>
           </div>
           <div class="onboarding-card">
@@ -1085,7 +1085,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260818-82"></script>
+  <script type="module" src="./js/app.js?v=20260818-88"></script>
 
 </body>
 </html>

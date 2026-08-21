@@ -1,4 +1,4 @@
-﻿// i18n_dict.js — 英文翻译词典（键为中文原文，未命中保留原文）
+// i18n_dict.js — 英文翻译词典（键为中文原文，未命中保留原文）
 // 说明：模型提示词/生成内容（Harness 六阶段、审查提示、工具调用纪律、注入块等）刻意不收录。
 // 带 {var} 占位符的键供 t(key, vars) 在调用处使用。
 
@@ -19,7 +19,7 @@ export const EN_DICT = {
   "工作流": "Workflow",
   "团队成员": "Team Members",
   "3轮": "3 rounds",
-  "5轮": "5 rounds",
+  "5 轮": "5 rounds",
   "8轮": "8 rounds",
   "10轮": "10 rounds",
   "开始讨论": "Start Discussion",
@@ -563,6 +563,7 @@ export const EN_DICT = {
   "压缩摘要生成失败:": "Summary generation failed:",
   "上下文压缩检查失败:": "Context compression check failed:",
   "上下文已压缩：{n} 条消息 → 摘要": "Context compressed: {n} messages → summary",
+  "上下文已压缩：{n} 条消息已摘要": "Context compressed: {n} messages summarized",
   "墨稿已成：可送入 Harness / 投到白板 / 存为模板": "Brief ready: send to Harness / post to Whiteboard / save as template",
   "墨迹 · 已成稿": "Ink · brief ready",
   "墨迹 · 收墨中": "Ink · wrapping up",

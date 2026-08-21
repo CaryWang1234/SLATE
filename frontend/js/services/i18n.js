@@ -9,7 +9,7 @@
  * - 模型生成内容与用户输入不翻译（SKIP_SELECTOR / data-i18n-skip 标记）。
  */
 
-import { EN_DICT } from "./i18n_dict.js?v=20260818-82";
+import { EN_DICT } from "./i18n_dict.js?v=20260818-88";
 
 let LANG = "zh";
 let observer = null;
@@ -35,7 +35,7 @@ export function t(key, vars) {
   return s;
 }
 
-/** 单段文本翻译：保留首尾空白，仅替换中间命中词典的中文 */
+/** 单段文本翻译：保留前后空白，仅替换中间命中词典的中文 */
 function translateText(s) {
   const trimmed = s.trim();
   if (!trimmed || !ZH_RE.test(trimmed)) return s;

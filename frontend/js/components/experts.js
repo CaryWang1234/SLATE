@@ -3,13 +3,13 @@
  * 对话模式通过 #expert-select 注入；团队模式通过成员 expertId 注入
  */
 
-import { state, setActiveExpertId } from "../store.js?v=20260818-82";
+import { state, setActiveExpertId } from "../store.js?v=20260818-88";
 import {
   loadExperts, getExpert, createExpert, saveExpert, deleteExpert,
   importExpertZip, expertExportUrl, uploadExpertFile, deleteExpertFile,
-} from "../services/experts.js?v=20260818-82";
-import { dlgConfirm } from "../services/dialog.js?v=20260818-82";
-import { t } from "../services/i18n.js?v=20260818-82";
+} from "../services/experts.js?v=20260818-88";
+import { dlgConfirm } from "../services/dialog.js?v=20260818-88";
+import { t } from "../services/i18n.js?v=20260818-88";
 
 let modal, expertListEl, detailEmpty, detailForm;
 let nameInput, descInput, personaInput, rulesInput;
@@ -26,7 +26,7 @@ function fmtSize(n) {
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260818-82");
+    const { toast: showToast } = await import("../app.js?v=20260818-88");
     showToast(msg);
   } catch {
     console.warn(msg);
@@ -84,7 +84,7 @@ function renderList() {
     meta.className = "exp-item-meta";
     const bits = [];
     if (item.description) bits.push(item.description);
-    bits.push(t("知识 {k} · 技术{s}", { k: item.knowledge_count, s: item.skills_count }));
+    bits.push(t("知识 {k} · 技能 {s}", { k: item.knowledge_count, s: item.skills_count }));
     meta.textContent = bits.join(" | ");
     el.appendChild(meta);
 
@@ -139,7 +139,10 @@ function renderFileList(folder) {
   listEl.innerHTML = "";
   const files = currentDetail[folder] || [];
   if (files.length === 0) {
-    listEl.innerHTML = '<div class="exp-file-empty">暂无文件，点击上方 + 添加文件"</div>';
+    const empty = document.createElement("div");
+    empty.className = "exp-file-empty";
+    empty.textContent = "暂无文件，点击上方 + 添加文件";
+    listEl.appendChild(empty);
     return;
   }
   for (const f of files) {

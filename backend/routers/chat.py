@@ -236,24 +236,25 @@ async def add_message(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
 @router.patch("/messages/{msg_id}")
 async def update_message(msg_id: str, body: dict[str, Any]) -> dict[str, Any]:
     """更新单条消息内容或渲染元数据。"""
-    fields: list[str] = []
-    values: list[Any] = []
-
-    if "content" in body:
-        fields.append("content = ?")
-        values.append(body.get("content", ""))
-    if "metadata" in body:
-        metadata = body.get("metadata", {})
-        metadata_text = json.dumps(metadata, ensure_ascii=False) if isinstance(metadata, dict) and metadata else ""
-        fields.append("metadata = ?")
-        values.append(metadata_text)
-
-    if not fields:
+    has_content = "content" in body
+    has_metadata = "metadata" in body
+    if not has_content and not has_metadata:
         return {"code": 0, "data": None, "message": "ok"}
 
-    values.append(msg_id)
     conn = _get_db()
-    conn.execute(f"UPDATE messages SET {', '.join(fields)} WHERE id = ?", values)
+    if has_content and has_metadata:
+        metadata = body.get("metadata", {})
+        metadata_text = json.dumps(metadata, ensure_ascii=False) if isinstance(metadata, dict) and metadata else ""
+        conn.execute(
+            "UPDATE messages SET content = ?, metadata = ? WHERE id = ?",
+            (body.get("content", ""), metadata_text, msg_id),
+        )
+    elif has_content:
+        conn.execute("UPDATE messages SET content = ? WHERE id = ?", (body.get("content", ""), msg_id))
+    else:
+        metadata = body.get("metadata", {})
+        metadata_text = json.dumps(metadata, ensure_ascii=False) if isinstance(metadata, dict) and metadata else ""
+        conn.execute("UPDATE messages SET metadata = ? WHERE id = ?", (metadata_text, msg_id))
     conn.commit()
     conn.close()
     return {"code": 0, "data": None, "message": "ok"}
@@ -298,10 +299,11 @@ async def batch_delete_conversations(body: dict[str, Any]) -> dict[str, Any]:
         if not ids:
             conn.close()
             return {"code": 0, "data": {"deleted": 0}, "message": "ok"}
-        placeholders = ", ".join("?" * len(ids))
-        conn.execute(f"DELETE FROM messages WHERE conversation_id IN ({placeholders})", ids)
-        cur = conn.execute(f"DELETE FROM conversations WHERE id IN ({placeholders})", ids)
-        deleted = cur.rowcount
+        deleted = 0
+        for conv_id in ids:
+            conn.execute("DELETE FROM messages WHERE conversation_id = ?", (conv_id,))
+            cur = conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+            deleted += max(cur.rowcount, 0)
     conn.commit()
     conn.close()
     return {"code": 0, "data": {"deleted": deleted}, "message": "ok"}

@@ -6,10 +6,11 @@
  * - 支持 AbortController 中断
  */
 
-import { get, post } from "./api.js?v=20260818-82";
-import { state, getModelKey } from "../store.js?v=20260818-82";
-import { guardSkillParams } from "./riskguard.js?v=20260818-82";
-import { t } from "./i18n.js?v=20260818-82";
+import { get, post } from "./api.js?v=20260818-88";
+import { state, getModelKey } from "../store.js?v=20260818-88";
+import { guardSkillParams } from "./riskguard.js?v=20260818-88";
+import { t } from "./i18n.js?v=20260818-88";
+import { makeId } from "./utils.js?v=20260818-88";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 
@@ -208,7 +209,7 @@ async function executeNode(node, userInput, outputs, members, rec) {
 // ── 并行执行引擎 ────────────────────────────
 
 function makeRunId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  return makeId();
 }
 
 /**

@@ -3,18 +3,20 @@
  * 轻量模型初步讨论，重型模型最终决策。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260818-82";
-import { notifyTaskComplete } from "../services/notify.js?v=20260818-82";
-import { streamChat } from "../services/api.js?v=20260818-82";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260818-82";
-import { renderMarkdown } from "../services/markdown.js?v=20260818-82";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260818-82";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260818-82";
-import { getExpertsCached } from "./experts.js?v=20260818-82";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-82";
-import { t } from "../services/i18n.js?v=20260818-82";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260818-88";
+import { notifyTaskComplete } from "../services/notify.js?v=20260818-88";
+import { streamChat } from "../services/api.js?v=20260818-88";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260818-88";
+import { renderMarkdown } from "../services/markdown.js?v=20260818-88";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260818-88";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260818-88";
+import { getExpertsCached } from "./experts.js?v=20260818-88";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-88";
+import { t } from "../services/i18n.js?v=20260818-88";
+import { makeId } from "../services/utils.js?v=20260818-88";
 
-// 当模型列表加载完成后，重新渲染团队成员（填充下拉选项目subscribe("modelRegistry", () => renderTeamMembers());
+// 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
+subscribe("modelRegistry", () => renderTeamMembers());
 
 let teamPanel, teamMembersArea, teamTopicInput, btnStartDiscuss, teamOutput, btnAddMember;
 let teamHistoryList, teamUsageBar, btnNewTeamDiscussion, btnStopDiscuss;
@@ -336,7 +338,7 @@ function fmtTok(n) {
 }
 
 function makeSessionId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  return makeId();
 }
 
 function resetTeamUsage() {
@@ -427,7 +429,10 @@ function renderTeamMembers() {
   teamMembersArea.innerHTML = "";
 
   if (teamMembers.length === 0) {
-    teamMembersArea.innerHTML = '<div class="team-empty">暂无团队成员，点击 + 添加</div>';
+    const empty = document.createElement("div");
+    empty.className = "team-empty";
+    empty.textContent = "暂无团队成员，点击 + 添加";
+    teamMembersArea.appendChild(empty);
     return;
   }
 
@@ -698,7 +703,7 @@ async function startDiscussion() {
     }
   }
 
-  // 多轮辩论：每轮每位成员可提案或回应他人，直到决策产生或轮次用户
+  // 多轮辩论：每轮每位成员可提案或回应他人，直到决策产生或轮次用尽
   for (let round = 1; round <= maxRounds && !verdict; round++) {
 
     addRoundHeader(round);
@@ -1188,16 +1193,28 @@ async function runSelectedWorkflow() {
     const okCount = result.order.filter(id => result.records[id].status === "success").length;
     try {
       const docId = await saveRunToKnowledge(wf, result);
-      wfResultBar.innerHTML = `<span class="wf-result-ok">${t("{ok}/{n} 节点成功 · 产物已写入知识库（{title}），可在记忆面板查看", { ok: okCount, n: total, title: docId })}</span>`;
+      wfResultBar.textContent = "";
+      const ok = document.createElement("span");
+      ok.className = "wf-result-ok";
+      ok.textContent = t("{ok}/{n} 节点成功 · 产物已写入知识库（{title}），可在记忆面板查看", { ok: okCount, n: total, title: docId });
+      wfResultBar.appendChild(ok);
     } catch (e) {
-      wfResultBar.innerHTML = `<span class="wf-result-error">${t("节点成功 {ok}/{n}，但写入知识库失败: {msg}", { ok: okCount, n: total, msg: e.message })}</span>`;
+      wfResultBar.textContent = "";
+      const err = document.createElement("span");
+      err.className = "wf-result-error";
+      err.textContent = t("节点成功 {ok}/{n}，但写入知识库失败: {msg}", { ok: okCount, n: total, msg: e.message });
+      wfResultBar.appendChild(err);
     }
     wfRunStatus.textContent = "";
     wfAbortBtn?.classList.add("hidden");
     notifyTaskComplete(t("工作流完成"), t("{ok}/{n} 节点成功", { ok: okCount, n: total }));
   } catch (e) {
     wfRunStatus.textContent = "";
-    wfResultBar.innerHTML = `<span class="wf-result-error">${t("工作流执行失败: {msg}", { msg: e.message })}</span>`;
+    wfResultBar.textContent = "";
+    const err = document.createElement("span");
+    err.className = "wf-result-error";
+    err.textContent = t("工作流执行失败: {msg}", { msg: e.message });
+    wfResultBar.appendChild(err);
   } finally {
     wfRunning = false;
     btnWfRun.disabled = false;

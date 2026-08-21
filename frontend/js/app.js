@@ -1,26 +1,26 @@
-﻿/**
+/**
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-82";
-import { initI18n, t } from "./services/i18n.js?v=20260818-82";
-import { get, post, put } from "./services/api.js?v=20260818-82";
-import { dlgConfirm } from "./services/dialog.js?v=20260818-82";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-82";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-82";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260818-82";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-82";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260818-82";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-82";
-import { initTeamPanel } from "./components/team.js?v=20260818-82";
-import { initProjectBar } from "./components/project_bar.js?v=20260818-82";
-import { initMemoryPanel } from "./components/memory.js?v=20260818-82";
-import { initExpertsPanel } from "./components/experts.js?v=20260818-82";
-import { initSchedule } from "./components/schedule.js?v=20260818-82";
-import { initRiskGuard } from "./services/riskguard.js?v=20260818-82";
-import { initUnderstandPanel } from "./components/understand.js?v=20260818-82";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-82";
-import { setProject, setProjectFileTree } from "./store.js?v=20260818-82";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-88";
+import { initI18n, t } from "./services/i18n.js?v=20260818-88";
+import { get, post, put } from "./services/api.js?v=20260818-88";
+import { dlgConfirm } from "./services/dialog.js?v=20260818-88";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-88";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-88";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260818-88";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-88";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260818-88";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-88";
+import { initTeamPanel } from "./components/team.js?v=20260818-88";
+import { initProjectBar } from "./components/project_bar.js?v=20260818-88";
+import { initMemoryPanel } from "./components/memory.js?v=20260818-88";
+import { initExpertsPanel } from "./components/experts.js?v=20260818-88";
+import { initSchedule } from "./components/schedule.js?v=20260818-88";
+import { initRiskGuard } from "./services/riskguard.js?v=20260818-88";
+import { initUnderstandPanel } from "./components/understand.js?v=20260818-88";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-88";
+import { setProject, setProjectFileTree } from "./store.js?v=20260818-88";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -543,7 +543,11 @@ async function renderLanInfo() {
     if (res?.code === 0) data = res.data;
   } catch {}
   if (!data || !data.enabled) {
-    box.innerHTML = `<div class="lan-info-error">${t("遥控服务未启动")}${data?.error ? ": " + data.error : t("，请重启应用")}</div>`;
+    box.innerHTML = "";
+    const err = document.createElement("div");
+    err.className = "lan-info-error";
+    err.textContent = t("遥控服务未启动") + (data?.error ? ": " + data.error : t("，请重启应用"));
+    box.appendChild(err);
     return;
   }
   const url = data.urls[0];
@@ -764,13 +768,17 @@ async function renderStorageUsage() {
       box.appendChild(row);
     }
   } catch (e) {
-    box.innerHTML = `<span class="setting-hint">${t("获取存储信息失败：{msg}", { msg: e.message })}</span>`;
+    box.innerHTML = "";
+    const hint = document.createElement("span");
+    hint.className = "setting-hint";
+    hint.textContent = t("获取存储信息失败：{msg}", { msg: e.message });
+    box.appendChild(hint);
   }
 }
 
 function initStorageManage() {
   renderStorageUsage();
-  // 打开设置页时刷新一次用户
+  // 打开设置页时刷新一次用量
   document.getElementById("btn-settings")?.addEventListener("click", () => setTimeout(renderStorageUsage, 300));
 
 }
@@ -889,7 +897,11 @@ async function renderUsageSummary() {
       box.appendChild(list);
     }
   } catch (e) {
-    box.innerHTML = `<div class="usage-summary-loading">${t("用量加载失败：{msg}", { msg: e.message })}</div>`;
+    box.innerHTML = "";
+    const err = document.createElement("div");
+    err.className = "usage-summary-loading";
+    err.textContent = t("用量加载失败：{msg}", { msg: e.message });
+    box.appendChild(err);
   }
 }
 
@@ -933,7 +945,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260818-82").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260818-88").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -979,7 +991,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260818-82");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260818-88");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1202,7 +1214,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260818-82");
+      const { openProject } = await import("./services/project.js?v=20260818-88");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }
@@ -1215,7 +1227,6 @@ async function init() {
   // 启动时自动检查更新（不阻塞初始化，失败静默）
   checkAppUpdate();
 
-  console.log("[SLATE] v3 初始化完成");
 }
 
 document.addEventListener("DOMContentLoaded", init);

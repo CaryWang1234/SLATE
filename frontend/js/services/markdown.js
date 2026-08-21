@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SLATE Markdown 渲染器：将 Markdown 文本安全渲染为 HTML。
  *
  * 设计要点：
