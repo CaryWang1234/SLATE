@@ -38,12 +38,19 @@ async def get_shared_state():
 @router.put("/state")
 async def save_shared_state(req: SharedStateRequest):
     allowed_keys = {
+        "theme",
         "modelKeys",
         "customModels",
         "currentModelId",
+        "maxTokens",
         "autoReview",
         "outputSettings",
+        "fileOutput",
+        "harness",
+        "notifications",
         "knowledgeSettings",
+        "activeExpertId",
+        "useResponses",
     }
     # 合并式写入：只更新本次提交的字段，避免漏传字段把已存设置抹掉
     existing: dict[str, Any] = {}

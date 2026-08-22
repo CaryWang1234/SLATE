@@ -12,11 +12,11 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-88";
-import { post } from "../services/api.js?v=20260818-88";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-88";
-import { t } from "./i18n.js?v=20260818-88";
-import { makeId } from "./utils.js?v=20260818-88";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-92";
+import { post } from "../services/api.js?v=20260818-92";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-92";
+import { t } from "./i18n.js?v=20260818-92";
+import { makeId } from "./utils.js?v=20260818-92";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -233,7 +233,7 @@ const TOOLS = {
 
   skill_run: {
     name: "执行工具",
-    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(持久化终端会话：支持多会话管理、状态保持（cd/export跨命令保持）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，高危命令双层拦截), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文纯文本，mode=html时返回原始HTML), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus激活窗口/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键（hotkey逗号分隔、press单键名）、button鼠标按键、region截图区域x,y,w,h、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词模糊匹配，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果)。也可传入 SKILL.md 技能名读取其定义内容",
+    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(持久化终端会话：支持多会话管理、状态保持（cd/export跨命令保持）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，高危命令双层拦截), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文纯文本，mode=html时返回原始HTML), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果)。也可传入 SKILL.md 技能名读取其定义内容",
     params: {
       skill: { type: "string", description: "工具或技能名称", required: true },
       params: { type: "object", description: "工具参数" },
@@ -728,6 +728,56 @@ const TOOL_RE = /◈◈◈\s*(\w+)\s*\r?\n([\s\S]*?)(?:◈◆◆|◆◆)/g;
 // file_create / file_append 走原样围栏协议：内容不经 JSON 转义，根治大内容转义损坏与 file_path 丢失
 const FILE_RAW_TOOLS = new Set(["file_create", "file_append"]);
 
+const TOOL_ALIASES = {
+  read_file: "project_read_file",
+  file_read: "project_read_file",
+  browse_files: "project_files",
+  list_files: "project_files",
+  find_file: "project_find_file",
+  search_file: "project_find_file",
+  edit_file: "file_edit",
+  create_file: "file_create",
+  append_file: "file_append",
+  run_skill: "skill_run",
+  skill: "skill_run",
+};
+
+const TOOL_USE_RECIPES = [
+  ["了解项目/目录", "project_files path=\"\"，再按结果读取关键文件"],
+  ["知道文件路径", "project_read_file"],
+  ["只知道文件名", "project_find_file -> project_read_file"],
+  ["修改已有文件", "project_read_file 确认现状 -> file_edit"],
+  ["创建新文件", "file_create 原样格式；超长内容用 file_append 分段"],
+  ["运行仓库检查/命令", "skill_run terminal（默认注入项目 work_dir）"],
+  ["代码/文档安全扫描", "skill_run code_scan / doc_scan"],
+  ["桌面操作", "skill_run computer_use，截图默认 jpeg/fast"],
+  ["生成图表/二维码/文档", "skill_run chart_create/qrcode_create/doc_write/ppt_create/word_create/excel_tool"],
+];
+
+const SKILL_RUN_QUICK_LIST = [
+  "file_tree", "file_peek", "file_edit", "file_create", "terminal",
+  "code_scan", "doc_scan", "git_tool", "web_search", "web_fetch",
+  "browser_automation", "computer_use", "chart_create", "qrcode_create",
+  "python_api_extract", "html_bundle", "ppt_create", "word_create", "excel_tool",
+];
+
+function compactDescription(text, limit = 260) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  return clean.length > limit ? `${clean.slice(0, limit)}...` : clean;
+}
+
+function normalizeToolName(name) {
+  const key = String(name || "").trim();
+  return TOOL_ALIASES[key] || key;
+}
+
+function stripJsonFence(raw) {
+  let text = String(raw || "").trim();
+  const fenced = /^```(?:json|javascript|js)?\s*([\s\S]*?)\s*```$/i.exec(text);
+  if (fenced) text = fenced[1].trim();
+  return text;
+}
+
 /** 自动确认开关（设置页可调，默认开）：开启时文件创建/修改直接落盘，不再等用户手动点「接受」 */
 function fileAutoApplyEnabled() {
   return state.fileOutput?.autoApply !== false;
@@ -744,6 +794,33 @@ function normalizeFilePathAlias(params) {
     }
   }
   return params;
+}
+
+function normalizeToolParams(name, params) {
+  const p = params && typeof params === "object" && !Array.isArray(params) ? { ...params } : {};
+  if (name === "project_read_file" || name === "project_files") {
+    if (p.file_path && !p.path) p.path = p.file_path;
+    if (p.relative_path && !p.path) p.path = p.relative_path;
+  }
+  if (name === "project_find_file" && p.path && !p.query) p.query = p.path;
+  if (name === "skill_run") {
+    if (p.name && !p.skill) p.skill = p.name;
+    if (p.tool && !p.skill) p.skill = p.tool;
+    if (p.arguments && !p.params) p.params = p.arguments;
+  }
+  return normalizeFilePathAlias(p);
+}
+
+function validateToolCall(name, params) {
+  const tool = TOOLS[name];
+  if (!tool) return "";
+  const missing = [];
+  for (const [key, spec] of Object.entries(tool.params || {})) {
+    if (spec.required && (params?.[key] === undefined || params?.[key] === null || params?.[key] === "")) {
+      missing.push(key);
+    }
+  }
+  return missing.length ? `缺少必填参数: ${missing.join(", ")}` : "";
 }
 
 /**
@@ -888,19 +965,19 @@ function detectToolCalls(text) {
   const re = new RegExp(TOOL_RE.source, "g");
   while ((match = re.exec(text)) !== null) {
     lastEnd = re.lastIndex;
-    const name = match[1];
+    const name = normalizeToolName(match[1]);
     if (FILE_RAW_TOOLS.has(name)) {
       calls.push({ name, params: parseFileWriteParams(match[2]) });
       continue;
     }
     let params;
     try {
-      params = JSON.parse(match[2] || "{}");
+      params = JSON.parse(stripJsonFence(match[2]) || "{}");
     } catch {
       // 闭合块但 JSON 损坏：用 salvage 尽力抢救参数，而不是直接丢弃（否则 file_path 等必丢）
       params = salvageTruncatedParams(match[2] || "");
     }
-    if (name === "file_edit") params = normalizeFilePathAlias(params);
+    params = normalizeToolParams(name, params);
     calls.push({ name, params });
   }
 
@@ -910,18 +987,18 @@ function detectToolCalls(text) {
 
   const openMatch = /◈◈◈[ \t]*(\w+)[ \t]*\r?\n([\s\S]*)$/.exec(rest);
   if (openMatch) {
-    const name = openMatch[1];
+    const name = normalizeToolName(openMatch[1]);
     const rawBody = openMatch[2];
     let params;
     if (FILE_RAW_TOOLS.has(name)) {
       params = parseFileWriteParams(rawBody);
     } else {
       try {
-        params = JSON.parse(rawBody.trim());
+        params = JSON.parse(stripJsonFence(rawBody));
       } catch {
         params = salvageTruncatedParams(rawBody);
       }
-      if (name === "file_edit") params = normalizeFilePathAlias(params);
+      params = normalizeToolParams(name, params);
     }
     params._truncated = true;
     calls.push({ name, params });
@@ -949,10 +1026,16 @@ function stripToolCalls(text) {
 // ── 工具执行 ──────────────────────────────────
 
 async function executeTool(name, params) {
+  name = normalizeToolName(name);
+  params = normalizeToolParams(name, params || {});
   const tool = TOOLS[name];
   if (!tool) return { success: false, output: `未知工具: ${name}` };
+  const validationError = validateToolCall(name, params);
+  if (validationError) {
+    return { success: false, output: `[工具 ${name}] 未执行：${validationError}。请按该工具参数说明重发完整调用。` };
+  }
   try {
-    const output = await tool.execute(params || {});
+    const output = await tool.execute(params);
     // 结构化结果（如 file_edit / file_create）直接传递，同时生成文本摘要给 AI
     if (output && typeof output === "object" && output._type) {
       let summary = `[工具 ${name}] `;
@@ -1015,7 +1098,11 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
   s += "1. 必须使用下方格式实际发出调用，不要只描述意图；禁止说“我先看看”“我需要查看”后停住。\n";
   s += "2. 任务需要查看文件、目录、项目结构或执行操作时，当前回复必须包含工具调用块；不要回答“我无法查看”——你可以。\n";
   s += "3. 你只是在问用户是否继续、是否要你动手时，不要调用工具，等待用户确认。\n";
-  s += "4. 只知道文件名但不知道相对路径时，先调用 project_find_file；拿到匹配路径后再调用 project_read_file 读取目标文件。\n\n";
+  s += "4. 同一回复可以发出多个独立工具块；无依赖的读取/扫描可以批量调用，有依赖的先拿结果再继续。\n";
+  s += "5. 只知道文件名但不知道相对路径时，先调用 project_find_file；拿到匹配路径后再调用 project_read_file。\n\n";
+  s += "**工具选择速查**\n";
+  for (const [scene, route] of TOOL_USE_RECIPES) s += `- ${scene}: ${route}\n`;
+  s += "\n";
   s += "**调用格式**：每次调用独占一块，◈◈◈ 与 ◈◆◆ 是固定标记，不可省略；一次回复可多次调用：\n";
   s += "◈◈◈tool_name\n{JSON参数}\n◈◆◆\n\n";
 
@@ -1036,7 +1123,10 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
   }
 
   for (const [key, tool] of Object.entries(TOOLS)) {
-    s += `### ${key} ${tool.description}\n`;
+    const desc = key === "skill_run"
+      ? `调用内置工具/远程 MCP/自定义技能。常用内置工具：${SKILL_RUN_QUICK_LIST.join(", ")}。复杂参数按工具名传入 params。`
+      : compactDescription(tool.description);
+    s += `### ${key} ${desc}\n`;
     if (tool.rawContent) {
       s += "专用格式（不是 JSON！内容原样直写，零转义）：\n";
       s += `◈◈◈${key}\n`;
@@ -1049,7 +1139,7 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
     if (pEntries.length > 0) {
       s += "参数 (JSON):\n";
       for (const [pk, pv] of pEntries) {
-        s += `  - ${pk}: ${pv.type}${pv.required ? " (必填)" : ""} ${pv.description}\n`;
+        s += `  - ${pk}: ${pv.type}${pv.required ? " (必填)" : ""} ${compactDescription(pv.description, 120)}\n`;
       }
     }
     s += `示例:\n◈◈◈${key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;

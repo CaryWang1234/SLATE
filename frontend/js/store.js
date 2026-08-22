@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260818-88";
+import { makeId } from "./services/utils.js?v=20260818-92";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -76,6 +76,8 @@ const state = {
   },
 
   // 输出控制：单次输出上限与“输出文件不限量”开关
+  maxTokens: 64000,
+
   outputSettings: {
     maxTokens: 16384,
     unlimitedFileOutput: true,
@@ -129,7 +131,7 @@ function notify(key, data) {
 
 function buildPersistentData() {
   return {
-    theme: state.theme,
+    theme: normalizeTheme(state.theme),
     modelKeys: state.modelKeys,
     customModels: state.customModels,
     currentModelId: state.currentModel?.id || state._pendingModelId || null,
@@ -140,6 +142,7 @@ function buildPersistentData() {
     lastProjectPath: state.project?.path || null,
     conversationUsage: state.conversationUsage,
     conversationTodos: state.conversationTodos,
+    maxTokens: state.maxTokens,
     autoReview: state.autoReview,
     outputSettings: state.outputSettings,
     fileOutput: state.fileOutput,
@@ -149,6 +152,10 @@ function buildPersistentData() {
     activeExpertId: state.activeExpertId,
     useResponses: state.useResponses,
   };
+}
+
+function normalizeTheme(value) {
+  return value === "dark" ? "dark" : "light";
 }
 
 function saveLocalPersistent(data = buildPersistentData()) {
@@ -163,13 +170,19 @@ function savePersistent() {
 
 function getSharedPersistentData(data = buildPersistentData()) {
   return {
+    theme: normalizeTheme(data.theme),
     modelKeys: data.modelKeys || {},
     customModels: data.customModels || [],
     currentModelId: data.currentModelId || null,
+    maxTokens: data.maxTokens || 64000,
     autoReview: data.autoReview || {},
     outputSettings: data.outputSettings || {},
     fileOutput: data.fileOutput || {},
+    harness: data.harness || {},
+    notifications: data.notifications || {},
     knowledgeSettings: data.knowledgeSettings || {},
+    activeExpertId: data.activeExpertId || "",
+    useResponses: data.useResponses === true,
   };
 }
 
@@ -188,7 +201,7 @@ function loadPersistent() {
     const raw = localStorage.getItem("slate_state");
     if (!raw) return;
     const data = JSON.parse(raw);
-    state.theme = data.theme || "light";
+    state.theme = normalizeTheme(data.theme);
     state.modelKeys = data.modelKeys || {};
     state.customModels = data.customModels || [];
     state.boardCards = data.boardCards || [];
@@ -199,6 +212,7 @@ function loadPersistent() {
     state._lastProjectPath = data.lastProjectPath || null;
     state.conversationUsage = data.conversationUsage || {};
     state.conversationTodos = data.conversationTodos || {};
+    state.maxTokens = Math.max(1000, parseInt(data.maxTokens) || 64000);
     state.autoReview = {
       ...state.autoReview,
       ...(data.autoReview || {}),
@@ -226,7 +240,7 @@ function loadPersistent() {
       ...(data.knowledgeSettings || {}),
     };
     state.activeExpertId = data.activeExpertId || "";
-    state.useResponses = data.useResponses || false;
+    state.useResponses = data.useResponses === true;
   } catch (e) {}
 }
 
@@ -247,6 +261,12 @@ async function loadSharedPersistent() {
     if (!state._pendingModelId && data.currentModelId) {
       state._pendingModelId = data.currentModelId;
     }
+    if (Object.prototype.hasOwnProperty.call(data, "theme")) {
+      state.theme = normalizeTheme(data.theme);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "maxTokens")) {
+      state.maxTokens = Math.max(1000, parseInt(data.maxTokens) || 64000);
+    }
     state.autoReview = {
       ...state.autoReview,
       ...(data.autoReview || {}),
@@ -259,10 +279,25 @@ async function loadSharedPersistent() {
       ...state.fileOutput,
       ...(data.fileOutput || {}),
     };
+    state.harness = {
+      ...state.harness,
+      ...(data.harness || {}),
+    };
+    if ((state.harness.maxRounds || 0) < 50) state.harness.maxRounds = 50;
+    state.notifications = {
+      ...state.notifications,
+      ...(data.notifications || {}),
+    };
     state.knowledgeSettings = {
       ...state.knowledgeSettings,
       ...(data.knowledgeSettings || {}),
     };
+    if (Object.prototype.hasOwnProperty.call(data, "activeExpertId")) {
+      state.activeExpertId = data.activeExpertId || "";
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "useResponses")) {
+      state.useResponses = data.useResponses === true;
+    }
     saveLocalPersistent();
   } catch (e) {}
 }
@@ -277,10 +312,10 @@ function setActiveExpertId(id, detail = null) {
 }
 
 function setTheme(t) {
-  state.theme = t;
-  document.documentElement.setAttribute("data-theme", t);
+  state.theme = normalizeTheme(t);
+  document.documentElement.setAttribute("data-theme", state.theme);
   savePersistent();
-  notify("theme", t);
+  notify("theme", state.theme);
 }
 
 function toggleTheme() {

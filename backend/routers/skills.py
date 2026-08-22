@@ -16,6 +16,7 @@ from typing import Any
 
 from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from backend.skills import plugin_adapter
 from backend.skills.sandbox import validate_skill_params, sanitize_param, MAX_PARAM_LENGTH
@@ -53,7 +54,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "doc_scan": "文档安全扫描（检测文档中的 PII/凭证/财务数据/机密标记/内网信息等，支持 md/docx/pptx/xlsx/pdf）",
     "mcp_factory": "工具工厂：根据描述自动生成新的工具，让 SLATE 自生产适配自身的工具",
     "browser_automation": "浏览器自动化：基于 Playwright 控制 Chromium 浏览器（导航/截图/点击/输入/执行JS）",
-    "computer_use": "桌面自动化：基于 pyautogui 控制鼠标键盘与窗口（截图/点击/输入/按键/剪贴板/窗口管理/图像定位）",
+    "computer_use": "桌面自动化：基于 pyautogui 控制鼠标键盘与窗口（快速截图/点击/输入/按键/剪贴板/窗口管理/图像定位）",
     "excel_tool": "Excel/CSV 办公表格：生成 .xlsx、读取表格内容、csv↔xlsx 互转",
     "pdf_tool": "PDF 办公文档：获取元信息、提取文本内容与表格数据",
     "git_tool": "Git 仓库只读信息：分支状态/提交日志/diff 统计/分支与远程列表",
@@ -126,7 +127,7 @@ async def execute_skill(body: dict[str, Any]) -> dict[str, Any]:
             return {"code": -1, "data": None, "message": f"技能 {skill_name} 缺少 execute 函数"}
 
         try:
-            result = module.execute(**params)
+            result = await run_in_threadpool(module.execute, **params)
             return {"code": 0, "data": result, "message": "ok"}
         except Exception as e:
             return {"code": -1, "data": None, "message": f"技能执行失败: {e}"}

@@ -2,11 +2,11 @@
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）。
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260818-88";
-import { get, post, del, upload } from "../services/api.js?v=20260818-88";
-import { guardSkillParams } from "../services/riskguard.js?v=20260818-88";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-88";
-import { t } from "../services/i18n.js?v=20260818-88";
+import { state, subscribe, setSkills } from "../store.js?v=20260818-92";
+import { get, post, del, upload } from "../services/api.js?v=20260818-92";
+import { guardSkillParams } from "../services/riskguard.js?v=20260818-92";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-92";
+import { t } from "../services/i18n.js?v=20260818-92";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -166,6 +166,11 @@ const SKILL_PARAM_DEFS = {
     { key: "keys", label: "按键（hotkey 逗号分隔 / press 单键名）", type: "text", placeholder: "ctrl,c 或 enter" },
     { key: "button", label: "鼠标按键", type: "text", placeholder: "left/right/middle" },
     { key: "region", label: "截图区域 x,y,w,h", type: "text", placeholder: "0,0,800,600" },
+    { key: "fast", label: "快速模式", type: "text", placeholder: "true" },
+    { key: "screenshot_format", label: "截图格式", type: "text", placeholder: "jpeg / png" },
+    { key: "quality", label: "JPEG 质量", type: "number", placeholder: "80" },
+    { key: "max_width", label: "截图最大宽度", type: "number", placeholder: "0" },
+    { key: "max_height", label: "截图最大高度", type: "number", placeholder: "0" },
     { key: "seconds", label: "等待秒数（wait）", type: "text", placeholder: "1" },
     { key: "repeats", label: "按键次数（press）", type: "text", placeholder: "1" },
     { key: "scroll_amount", label: "滚动格数", type: "text", placeholder: "3" },
