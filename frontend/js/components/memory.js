@@ -9,12 +9,12 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260818-96";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260818-96";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-96";
-import { t } from "../services/i18n.js?v=20260818-96";
-import { makeId } from "../services/utils.js?v=20260818-96";
-import { initVaultPanel, openVaultPanel } from "./vault.js?v=20260818-96";
+} from "../store.js?v=20260818-100";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260818-100";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-100";
+import { t } from "../services/i18n.js?v=20260818-100";
+import { makeId } from "../services/utils.js?v=20260818-100";
+import { initVaultPanel, openVaultPanel } from "./vault.js?v=20260818-100";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -70,6 +70,136 @@ const CATEGORY_OPTIONS = CATEGORY_GROUPS.flatMap(g =>
   g.items.map(item => ({ value: item.value, label: `[${g.label}] ${item.label}` }))
 );
 
+const MEMORY_RESULT_EMPTY = { added: 0, overwritten: 0, deleted: 0, profileUpdated: false };
+
+function normalizeMemoryCategory(category) {
+  const value = String(category || "general").trim();
+  return value || "general";
+}
+
+function normalizeMemoryContent(content) {
+  return String(content || "").replace(/\s+/g, " ").trim();
+}
+
+function memoryTokens(text) {
+  const normalized = normalizeMemoryContent(text).toLowerCase();
+  const words = normalized.match(/[a-z0-9_+\-.#]{2,}|[\u4e00-\u9fff]{1,4}/g) || [];
+  return new Set(words);
+}
+
+function memorySimilarity(a, b) {
+  const ta = memoryTokens(a);
+  const tb = memoryTokens(b);
+  if (!ta.size || !tb.size) return 0;
+  let hit = 0;
+  for (const token of ta) if (tb.has(token)) hit++;
+  return hit / Math.max(ta.size, tb.size);
+}
+
+function findDuplicateMemory(content, ignoreId = "") {
+  const normalized = normalizeMemoryContent(content).toLowerCase();
+  if (!normalized) return null;
+  return state.memories.find(mem => {
+    if (ignoreId && mem.id === ignoreId) return false;
+    const existing = normalizeMemoryContent(mem.content).toLowerCase();
+    return existing === normalized || memorySimilarity(existing, normalized) >= 0.88;
+  }) || null;
+}
+
+function extractJsonArray(text) {
+  const raw = String(text || "");
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] || raw;
+  const start = fenced.indexOf("[");
+  const end = fenced.lastIndexOf("]");
+  if (start < 0 || end < start) return null;
+  return JSON.parse(fenced.slice(start, end + 1));
+}
+
+function extractJsonObject(text) {
+  const raw = String(text || "");
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] || raw;
+  const start = fenced.indexOf("{");
+  const end = fenced.lastIndexOf("}");
+  if (start < 0 || end < start) return null;
+  return JSON.parse(fenced.slice(start, end + 1));
+}
+
+async function persistMemory(memory) {
+  const content = normalizeMemoryContent(memory?.content);
+  if (!content) return { code: 1, message: "记忆内容不能为空" };
+  const payload = {
+    id: memory.id,
+    category: normalizeMemoryCategory(memory.category),
+    content,
+  };
+  const res = await post("/chat/memories", payload);
+  if (res.code !== 0) throw new Error(res.message || "保存记忆失败");
+  return res;
+}
+
+async function saveNewMemory(memory) {
+  const content = normalizeMemoryContent(memory?.content);
+  if (!content) return null;
+  if (findDuplicateMemory(content)) return null;
+  const saved = addMemory({
+    ...memory,
+    category: normalizeMemoryCategory(memory?.category),
+    content,
+  });
+  try {
+    const res = await persistMemory(saved);
+    if (res.data?.id && res.data.id !== saved.id) updateMemory(saved.id, { id: res.data.id });
+    await indexMemoryInKnowledge(saved);
+    return saved;
+  } catch (e) {
+    removeMemory(saved.id);
+    throw e;
+  }
+}
+
+async function saveMemoryUpdate(id, updates) {
+  const exists = state.memories.find(m => m.id === id);
+  if (!exists) return false;
+  const previous = { ...exists };
+  const next = {
+    category: updates.category !== undefined ? normalizeMemoryCategory(updates.category) : exists.category,
+    content: updates.content !== undefined ? normalizeMemoryContent(updates.content) : exists.content,
+  };
+  if (!next.content) return false;
+  const duplicate = findDuplicateMemory(next.content, id);
+  if (duplicate) return false;
+  updateMemory(id, next);
+  try {
+    const res = await patch(`/chat/memories/${id}`, next);
+    if (res.code !== 0) throw new Error(res.message || "更新记忆失败");
+    await indexMemoryInKnowledge({ id, ...next });
+    return true;
+  } catch (e) {
+    updateMemory(id, previous);
+    throw e;
+  }
+}
+
+async function deleteMemoryEverywhere(id) {
+  removeMemory(id);
+  try { await del(`/chat/memories/${id}`); } catch (e) {}
+  try { await del(`/knowledge/docs/memory:${id}`); } catch (e) {}
+}
+
+async function loadMemoriesFromServer() {
+  try {
+    const res = await get("/chat/memories");
+    if (res.code === 0 && Array.isArray(res.data)) setMemories(res.data);
+  } catch (e) {}
+}
+
+async function loadSnippetsFromServer() {
+  try {
+    const res = await get("/chat/snippets");
+    if (res.code === 0 && Array.isArray(res.data)) setPromptSnippets(res.data);
+  } catch (e) {}
+}
+
 // ── 记忆列表渲染 ─────────────────────────────────────────────────────────────
 
 function renderMemoryList() {
@@ -97,9 +227,8 @@ function renderMemoryList() {
     content.addEventListener("dblclick", async () => {
       const newText = await dlgPrompt("编辑记忆内容：", { title: "编辑记忆", value: mem.content, textarea: true });
       if (newText !== null && newText.trim()) {
-        updateMemory(mem.id, { content: newText.trim() });
-        patch(`/chat/memories/${mem.id}`, { content: newText.trim() }).catch(() => {});
-        indexMemoryInKnowledge({ ...mem, content: newText.trim() });
+        try { await saveMemoryUpdate(mem.id, { content: newText }); }
+        catch (e) { import("../app.js?v=20260818-100").then(({ toast }) => toast(t("保存失败: {msg}", { msg: e.message }))); }
       }
     });
     item.appendChild(content);
@@ -115,9 +244,8 @@ function renderMemoryList() {
       const options = known ? CATEGORY_OPTIONS : [{ value: mem.category, label: mem.category }, ...CATEGORY_OPTIONS];
       const newCat = await dlgPrompt("编辑分类：", { title: "编辑分类", options, value: mem.category });
       if (newCat !== null && newCat.trim()) {
-        updateMemory(mem.id, { category: newCat.trim() });
-        patch(`/chat/memories/${mem.id}`, { category: newCat.trim() }).catch(() => {});
-        indexMemoryInKnowledge({ ...mem, category: newCat.trim() });
+        try { await saveMemoryUpdate(mem.id, { category: newCat }); }
+        catch (e) { import("../app.js?v=20260818-100").then(({ toast }) => toast(t("保存失败: {msg}", { msg: e.message }))); }
       }
     });
     actions.appendChild(editBtn);
@@ -126,9 +254,8 @@ function renderMemoryList() {
     delBtn.textContent = "×";
     delBtn.title = "删除";
     delBtn.addEventListener("click", async () => {
-      removeMemory(mem.id);
-      try { await del(`/chat/memories/${mem.id}`); } catch (e) {}
-      try { await del(`/knowledge/docs/memory:${mem.id}`); } catch (e) {}
+      if (!await dlgConfirm(t("删除记忆？"), { danger: true, okText: "删除" })) return;
+      await deleteMemoryEverywhere(mem.id);
     });
     actions.appendChild(delBtn);
 
@@ -141,12 +268,12 @@ function renderMemoryList() {
 
 async function extractMemoriesFromConversation() {
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260818-96");
+    const { toast } = await import("../app.js?v=20260818-100");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260818-96");
+  const { toast } = await import("../app.js?v=20260818-100");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -187,26 +314,23 @@ async function extractMemoriesFromConversation() {
     }
 
     // 解析 JSON
-    const jsonMatch = result.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
+    const memories = extractJsonArray(result);
+    if (!Array.isArray(memories)) {
       toast("未能提取有效记忆");
       return;
     }
 
-    const memories = JSON.parse(jsonMatch[0]);
-    let addedCount = 0, overwrittenCount = 0, deletedCount = 0;
+    let addedCount = 0, overwrittenCount = 0, deletedCount = 0, skippedCount = 0;
 
     for (const mem of memories) {
       const action = mem.action || "add";
-      const content = String(mem?.content || "").trim();
+      const content = normalizeMemoryContent(mem?.content);
       const targetId = String(mem?.target_id || "").trim();
 
       if (action === "delete" && targetId) {
         const exists = state.memories.find(m => m.id === targetId);
         if (exists) {
-          removeMemory(targetId);
-          del(`/chat/memories/${targetId}`).catch(() => {});
-          del(`/knowledge/docs/memory:${targetId}`).catch(() => {});
+          await deleteMemoryEverywhere(targetId);
           deletedCount++;
         }
         continue;
@@ -215,20 +339,16 @@ async function extractMemoriesFromConversation() {
       if (action === "overwrite" && targetId && content) {
         const exists = state.memories.find(m => m.id === targetId);
         if (exists) {
-          updateMemory(targetId, { category: mem.category || exists.category, content });
-          patch(`/chat/memories/${targetId}`, { category: mem.category || exists.category, content }).catch(() => {});
-          indexMemoryInKnowledge({ id: targetId, category: mem.category || exists.category, content });
-          overwrittenCount++;
+          if (await saveMemoryUpdate(targetId, { category: mem.category || exists.category, content })) overwrittenCount++;
+          else skippedCount++;
         }
         continue;
       }
 
       if (content) {
-        const newMem = { category: mem.category || "general", content };
-        const saved = addMemory(newMem);
-        post("/chat/memories", { id: saved.id, category: saved.category, content: saved.content }).catch(() => {});
-        indexMemoryInKnowledge(saved);
-        addedCount++;
+        const saved = await saveNewMemory({ category: mem.category || "general", content });
+        if (saved) addedCount++;
+        else skippedCount++;
       }
     }
 
@@ -236,6 +356,7 @@ async function extractMemoriesFromConversation() {
     if (addedCount) msg += t("新增 {n} 条", { n: addedCount });
     if (overwrittenCount) msg += (msg ? "，" : "") + t("覆盖 {n} 条", { n: overwrittenCount });
     if (deletedCount) msg += (msg ? "，" : "") + t("删除 {n} 条", { n: deletedCount });
+    if (skippedCount) msg += (msg ? "，" : "") + t("跳过重复 {n} 条", { n: skippedCount });
     toast(msg || t("未提取到有效记忆"));
   } catch (e) {
     console.error("提取记忆失败:", e);
@@ -297,9 +418,7 @@ function normalizeProfilePatch(profile) {
 }
 
 function isDuplicateMemory(content) {
-  const normalized = String(content || "").trim().toLowerCase();
-  if (!normalized) return true;
-  return state.memories.some(mem => String(mem.content || "").trim().toLowerCase() === normalized);
+  return Boolean(findDuplicateMemory(content));
 }
 
 async function indexMemoryInKnowledge(memory) {
@@ -318,15 +437,15 @@ async function indexMemoryInKnowledge(memory) {
 }
 
 async function autoRefineMemoryAndProfile({ silent = true } = {}) {
-  if (autoRefineRunning) return { added: 0, overwritten: 0, deleted: 0, profileUpdated: false };
-  if (Date.now() - lastAutoRefineAt < 45000) return { added: 0, overwritten: 0, deleted: 0, profileUpdated: false };
+  if (autoRefineRunning) return { ...MEMORY_RESULT_EMPTY };
+  if (Date.now() - lastAutoRefineAt < 45000) return { ...MEMORY_RESULT_EMPTY };
   const visibleMessages = state.messages.filter(m => !m.hidden && (m.role === "user" || m.role === "assistant"));
-  if (visibleMessages.length < 4) return { added: 0, overwritten: 0, deleted: 0, profileUpdated: false };
+  if (visibleMessages.length < 4) return { ...MEMORY_RESULT_EMPTY };
 
   const modelId = state.currentModel?.id;
-  if (!modelId) return { added: 0, overwritten: 0, deleted: 0, profileUpdated: false };
+  if (!modelId) return { ...MEMORY_RESULT_EMPTY };
   const apiKey = getModelKey(modelId);
-  if (!apiKey && modelId !== "local") return { added: 0, profileUpdated: false };
+  if (!apiKey && modelId !== "local") return { ...MEMORY_RESULT_EMPTY };
 
   const recent = visibleMessages.slice(-8)
     .map(m => `[${m.role === "user" ? "用户" : "助手"}]: ${String(m.content || "").slice(0, 1600)}`)
@@ -349,21 +468,18 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
       result += chunk;
     }
 
-    const jsonMatch = result.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { added: 0, profileUpdated: false };
-    const parsed = JSON.parse(jsonMatch[0]);
-    let added = 0, overwritten = 0, deleted = 0;
+    const parsed = extractJsonObject(result);
+    if (!parsed) return { ...MEMORY_RESULT_EMPTY };
+    let added = 0, overwritten = 0, deleted = 0, skipped = 0;
     for (const mem of Array.isArray(parsed.memories) ? parsed.memories : []) {
       const action = mem.action || "add";
-      const content = String(mem?.content || "").trim();
+      const content = normalizeMemoryContent(mem?.content);
       const targetId = String(mem?.target_id || "").trim();
 
       if (action === "delete" && targetId) {
         const exists = state.memories.find(m => m.id === targetId);
         if (exists) {
-          removeMemory(targetId);
-          del(`/chat/memories/${targetId}`).catch(() => {});
-          del(`/knowledge/docs/memory:${targetId}`).catch(() => {});
+          await deleteMemoryEverywhere(targetId);
           deleted++;
         }
         continue;
@@ -372,35 +488,32 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
       if (action === "overwrite" && targetId && content) {
         const exists = state.memories.find(m => m.id === targetId);
         if (exists) {
-          updateMemory(targetId, { category: mem.category || exists.category, content });
-          patch(`/chat/memories/${targetId}`, { category: mem.category || exists.category, content }).catch(() => {});
-          indexMemoryInKnowledge({ id: targetId, category: mem.category || exists.category, content });
-          overwritten++;
+          if (await saveMemoryUpdate(targetId, { category: mem.category || exists.category, content })) overwritten++;
+          else skipped++;
         }
         continue;
       }
 
       // action === "add" (default)
-      if (!content || isDuplicateMemory(content)) continue;
-      const saved = addMemory({ category: mem.category || "general", content });
-      post("/chat/memories", { id: saved.id, category: saved.category, content: saved.content }).catch(() => {});
-      indexMemoryInKnowledge(saved);
-      added++;
+      const saved = await saveNewMemory({ category: mem.category || "general", content });
+      if (saved) added++;
+      else skipped++;
     }
 
     const patch = normalizeProfilePatch(parsed.profile);
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || overwritten || deleted || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260818-96");
+      const { toast } = await import("../app.js?v=20260818-100");
       let msg = "";
       if (added) msg += t("新增 {n} 条", { n: added });
       if (overwritten) msg += (msg ? "，" : "") + t("覆盖 {n} 条", { n: overwritten });
       if (deleted) msg += (msg ? "，" : "") + t("删除 {n} 条", { n: deleted });
+      if (skipped) msg += (msg ? "，" : "") + t("跳过重复 {n} 条", { n: skipped });
       if (profileUpdated) msg += (msg ? "，" : "") + t("更新画像");
       toast(msg || t("记忆已更新"));
     }
-    return { added, overwritten, deleted, profileUpdated };
+    return { added, overwritten, deleted, profileUpdated, skipped };
   } catch (e) {
     console.warn("自动提炼记忆失败:", e);
     return { added: 0, overwritten: 0, deleted: 0, profileUpdated: false, error: e.message };
@@ -417,11 +530,14 @@ async function showAddMemoryDialog() {
 
   const category = (await dlgPrompt("选择分类：", { title: "添加记忆", options: CATEGORY_OPTIONS, value: "general" })) || "general";
 
-  const mem = { category: category.trim(), content: content.trim() };
-  const saved = addMemory(mem);
-  post("/chat/memories", { id: saved.id, category: saved.category, content: saved.content })
-    .then(() => indexMemoryInKnowledge(saved))
-    .catch(() => indexMemoryInKnowledge(saved));
+  try {
+    const saved = await saveNewMemory({ category, content });
+    const { toast } = await import("../app.js?v=20260818-100");
+    toast(saved ? t("记忆已添加") : t("已存在相似记忆，已跳过"));
+  } catch (e) {
+    const { toast } = await import("../app.js?v=20260818-100");
+    toast(t("保存失败: {msg}", { msg: e.message }));
+  }
 }
 
 function renderKnowledgeList(items = []) {
@@ -473,7 +589,7 @@ function renderKnowledgeList(items = []) {
 async function loadKnowledgeDocs() {
   if (!knowledgeList) return;
   try {
-    if (!memoryReindexDone) {
+    if (!memoryReindexDone || state.memories.some(m => m._needsIndex)) {
       memoryReindexDone = true;
       await post("/knowledge/reindex-memories", {});
     }
@@ -506,7 +622,7 @@ async function addKnowledgeDialog() {
     content: content.trim(),
   });
   if (res.code === 0) {
-    const { toast } = await import("../app.js?v=20260818-96");
+    const { toast } = await import("../app.js?v=20260818-100");
     toast("知识已添加");
     await loadKnowledgeDocs();
   }
@@ -662,7 +778,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260818-96").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260818-100").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗？", { danger: true, okText: "重置" })) {
@@ -700,6 +816,8 @@ function initMemoryPanel() {
   renderMemoryList();
   renderSnippetList();
   loadKnowledgeSettingsToForm();
+  loadMemoriesFromServer().then(renderMemoryList);
+  loadSnippetsFromServer().then(renderSnippetList);
   loadKnowledgeDocs();
 }
 
@@ -710,6 +828,8 @@ function openMemoryModal() {
   loadProfileToForm();
   renderMemoryList();
   loadKnowledgeSettingsToForm();
+  loadMemoriesFromServer().then(renderMemoryList);
+  loadSnippetsFromServer().then(renderSnippetList);
   loadKnowledgeDocs();
   memoryModal.classList.remove("hidden");
 }
@@ -805,7 +925,7 @@ async function captureConversationSpark() {
     }
 
     if (count > 0) {
-      const { toast } = await import("../app.js?v=20260818-96");
+      const { toast } = await import("../app.js?v=20260818-100");
       toast(t("已捕获 {n} 条灵光", { n: count }));
     }
   } catch (e) {

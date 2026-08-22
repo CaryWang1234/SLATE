@@ -63,8 +63,8 @@ def _tokenize(text: str) -> list[str]:
     words = re.findall(r"[a-z0-9_+\-.#]{2,}|[\u4e00-\u9fff]{1,4}", lowered)
     grams: list[str] = []
     chinese = "".join(re.findall(r"[\u4e00-\u9fff]", lowered))
-    for size in (2, 3):
-      grams.extend(chinese[i:i + size] for i in range(max(0, len(chinese) - size + 1)))
+    for size in (2, 3, 4):
+        grams.extend(chinese[i:i + size] for i in range(max(0, len(chinese) - size + 1)))
     return [w for w in words + grams if w.strip()]
 
 
@@ -134,7 +134,7 @@ def upsert_document(
     )
     conn.execute("DELETE FROM knowledge_chunks WHERE doc_id = ?", (doc_id,))
     for index, chunk in enumerate(chunks):
-        terms = " ".join(sorted(set(_tokenize(chunk)))[:200])
+        terms = " ".join(sorted(set(_tokenize(chunk)))[:500])
         conn.execute(
             "INSERT INTO knowledge_chunks (id, doc_id, chunk_index, content, vector, terms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (str(uuid.uuid4())[:12], doc_id, index, chunk, json.dumps(_hash_vector(chunk)), terms, now),

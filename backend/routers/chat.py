@@ -416,11 +416,24 @@ async def import_all(body: dict[str, Any]) -> dict[str, Any]:
     for mem in memories:
         if not mem.get("id"):
             continue
+        content = str(mem.get("content", "")).strip()
+        if not content:
+            continue
+        category = str(mem.get("category") or "general").strip()[:40] or "general"
         cur = conn.execute(
             "INSERT OR IGNORE INTO memories (id, category, content, created_at) VALUES (?, ?, ?, ?)",
-            (mem["id"], mem.get("category", "general"), mem.get("content", ""), mem.get("created_at") or time.time()),
+            (str(mem["id"])[:80], category, content, mem.get("created_at") or time.time()),
         )
         stats["memories"] += cur.rowcount
+        if cur.rowcount:
+            upsert_document(
+                doc_id=f"memory:{str(mem['id'])[:80]}",
+                title=f"长期记忆 · {category}",
+                source="long-term-memory",
+                kind="memory",
+                content=content,
+                metadata={"memory_id": str(mem["id"])[:80], "category": category},
+            )
     for s in snippets:
         if not s.get("id"):
             continue
@@ -524,32 +537,49 @@ async def list_memories() -> dict[str, Any]:
 
 @router.post("/memories")
 async def create_memory(body: dict[str, Any]) -> dict[str, Any]:
-    mem_id = body.get("id", str(uuid.uuid4())[:8])
-    category = body.get("category", "general")
-    content = body.get("content", "")
+    mem_id = str(body.get("id") or str(uuid.uuid4())[:8]).strip()[:80]
+    category = str(body.get("category") or "general").strip()[:40] or "general"
+    content = str(body.get("content") or "").strip()
+    if not content:
+        return {"code": 1, "message": "记忆内容不能为空"}
     now = time.time()
     conn = _get_db()
-    conn.execute("INSERT INTO memories (id, category, content, created_at) VALUES (?, ?, ?, ?)",
-                 (mem_id, category, content, now))
+    conn.execute(
+        """
+        INSERT INTO memories (id, category, content, created_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            category=excluded.category,
+            content=excluded.content
+        """,
+        (mem_id, category, content, now),
+    )
     conn.commit()
     conn.close()
-    if content:
-        upsert_document(
-            doc_id=f"memory:{mem_id}",
-            title=f"长期记忆 · {category}",
-            source="long-term-memory",
-            kind="memory",
-            content=content,
-            metadata={"memory_id": mem_id, "category": category},
-        )
-    return {"code": 0, "data": {"id": mem_id}, "message": "ok"}
+    upsert_document(
+        doc_id=f"memory:{mem_id}",
+        title=f"长期记忆 · {category}",
+        source="long-term-memory",
+        kind="memory",
+        content=content,
+        metadata={"memory_id": mem_id, "category": category},
+    )
+    return {"code": 0, "data": {"id": mem_id, "category": category, "content": content, "created_at": now}, "message": "ok"}
 
 
 @router.patch("/memories/{mem_id}")
 async def update_memory(mem_id: str, body: dict[str, Any]) -> dict[str, Any]:
     category = body.get("category")
     content = body.get("content")
+    if category is not None:
+        category = str(category).strip()[:40] or "general"
+    if content is not None:
+        content = str(content).strip()
     conn = _get_db()
+    exists = conn.execute("SELECT id FROM memories WHERE id=?", (mem_id,)).fetchone()
+    if not exists:
+        conn.close()
+        return {"code": 1, "message": "记忆不存在"}
     if category is not None:
         conn.execute("UPDATE memories SET category=? WHERE id=?", (category, mem_id))
     if content is not None:
@@ -566,17 +596,19 @@ async def update_memory(mem_id: str, body: dict[str, Any]) -> dict[str, Any]:
             content=row["content"],
             metadata={"memory_id": mem_id, "category": row["category"]},
         )
-    return {"code": 0, "data": None, "message": "ok"}
+    else:
+        delete_document(f"memory:{mem_id}")
+    return {"code": 0, "data": dict(row) if row else None, "message": "ok"}
 
 
 @router.delete("/memories/{mem_id}")
 async def delete_memory(mem_id: str) -> dict[str, Any]:
     conn = _get_db()
-    conn.execute("DELETE FROM memories WHERE id=?", (mem_id,))
+    cur = conn.execute("DELETE FROM memories WHERE id=?", (mem_id,))
     conn.commit()
     conn.close()
     delete_document(f"memory:{mem_id}")
-    return {"code": 0, "data": None, "message": "ok"}
+    return {"code": 0, "data": {"deleted": cur.rowcount}, "message": "ok"}
 
 
 # ── 提示词素材 CRUD ───────────────────────────

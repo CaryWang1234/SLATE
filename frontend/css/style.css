@@ -1399,13 +1399,14 @@ textarea::-webkit-scrollbar-thumb {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 12px;
-  min-width: 140px;
-  max-width: 260px;
+  width: 220px;
+  max-width: 220px;
   cursor: grab;
   user-select: none;
   position: absolute;
   transition: border-color var(--transition), background-color var(--transition);
   pointer-events: auto;
+  touch-action: none;
 }
 
 .board-card:hover {

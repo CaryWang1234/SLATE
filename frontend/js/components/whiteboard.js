@@ -2,11 +2,11 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-96";
-import { streamChat } from "../services/api.js?v=20260818-96";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-96";
-import { t } from "../services/i18n.js?v=20260818-96";
-import { makeId } from "../services/utils.js?v=20260818-96";
+import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-100";
+import { streamChat } from "../services/api.js?v=20260818-100";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-100";
+import { t } from "../services/i18n.js?v=20260818-100";
+import { makeId } from "../services/utils.js?v=20260818-100";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -19,6 +19,16 @@ let currentToolMode = "select";
 let connectSourceId = null;
 let strokes = [];
 let currentStroke = null;
+let activeCardDrag = null;
+let suppressCardClickUntil = 0;
+
+const CARD_LAYOUT = {
+  width: 220,
+  minGapX: 28,
+  gapY: 28,
+  startX: 24,
+  startY: 24,
+};
 
 // 颜色选项
 const CARD_COLORS = [
@@ -33,11 +43,84 @@ const CARD_COLORS = [
 
 // ── 卡片渲染 ─────────────────────────────────
 
+function getBoardViewportSize() {
+  const rect = boardCanvas?.getBoundingClientRect?.();
+  return {
+    width: Math.max(320, rect?.width || 900),
+    height: Math.max(260, rect?.height || 600),
+  };
+}
+
+function getNextCardPosition(index = state.boardCards.length) {
+  const { width } = getBoardViewportSize();
+  const columns = Math.max(1, Math.floor((width - CARD_LAYOUT.startX * 2) / (CARD_LAYOUT.width + CARD_LAYOUT.minGapX)));
+  const col = index % columns;
+  const row = Math.floor(index / columns);
+  return {
+    x: CARD_LAYOUT.startX + col * (CARD_LAYOUT.width + CARD_LAYOUT.minGapX),
+    y: CARD_LAYOUT.startY + row * (100 + CARD_LAYOUT.gapY),
+  };
+}
+
+function normalizeBoardCardsLayout(cards = state.boardCards) {
+  let changed = false;
+  const normalized = cards.map((card, index) => {
+    const hasX = Number.isFinite(Number(card.x));
+    const hasY = Number.isFinite(Number(card.y));
+    if (hasX && hasY) return card;
+    changed = true;
+    return { ...card, ...getNextCardPosition(index) };
+  });
+  if (changed) setBoardCards(normalized);
+  return changed ? normalized : cards;
+}
+
+function placeNewCard(card, index = state.boardCards.length) {
+  const pos = getNextCardPosition(index);
+  return {
+    ...card,
+    x: Number.isFinite(Number(card.x)) ? Number(card.x) : pos.x,
+    y: Number.isFinite(Number(card.y)) ? Number(card.y) : pos.y,
+  };
+}
+
+function updateCardPosition(cardId, x, y) {
+  const maxX = Math.max(CARD_LAYOUT.startX, (boardCanvas?.scrollWidth || getBoardViewportSize().width) - 180);
+  const maxY = Math.max(CARD_LAYOUT.startY, (boardCanvas?.scrollHeight || getBoardViewportSize().height) - 80);
+  const nx = Math.max(0, Math.min(maxX, Math.round(x)));
+  const ny = Math.max(0, Math.min(maxY, Math.round(y)));
+  const cards = state.boardCards.map(card => (
+    card.id === cardId ? { ...card, x: nx, y: ny } : card
+  ));
+  setBoardCards(cards);
+}
+
+function updateBoardLayerSize(cards = state.boardCards) {
+  if (!boardCanvas || !boardCards) return;
+  const viewport = getBoardViewportSize();
+  const maxRight = cards.reduce((max, card) => Math.max(max, (Number(card.x) || 0) + CARD_LAYOUT.width + 80), viewport.width);
+  const maxBottom = cards.reduce((max, card) => Math.max(max, (Number(card.y) || 0) + 180), viewport.height);
+  const width = Math.ceil(maxRight);
+  const height = Math.ceil(maxBottom);
+  boardCards.style.width = `${width}px`;
+  boardCards.style.height = `${height}px`;
+  if (notesLayer) {
+    notesLayer.style.width = `${width}px`;
+    notesLayer.style.height = `${height}px`;
+  }
+  if (drawCanvas) {
+    drawCanvas.style.minWidth = `${width}px`;
+    drawCanvas.style.minHeight = `${height}px`;
+  }
+}
+
 function renderCard(card) {
   const el = document.createElement("div");
   el.className = "board-card";
-  el.draggable = currentToolMode === "select";
+  el.draggable = false;
   el.dataset.cardId = card.id;
+  el.style.left = `${Number(card.x) || 0}px`;
+  el.style.top = `${Number(card.y) || 0}px`;
 
   // 应用颜色
   const color = CARD_COLORS.find(c => c.id === card.color) || CARD_COLORS[0];
@@ -88,33 +171,67 @@ function renderCard(card) {
     if (currentToolMode === "select") openCardModal(card);
   });
 
-  // 拖拽事件
-  el.addEventListener("dragstart", (e) => {
-    if (currentToolMode !== "select") {
-      e.preventDefault();
-      return;
-    }
+  el.addEventListener("pointerdown", (e) => {
+    if (currentToolMode !== "select") return;
+    if (e.button !== 0 || e.target.closest("button")) return;
+    e.preventDefault();
+    activeCardDrag = {
+      id: card.id,
+      startX: Number(card.x) || 0,
+      startY: Number(card.y) || 0,
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      moved: false,
+    };
     el.classList.add("dragging");
-    e.dataTransfer.setData("text/plain", card.id);
-    e.dataTransfer.effectAllowed = "move";
+    el.setPointerCapture(e.pointerId);
   });
 
-  el.addEventListener("dragend", () => {
+  el.addEventListener("pointermove", (e) => {
+    if (!activeCardDrag || activeCardDrag.id !== card.id) return;
+    e.preventDefault();
+    const dx = e.clientX - activeCardDrag.pointerX;
+    const dy = e.clientY - activeCardDrag.pointerY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) activeCardDrag.moved = true;
+    el.style.left = `${Math.max(0, Math.round(activeCardDrag.startX + dx))}px`;
+    el.style.top = `${Math.max(0, Math.round(activeCardDrag.startY + dy))}px`;
+    drawArrows();
+  });
+
+  const finishDrag = (e) => {
+    if (!activeCardDrag || activeCardDrag.id !== card.id) return;
+    const drag = activeCardDrag;
+    activeCardDrag = null;
     el.classList.remove("dragging");
+    try { el.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (!drag.moved) return;
+    suppressCardClickUntil = Date.now() + 250;
+    updateCardPosition(card.id, parseFloat(el.style.left) || 0, parseFloat(el.style.top) || 0);
+  };
+  el.addEventListener("pointerup", finishDrag);
+  el.addEventListener("pointercancel", finishDrag);
+  el.addEventListener("click", (e) => {
+    if (Date.now() < suppressCardClickUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
   });
 
   return el;
 }
 
 function renderAllCards() {
+  const cards = normalizeBoardCardsLayout();
+  if (cards !== state.boardCards) return;
+  updateBoardLayerSize(cards);
   boardCards.innerHTML = "";
   svgOverlay = null;
-  if (state.boardCards.length === 0) {
+  if (cards.length === 0) {
     boardEmpty.style.display = "";
     return;
   }
   boardEmpty.style.display = "none";
-  for (const card of state.boardCards) {
+  for (const card of cards) {
     boardCards.appendChild(renderCard(card));
   }
   // 绘制箭头（延迟确定DOM 已更新）
@@ -424,14 +541,14 @@ function saveCard() {
     setBoardCards(cards);
   } else {
     // 添加新卡片
-    const card = {
+    const card = placeNewCard({
 
       id: `c${Date.now().toString(36)}`,
       title,
       body,
       arrows,
       color: selectedColor,
-    };
+    });
     addBoardCard(card);
   }
 
@@ -822,7 +939,7 @@ function addToolStepCard(toolName, params, status = "running") {
   const color = statusColors[status] || "default";
   
   // 创建步骤卡片
-  const card = {
+  const card = placeNewCard({
     id: makeId("step_"),
     title: `${icon} 步骤 ${stepNum}: ${desc}`,
     body: summary || "(无参数)",
@@ -833,7 +950,7 @@ function addToolStepCard(toolName, params, status = "running") {
     _stepNum: stepNum,
     _status: status,
     _timestamp: Date.now(),
-  };
+  });
   
   // 连接到上一步
   if (stepCards.length > 0) {

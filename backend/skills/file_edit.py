@@ -4,6 +4,7 @@
 - view: 带行号读取文件（供 AI 精确定位引用）
 - replace: 精确字符串替换（唯一匹配 + 自动备份）
 - edit: 基于 diff 的精确修改（old_text → new_text）
+- replace_range: 按行号范围替换内容（1-based，预览 diff）
 - read: 读取文件内容（支持行号范围）
 - insert: 在指定行插入内容
 - delete: 删除指定行范围
@@ -106,6 +107,20 @@ def _generate_diff(original: str, content: str, filename: str) -> str:
     return "".join(diff_lines)
 
 
+def _normalize_newlines(text: str, line_ending: str = "\n") -> str:
+    """把调用方传入的换行统一到目标文件的换行风格。"""
+    normalized = str(text).replace("\r\n", "\n").replace("\r", "\n")
+    if line_ending == "\r\n":
+        normalized = normalized.replace("\n", "\r\n")
+    return normalized
+
+
+def _count_diff_lines(diff_text: str) -> tuple[int, int]:
+    added = sum(1 for line in diff_text.splitlines() if line.startswith("+") and not line.startswith("+++"))
+    removed = sum(1 for line in diff_text.splitlines() if line.startswith("-") and not line.startswith("---"))
+    return added, removed
+
+
 def _execute_view(
     file_path: str,
     start_line: int | None = None,
@@ -166,7 +181,7 @@ def _execute_replace(
     if old_str is None or old_str == "":
         return {"error": "old_str 不能为空"}
 
-    lines, content, line_ending, error = _read_with_lines(file_path)
+    _lines, content, _line_ending, error = _read_with_lines(file_path)
     if error:
         return {"error": error}
 
@@ -242,7 +257,7 @@ def _execute_edit(file_path: str, edits: Any) -> dict[str, Any]:
     if not edit_list or not isinstance(edit_list, list):
         return {"error": "edits 不能为空"}
     
-    content, error = _read_file(file_path)
+    _lines, content, line_ending, error = _read_with_lines(file_path)
     if error:
         return {"error": error}
     
@@ -255,22 +270,24 @@ def _execute_edit(file_path: str, edits: Any) -> dict[str, Any]:
         old_text = edit.get("old_text", "")
         new_text = edit.get("new_text", "")
         
-        if not old_text and old_text != "":
-            errors.append(f"第 {i + 1} 项缺少 old_text")
+        if not isinstance(old_text, str) or old_text == "":
+            errors.append(f"第 {i + 1} 项缺少 old_text 或 old_text 为空")
             continue
+
+        old_text = _normalize_newlines(old_text, line_ending)
+        new_text = _normalize_newlines(new_text, line_ending)
         
         count = content.count(old_text)
         if count == 0:
-            errors.append(f"第 {i + 1} 项: old_text 在文件中未找到")
+            errors.append(f"第 {i + 1} 项: old_text 在文件中未找到；若已确认行号，建议改用 action=replace_range")
             continue
         if count > 1:
-            errors.append(f"第 {i + 1} 项: old_text 在文件中出现 {count} 次，需更精确以唯一匹配")
+            errors.append(f"第 {i + 1} 项: old_text 在文件中出现 {count} 次，需更精确以唯一匹配；若已确认行号，建议改用 action=replace_range")
             continue
         
-        content = content.replace(old_text, new_text, 1)
-        
-        before = content[:content.index(new_text)] if new_text in content else ""
-        line_no = before.count("\n") + 1 if new_text else content[:len(content) - len(new_text)].count("\n") + 1
+        pos = content.index(old_text)
+        line_no = content[:pos].count("\n") + 1
+        content = content[:pos] + new_text + content[pos + len(old_text):]
         
         applied.append({
             "index": i + 1,
@@ -292,8 +309,7 @@ def _execute_edit(file_path: str, edits: Any) -> dict[str, Any]:
         }
     
     diff_text = _generate_diff(original, content, target.name)
-    added = sum(1 for l in diff_text.splitlines() if l.startswith("+") and not l.startswith("+++"))
-    removed = sum(1 for l in diff_text.splitlines() if l.startswith("-") and not l.startswith("---"))
+    added, removed = _count_diff_lines(diff_text)
     
     return {
         "file": str(target),
@@ -309,6 +325,66 @@ def _execute_edit(file_path: str, edits: Any) -> dict[str, Any]:
         },
         "new_content": content,
         "note": "编辑已预览。用户可选择「接受」写入文件、「拒绝」放弃、「复制」拷贝 diff。",
+    }
+
+
+def _execute_replace_range(file_path: str, content: str, start_line: int, end_line: int) -> dict[str, Any]:
+    """按 1-based 行号范围替换内容，适合先 view/read 后精确修改。"""
+    if start_line < 1:
+        return {"error": "start_line 必须 >= 1"}
+    if end_line < start_line:
+        return {"error": "end_line 必须 >= start_line"}
+
+    lines, original, line_ending, error = _read_with_lines(file_path)
+    if error:
+        return {"error": error}
+
+    total = len(lines)
+    if total == 0:
+        return {"error": "空文件请使用 insert 或 replace 操作"}
+    if start_line > total:
+        return {"error": f"start_line 超出文件行数（当前 {total} 行）"}
+    if end_line > total:
+        return {"error": f"end_line 超出文件行数（当前 {total} 行）"}
+
+    normalized_content = _normalize_newlines(content, line_ending)
+    replacement_lines = normalized_content.splitlines()
+    start = start_line - 1
+    end = end_line
+    new_lines = lines[:start] + replacement_lines + lines[end:]
+
+    final_newline = original.endswith(("\n", "\r")) or (
+        end_line == total and normalized_content.endswith(("\n", "\r"))
+    )
+    new_content = line_ending.join(new_lines)
+    if final_newline and new_content:
+        new_content += line_ending
+
+    target = Path(file_path)
+    diff_text = _generate_diff(original, new_content, target.name)
+    added, removed = _count_diff_lines(diff_text)
+
+    return {
+        "file": str(target),
+        "file_name": target.name,
+        "action": "replace_range",
+        "range": f"{start_line}-{end_line}",
+        "diff": diff_text,
+        "applied": [{
+            "index": 1,
+            "line": start_line,
+            "old_lines": end_line - start_line + 1,
+            "new_lines": len(replacement_lines),
+        }],
+        "errors": [],
+        "stats": {
+            "edits_total": 1,
+            "edits_applied": 1,
+            "lines_added": added,
+            "lines_removed": removed,
+        },
+        "new_content": new_content,
+        "note": "行范围替换已预览。用户可选择「接受」写入文件、「拒绝」放弃、「复制」拷贝 diff。",
     }
 
 
@@ -515,13 +591,13 @@ def execute(
 
     Args:
         file_path: 目标文件路径
-        action: 操作类型 - view/replace/edit/read/insert/delete/copy/paste/cut
+        action: 操作类型 - view/replace/edit/replace_range/read/insert/delete/copy/paste/cut
         edits: JSON 数组（edit 操作），每项含 old_text 和 new_text
-        content: 要插入的内容（insert 操作）
+        content: 要插入或替换的内容（insert/replace_range 操作）
         old_str: 要被替换的精确字符串（replace 操作）
         new_str: 替换后的新字符串（replace 操作）
-        start_line: 起始行号（1-based，用于 view/insert/delete/copy/paste/cut）
-        end_line: 结束行号（1-based，用于 view/delete/copy/cut）
+        start_line: 起始行号（1-based，用于 view/replace_range/insert/delete/copy/paste/cut）
+        end_line: 结束行号（1-based，用于 view/replace_range/delete/copy/cut）
         clipboard_name: 剪贴板名称（默认 "default"，支持多个命名剪贴板）
     """
     if not file_path:
@@ -543,6 +619,9 @@ def execute(
         if edits is None:
             return {"error": "edit 操作需要 edits 参数"}
         return _execute_edit(file_path, edits)
+
+    if action == "replace_range":
+        return _execute_replace_range(file_path, content, start_line, end_line)
     
     if action == "read":
         return _execute_read(file_path, start_line, end_line)
@@ -562,4 +641,4 @@ def execute(
     if action == "cut":
         return _execute_cut(file_path, start_line, end_line, clipboard_name)
     
-    return {"error": f"未知操作: {action}，可选: view/replace/edit/read/insert/delete/copy/paste/cut"}
+    return {"error": f"未知操作: {action}，可选: view/replace/edit/replace_range/read/insert/delete/copy/paste/cut"}

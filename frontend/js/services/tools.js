@@ -12,11 +12,11 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-96";
-import { post } from "../services/api.js?v=20260818-96";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-96";
-import { t } from "./i18n.js?v=20260818-96";
-import { makeId } from "./utils.js?v=20260818-96";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-100";
+import { post } from "../services/api.js?v=20260818-100";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-100";
+import { t } from "./i18n.js?v=20260818-100";
+import { makeId } from "./utils.js?v=20260818-100";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -233,7 +233,7 @@ const TOOLS = {
 
   skill_run: {
     name: "执行工具",
-    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(持久化终端会话：支持多会话管理、状态保持（cd/export跨命令保持）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，高危命令双层拦截), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文纯文本，mode=html时返回原始HTML), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果)。也可传入 SKILL.md 技能名读取其定义内容",
+    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/replace_range按行号范围替换（start_line/end_line/content，推荐先view确认行号）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(持久化终端会话：支持多会话管理、状态保持（cd/export跨命令保持）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，高危命令双层拦截), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文纯文本，mode=html时返回原始HTML), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果)。也可传入 SKILL.md 技能名读取其定义内容",
     params: {
       skill: { type: "string", description: "工具或技能名称", required: true },
       params: { type: "object", description: "工具参数" },
@@ -354,20 +354,28 @@ const TOOLS = {
 
   file_edit: {
     name: "编辑文件",
-    description: "文件编辑：view 带行号查看 / replace 精确唯一替换 / edit diff / read / insert / delete / copy / paste / cut。默认自动应用写入（用户在设置关闭自动确认时改为预览后手动接受）。参数名 file_path（不是 path）。",
+    description: "文件编辑：view 带行号查看 / edit 精确文本替换 / replace_range 按行号替换 / read / insert / delete / copy / paste / cut。默认自动应用写入（用户在设置关闭自动确认时改为预览后手动接受）。参数名 file_path（不是 path）。",
     params: {
       file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录）", required: true },
+      action: { type: "string", description: "操作类型：edit / replace_range / view / read / insert / delete / copy / paste / cut" },
       edits: { type: "array", description: '编辑列表（edit 操作），每项含 old_text 和 new_text，如 [{"old_text":"原内容","new_text":"新内容"}]' },
       old_str: { type: "string", description: "要被替换的精确字符串（replace 操作，必须唯一匹配）" },
       new_str: { type: "string", description: "替换后的新字符串（replace 操作）" },
+      content: { type: "string", description: "插入或替换内容（insert/replace_range 操作）" },
+      start_line: { type: "number", description: "起始行号（1-based，用于 replace_range/view/read/insert/delete/copy/paste/cut）" },
+      end_line: { type: "number", description: "结束行号（1-based，用于 replace_range/view/read/delete/copy/cut）" },
     },
-    async execute({ file_path, edits, _truncated }) {
+    async execute({ file_path, action = "edit", edits, content = "", old_str = "", new_str = "", start_line = 0, end_line = 0, clipboard_name = "default", _truncated }) {
       if (!state.project) return "未打开项目";
       if (!file_path) return "缺少 file_path";
-      if (!edits || !edits.length) return "缺少 edits";
+      const normalizedAction = String(action || "edit").trim().toLowerCase();
+      const editList = Array.isArray(edits) ? edits : [];
+      const editsTotal = normalizedAction === "edit" ? editList.length : 1;
+      if (normalizedAction === "edit" && !editList.length) return "缺少 edits";
+      if (normalizedAction === "replace_range" && (!start_line || !end_line)) return "replace_range 需要 start_line 和 end_line";
 
-      // 输出被截断时 edits 列表可能不完整，只应用部分编辑很危险，拒绝执行
-      if (_truncated) {
+      // 输出被截断时写入参数可能不完整，只应用部分编辑很危险，拒绝执行
+      if (_truncated && !["view", "read", "copy"].includes(normalizedAction)) {
 
         return {
           _type: "file_edit",
@@ -376,8 +384,8 @@ const TOOLS = {
           file_name: String(file_path || "").replace(/\\/g, "/").split("/").pop() || "",
           diff: "",
           new_content: "",
-          stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
-          errors: ["模型输出被截断，edits 可能不完整，已拒绝执行。请减少单次编辑量或重试"],
+          stats: { edits_total: editsTotal, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+          errors: ["模型输出被截断，文件修改参数可能不完整，已拒绝执行。请减少单次编辑量或重试"],
           applied: [],
           truncated: true,
         };
@@ -392,17 +400,28 @@ const TOOLS = {
           file_name: String(file_path || "").replace(/\\/g, "/").split("/").pop() || "",
           diff: "",
           new_content: "",
-          stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+          stats: { edits_total: editsTotal, edits_applied: 0, lines_added: 0, lines_removed: 0 },
           errors: [target.error],
           applied: [],
         };
       }
       const absPath = target.abs;
+      const params = {
+        file_path: absPath,
+        action: normalizedAction,
+        content,
+        old_str,
+        new_str,
+        start_line: Number.parseInt(start_line, 10) || 0,
+        end_line: Number.parseInt(end_line, 10) || 0,
+        clipboard_name,
+      };
+      if (normalizedAction === "edit") params.edits = JSON.stringify(editList);
       let res;
       try {
         res = await post("/skills/execute", {
           skill: "file_edit",
-          params: { file_path: absPath, edits: JSON.stringify(edits) },
+          params,
         });
       } catch (e) {
         return {
@@ -412,7 +431,7 @@ const TOOLS = {
           file_name: target.fileName,
           diff: "",
           new_content: "",
-          stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+          stats: { edits_total: editsTotal, edits_applied: 0, lines_added: 0, lines_removed: 0 },
           errors: ["网络请求失败: " + e.message],
           applied: [],
         };
@@ -425,7 +444,7 @@ const TOOLS = {
           file_name: target.fileName,
           diff: "",
           new_content: "",
-          stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+          stats: { edits_total: editsTotal, edits_applied: 0, lines_added: 0, lines_removed: 0 },
           errors: [res.message || "未知错误"],
           applied: [],
         };
@@ -439,21 +458,28 @@ const TOOLS = {
           file_name: target.fileName,
           diff: "",
           new_content: "",
-          stats: { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+          stats: { edits_total: editsTotal, edits_applied: 0, lines_added: 0, lines_removed: 0 },
           errors: [data.error],
           applied: [],
         };
+      }
+      if (["view", "read"].includes(normalizedAction)) {
+        const range = data.range ? ` (${data.range})` : "";
+        return `[${target.relative}${range}]\n${data.content || ""}`;
+      }
+      if (normalizedAction === "copy") {
+        return `已复制 ${data.copied_lines || 0} 行、${data.copied_chars || 0} 字符到剪贴板 ${data.clipboard || "default"}。\n${data.preview || ""}`;
       }
 
       // 返回结构化数据，chat.js 会按 _type 渲染 diff UI
       const structured = {
         _type: "file_edit",
-        file: data.file,
+        file: data.file || absPath,
         file_path_rel: target.relative,
-        file_name: data.file_name,
-        diff: data.diff,
+        file_name: data.file_name || target.fileName,
+        diff: data.diff || "",
         new_content: data.new_content,
-        stats: data.stats || { edits_total: edits.length, edits_applied: 0, lines_added: 0, lines_removed: 0 },
+        stats: data.stats || { edits_total: editsTotal, edits_applied: data.new_content ? 1 : 0, lines_added: 0, lines_removed: 0 },
         errors: data.errors || [],
         applied: data.applied || [],
       };
@@ -1186,10 +1212,12 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
   s += "核心原则：你说改它就真改，你不说它绝不碰。\n";
   s += "- file_path: 相对于项目根目录的路径\n";
   s += "- file_path 只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
-  s += "- edits: JSON 数组，每项包含 old_text（要替换的原文）和 new_text（替换后的内容）\n";
-  s += "- old_text 必须在文件中唯一出现，否则会报错\n";
-  s += "- 只包含你要修改的部分，不要包含整个文件内容\n";
-  s += "- 可以包含多组编辑，一次性完成所有修改\n";
+  s += "- 修改前必须先用 project_read_file、file_peek 或 file_edit action=view/read 确认最新内容与行号\n";
+  s += "- 推荐路径：已确认行号时使用 action=replace_range，传 start_line、end_line、content，按完整行范围替换，最稳妥\n";
+  s += "- 小范围且 old_text 唯一时可使用 action=edit，edits 为 JSON 数组，每项包含 old_text 和 new_text\n";
+  s += "- action=edit 的 old_text 必须在文件中唯一出现；不唯一或找不到时，重新读取并改用 replace_range\n";
+  s += "- 只包含你要修改的部分，不要包含整个文件内容；replace_range 的 content 只写目标行范围的新内容\n";
+  s += "- 可以包含多组 edits 一次性完成所有修改；跨远距离的大修改优先分多次 replace_range\n";
   s += "- 用户会看到 diff 预览，并可以选择「接受」「拒绝」或「复制」\n";
   s += "- 编辑完成后，等待用户确认，不要自动继续修改\n";
 

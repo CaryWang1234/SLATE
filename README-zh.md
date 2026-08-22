@@ -23,7 +23,7 @@
 
 SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、上下文管理与项目灵感整理。
 
-它内置多模型对话、工具调用、Harness 自主执行、磨墨模式、AI 团队辩论与白板式逻辑链，既能直接驱动内置工具完成任务，也能生成高质量 Prompt 交给外部 Coding Agent（Claude Code、Codex、Cursor 等）执行。
+它内置多模型对话、MCP 工具调用、Harness 自主执行、磨墨模式、AI 团队辩论与白板式逻辑链，既能直接驱动内置工具完成任务，也能生成高质量 Prompt 交给外部 Coding Agent（Claude Code、Codex、Cursor 等）执行。
 
 **零 npm 依赖，零构建工具，原生技术栈，本地优先。**
 
@@ -35,8 +35,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 - ⚡ **Harness 自主执行** —— 六阶段闭环自主推进，默认 50 轮不断线，大任务自动建 TODOLIST 统筹批量销账；停止不退出，仅手动停止 / 轮数用完 / 清单了结才结束
 - 🖌️ **磨墨模式** —— `/grind` 一句粗糙想法，AI 三段式追问研磨成结构化任务书，一键送入 Harness
 - 🗂️ **对话与数据管理** —— 历史全文搜索、会话导出 / 改名 / 批量管理、消息编辑删除，一键备份恢复全部数据，存储用量可视可清理
-- 🛠️ **30 个内置工具** —— 文件读写编辑追加、终端沙箱、PPT / Word / Excel 文档生成、PDF 文本与表格提取、SVG 图表与二维码、Python API 文档提取、便携网页打包、联网搜索与网页抓取、Git 仓库只读信息、文档安全扫描、工具工厂自生产工具、截图转代码、浏览器与桌面自动化（含窗口管理与剪贴板）等
-- 🔌 **外部 MCP Server** —— 连接外部 MCP Server（SSE 传输协议）扩展工具能力，远程工具与内置工具统一展示，AI 模型可无缝调用
+- 🛠️ **26 个内置 MCP 工具** —— 文件读写编辑追加、终端沙箱、PPT / Word 文档生成、SVG 图表与二维码、Python API 文档提取、便携网页打包、联网搜索与网页抓取、MCP 工厂自生产工具、截图转代码、浏览器与桌面自动化等
 - 🧩 **自定义 Skill 系统** —— `SKILL.md` 即插即用，聊天中 `@` 提及即注入上下文
 - 🎓 **专家包（Expert Pack）** —— 人格 + 规则 + 知识 + 技能五件套，zip 导入导出，对话 / 团队 / @提及三路注入
 - 📖 **Better Project Understanding** —— 简略 / 平衡 / 详细三档扫描项目，自动生成导览·百科与规则手册
@@ -51,7 +50,6 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 - 🗜️ **上下文智能压缩** —— 超阈值自动摘要，输出截断四层防线自动续写补全，四层超时防线防卡死
 - 🏭 **提示词工厂** —— 宪法 + 上下文 + 约束一键整合为可交付 Prompt
 - 🎤 **语音输入** —— 点击麦克风按钮即可口述消息，基于 Web Speech API，自动识别中英文，实时转写预览
-- 📚 **Markdown 文库** —— 集成于记忆弹窗的 Obsidian 风格知识库：文件夹 + 笔记管理、Markdown 实时编辑与预览、`[[wiki-link]]` 双向链接、全文搜索 + 标签系统
 - 🌍 **多语言界面** —— 安装时选择简体中文或 English，界面与提示文字全程本地化
 
 ---
@@ -80,7 +78,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 - 墨稿含目标 / 受众 / 交付物 / 验收标准 / 边界 / 建议路径 / 遗留问题，附三键：送入 Harness 执行 / 投到白板推演 / 存为模板复用
 - 磨墨会话按会话持久化，刷新与切换会话自动恢复
 
-### 工具 & Skill 系统
+### MCP 工具 & Skill 系统
 
 内置工具（`backend/skills/`）：
 
@@ -88,7 +86,8 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 |------|------|
 | `file_tree` / `file_peek` | 项目目录浏览 / 文件读取 |
 | `file_create` / `file_edit` | 文件创建 / 差异预览式编辑 |
-| `terminal` | 持久化终端会话：状态保持（cd/env）、多会话管理、进程控制 |
+| `file_append` | 文件末尾追加，超长文件分段写入与截断补齐 |
+| `terminal` | 受限沙箱命令执行 |
 | `html_render` / `css_color` | HTML 骨架生成 / CSS 调色 |
 | `doc_write` / `text_summarize` | Markdown 文档编写 / 文本摘要 |
 | `ppt_create` / `word_create` | .pptx 演示文稿 / .docx Word 文档生成 |
@@ -97,15 +96,11 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 | `web_search` / `web_fetch` | 联网搜索（免 Key）/ 网页内容获取 |
 | `chart_create` / `qrcode_create` | SVG 图表生成（柱状/条形/折线/饼图）/ 二维码生成，产出内联预览 |
 | `python_api_extract` / `html_bundle` | Python 库公共 API 文档提取（JSON/Markdown）/ 网页 css/js 内联单文件打包 |
-| `code_scan` / `doc_scan` | 代码安全扫描 / 文档安全扫描（检测 PII、凭证、财务数据、机密标记等） |
-| `browser_automation` / `computer_use` | 浏览器自动化（Playwright 控制 Chromium）/ 桌面自动化（鼠标键盘、窗口管理、剪贴板） |
-| `excel_tool` / `pdf_tool` | Excel/CSV 表格创建读取互转 / PDF 文本与表格提取 |
-| `git_tool` | Git 仓库只读信息：分支状态/提交日志/diff 统计/分支与远程列表 |
+| `code_scan` / `mcp_factory` | 代码安全扫描 / MCP 工具自生产（让 SLATE 自生产适配自身的 MCP） |
+| `browser_automation` / `computer_use` | 浏览器自动化（Playwright 控制 Chromium）/ 桌面自动化（鼠标键盘控制） |
 | `screenshot_to_code` | 截图转代码——AI 视觉分析截图内容，生成 HTML/CSS 还原视觉效果 |
 
-自定义 Skill：上传或导入 `SKILL.md` 即可扩展新能力；聊天输入框 `@` 提及工具、Skill 或专家包，发送时自动注入对应上下文。
-
-外部 MCP Server：设置页 → MCP Server 区块添加外部 MCP Server（SSE 传输协议），自动发现远程工具并与内置工具统一展示，AI 模型可通过 `skill_run` 调用。
+自定义 Skill：上传或导入 `SKILL.md` 即可扩展新能力；聊天输入框 `@` 提及 MCP 工具、Skill 或专家包，发送时自动注入对应上下文。
 
 ### 专家包（Expert Pack）
 
@@ -248,18 +243,14 @@ SLATE/
 │   │   ├── projects.py         # 项目管理 / Better Project Understanding 扫描 / Code Review
 │   │   ├── experts.py          # 专家包增删改查 / zip 导入导出
 │   │   ├── skills.py           # 技能调用
-│   │   ├── mcp.py              # 标准 MCP 协议端点（JSON-RPC 2.0）
-│   │   ├── mcp_servers.py      # 外部 MCP Server 管理（增删查 + 代理调用）
 │   │   ├── settings.py         # 设置 / 跨设备同步 / 存储空间管理
 │   │   ├── constitution.py     # 项目宪法
 │   │   ├── grind.py            # 磨墨模式会话状态机
 │   │   ├── i18n.py             # 界面语言配置（安装时选择，运行时只读）
 │   │   ├── update.py           # 启动更新检查（GitHub Releases）
 │   │   ├── workflows.py        # 团队工作流 DAG 定义
-│   │   ├── vault.py            # Markdown 文库（Obsidian 风格知识库）
 │   │   └── files.py            # 多模态文件解析
-│   └── skills/                 # 30 个内置工具实现（含高危命令双层拦截）
-├── backend/mcp_client.py       # MCP 客户端管理器（SSE 传输协议）
+│   └── skills/                 # 24 个内置 MCP 工具实现（含高危命令双层拦截）
 ├── frontend/
 │   ├── index.html              # 三栏布局入口（对话 / 黑板 / 工厂+能力）
 │   ├── css/style.css           # 全局样式（双主题）

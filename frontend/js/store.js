@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260818-96";
+import { makeId } from "./services/utils.js?v=20260818-100";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -524,13 +524,25 @@ function setProjectFileTree(data) {
 // ── 记忆管理 ────────────────────────────────
 
 function setMemories(list) {
-  state.memories = list;
+  state.memories = (Array.isArray(list) ? list : []).map(mem => ({
+    ...mem,
+    id: mem.id || makeId(),
+    category: mem.category || "general",
+    content: mem.content || "",
+    createdAt: mem.createdAt || (mem.created_at ? Math.round(Number(mem.created_at) * 1000) : Date.now()),
+  }));
   savePersistent();
-  notify("memories", list);
+  notify("memories", state.memories);
 }
 
 function addMemory(mem) {
-  const newMem = { ...mem, id: makeId(), createdAt: Date.now() };
+  const newMem = {
+    ...mem,
+    id: mem.id || makeId(),
+    category: mem.category || "general",
+    content: mem.content || "",
+    createdAt: mem.createdAt || (mem.created_at ? Math.round(Number(mem.created_at) * 1000) : Date.now()),
+  };
   state.memories.push(newMem);
   savePersistent();
   notify("memories", state.memories);
@@ -569,9 +581,13 @@ function resetUserProfile() {
 // ── 提示词素材 ──────────────────────────────
 
 function setPromptSnippets(list) {
-  state.promptSnippets = list;
+  state.promptSnippets = (Array.isArray(list) ? list : []).map(snip => ({
+    ...snip,
+    id: snip.id || makeId(),
+    createdAt: snip.createdAt || (snip.created_at ? Math.round(Number(snip.created_at) * 1000) : Date.now()),
+  }));
   savePersistent();
-  notify("promptSnippets", list);
+  notify("promptSnippets", state.promptSnippets);
 }
 
 function setKnowledgeContext(items) {

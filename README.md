@@ -23,7 +23,7 @@
 
 SLATE is a **lightweight local AI collaboration tool** focused on prompt engineering, context management, and project ideation.
 
-It features multi-model chat, tool calling, Harness autonomous execution, Grind Mode, AI team debates, and a whiteboard-style logic chain. It can either drive built-in tools to complete tasks directly, or generate high-quality prompts for external Coding Agents (Claude Code, Codex, Cursor, etc.).
+It features multi-model chat, MCP tool calling, Harness autonomous execution, Grind Mode, AI team debates, and a whiteboard-style logic chain. It can either drive built-in tools to complete tasks directly, or generate high-quality prompts for external Coding Agents (Claude Code, Codex, Cursor, etc.).
 
 **Zero npm dependencies. Zero build tools. Native tech stack. Local-first.**
 
@@ -35,8 +35,7 @@ It features multi-model chat, tool calling, Harness autonomous execution, Grind 
 - ⚡ **Harness Autonomous Execution** — Six-phase closed-loop with 50 rounds by default; auto-generates TODOLIST for large tasks; stop doesn't quit — only manual stop / rounds exhausted / checklist done ends the session
 - 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Harness
 - 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
-- 🛠️ **30 Built-in Tools** — File read/write/edit/append, terminal sandbox, PPT/Word/Excel generation, PDF text & table extraction, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, Git repo insights, document security scanning, Tool Factory for self-production, screenshot-to-code, browser & desktop automation (incl. window management & clipboard)
-- 🔌 **External MCP Server** — Connect to external MCP Servers (SSE transport) to extend tool capabilities; remote tools appear alongside built-in tools, AI can call them seamlessly
+- 🛠️ **26 Built-in MCP Tools** — File read/write/edit/append, terminal sandbox, PPT/Word generation, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, MCP Factory for self-production, screenshot-to-code, browser & desktop automation
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
@@ -51,7 +50,6 @@ It features multi-model chat, tool calling, Harness autonomous execution, Grind 
 - 🗜️ **Smart Context Compression** — Auto-summarize over threshold, four-layer truncation defense with auto-continuation, four-layer timeout prevention
 - 🏭 **Prompt Factory** — Constitution + context + constraints integrated into a deliverable prompt
 - 🎤 **Voice Input** — Click the mic button to dictate messages via Web Speech API; auto-detects language (Chinese/English); real-time transcription preview
-- 📚 **Markdown Vault** — Obsidian-style knowledge library integrated into the memory modal: folder + note management, real-time Markdown edit & preview, `[[wiki-link]]` bidirectional linking, full-text search + tag system
 - 🌍 **Multilingual UI** — Choose Simplified Chinese or English at install time; full interface and toast localization
 
 ---
@@ -80,7 +78,7 @@ It features multi-model chat, tool calling, Harness autonomous execution, Grind 
 - Brief includes goals / audience / deliverables / acceptance criteria / boundaries / suggested path / open questions; three actions: send to Harness / push to whiteboard / save as template
 - Grind sessions persist and auto-restore on refresh or switch
 
-### Tools & Skill System
+### MCP Tools & Skill System
 
 Built-in tools (`backend/skills/`):
 
@@ -88,7 +86,8 @@ Built-in tools (`backend/skills/`):
 |------|-------------|
 | `file_tree` / `file_peek` | Browse project structure / Read files |
 | `file_create` / `file_edit` | Create files / Diff-preview editing |
-| `terminal` | Persistent terminal sessions with state preservation (cd/env), multi-session management, process control |
+| `file_append` | Append to files, segmented writes for long content |
+| `terminal` | Sandboxed command execution |
 | `html_render` / `css_color` | HTML skeleton generation / CSS color tuning |
 | `doc_write` / `text_summarize` | Markdown writing / Text summarization |
 | `ppt_create` / `word_create` | .pptx presentations / .docx Word documents |
@@ -97,15 +96,11 @@ Built-in tools (`backend/skills/`):
 | `web_search` / `web_fetch` | Web search (no key needed) / Page content retrieval |
 | `chart_create` / `qrcode_create` | SVG charts (bar/line/pie) / QR codes, inline preview |
 | `python_api_extract` / `html_bundle` | Python library API extraction / Web page bundling |
-| `code_scan` / `doc_scan` | Code security scanning / document security scanning (PII, credentials, financial data, confidential markers) |
-| `browser_automation` / `computer_use` | Browser automation (Playwright) / Desktop automation (mouse/keyboard, window management, clipboard) |
-| `excel_tool` / `pdf_tool` | Excel & CSV create/read/convert / PDF text & table extraction |
-| `git_tool` | Read-only Git insights: status/log/diff/branches/remotes |
+| `code_scan` / `mcp_factory` | Code security scanning / MCP tool self-production |
+| `browser_automation` / `computer_use` | Browser automation (Playwright) / Desktop automation (mouse/keyboard) |
 | `screenshot_to_code` | Screenshot to code — AI reads image and generates HTML/CSS to match |
 
 Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention in chat to auto-inject context.
-
-External MCP Servers: Settings → MCP Server section to add external MCP Servers (SSE transport). Remote tools are auto-discovered and displayed alongside built-in tools; AI models can call them via `skill_run`.
 
 ### Expert Packs
 
@@ -248,18 +243,14 @@ SLATE/
 │   │   ├── projects.py         # Project management / Better Project Understanding / Code Review
 │   │   ├── experts.py          # Expert pack CRUD / zip import/export
 │   │   ├── skills.py           # Skill invocation
-│   │   ├── mcp.py              # Standard MCP protocol endpoint (JSON-RPC 2.0)
-│   │   ├── mcp_servers.py      # External MCP Server management (CRUD + proxy)
 │   │   ├── settings.py         # Settings / cross-device sync / storage management
 │   │   ├── constitution.py     # Project constitution
 │   │   ├── grind.py            # Grind Mode session state machine
 │   │   ├── i18n.py             # UI language config (install-time choice, read-only at runtime)
 │   │   ├── update.py           # Startup update check (GitHub Releases)
 │   │   ├── workflows.py        # Team workflow DAG definition
-│   │   ├── vault.py            # Markdown vault (Obsidian-style knowledge library)
 │   │   └── files.py            # Multimodal file parsing
-│   └── skills/                 # 30 built-in tool implementations (incl. high-risk command dual interception)
-├── backend/mcp_client.py       # MCP Client manager (SSE transport)
+│   └── skills/                 # 24 built-in MCP tool implementations (incl. high-risk command dual interception)
 ├── frontend/
 │   ├── index.html              # Three-column layout entry (Chat / Whiteboard / Factory+Capabilities)
 │   ├── css/style.css           # Global styles (dual theme)

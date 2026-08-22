@@ -2,11 +2,11 @@
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）。
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260818-96";
-import { get, post, del, upload } from "../services/api.js?v=20260818-96";
-import { guardSkillParams } from "../services/riskguard.js?v=20260818-96";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-96";
-import { t } from "../services/i18n.js?v=20260818-96";
+import { state, subscribe, setSkills } from "../store.js?v=20260818-100";
+import { get, post, del, upload } from "../services/api.js?v=20260818-100";
+import { guardSkillParams } from "../services/riskguard.js?v=20260818-100";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260818-100";
+import { t } from "../services/i18n.js?v=20260818-100";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -74,11 +74,11 @@ const SKILL_PARAM_DEFS = {
   ],
   file_edit: [
     { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/app.js" },
-    { key: "action", label: "操作类型", type: "text", placeholder: "view / replace / edit / read / insert / delete / copy / paste / cut" },
+    { key: "action", label: "操作类型", type: "text", placeholder: "view / replace / edit / replace_range / read / insert / delete / copy / paste / cut" },
     { key: "edits", label: "编辑操作（edit 操作，JSON 数组）", type: "textarea", placeholder: '[{"old_text": "原内容", "new_text": "新内容"}]' },
     { key: "old_str", label: "精确匹配字符串（replace 操作）", type: "textarea", placeholder: "要被替换的精确文本" },
     { key: "new_str", label: "替换后内容（replace 操作）", type: "textarea", placeholder: "替换后的新文本" },
-    { key: "content", label: "插入内容（insert 操作）", type: "textarea", placeholder: "要插入的文本" },
+    { key: "content", label: "插入/替换内容（insert/replace_range 操作）", type: "textarea", placeholder: "要插入或替换的文本" },
     { key: "start_line", label: "起始行号（1-based）", type: "number", placeholder: "1" },
     { key: "end_line", label: "结束行号（1-based）", type: "number", placeholder: "10" },
     { key: "clipboard_name", label: "剪贴板名称", type: "text", placeholder: "default" },
