@@ -48,6 +48,12 @@ async def check_request_size(request: Request, call_next):
 
 
 @app.middleware("http")
+async def check_lan_auth(request: Request, call_next):
+    """局域网副端口访问必须带授权 token；本机主端口不受影响。"""
+    return await lan.enforce_lan_auth(request, call_next)
+
+
+@app.middleware("http")
 async def add_dev_cache_headers(request, call_next):
     response = await call_next(request)
     if not request.url.path.startswith("/api/"):

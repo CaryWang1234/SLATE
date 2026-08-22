@@ -3,7 +3,7 @@
  * 专家包结构：persona.md + rules.md + data.json + knowledge/ + skills/
  */
 
-import { get, post, put, del, upload } from "./api.js?v=20260818-92";
+import { get, post, put, del, upload } from "./api.js?v=20260818-96";
 
 /** 专家详情缓存（expertId -> detail），供对话团队注入时免重复请求 */
 const expertCache = new Map();

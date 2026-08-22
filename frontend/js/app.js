@@ -2,25 +2,25 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-92";
-import { initI18n, t } from "./services/i18n.js?v=20260818-92";
-import { get, post, put } from "./services/api.js?v=20260818-92";
-import { dlgConfirm } from "./services/dialog.js?v=20260818-92";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-92";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-92";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260818-92";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-92";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260818-92";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-92";
-import { initTeamPanel } from "./components/team.js?v=20260818-92";
-import { initProjectBar } from "./components/project_bar.js?v=20260818-92";
-import { initMemoryPanel } from "./components/memory.js?v=20260818-92";
-import { initExpertsPanel } from "./components/experts.js?v=20260818-92";
-import { initSchedule } from "./components/schedule.js?v=20260818-92";
-import { initRiskGuard } from "./services/riskguard.js?v=20260818-92";
-import { initUnderstandPanel } from "./components/understand.js?v=20260818-92";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-92";
-import { setProject, setProjectFileTree } from "./store.js?v=20260818-92";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-96";
+import { initI18n, t } from "./services/i18n.js?v=20260818-96";
+import { get, post, put } from "./services/api.js?v=20260818-96";
+import { dlgConfirm } from "./services/dialog.js?v=20260818-96";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-96";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-96";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260818-96";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-96";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260818-96";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-96";
+import { initTeamPanel } from "./components/team.js?v=20260818-96";
+import { initProjectBar } from "./components/project_bar.js?v=20260818-96";
+import { initMemoryPanel } from "./components/memory.js?v=20260818-96";
+import { initExpertsPanel } from "./components/experts.js?v=20260818-96";
+import { initSchedule } from "./components/schedule.js?v=20260818-96";
+import { initRiskGuard } from "./services/riskguard.js?v=20260818-96";
+import { initUnderstandPanel } from "./components/understand.js?v=20260818-96";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-96";
+import { setProject, setProjectFileTree } from "./store.js?v=20260818-96";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -411,7 +411,7 @@ function openSettings(options = {}) {
   document.getElementById("setting-output-unlimited").checked = state.outputSettings?.unlimitedFileOutput !== false;
   document.getElementById("setting-file-auto-apply").checked = state.fileOutput?.autoApply !== false;
   document.getElementById("setting-auto-review-enabled").checked = state.autoReview?.enabled !== false;
-  document.getElementById("setting-auto-review-long-stall").checked = state.autoReview?.reviewLongStall !== false;
+  document.getElementById("setting-auto-review-long-stall").checked = state.autoReview?.reviewLongStall === true;
   document.getElementById("setting-auto-review-min-chars").value = state.autoReview?.minChars || 120;
   populateAutoReviewModelSelect();
   // 通知设置
@@ -560,7 +560,7 @@ async function renderLanInfo() {
       <img class="lan-qr" src="/api/lan/qrcode?t=${Date.now()}" alt="遥控地址二维码">
       <div class="lan-qr-tip">手机扫码直接打开<br>（需连入同一局域网）</div>
     </div>
-    <p class="lan-tip">遥控未设密码：同一局域网内的任何人都能完整操作本应用（含终端命令），请勿在不受信任的网络中使用。</p>
+    <p class="lan-tip">已启用授权链接：只有使用上方地址或二维码进入的设备才能访问。请勿把链接分享给不受信任的人。</p>
   `;
   document.getElementById("btn-lan-copy")?.addEventListener("click", async () => {
     try {
@@ -583,9 +583,16 @@ async function renderLanInfo() {
 function initOnboarding() {
   const modal = document.getElementById("onboarding-modal");
   if (!modal) return;
+  const legacySeen = localStorage.getItem("slate_onboarded") === "1";
+  if (legacySeen && state.onboardingSeen !== true) {
+    state.onboardingSeen = true;
+    savePersistent();
+  }
   const close = () => {
     modal.classList.add("hidden");
+    state.onboardingSeen = true;
     localStorage.setItem("slate_onboarded", "1");
+    savePersistent();
   };
   document.getElementById("btn-onboarding-done")?.addEventListener("click", close);
   modal.querySelector(".modal-close")?.addEventListener("click", close);
@@ -594,7 +601,7 @@ function initOnboarding() {
   document.getElementById("btn-view-onboarding")?.addEventListener("click", () => {
     modal.classList.remove("hidden");
   });
-  if (!localStorage.getItem("slate_onboarded")) modal.classList.remove("hidden");
+  if (state.onboardingSeen !== true && !legacySeen) modal.classList.remove("hidden");
 }
 
 // ── 数据备份与恢复────────────────────
@@ -911,7 +918,7 @@ function applyAutoReviewSettings() {
     enabled: document.getElementById("setting-auto-review-enabled").checked,
     modelId: document.getElementById("setting-auto-review-model").value || "",
     minChars: Math.max(20, Math.min(800, parseInt(document.getElementById("setting-auto-review-min-chars").value) || 120)),
-    reviewLongStall: document.getElementById("setting-auto-review-long-stall")?.checked !== false,
+    reviewLongStall: document.getElementById("setting-auto-review-long-stall")?.checked === true,
   };
   savePersistent();
 }
@@ -945,7 +952,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260818-92").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260818-96").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -979,7 +986,7 @@ async function saveSettings() {
     enabled: document.getElementById("setting-auto-review-enabled").checked,
     modelId: document.getElementById("setting-auto-review-model").value || "",
     minChars: Math.max(20, Math.min(800, parseInt(document.getElementById("setting-auto-review-min-chars").value) || 120)),
-    reviewLongStall: document.getElementById("setting-auto-review-long-stall")?.checked !== false,
+    reviewLongStall: document.getElementById("setting-auto-review-long-stall")?.checked === true,
   };
   state.notifications = {
     soundEnabled: document.getElementById("setting-notif-sound").checked,
@@ -991,7 +998,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260818-92");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260818-96");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1214,7 +1221,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260818-92");
+      const { openProject } = await import("./services/project.js?v=20260818-96");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

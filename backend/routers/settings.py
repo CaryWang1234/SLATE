@@ -51,6 +51,7 @@ async def save_shared_state(req: SharedStateRequest):
         "knowledgeSettings",
         "activeExpertId",
         "useResponses",
+        "onboardingSeen",
     }
     # 合并式写入：只更新本次提交的字段，避免漏传字段把已存设置抹掉
     existing: dict[str, Any] = {}

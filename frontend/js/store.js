@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260818-92";
+import { makeId } from "./services/utils.js?v=20260818-96";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -72,7 +72,7 @@ const state = {
     enabled: true,
     modelId: "",
     minChars: 120,
-    reviewLongStall: true, // 长回复停顿也送审（默认开）
+    reviewLongStall: false, // 长回复停顿审查默认关，避免正常总结后误触发工具
   },
 
   // 输出控制：单次输出上限与“输出文件不限量”开关
@@ -112,6 +112,9 @@ const state = {
 
   // Responses API 模式（可选，仅部分模型支持）
   useResponses: false,
+
+  // 首次启动引导：跨 localStorage / 桌面共享配置保存，避免 WebView profile 波动后反复弹出
+  onboardingSeen: false,
 };
 
 // ── 订阅者 ──────────────────────────────────
@@ -151,6 +154,7 @@ function buildPersistentData() {
     knowledgeSettings: state.knowledgeSettings,
     activeExpertId: state.activeExpertId,
     useResponses: state.useResponses,
+    onboardingSeen: state.onboardingSeen === true,
   };
 }
 
@@ -183,6 +187,7 @@ function getSharedPersistentData(data = buildPersistentData()) {
     knowledgeSettings: data.knowledgeSettings || {},
     activeExpertId: data.activeExpertId || "",
     useResponses: data.useResponses === true,
+    onboardingSeen: data.onboardingSeen === true,
   };
 }
 
@@ -241,6 +246,7 @@ function loadPersistent() {
     };
     state.activeExpertId = data.activeExpertId || "";
     state.useResponses = data.useResponses === true;
+    state.onboardingSeen = data.onboardingSeen === true;
   } catch (e) {}
 }
 
@@ -297,6 +303,9 @@ async function loadSharedPersistent() {
     }
     if (Object.prototype.hasOwnProperty.call(data, "useResponses")) {
       state.useResponses = data.useResponses === true;
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "onboardingSeen")) {
+      state.onboardingSeen = data.onboardingSeen === true;
     }
     saveLocalPersistent();
   } catch (e) {}

@@ -304,6 +304,7 @@ export const EN_DICT = {
   "手机扫码直接打开": "Scan with your phone to open",
   "（需连入同一局域网）": "(must be on the same LAN)",
   "⚠ 遥控未设密码：同一局域网内的任何人都能完整操作本应用（含终端命令），请勿在不受信任的网络中使用。": "⚠ Remote access has no password: anyone on the same LAN can fully operate this app (including terminal commands). Do not use it on untrusted networks.",
+  "已启用授权链接：只有使用上方地址或二维码进入的设备才能访问。请勿把链接分享给不受信任的人。": "Authorized link enabled: only devices that enter through the address or QR code above can access. Do not share the link with untrusted people.",
   "遥控地址已复制": "Remote address copied",
   "自动复制失败，已为你选中地址": "Auto-copy failed; the address has been selected for you",
   "导出失败": "Export failed",
