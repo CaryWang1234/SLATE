@@ -96,6 +96,10 @@ def _parse_coords(x: Any, y: Any) -> tuple[int, int] | None:
     """解析坐标参数，返回 (x, y) 或 None。"""
     if x is None or y is None:
         return None
+    try:
+        return int(x), int(y)
+    except (ValueError, TypeError):
+        return None
 
 
 def _to_bool(value: Any, default: bool = False) -> bool:
@@ -115,10 +119,6 @@ def _parse_region(region: str) -> tuple[int, int, int, int] | None:
     if parts[2] <= 0 or parts[3] <= 0:
         raise ValueError("region 的宽高必须大于 0")
     return tuple(parts)
-    try:
-        return int(x), int(y)
-    except (ValueError, TypeError):
-        return None
 
 
 def _find_window(title: str):
