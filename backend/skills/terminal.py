@@ -27,6 +27,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from backend.subprocess_utils import hidden_subprocess_kwargs
 from backend.skills.sandbox import truncate_output, MAX_OUTPUT_CHARS
 
 # 默认工作目录
@@ -94,10 +95,35 @@ def _get_shell() -> list[str]:
     """返回当前平台的 shell 命令。"""
     if sys.platform == "win32":
         # Windows: 优先 PowerShell，回退 cmd
-        return ["powershell.exe", "-NoExit", "-Command", "-"]
+        return ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-NoExit", "-Command", "-"]
     else:
         # Unix: 优先 bash，回退 sh
         return ["/bin/bash", "--norc", "--noprofile", "-i"]
+
+
+def _command_with_marker(command: str, marker: str) -> str:
+    if sys.platform == "win32":
+        return (
+            f"{command}\n"
+            "$slateExit = if ($LASTEXITCODE -ne $null) { $LASTEXITCODE } elseif ($?) { 0 } else { 1 }\n"
+            f'Write-Output "{marker}:$slateExit"'
+        )
+    return f"{command}\nprintf '\\n{marker}:%s\\n' \"$?\""
+
+
+def _strip_completion_marker(output: str, marker: str) -> tuple[str, int | None]:
+    marker_prefix = f"{marker}:"
+    exit_code: int | None = None
+    kept: list[str] = []
+    for line in output.splitlines():
+        if marker_prefix in line:
+            _, _, tail = line.partition(marker_prefix)
+            match = re.match(r"\s*(-?\d+)", tail)
+            if match:
+                exit_code = int(match.group(1))
+            continue
+        kept.append(line)
+    return "\n".join(kept).strip(), exit_code
 
 
 class TerminalSession:
@@ -135,6 +161,7 @@ class TerminalSession:
             env=self.env,
             text=True,
             bufsize=1,  # 行缓冲
+            **hidden_subprocess_kwargs(),
         )
         self._start_reader_thread()
     
@@ -181,19 +208,43 @@ class TerminalSession:
         
         try:
             # 发送命令
-            self.process.stdin.write(command + "\n")
+            marker = f"__SLATE_DONE_{uuid.uuid4().hex}__"
+            self.process.stdin.write(_command_with_marker(command, marker) + "\n")
             self.process.stdin.flush()
             
-            # 等待输出稳定（简单策略：等待一段时间）
-            time.sleep(0.5)
+            deadline = time.monotonic() + max(float(timeout or TIMEOUT), 0.1)
+            timed_out = False
+            while True:
+                output_snapshot = "".join(self.output_buffer)
+                if marker in output_snapshot:
+                    break
+                if self.process.poll() is not None:
+                    break
+                if time.monotonic() >= deadline:
+                    timed_out = True
+                    break
+                time.sleep(0.05)
             
             # 收集输出
             output = "".join(self.output_buffer).strip()
             errors = "".join(self.error_buffer).strip()
+            output, exit_code = _strip_completion_marker(output, marker)
             
             if errors:
                 output += f"\n[STDERR]\n{errors}"
             
+            if timed_out:
+                partial, was_truncated = truncate_output(output or "(无输出)")
+                self.kill_process()
+                return {
+                    "error": f"命令超时（{timeout}s）",
+                    "command": command,
+                    "session_id": self.session_id,
+                    "work_dir": str(self.cwd),
+                    "output": partial,
+                    "truncated": was_truncated,
+                }
+
             # 截断
             output, was_truncated = truncate_output(output or "(无输出)")
             
@@ -202,6 +253,7 @@ class TerminalSession:
                 "session_id": self.session_id,
                 "work_dir": str(self.cwd),
                 "output": output,
+                "exit_code": exit_code,
                 "truncated": was_truncated,
             }
         except Exception as e:

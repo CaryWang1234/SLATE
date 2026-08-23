@@ -94,7 +94,8 @@ def execute(description: str = "", component: str = "page", **_kw: Any) -> dict[
         description: 风格描述（如"温暖的橙色系"、"冷色调科技感"、"深色模式"）
         component: 目标组件（page / card / button / nav / form / code）
     """
-    desc = description.strip() or "简洁现代风格"
+    style = str(_kw.get("style") or "").strip()
+    desc = " ".join(part for part in (description.strip(), style) if part) or "简洁现代风格"
     comp = component.strip() or "page"
 
     preset_name = _match_preset(desc)

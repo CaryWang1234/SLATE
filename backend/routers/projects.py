@@ -10,6 +10,8 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from backend.subprocess_utils import hidden_subprocess_kwargs
+
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 # 服务端当前项目状态（内存态，重启丢失）
@@ -300,6 +302,7 @@ async def review_diff(req: ReviewDiffRequest):
         subprocess.run(
             ["git", "rev-parse", "--git-dir"],
             cwd=project_dir, capture_output=True, timeout=10, check=True,
+            **hidden_subprocess_kwargs(),
         )
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
         return {"code": 1, "message": "该项目不是 Git 仓库"}
@@ -317,6 +320,7 @@ async def review_diff(req: ReviewDiffRequest):
     try:
         result = subprocess.run(
             cmd, cwd=project_dir, capture_output=True, text=True, timeout=30,
+            **hidden_subprocess_kwargs(),
         )
         diff_text = result.stdout
     except subprocess.TimeoutExpired:

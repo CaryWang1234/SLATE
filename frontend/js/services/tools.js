@@ -782,9 +782,12 @@ const TOOL_USE_RECIPES = [
 
 const SKILL_RUN_QUICK_LIST = [
   "file_tree", "file_peek", "file_edit", "file_create", "terminal",
-  "code_scan", "doc_scan", "git_tool", "web_search", "web_fetch",
-  "browser_automation", "computer_use", "chart_create", "qrcode_create",
-  "python_api_extract", "html_bundle", "ppt_create", "word_create", "excel_tool",
+  "repo_stats", "todo_scan", "git_tool", "code_scan", "doc_scan",
+  "web_search", "web_fetch", "browser_automation", "computer_use",
+  "html_render", "css_color", "doc_write", "text_summarize", "json_tool",
+  "regex_test", "chart_create", "qrcode_create", "python_api_extract",
+  "html_bundle", "ppt_create", "word_create", "excel_tool", "pdf_tool",
+  "mcp_factory", "screenshot_to_code",
 ];
 
 const CORE_AGENT_TOOLS = [
@@ -1082,26 +1085,33 @@ async function executeTool(name, params) {
     // 结构化结果（如 file_edit / file_create）直接传递，同时生成文本摘要给 AI
     if (output && typeof output === "object" && output._type) {
       let summary = `[工具 ${name}] `;
+      const applied = output.applied === "auto" || output.applied === true;
       if (output._type === "file_edit") {
         const s = output.stats;
         const targetPath = output.file_path_rel || output.file_name || output.file || "";
         summary = `[工具 file_edit] 文件: ${output.file_name}（${targetPath}），${s.edits_total} 处编辑，${s.edits_applied} 处成功，+${s.lines_added} -${s.lines_removed} 行。`;
         if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
-        summary += " diff 已展示给用户，尚未写入磁盘，等待用户确认。";
+        summary += applied
+          ? " 已自动写入磁盘。"
+          : " diff 已展示给用户，尚未写入磁盘，等待用户确认。";
       } else if (output._type === "file_create") {
         const s = output.stats;
         const targetPath = output.file_path_rel || output.file_name || output.file || "";
         summary = `[工具 file_create] 新文件 ${output.file_name}（${targetPath}），${s.lines} 行，${s.chars} 字符。`;
         if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
         if (output.truncated) summary += " 注意：本次内容因输出截断可能不完整；若用户接受预览，请立即用 file_append 从断点补齐剩余内容。";
-        summary += " 预览已展示给用户，尚未写入磁盘，等待用户确认。";
+        summary += applied
+          ? " 已自动创建并写入磁盘。"
+          : " 预览已展示给用户，尚未写入磁盘，等待用户确认。";
       } else if (output._type === "file_append") {
         const s = output.stats;
         const targetPath = output.file_path_rel || output.file_name || output.file || "";
         summary = `[工具 file_append] 文件: ${output.file_name}（${targetPath}），本次追加 ${s.lines} 行，${s.chars} 字符。`;
         if (output.errors?.length) summary += ` 警告: ${output.errors.join("; ")}`;
         if (output.truncated) summary += " 注意：本次追加内容因输出截断可能不完整，请继续用 file_append 补齐剩余内容。";
-        summary += " 追加预览已展示给用户，尚未写入磁盘，等待用户确认。";
+        summary += applied
+          ? " 已自动追加到磁盘。"
+          : " 追加预览已展示给用户，尚未写入磁盘，等待用户确认。";
       }
       return { success: true, output: summary, _structured: output };
     }

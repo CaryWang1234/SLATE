@@ -31,7 +31,13 @@ def execute(text: str = "", mode: str = "format", path: str = "", indent: int = 
     except Exception as exc:
         return {"valid": False, "error": str(exc)}
 
-    action = str(mode or "format").strip().lower()
+    action = str(_kw.get("action") or mode or "format").strip().lower()
+    if action in {"validate", "format"}:
+        action = "format"
+    elif action in {"compact", "minify"}:
+        action = "minify"
+    elif action in {"read", "query", "path"}:
+        action = "path"
     try:
         spaces = max(0, min(int(indent), 8))
     except (TypeError, ValueError):

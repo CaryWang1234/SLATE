@@ -18,6 +18,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from backend.subprocess_utils import hidden_subprocess_kwargs
+
 TIMEOUT = 30
 
 
@@ -34,6 +36,7 @@ def _git(directory: str, args: list[str]) -> tuple[int, str, str]:
         encoding="utf-8",
         errors="replace",
         timeout=TIMEOUT,
+        **hidden_subprocess_kwargs(),
     )
     return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
 

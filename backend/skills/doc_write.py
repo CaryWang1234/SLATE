@@ -10,6 +10,7 @@ def execute(
     doc_type: str = "technical",
     sections: str = "",
     content_hint: str = "",
+    content: str = "",
     **_kw: Any,
 ) -> dict[str, Any]:
     """
@@ -23,7 +24,7 @@ def execute(
     """
     doc_title = title.strip() or "未命名文档"
     dtype = doc_type.strip().lower()
-    hint = content_hint.strip()
+    hint = (content_hint or content).strip()
 
     # 文档模板
     templates: dict[str, dict[str, Any]] = {

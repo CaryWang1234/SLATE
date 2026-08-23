@@ -27,6 +27,7 @@ from fastapi import APIRouter, Request
 from backend.routers.chat import _get_db, add_message, create_conversation
 from backend.routers.proxy import _find_model
 from backend.routers.settings import STATE_PATH
+from backend.subprocess_utils import hidden_subprocess_kwargs
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
@@ -154,6 +155,7 @@ def _check_git_push(task: dict[str, Any]) -> bool:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=str(rp), capture_output=True, text=True, timeout=10,
+            **hidden_subprocess_kwargs(),
         )
         if result.returncode != 0:
             return False
@@ -224,6 +226,7 @@ def _init_event_snapshots() -> None:
                     result = subprocess.run(
                         ["git", "rev-parse", "HEAD"],
                         cwd=str(rp), capture_output=True, text=True, timeout=10,
+                        **hidden_subprocess_kwargs(),
                     )
                     if result.returncode == 0:
                         _git_heads[str(rp.resolve())] = result.stdout.strip()

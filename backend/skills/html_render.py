@@ -55,8 +55,15 @@ TEMPLATE = """\
 </html>"""
 
 
-def execute(title: str = "SLATE 页面", body: str = "<p>内容区域</p>", **_: Any) -> dict[str, Any]:
+def execute(
+    title: str = "SLATE 页面",
+    body: str = "<p>内容区域</p>",
+    html: str = "",
+    **_: Any,
+) -> dict[str, Any]:
     """生成纯黑白风格的 HTML 骨架。"""
+    if html:
+        body = html
     html = TEMPLATE.format(title=title, body=body)
     return {
         "title": title,

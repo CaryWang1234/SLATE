@@ -217,3 +217,4 @@ if (errors.length) {
 }
 
 console.log(`Frontend integrity check passed (${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files).`);
+process.exit(0);
