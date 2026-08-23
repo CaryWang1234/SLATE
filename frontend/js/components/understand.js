@@ -4,11 +4,11 @@
  * 三档深度：简略/ 平衡 / 详细（扫描预算与输出长度随档位变化）
  */
 
-import { state, setProject, getModelKey } from "../store.js?v=20260818-100";
-import { post, streamChat } from "../services/api.js?v=20260818-100";
-import { updateProjectConfig } from "../services/project.js?v=20260818-100";
-import { renderMarkdown } from "../services/markdown.js?v=20260818-100";
-import { t } from "../services/i18n.js?v=20260818-100";
+import { state, setProject, getModelKey } from "../store.js?v=20260818-103";
+import { post, streamChat } from "../services/api.js?v=20260818-103";
+import { updateProjectConfig } from "../services/project.js?v=20260818-103";
+import { renderMarkdown } from "../services/markdown.js?v=20260818-103";
+import { t } from "../services/i18n.js?v=20260818-103";
 
 const LEVELS = {
   brief: { label: "简略", tree: "目录深度 2 层", files: "精读 6 个关键文件", out: "输出约 900 字" },
@@ -36,7 +36,7 @@ function showView(name) {
 function openUnderstandModal() {
   bindUnderstandModal();
   if (!state.project) {
-    import("../app.js?v=20260818-100").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
+    import("../app.js?v=20260818-103").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
     return;
   }
   currentResult = state.project.config?.understanding || null;
@@ -61,13 +61,13 @@ function renderLevelCards() {
 
     const title = document.createElement("div");
     title.className = "understand-level-title";
-    title.textContent = meta.label;
+    title.textContent = t(meta.label);
     card.appendChild(title);
 
     for (const line of [meta.tree, meta.files, meta.out]) {
       const d = document.createElement("div");
       d.className = "understand-level-line";
-      d.textContent = line;
+      d.textContent = t(line);
       card.appendChild(d);
     }
     card.addEventListener("click", () => {
@@ -103,7 +103,7 @@ async function startUnderstanding() {
   const model = state.currentModel;
   const apiKey = model?.id ? getModelKey(model.id) : "";
   if (!model?.id || !apiKey) {
-    import("../app.js?v=20260818-100").then(({ toast }) => toast("请先选择模型并配色API Key")).catch(() => {});
+    import("../app.js?v=20260818-103").then(({ toast }) => toast(t("请先选择模型并配置 API Key"))).catch(() => {});
     return;
   }
 
@@ -121,26 +121,30 @@ async function startUnderstanding() {
     if (scanRes.code !== 0) throw new Error(scanRes.message || "扫描失败");
     const scan = scanRes.data;
     appendLog(t("扫描完成：{n} 个文件，精读 {h} 个", { n: scan.total_files, h: scan.heads.length }) + (scan.truncated ? t("（目录树已截断）") : ""));
+    if (scan.heads.length === 0) appendLog(t("未读取到关键文本文件，将仅依据目录树生成"));
+    throwIfAborted();
     setStepStatus(0, "done");
 
     const scanContext = buildScanContext(scan);
 
     // 生成导览·百科
     setStepStatus(1, "running");
-    appendLog("正在生成导览·百科…");
+    appendLog(t("正在生成导览·百科…"));
     const tour = await generateDoc(model.id, apiKey, buildTourPrompt(scan.project, currentLevel), scanContext);
+    throwIfAborted();
     appendLog(t("导览·百科完成（{n} 字符）", { n: tour.length }));
     setStepStatus(1, "done");
 
     // 生成规则手册
     setStepStatus(2, "running");
-    appendLog("正在生成规则手册…");
+    appendLog(t("正在生成规则手册…"));
     const rules = await generateDoc(model.id, apiKey, buildRulesPrompt(scan.project, currentLevel), scanContext);
+    throwIfAborted();
     appendLog(t("规则手册完成（{n} 字符）", { n: rules.length }));
     setStepStatus(2, "done");
 
     // 保存到项目配置（合并式写入）
-    appendLog("正在保存到项目配置…");
+    appendLog(t("正在保存到项目配置…"));
     currentResult = {
       level: currentLevel,
       generated_at: new Date().toISOString(),
@@ -152,29 +156,35 @@ async function startUnderstanding() {
     const saveRes = await updateProjectConfig(config);
     if (saveRes.code === 0) {
       setProject(saveRes.data);
-      appendLog("已保存到 .slate/config.json");
+      appendLog(t("已保存到 .slate/config.json"));
     } else {
       appendLog(t("保存失败（仍可复制结果）: {msg}", { msg: saveRes.message }));
     }
 
     renderResult();
     showView("result");
-    import("../app.js?v=20260818-100").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
+    import("../app.js?v=20260818-103").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
   } catch (e) {
     if (e.name === "AbortError") {
-      appendLog("已取消");
+      appendLog(t("已取消"));
       showView("setup");
     } else {
       const steps = progressSteps?.children || [];
       for (let i = 0; i < steps.length; i++) {
         if (steps[i].classList.contains("running")) setStepStatus(i, "error");
       }
-      appendLog(t("失败: {msg}", { msg: e.message }));
-      import("../app.js?v=20260818-100").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
+      appendLog(t("✕ 失败: {msg}", { msg: e.message }));
+      import("../app.js?v=20260818-103").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
     }
   } finally {
     running = false;
     abortController = null;
+  }
+}
+
+function throwIfAborted() {
+  if (abortController?.signal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
   }
 }
 
@@ -192,18 +202,29 @@ async function generateDoc(modelId, apiKey, systemPrompt, scanContext) {
     stream: true,
     signal: abortController?.signal,
   })) {
+    throwIfAborted();
     fullText += chunk;
   }
-  if (!fullText.trim()) throw new Error("模型未返回内容");
+  if (!fullText.trim()) throw new Error(t("模型未返回内容"));
   return fullText.trim();
 }
 
 // ── 提示词 ───────────────────────────────────
 
 function buildScanContext(scan) {
-  const parts = [`项目名：${scan.project}`, "", "== 目录树 ==", scan.tree, "", "== 关键文件内容（截取开头） =="];
+  const parts = [
+    `项目名：${scan.project}`,
+    `扫描档位：${scan.level || currentLevel}`,
+    `精读文件数：${scan.heads?.length || 0}/${scan.total_files || 0}`,
+    "",
+    "== 目录树 ==",
+    scan.tree || "（无目录树）",
+    "",
+    "== 关键文件内容（截取开头） ==",
+  ];
   for (const h of scan.heads) {
-    parts.push("", `### ${h.path}`, "```", h.content, "```");
+    const note = h.truncated ? `（${h.lines} 行，已截取前 ${h.head_lines} 行）` : `（${h.lines} 行）`;
+    parts.push("", `### ${h.path} ${note}`, "```", h.content, "```");
   }
   return parts.join("\n");
 }
@@ -282,9 +303,9 @@ async function copyCurrentResult() {
   const text = activeTab === "tour" ? currentResult.tour : currentResult.rules;
   try {
     await navigator.clipboard.writeText(text || "");
-    import("../app.js?v=20260818-100").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
+    import("../app.js?v=20260818-103").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
   } catch {
-    import("../app.js?v=20260818-100").then(({ toast }) => toast("复制失败")).catch(() => {});
+    import("../app.js?v=20260818-103").then(({ toast }) => toast("复制失败")).catch(() => {});
   }
 }
 
@@ -315,7 +336,11 @@ function bindUnderstandModal() {
     abortController?.abort();
     if (!running) showView("setup");
   });
-  document.getElementById("btn-understand-regen")?.addEventListener("click", () => showView("setup"));
+  document.getElementById("btn-understand-regen")?.addEventListener("click", () => {
+    currentResult = null;
+    activeTab = "tour";
+    showView("setup");
+  });
   btnCopyResult?.addEventListener("click", copyCurrentResult);
 
   resultTabs?.querySelectorAll(".understand-tab").forEach(tab => {

@@ -2,25 +2,25 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-100";
-import { initI18n, t } from "./services/i18n.js?v=20260818-100";
-import { get, post, put } from "./services/api.js?v=20260818-100";
-import { dlgConfirm } from "./services/dialog.js?v=20260818-100";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-100";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-100";
-import { initWhiteboard } from "./components/whiteboard.js?v=20260818-100";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-100";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260818-100";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-100";
-import { initTeamPanel } from "./components/team.js?v=20260818-100";
-import { initProjectBar } from "./components/project_bar.js?v=20260818-100";
-import { initMemoryPanel } from "./components/memory.js?v=20260818-100";
-import { initExpertsPanel } from "./components/experts.js?v=20260818-100";
-import { initSchedule } from "./components/schedule.js?v=20260818-100";
-import { initRiskGuard } from "./services/riskguard.js?v=20260818-100";
-import { initUnderstandPanel } from "./components/understand.js?v=20260818-100";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-100";
-import { setProject, setProjectFileTree } from "./store.js?v=20260818-100";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260818-103";
+import { initI18n, t } from "./services/i18n.js?v=20260818-103";
+import { get, post, put } from "./services/api.js?v=20260818-103";
+import { dlgConfirm } from "./services/dialog.js?v=20260818-103";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260818-103";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260818-103";
+import { initWhiteboard } from "./components/whiteboard.js?v=20260818-103";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260818-103";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260818-103";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260818-103";
+import { initTeamPanel } from "./components/team.js?v=20260818-103";
+import { initProjectBar } from "./components/project_bar.js?v=20260818-103";
+import { initMemoryPanel } from "./components/memory.js?v=20260818-103";
+import { initExpertsPanel } from "./components/experts.js?v=20260818-103";
+import { initSchedule } from "./components/schedule.js?v=20260818-103";
+import { initRiskGuard } from "./services/riskguard.js?v=20260818-103";
+import { initUnderstandPanel } from "./components/understand.js?v=20260818-103";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260818-103";
+import { setProject, setProjectFileTree } from "./store.js?v=20260818-103";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -623,19 +623,28 @@ function initBackupRestore() {
         backend: res.data,
         local,
       };
+      let savedPath = "";
+      try {
+        const saveRes = await post("/chat/backup-file", { payload });
+        if (saveRes.code === 0) savedPath = saveRes.data?.path || "";
+      } catch (e) {
+        console.warn("备份落盘失败:", e);
+      }
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      a.href = url;
       a.download = `SLATE-backup-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 500);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       const d = res.data || {};
       if (statusEl) {
-        statusEl.textContent = t("已导出：{a} 会话 / {b} 条消息 / {c} 条记忆 / {d} 条素材", { a: d.conversations?.length || 0, b: d.messages?.length || 0, c: d.memories?.length || 0, d: d.snippets?.length || 0 });
+        const base = t("已导出：{a} 会话 / {b} 条消息 / {c} 条记忆 / {d} 条素材", { a: d.conversations?.length || 0, b: d.messages?.length || 0, c: d.memories?.length || 0, d: d.snippets?.length || 0 });
+        statusEl.textContent = savedPath ? `${base}；本地备份：${savedPath}` : base;
       }
-      toast("备份已下载");
+      toast(savedPath ? "备份已下载，并已保存到本地 backups 目录" : "备份已下载");
     } catch (e) {
       toast(t("导出备份失败: {msg}", { msg: e.message }));
     }
@@ -952,7 +961,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260818-100").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260818-103").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -998,7 +1007,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260818-100");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260818-103");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1221,7 +1230,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260818-100");
+      const { openProject } = await import("./services/project.js?v=20260818-103");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

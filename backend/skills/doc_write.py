@@ -57,6 +57,11 @@ def execute(
     else:
         section_list = tpl["default_sections"]
 
+    def section_body(section: str) -> str:
+        if hint:
+            return f"围绕“{hint}”补充本节内容，重点说明 {section} 的事实、约束与待确认事项。"
+        return f"本节用于说明 {section}。当前未提供更多上下文，请在补充材料后完善具体内容。"
+
     # 生成 Markdown
     lines: list[str] = []
     lines.append(f"# {doc_title}")
@@ -74,7 +79,7 @@ def execute(
     for i, sec in enumerate(section_list, 1):
         lines.append(f"## {i}. {sec}")
         lines.append("")
-        lines.append(f"<!-- {sec} 内容待补充 -->")
+        lines.append(section_body(sec))
         lines.append("")
 
     lines.append("---")
@@ -89,5 +94,5 @@ def execute(
         "doc_type": dtype,
         "sections": section_list,
         "word_count": len(markdown),
-        "note": "生成的是文档骨架，各章节内容需根据实际情况补充。",
+        "note": "已生成可直接预览的文档初稿，各章节可根据实际材料继续细化。",
     }

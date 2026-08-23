@@ -516,9 +516,9 @@ class ScanRequest(BaseModel):
 
 # 三档扫描预算（写死）：目录深度 / 树条目上限 / 精读文件数 / 每文件行数
 SCAN_LEVELS = {
-    "brief":    {"depth": 2, "max_tree": 300,  "max_files": 6,  "head_lines": 40},
-    "balanced": {"depth": 3, "max_tree": 600,  "max_files": 16, "head_lines": 70},
-    "detailed": {"depth": 5, "max_tree": 1200, "max_files": 36, "head_lines": 110},
+    "brief":    {"depth": 2, "scan_depth": 5, "max_tree": 300,  "max_files": 6,  "head_lines": 40},
+    "balanced": {"depth": 3, "scan_depth": 7, "max_tree": 600,  "max_files": 16, "head_lines": 70},
+    "detailed": {"depth": 5, "scan_depth": 9, "max_tree": 1200, "max_files": 36, "head_lines": 110},
 }
 
 KEY_NAMES = {
@@ -531,18 +531,46 @@ KEY_NAMES = {
     "index.html", "main.py", "app.py", "desktop.py", "main.js", "app.js", "index.js",
 }
 
+KEY_PATH_PARTS = (
+    "frontend/js/components",
+    "frontend/js/services",
+    "frontend/js/store",
+    "backend/routers",
+    "backend/skills",
+    "scripts",
+)
+
+UNDERSTAND_PATH_HINTS = (
+    "understand",
+    "project_bar",
+    "projects.py",
+    "i18n",
+    "markdown",
+    "api.js",
+    "store.js",
+)
+
 
 def _file_priority(rel: str, name: str, ext: str) -> int:
     """精读优先级：越小越重要"""
     low = name.lower()
-    if low.startswith("readme"):
+    rel_low = rel.lower()
+    if rel_low.endswith("frontend/js/components/understand.js"):
         return 0
-    if low in KEY_NAMES:
+    if rel_low.endswith("backend/routers/projects.py"):
         return 1
-    if ext in (".md", ".json", ".toml", ".yaml", ".yml", ".cfg", ".ini"):
+    if low.startswith("readme"):
         return 2
-    if ext in TEXT_EXTS:
+    if any(hint in rel_low for hint in UNDERSTAND_PATH_HINTS):
         return 3
+    if low in KEY_NAMES:
+        return 4
+    if any(part in rel_low for part in KEY_PATH_PARTS):
+        return 5
+    if ext in (".md", ".json", ".toml", ".yaml", ".yml", ".cfg", ".ini"):
+        return 6
+    if ext in TEXT_EXTS:
+        return 7
     return 9
 
 
@@ -560,7 +588,7 @@ async def scan_project(req: ScanRequest):
 
     def walk(d: Path, depth: int, prefix: str) -> None:
         nonlocal truncated
-        if truncated or depth > budget["depth"]:
+        if depth > budget["scan_depth"]:
             return
         try:
             entries = sorted(d.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
@@ -571,15 +599,19 @@ async def scan_project(req: ScanRequest):
             if not (e.name.startswith(".") and e.name != ".env")
             and not (e.is_dir() and e.name in IGNORE_DIRS)
         ]
+        emit_tree = depth <= budget["depth"]
         for i, entry in enumerate(visible):
-            if len(tree_lines) >= budget["max_tree"]:
-                truncated = True
-                return
             last = i == len(visible) - 1
-            branch = "└─ " if last else "├─ "
-            tree_lines.append(f"{prefix}{branch}{entry.name}{'/' if entry.is_dir() else ''}")
+            next_prefix = prefix
+            if emit_tree and len(tree_lines) < budget["max_tree"]:
+                branch = "└─ " if last else "├─ "
+                tree_lines.append(f"{prefix}{branch}{entry.name}{'/' if entry.is_dir() else ''}")
+                next_prefix = prefix + ("   " if last else "│  ")
+            elif emit_tree:
+                truncated = True
+
             if entry.is_dir():
-                walk(entry, depth + 1, prefix + ("   " if last else "│  "))
+                walk(entry, depth + 1, next_prefix)
             elif entry.is_file():
                 size = _safe_file_size(entry) or 0
                 if size <= 2 * 1024 * 1024:  # 跳过超大文件
@@ -590,10 +622,12 @@ async def scan_project(req: ScanRequest):
     tree_lines.append(project_dir.name + "/")
     walk(project_dir, 1, "")
 
-    # 按优先级选出精读文件
-    files.sort(key=lambda f: (_file_priority(f[0], f[1], f[2]), f[0]))
+    # 按优先级选出精读文件；同等优先级下短路径优先，避免深层生成物挤掉入口文件。
+    files.sort(key=lambda f: (_file_priority(f[0], f[1], f[2]), len(f[0]), f[0]))
     heads: list[dict] = []
-    for rel, name, ext, size in files[: budget["max_files"]]:
+    for rel, name, ext, size in files:
+        if len(heads) >= budget["max_files"]:
+            break
         if ext not in TEXT_EXTS:
             continue
         try:
@@ -601,10 +635,19 @@ async def scan_project(req: ScanRequest):
         except OSError:
             continue
         lines = content.splitlines()
-        head = "\n".join(lines[: budget["head_lines"]])
-        if len(lines) > budget["head_lines"]:
+        head_lines = budget["head_lines"]
+        head = "\n".join(lines[:head_lines])
+        truncated_head = len(lines) > head_lines
+        if truncated_head:
             head += f"\n…（共 {len(lines)} 行，已截取开头）"
-        heads.append({"path": rel, "content": head[:6000]})
+        heads.append({
+            "path": rel,
+            "content": head[:6000],
+            "size": size,
+            "lines": len(lines),
+            "head_lines": min(len(lines), head_lines),
+            "truncated": truncated_head or len(head) > 6000,
+        })
 
     return {
         "code": 0,

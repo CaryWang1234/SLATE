@@ -39,7 +39,6 @@ def execute({params}) -> dict[str, Any]:
 {validations}
 
     # ── 核心逻辑 ──
-    # TODO: 请根据需求实现具体逻辑
 {body}
 
     return {{"status": "ok", "message": "工具执行成功"}}
@@ -130,6 +129,9 @@ def execute(
 
     if not description:
         return {"error": "description 不能为空"}
+
+    if not body or not body.strip():
+        return {"error": "body 不能为空，请提供工具的核心逻辑代码"}
 
     # 检查是否已存在
     target_path = SKILLS_DIR / f"{name}.py"

@@ -14,6 +14,7 @@ import os
 import sqlite3
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
 DB_PATH = DATA_DIR / "chat_history.db"
+BACKUP_DIR = DATA_DIR / "backups"
 
 
 def _get_db() -> sqlite3.Connection:
@@ -445,6 +447,19 @@ async def import_all(body: dict[str, Any]) -> dict[str, Any]:
     conn.commit()
     conn.close()
     return {"code": 0, "data": stats, "message": "ok"}
+
+
+@router.post("/backup-file")
+async def save_backup_file(body: dict[str, Any]) -> dict[str, Any]:
+    """将前端组装好的完整备份写入本地 data/backups，供桌面环境下载失败时兜底。"""
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    payload = body.get("payload") if isinstance(body.get("payload"), dict) else body
+    if not isinstance(payload, dict):
+        return {"code": -1, "data": None, "message": "备份内容无效"}
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = BACKUP_DIR / f"SLATE-backup-{stamp}.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"code": 0, "data": {"path": str(path), "file_name": path.name}, "message": "ok"}
 
 
 @router.patch("/conversations/{conv_id}/usage")

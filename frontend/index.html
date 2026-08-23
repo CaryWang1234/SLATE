@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260818-100">
+  <link rel="stylesheet" href="./css/style.css?v=20260818-103">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏    document.documentElement.classList.add("i18n-pending");
     setTimeout(function () { document.documentElement.classList.remove("i18n-pending"); }, 2500);
@@ -90,7 +90,7 @@
                 <button id="btn-conv-manage" class="icon-btn conv-manage-btn" title="批量管理历史会话">✦ 管理</button>
               </div>
               <div class="conv-search-wrap">
-                <input id="conv-search" class="conv-search" type="text" placeholder="🔍 搜索历史会" autocomplete="off">
+                <input id="conv-search" class="conv-search" type="text" placeholder="🔍 搜索历史会话" autocomplete="off">
               </div>
               <div id="conv-list"></div>
             </div>
@@ -629,7 +629,7 @@
         <div id="memory-tab-profile" class="memory-tab-content">
           <div class="setting-group">
             <label class="setting-label">角色/职业</label>
-            <input id="profile-role" type="text" class="setting-input" placeholder="如：全栈开发者、产品经理师等">
+            <input id="profile-role" type="text" class="setting-input" placeholder="如：全栈开发者、产品经理等">
           </div>
           <div class="setting-group">
             <label class="setting-label">工作风格</label>
@@ -645,7 +645,7 @@
           </div>
           <div class="setting-group">
             <label class="setting-label">其他</label>
-            <textarea id="profile-custom" class="setting-input setting-textarea" rows="2" placeholder="其他希望 AI 了解的信息）"></textarea>
+            <textarea id="profile-custom" class="setting-input setting-textarea" rows="2" placeholder="其他希望 AI 了解的信息"></textarea>
           </div>
           <div class="memory-profile-actions">
             <button id="btn-reset-profile" class="send-btn send-btn-sm" style="background:#555;">重置画像</button>
@@ -655,7 +655,7 @@
         <!-- 知识中心 -->
         <div id="memory-tab-knowledge" class="memory-tab-content">
           <div class="knowledge-toolbar">
-            <input id="knowledge-search-input" class="setting-input" type="text" placeholder="搜索知识库。">
+            <input id="knowledge-search-input" class="setting-input" type="text" placeholder="搜索知识库...">
             <button id="btn-search-knowledge" class="send-btn send-btn-sm">搜索</button>
             <button id="btn-add-knowledge" class="send-btn send-btn-sm">+ 添加知识</button>
           </div>
@@ -763,7 +763,7 @@
           <div id="expert-detail-form" class="exp-detail-form hidden">
             <div class="exp-field-row">
               <label class="exp-field">名称<input id="expert-name" type="text" class="exp-input" placeholder="专家名称"></label>
-              <label class="exp-field">描述<input id="expert-desc" type="text" class="exp-input" placeholder="一句话描述该专家</label>
+              <label class="exp-field">描述<input id="expert-desc" type="text" class="exp-input" placeholder="一句话描述该专家"></label>
             </div>
             <div class="exp-tabs">
               <button class="exp-tab active" data-tab="persona">人格 persona.md</button>
@@ -1085,7 +1085,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260818-100"></script>
+  <script type="module" src="./js/app.js?v=20260818-103"></script>
 
 </body>
 </html>

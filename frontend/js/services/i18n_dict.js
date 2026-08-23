@@ -935,6 +935,7 @@ export const EN_DICT = {
   "请先选择模型并配置 API Key": "Please select a model and configure an API Key first",
   "开始扫描项目（档位：{level}）…": "Scanning project (tier: {level})…",
   "扫描完成：{n} 个文件，精读 {h} 个": "Scan complete: {n} files, {h} read in detail",
+  "未读取到关键文本文件，将仅依据目录树生成": "No key text files were read; generating from the directory tree only",
   "扫描失败": "Scan failed",
   "（目录树已截断）": "(directory tree truncated)",
   "正在生成导览·百科…": "Generating Tour & Wiki…",

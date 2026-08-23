@@ -183,6 +183,19 @@ def _build_responses_request(body: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _extract_responses_text(data: dict[str, Any]) -> str:
+    """从 Responses API 非流式/完成事件中提取文本。"""
+    text = data.get("output_text") or ""
+    for item in data.get("output", []) or []:
+        if item.get("type") == "message":
+            for content in item.get("content", []) or []:
+                if content.get("type") in ("output_text", "text"):
+                    text += content.get("text", "")
+        elif item.get("type") == "output_text":
+            text += item.get("text", "")
+    return text
+
+
 def _parse_data_url(url: str) -> tuple[str, str] | None:
     """解析 data:MIME;base64,DATA 格式，返回 (mime, data)，非法时返回 None。"""
     m = re.match(r"^data:([^;]+);base64,(.+)$", url, re.DOTALL)
@@ -287,6 +300,8 @@ async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str
     """流式调用 Responses API，将事件转换为前端已适配的 Chat Completions SSE 格式。"""
     client = _get_stream_client(url.rsplit("/", 2)[0])
     async with client.stream("POST", url, json=payload, headers=headers) as resp:
+            resp.raise_for_status()
+            sent_text_delta = False
             async for line in resp.aiter_lines():
                 if not line.startswith("data:"):
                     continue
@@ -303,22 +318,45 @@ async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str
                 obj_type = data.get("type", "")
 
                 # 文本增量：response.output_text.delta
-                if obj_type == "response.output_text.delta":
+                if obj_type in ("response.output_text.delta", "response.text.delta"):
                     delta = data.get("delta", "")
                     if delta:
+                        sent_text_delta = True
                         chunk = {"choices": [{"delta": {"content": delta}, "index": 0}]}
                         yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
                 # 思考增量：response.reasoning_text.delta（Responses API）
-                elif obj_type == "response.reasoning_text.delta":
+                elif obj_type in ("response.reasoning_text.delta", "response.reasoning.delta"):
                     delta = data.get("delta", "")
                     if delta:
                         chunk = {"choices": [{"delta": {"reasoning": delta}, "index": 0}]}
                         yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
+                elif obj_type in ("response.output_item.done", "response.content_part.done"):
+                    if sent_text_delta:
+                        continue
+                    item = data.get("item") or data.get("part") or {}
+                    text = ""
+                    if item.get("type") in ("message", "output_text"):
+                        for content in item.get("content", []) or []:
+                            if isinstance(content, dict) and content.get("type") in ("output_text", "text"):
+                                text += content.get("text", "")
+                        if item.get("type") == "output_text":
+                            text += item.get("text", "")
+                    if text:
+                        chunk = {"choices": [{"delta": {"content": text}, "index": 0}]}
+                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+
                 # 完成信号
-                elif obj_type in ("response.completed", "response.output_item.done"):
-                    status = data.get("response", {}).get("status", "completed")
+                elif obj_type == "response.completed":
+                    response = data.get("response", {}) or {}
+                    if not sent_text_delta:
+                        final_text = _extract_responses_text(response)
+                        if final_text:
+                            chunk = {"choices": [{"delta": {"content": final_text}, "index": 0}]}
+                            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                            sent_text_delta = True
+                    status = response.get("status", "completed")
                     if status == "completed":
                         chunk = {"choices": [{"delta": {}, "finish_reason": "stop", "index": 0}]}
                         yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
@@ -489,12 +527,7 @@ async def proxy_chat(request: Request) -> Any:
         resp = await client.post(url, json=payload, headers=headers)
         data = resp.json()
         # 将 Responses API 响应转换为 Chat Completions 格式
-        text = ""
-        for item in data.get("output", []):
-            if item.get("type") == "message":
-                for content in item.get("content", []):
-                    if content.get("type") == "output_text":
-                        text += content.get("text", "")
+        text = _extract_responses_text(data)
         logger.info(f"[{trace_id}] Responses API 完成: {len(text)} 字符")
         return {
             "code": 0,
