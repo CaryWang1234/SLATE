@@ -26,6 +26,10 @@ TEXT_EXTS = {
     ".ini", ".cfg", ".env", ".log", ".csv", ".sql", ".rs", ".go", ".java",
     ".c", ".cpp", ".h", ".hpp", ".rb", ".php", ".swift", ".kt",
 }
+TEXT_NAMES = {
+    ".env", ".env.example", ".gitignore", ".gitattributes", ".dockerignore",
+    ".editorconfig", ".npmrc", ".python-version", ".node-version",
+}
 
 
 def _read_slate_config(project_dir: Path) -> dict:
@@ -54,6 +58,21 @@ def _safe_file_size(path: Path) -> int | None:
         return path.stat().st_size if path.is_file() else None
     except OSError:
         return None
+
+
+def _normalize_project_subpath(path: str | None) -> str:
+    """Keep real dot-prefixed names while treating empty, dot, and dot-slash as project root."""
+    raw = (path or "").strip().replace("\\", "/")
+    return "" if raw in {"", ".", "./"} else raw
+
+
+def _is_ignored_project_entry(path: Path) -> bool:
+    """Hide only explicit noisy/generated directories; keep project dotfiles such as .github."""
+    return path.is_dir() and path.name in IGNORE_DIRS
+
+
+def _is_text_project_file(path: Path) -> bool:
+    return path.suffix.lower() in TEXT_EXTS or path.name.lower() in TEXT_NAMES
 
 
 # ── 请求模型 ──────────────────────────────────
@@ -138,7 +157,7 @@ async def browse_files(req: BrowseRequest):
         return {"code": 1, "message": "未打开项目"}
 
     project_dir = Path(_current_project["path"])
-    sub = req.path.strip(".") if req.path else ""
+    sub = _normalize_project_subpath(req.path)
 
     if sub:
         target = (project_dir / sub).resolve()
@@ -156,8 +175,7 @@ async def browse_files(req: BrowseRequest):
 
     if target.is_file():
         # 返回文件内容（文本文件）
-        ext = target.suffix.lower()
-        if ext in TEXT_EXTS or ext in {".svg"}:
+        if _is_text_project_file(target) or target.suffix.lower() in {".svg"}:
             try:
                 content = target.read_text(encoding="utf-8", errors="replace")
                 return {
@@ -182,9 +200,7 @@ async def browse_files(req: BrowseRequest):
         return {"code": 1, "message": "无权限访问"}
 
     for item in items:
-        if item.name.startswith(".") and item.name != ".env":
-            continue
-        if item.is_dir() and item.name in IGNORE_DIRS:
+        if _is_ignored_project_entry(item):
             continue
         entries.append({
             "name": item.name,
@@ -367,9 +383,7 @@ async def find_files(req: FindRequest):
         for path in children:
             if len(matches) >= limit:
                 break
-            if path.name.startswith(".") and path.name != ".env":
-                continue
-            if path.is_dir() and path.name in IGNORE_DIRS:
+            if _is_ignored_project_entry(path):
                 continue
             rel = path.relative_to(project_dir).as_posix()
             name = path.name.lower()
@@ -569,7 +583,7 @@ def _file_priority(rel: str, name: str, ext: str) -> int:
         return 5
     if ext in (".md", ".json", ".toml", ".yaml", ".yml", ".cfg", ".ini"):
         return 6
-    if ext in TEXT_EXTS:
+    if ext in TEXT_EXTS or low in TEXT_NAMES:
         return 7
     return 9
 
@@ -596,8 +610,7 @@ async def scan_project(req: ScanRequest):
             return
         visible = [
             e for e in entries
-            if not (e.name.startswith(".") and e.name != ".env")
-            and not (e.is_dir() and e.name in IGNORE_DIRS)
+            if not _is_ignored_project_entry(e)
         ]
         emit_tree = depth <= budget["depth"]
         for i, entry in enumerate(visible):
@@ -628,7 +641,7 @@ async def scan_project(req: ScanRequest):
     for rel, name, ext, size in files:
         if len(heads) >= budget["max_files"]:
             break
-        if ext not in TEXT_EXTS:
+        if ext not in TEXT_EXTS and name.lower() not in TEXT_NAMES:
             continue
         try:
             content = (project_dir / rel).read_text(encoding="utf-8", errors="replace")

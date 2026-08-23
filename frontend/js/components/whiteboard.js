@@ -2,25 +2,27 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, getModelKey } from "../store.js?v=20260818-103";
-import { streamChat } from "../services/api.js?v=20260818-103";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-103";
-import { t } from "../services/i18n.js?v=20260818-103";
-import { makeId } from "../services/utils.js?v=20260818-103";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260818-108";
+import { streamChat } from "../services/api.js?v=20260818-108";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-108";
+import { t } from "../services/i18n.js?v=20260818-108";
+import { makeId } from "../services/utils.js?v=20260818-108";
 
-let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea;
+let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
 let btnCardDelete, btnCardSave, btnCardCancel;
 let editingCardId = null;
 let selectedColor = "default";
 let svgOverlay = null;
 let mermaidVisible = false;
+let currentBoardView = "canvas";
 let currentToolMode = "select";
 let connectSourceId = null;
 let strokes = [];
 let currentStroke = null;
 let activeCardDrag = null;
 let suppressCardClickUntil = 0;
+let selectedCardIds = new Set();
 
 const CARD_LAYOUT = {
   width: 220,
@@ -40,6 +42,24 @@ const CARD_COLORS = [
   { id: "blue", name: "蓝色", bg: "#e6f4ff", border: "#91caff" },
   { id: "purple", name: "紫色", bg: "#f5f0ff", border: "#b37feb" },
 ];
+
+const BOARD_VIEW_LABELS = {
+  canvas: "画布",
+  git: "Git 树",
+  flow: "流程",
+  kanban: "看板",
+  outline: "纲要",
+};
+
+const COLOR_META = {
+  default: { label: "未分类", icon: "·" },
+  red: { label: "风险", icon: "!" },
+  orange: { label: "待处理", icon: "…" },
+  yellow: { label: "想法", icon: "*" },
+  green: { label: "完成", icon: "✓" },
+  blue: { label: "信息", icon: "i" },
+  purple: { label: "创意", icon: "◇" },
+};
 
 // ── 卡片渲染 ─────────────────────────────────
 
@@ -95,28 +115,311 @@ function updateCardPosition(cardId, x, y) {
   setBoardCards(cards);
 }
 
+function updateCardPositions(updates) {
+  const updateMap = new Map(updates.map(item => [item.id, item]));
+  const maxX = Math.max(CARD_LAYOUT.startX, (boardCanvas?.scrollWidth || getBoardViewportSize().width) - 180);
+  const maxY = Math.max(CARD_LAYOUT.startY, (boardCanvas?.scrollHeight || getBoardViewportSize().height) - 80);
+  const cards = state.boardCards.map(card => {
+    const next = updateMap.get(card.id);
+    if (!next) return card;
+    return {
+      ...card,
+      x: Math.max(0, Math.min(maxX, Math.round(next.x))),
+      y: Math.max(0, Math.min(maxY, Math.round(next.y))),
+    };
+  });
+  setBoardCards(cards);
+}
+
 function updateBoardLayerSize(cards = state.boardCards) {
   if (!boardCanvas || !boardCards) return;
   const viewport = getBoardViewportSize();
   const maxRight = cards.reduce((max, card) => Math.max(max, (Number(card.x) || 0) + CARD_LAYOUT.width + 80), viewport.width);
+  const noteRight = (state.boardNotes || []).reduce((max, note) => Math.max(max, (Number(note.x) || 0) + (Number(note.width) || 180) + 80), viewport.width);
+  const noteBottom = (state.boardNotes || []).reduce((max, note) => Math.max(max, (Number(note.y) || 0) + 120), viewport.height);
+  const strokeRight = strokes.flatMap(s => s.points || []).reduce((max, p) => Math.max(max, (Number(p.x) || 0) + 80), viewport.width);
+  const strokeBottom = strokes.flatMap(s => s.points || []).reduce((max, p) => Math.max(max, (Number(p.y) || 0) + 80), viewport.height);
   const maxBottom = cards.reduce((max, card) => Math.max(max, (Number(card.y) || 0) + 180), viewport.height);
   const width = Math.ceil(maxRight);
-  const height = Math.ceil(maxBottom);
-  boardCards.style.width = `${width}px`;
+  const height = Math.ceil(Math.max(maxBottom, noteBottom, strokeBottom));
+  const layerWidth = Math.ceil(Math.max(width, noteRight, strokeRight));
+  boardCards.style.width = `${layerWidth}px`;
   boardCards.style.height = `${height}px`;
   if (notesLayer) {
-    notesLayer.style.width = `${width}px`;
+    notesLayer.style.width = `${layerWidth}px`;
     notesLayer.style.height = `${height}px`;
   }
   if (drawCanvas) {
-    drawCanvas.style.minWidth = `${width}px`;
+    drawCanvas.style.minWidth = `${layerWidth}px`;
     drawCanvas.style.minHeight = `${height}px`;
+  }
+  requestAnimationFrame(resizeDrawCanvas);
+}
+
+function selectCard(cardId, event = null) {
+  if (!cardId) return;
+  if (event?.shiftKey || event?.ctrlKey || event?.metaKey) {
+    if (selectedCardIds.has(cardId)) selectedCardIds.delete(cardId);
+    else selectedCardIds.add(cardId);
+  } else if (!selectedCardIds.has(cardId) || selectedCardIds.size > 1) {
+    selectedCardIds = new Set([cardId]);
+  }
+  renderSelection();
+}
+
+function clearSelection() {
+  if (!selectedCardIds.size) return;
+  selectedCardIds.clear();
+  renderSelection();
+}
+
+function renderSelection() {
+  boardCards?.querySelectorAll(".board-card").forEach(el => {
+    el.classList.toggle("selected", selectedCardIds.has(el.dataset.cardId));
+  });
+  if (selectionInfo) {
+    selectionInfo.textContent = selectedCardIds.size ? t("已选 {n}", { n: selectedCardIds.size }) : "";
+  }
+}
+
+function cardByIdMap(cards = state.boardCards) {
+  return new Map((cards || []).map(card => [card.id, card]));
+}
+
+function buildBoardGraph(cards = state.boardCards) {
+  const cardMap = cardByIdMap(cards);
+  const incoming = new Map(cards.map(card => [card.id, []]));
+  const outgoing = new Map(cards.map(card => [card.id, []]));
+  for (const card of cards) {
+    for (const targetId of card.arrows || []) {
+      if (!cardMap.has(targetId)) continue;
+      outgoing.get(card.id).push(targetId);
+      incoming.get(targetId).push(card.id);
+    }
+  }
+  const roots = cards.filter(card => (incoming.get(card.id) || []).length === 0);
+  return { cardMap, incoming, outgoing, roots: roots.length ? roots : cards.slice(0, 1) };
+}
+
+function boardCardSummary(card) {
+  const meta = COLOR_META[card.color || "default"] || COLOR_META.default;
+  const node = document.createElement("button");
+  node.className = `board-view-card board-view-color-${card.color || "default"}`;
+  node.type = "button";
+  node.dataset.cardId = card.id;
+  node.addEventListener("click", () => {
+    selectedCardIds = new Set([card.id]);
+    setBoardView("canvas");
+    requestAnimationFrame(() => {
+      const el = boardCards?.querySelector(`[data-card-id="${card.id}"]`);
+      if (el) {
+        boardCanvas.scrollTo({
+          left: Math.max(0, (Number(card.x) || 0) - 80),
+          top: Math.max(0, (Number(card.y) || 0) - 80),
+          behavior: "smooth",
+        });
+      }
+      renderSelection();
+    });
+  });
+  node.addEventListener("dblclick", () => openCardModal(card));
+
+  const head = document.createElement("span");
+  head.className = "board-view-card-head";
+  const badge = document.createElement("span");
+  badge.className = "board-view-card-badge";
+  badge.textContent = meta.icon;
+  const title = document.createElement("strong");
+  title.textContent = card.title || t("未命名");
+  head.append(badge, title);
+  node.appendChild(head);
+
+  if (card.body) {
+    const body = document.createElement("span");
+    body.className = "board-view-card-body";
+    body.textContent = card.body;
+    node.appendChild(body);
+  }
+  return node;
+}
+
+function renderBoardView() {
+  if (!boardViewPanel || currentBoardView === "canvas") return;
+  const cards = state.boardCards || [];
+  boardViewPanel.innerHTML = "";
+  const header = document.createElement("div");
+  header.className = "board-view-header";
+  const title = document.createElement("strong");
+  title.textContent = BOARD_VIEW_LABELS[currentBoardView] || t("视图");
+  const meta = document.createElement("span");
+  meta.textContent = t("{n} 张卡片", { n: cards.length });
+  header.append(title, meta);
+  boardViewPanel.appendChild(header);
+  if (!cards.length) {
+    const empty = document.createElement("div");
+    empty.className = "board-view-empty";
+    empty.textContent = t("黑板是空的，请先添加卡片");
+    boardViewPanel.appendChild(empty);
+    return;
+  }
+  if (currentBoardView === "git") renderGitTreeView(cards);
+  else if (currentBoardView === "flow") renderFlowView(cards);
+  else if (currentBoardView === "kanban") renderKanbanView(cards);
+  else if (currentBoardView === "outline") renderOutlineView(cards);
+}
+
+function renderGitTreeView(cards) {
+  const { incoming, outgoing, roots } = buildBoardGraph(cards);
+  const lanes = [];
+  const levels = new Map();
+  const queue = roots.map(card => card.id);
+  roots.forEach(card => levels.set(card.id, 0));
+  while (queue.length) {
+    const id = queue.shift();
+    const base = levels.get(id) || 0;
+    for (const child of outgoing.get(id) || []) {
+      const next = Math.max(levels.get(child) || 0, base + 1);
+      if (next !== levels.get(child)) {
+        levels.set(child, next);
+        queue.push(child);
+      }
+    }
+  }
+  cards.forEach((card, index) => {
+    const level = levels.has(card.id) ? levels.get(card.id) : Math.floor(index / 4);
+    if (!lanes[level]) lanes[level] = [];
+    lanes[level].push(card);
+  });
+  const wrap = document.createElement("div");
+  wrap.className = "board-git-tree";
+  lanes.forEach((laneCards, idx) => {
+    const lane = document.createElement("div");
+    lane.className = "board-git-lane";
+    const laneTitle = document.createElement("div");
+    laneTitle.className = "board-git-lane-title";
+    laneTitle.textContent = idx === 0 ? t("root") : t("level {n}", { n: idx });
+    lane.appendChild(laneTitle);
+    laneCards.forEach(card => {
+      const item = document.createElement("div");
+      item.className = "board-git-node";
+      const parents = incoming.get(card.id) || [];
+      item.appendChild(boardCardSummary(card));
+      if (parents.length) {
+        const parentText = document.createElement("div");
+        parentText.className = "board-git-parents";
+        parentText.textContent = "↤ " + parents.join(", ");
+        item.appendChild(parentText);
+      }
+      lane.appendChild(item);
+    });
+    wrap.appendChild(lane);
+  });
+  boardViewPanel.appendChild(wrap);
+}
+
+function renderFlowView(cards) {
+  const { incoming, outgoing, roots, cardMap } = buildBoardGraph(cards);
+  const wrap = document.createElement("div");
+  wrap.className = "board-flow-view";
+  const seen = new Set();
+  const visit = (card, depth = 0) => {
+    if (!card || seen.has(card.id)) return;
+    seen.add(card.id);
+    const row = document.createElement("div");
+    row.className = "board-flow-row";
+    row.style.marginLeft = `${depth * 24}px`;
+    row.appendChild(boardCardSummary(card));
+    const children = outgoing.get(card.id) || [];
+    if (children.length) {
+      const arrow = document.createElement("span");
+      arrow.className = "board-flow-arrow";
+      arrow.textContent = "→";
+      row.appendChild(arrow);
+    }
+    wrap.appendChild(row);
+    children.forEach(child => visit(cardMap.get(child), depth + 1));
+  };
+  roots.forEach(root => visit(root));
+  cards.filter(card => !seen.has(card.id)).forEach(card => visit(card));
+  if ([...incoming.values()].some(list => list.length > 1)) {
+    const hint = document.createElement("div");
+    hint.className = "board-view-hint";
+    hint.textContent = t("存在合流节点，双击卡片可编辑连接关系。");
+    wrap.appendChild(hint);
+  }
+  boardViewPanel.appendChild(wrap);
+}
+
+function renderKanbanView(cards) {
+  const wrap = document.createElement("div");
+  wrap.className = "board-kanban-view";
+  for (const color of ["red", "orange", "yellow", "blue", "purple", "green", "default"]) {
+    const colCards = cards.filter(card => (card.color || "default") === color);
+    const col = document.createElement("div");
+    col.className = `board-kanban-col board-view-color-${color}`;
+    const head = document.createElement("div");
+    head.className = "board-kanban-head";
+    head.textContent = `${COLOR_META[color].label} (${colCards.length})`;
+    col.appendChild(head);
+    colCards.forEach(card => col.appendChild(boardCardSummary(card)));
+    wrap.appendChild(col);
+  }
+  boardViewPanel.appendChild(wrap);
+}
+
+function renderOutlineView(cards) {
+  const { outgoing, roots, cardMap } = buildBoardGraph(cards);
+  const seen = new Set();
+  const makeList = (items, depth = 0) => {
+    const ul = document.createElement("ul");
+    ul.className = depth === 0 ? "board-outline-root" : "board-outline-children";
+    for (const card of items) {
+      if (!card || seen.has(card.id)) continue;
+      seen.add(card.id);
+      const li = document.createElement("li");
+      li.appendChild(boardCardSummary(card));
+      const children = (outgoing.get(card.id) || []).map(id => cardMap.get(id)).filter(Boolean);
+      if (children.length) li.appendChild(makeList(children, depth + 1));
+      ul.appendChild(li);
+    }
+    return ul;
+  };
+  boardViewPanel.appendChild(makeList(roots));
+  const orphans = cards.filter(card => !seen.has(card.id));
+  if (orphans.length) {
+    const h = document.createElement("div");
+    h.className = "board-view-hint";
+    h.textContent = t("未连接卡片");
+    boardViewPanel.appendChild(h);
+    boardViewPanel.appendChild(makeList(orphans));
+  }
+}
+
+function setBoardView(view) {
+  currentBoardView = view || "canvas";
+  const canvasMode = currentBoardView === "canvas";
+  boardCanvas?.classList.toggle("hidden", !canvasMode);
+  boardViewPanel?.classList.toggle("hidden", canvasMode);
+  document.querySelectorAll(".board-view-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.view === currentBoardView);
+  });
+  document.querySelectorAll(".board-tool-btn, #btn-undo-stroke, #btn-clear-strokes").forEach(el => {
+    el.disabled = !canvasMode;
+  });
+  if (canvasMode) {
+    renderAllCards();
+    renderNotes();
+    redrawStrokes();
+  } else {
+    clearSelection();
+    renderBoardView();
   }
 }
 
 function renderCard(card) {
   const el = document.createElement("div");
   el.className = "board-card";
+  if (selectedCardIds.has(card.id)) el.classList.add("selected");
   el.draggable = false;
   el.dataset.cardId = card.id;
   el.style.left = `${Number(card.x) || 0}px`;
@@ -175,8 +478,15 @@ function renderCard(card) {
     if (currentToolMode !== "select") return;
     if (e.button !== 0 || e.target.closest("button")) return;
     e.preventDefault();
+    selectCard(card.id, e);
+    const dragIds = selectedCardIds.has(card.id) ? [...selectedCardIds] : [card.id];
+    const starts = new Map(state.boardCards
+      .filter(c => dragIds.includes(c.id))
+      .map(c => [c.id, { x: Number(c.x) || 0, y: Number(c.y) || 0 }]));
     activeCardDrag = {
       id: card.id,
+      ids: dragIds,
+      starts,
       startX: Number(card.x) || 0,
       startY: Number(card.y) || 0,
       pointerX: e.clientX,
@@ -184,6 +494,9 @@ function renderCard(card) {
       moved: false,
     };
     el.classList.add("dragging");
+    for (const id of dragIds) {
+      boardCards.querySelector(`[data-card-id="${id}"]`)?.classList.add("dragging");
+    }
     el.setPointerCapture(e.pointerId);
   });
 
@@ -193,8 +506,13 @@ function renderCard(card) {
     const dx = e.clientX - activeCardDrag.pointerX;
     const dy = e.clientY - activeCardDrag.pointerY;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) activeCardDrag.moved = true;
-    el.style.left = `${Math.max(0, Math.round(activeCardDrag.startX + dx))}px`;
-    el.style.top = `${Math.max(0, Math.round(activeCardDrag.startY + dy))}px`;
+    for (const id of activeCardDrag.ids || [card.id]) {
+      const start = activeCardDrag.starts?.get(id) || { x: activeCardDrag.startX, y: activeCardDrag.startY };
+      const node = boardCards.querySelector(`[data-card-id="${id}"]`);
+      if (!node) continue;
+      node.style.left = `${Math.max(0, Math.round(start.x + dx))}px`;
+      node.style.top = `${Math.max(0, Math.round(start.y + dy))}px`;
+    }
     drawArrows();
   });
 
@@ -202,11 +520,15 @@ function renderCard(card) {
     if (!activeCardDrag || activeCardDrag.id !== card.id) return;
     const drag = activeCardDrag;
     activeCardDrag = null;
-    el.classList.remove("dragging");
+    boardCards.querySelectorAll(".board-card.dragging").forEach(node => node.classList.remove("dragging"));
     try { el.releasePointerCapture(e.pointerId); } catch (err) {}
     if (!drag.moved) return;
     suppressCardClickUntil = Date.now() + 250;
-    updateCardPosition(card.id, parseFloat(el.style.left) || 0, parseFloat(el.style.top) || 0);
+    const updates = (drag.ids || [card.id]).map(id => {
+      const node = boardCards.querySelector(`[data-card-id="${id}"]`);
+      return { id, x: parseFloat(node?.style.left) || 0, y: parseFloat(node?.style.top) || 0 };
+    });
+    updateCardPositions(updates);
   };
   el.addEventListener("pointerup", finishDrag);
   el.addEventListener("pointercancel", finishDrag);
@@ -234,6 +556,7 @@ function renderAllCards() {
   for (const card of cards) {
     boardCards.appendChild(renderCard(card));
   }
+  renderSelection();
   // 绘制箭头（延迟确定DOM 已更新）
   setTimeout(drawArrows, 50);
 }
@@ -320,6 +643,14 @@ function setToolMode(mode) {
   renderAllCards();
 }
 
+function getBoardPoint(e, target = boardCanvas) {
+  const rect = target.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left + (target === boardCanvas ? boardCanvas.scrollLeft : 0),
+    y: e.clientY - rect.top + (target === boardCanvas ? boardCanvas.scrollTop : 0),
+  };
+}
+
 function setupBoardTools() {
   document.querySelectorAll(".board-tool-btn").forEach(btn => {
     btn.addEventListener("click", () => setToolMode(btn.dataset.mode || "select"));
@@ -352,25 +683,19 @@ function handleConnectCard(cardId) {
   setBoardCards(cards);
 }
 
-function getCanvasPoint(e) {
-  const rect = drawCanvas.getBoundingClientRect();
-  return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
-  };
-}
-
 function resizeDrawCanvas() {
   if (!drawCanvas || !boardCanvas) return;
   const rect = boardCanvas.getBoundingClientRect();
   const scale = window.devicePixelRatio || 1;
-  const width = Math.max(1, Math.round(rect.width * scale));
-  const height = Math.max(1, Math.round(rect.height * scale));
+  const cssWidth = Math.max(rect.width, boardCanvas.scrollWidth || rect.width);
+  const cssHeight = Math.max(rect.height, boardCanvas.scrollHeight || rect.height);
+  const width = Math.max(1, Math.round(cssWidth * scale));
+  const height = Math.max(1, Math.round(cssHeight * scale));
   if (drawCanvas.width !== width || drawCanvas.height !== height) {
     drawCanvas.width = width;
     drawCanvas.height = height;
-    drawCanvas.style.width = `${rect.width}px`;
-    drawCanvas.style.height = `${rect.height}px`;
+    drawCanvas.style.width = `${cssWidth}px`;
+    drawCanvas.style.height = `${cssHeight}px`;
   }
   drawCtx = drawCanvas.getContext("2d");
   drawCtx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -379,8 +704,7 @@ function resizeDrawCanvas() {
 
 function redrawStrokes() {
   if (!drawCtx || !drawCanvas) return;
-  const rect = drawCanvas.getBoundingClientRect();
-  drawCtx.clearRect(0, 0, rect.width, rect.height);
+  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
   for (const stroke of strokes) drawStroke(stroke);
   if (currentStroke) drawStroke(currentStroke);
 }
@@ -410,18 +734,21 @@ function setupDrawing() {
     currentStroke = {
       color: getComputedStyle(document.documentElement).getPropertyValue("--text").trim() || "#1A1A1A",
       width: 2,
-      points: [getCanvasPoint(e)],
+      points: [getBoardPoint(e, drawCanvas)],
     };
     redrawStrokes();
   });
   drawCanvas.addEventListener("pointermove", (e) => {
     if (!currentStroke) return;
-    currentStroke.points.push(getCanvasPoint(e));
+    currentStroke.points.push(getBoardPoint(e, drawCanvas));
     redrawStrokes();
   });
   const endStroke = (e) => {
     if (!currentStroke) return;
-    if (currentStroke.points.length > 1) strokes.push(currentStroke);
+    if (currentStroke.points.length > 1) {
+      strokes.push(currentStroke);
+      setBoardStrokes(strokes);
+    }
     currentStroke = null;
     try { drawCanvas.releasePointerCapture(e.pointerId); } catch (err) {}
     redrawStrokes();
@@ -433,6 +760,7 @@ function setupDrawing() {
 function undoStroke() {
   if (strokes.length > 0) {
     strokes.pop();
+    setBoardStrokes(strokes);
     redrawStrokes();
   }
 }
@@ -440,31 +768,124 @@ function undoStroke() {
 function clearStrokesAndNotes() {
   strokes = [];
   currentStroke = null;
-  if (notesLayer) notesLayer.innerHTML = "";
+  setBoardStrokes([]);
+  setBoardNotes([]);
   redrawStrokes();
+}
+
+function renderNotes() {
+  if (!notesLayer) return;
+  notesLayer.innerHTML = "";
+  for (const note of state.boardNotes || []) {
+    const wrap = document.createElement("div");
+    wrap.className = "board-note-wrap";
+    wrap.dataset.noteId = note.id;
+    wrap.style.left = `${Number(note.x) || 0}px`;
+    wrap.style.top = `${Number(note.y) || 0}px`;
+    wrap.style.width = `${Math.max(90, Number(note.width) || 180)}px`;
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "board-note";
+    textarea.value = note.text || "";
+    textarea.rows = 1;
+    textarea.placeholder = t("输入文字");
+    const autosize = () => {
+      textarea.style.height = "auto";
+      textarea.style.height = `${Math.max(28, textarea.scrollHeight)}px`;
+    };
+    textarea.addEventListener("input", () => {
+      autosize();
+      updateNote(note.id, { text: textarea.value }, { silent: true });
+    });
+    textarea.addEventListener("blur", () => {
+      if (!textarea.value.trim()) removeNote(note.id);
+      else updateNote(note.id, { text: textarea.value });
+    });
+    textarea.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") textarea.blur();
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") textarea.blur();
+    });
+    wrap.appendChild(textarea);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "board-note-delete";
+    deleteBtn.textContent = "×";
+    deleteBtn.title = t("删除");
+    deleteBtn.addEventListener("click", () => removeNote(note.id));
+    wrap.appendChild(deleteBtn);
+
+    let drag = null;
+    wrap.addEventListener("pointerdown", (e) => {
+      if (e.target === textarea || e.target.closest("button")) return;
+      e.preventDefault();
+      drag = {
+        pointerId: e.pointerId,
+        startX: Number(note.x) || 0,
+        startY: Number(note.y) || 0,
+        pointerX: e.clientX,
+        pointerY: e.clientY,
+      };
+      wrap.classList.add("dragging");
+      wrap.setPointerCapture(e.pointerId);
+    });
+    wrap.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const x = Math.max(0, Math.round(drag.startX + e.clientX - drag.pointerX));
+      const y = Math.max(0, Math.round(drag.startY + e.clientY - drag.pointerY));
+      wrap.style.left = `${x}px`;
+      wrap.style.top = `${y}px`;
+    });
+    const finish = (e) => {
+      if (!drag) return;
+      drag = null;
+      wrap.classList.remove("dragging");
+      try { wrap.releasePointerCapture(e.pointerId); } catch (err) {}
+      updateNote(note.id, { x: parseFloat(wrap.style.left) || 0, y: parseFloat(wrap.style.top) || 0 });
+    };
+    wrap.addEventListener("pointerup", finish);
+    wrap.addEventListener("pointercancel", finish);
+
+    notesLayer.appendChild(wrap);
+    requestAnimationFrame(autosize);
+  }
+  updateBoardLayerSize();
+}
+
+function updateNote(id, patch, options = {}) {
+  const notes = (state.boardNotes || []).map(note => note.id === id ? { ...note, ...patch } : note);
+  if (options.silent) {
+    state.boardNotes = notes;
+    return;
+  }
+  setBoardNotes(notes);
+}
+
+function removeNote(id) {
+  setBoardNotes((state.boardNotes || []).filter(note => note.id !== id));
+}
+
+function addNoteAt(x, y) {
+  const note = {
+    id: makeId("note_"),
+    text: "",
+    x: Math.max(0, Math.round(x)),
+    y: Math.max(0, Math.round(y)),
+    width: 190,
+  };
+  setBoardNotes([...(state.boardNotes || []), note]);
+  requestAnimationFrame(() => {
+    const node = notesLayer?.querySelector(`[data-note-id="${note.id}"] textarea`);
+    node?.focus();
+  });
 }
 
 function setupTextNotes() {
   if (!boardCanvas || !notesLayer) return;
   boardCanvas.addEventListener("click", (e) => {
     if (currentToolMode !== "text") return;
-    if (e.target.closest(".board-card, .board-note, button")) return;
-    const rect = boardCanvas.getBoundingClientRect();
-    const note = document.createElement("textarea");
-    note.className = "board-note";
-    note.value = "";
-    note.style.left = `${e.clientX - rect.left + boardCanvas.scrollLeft}px`;
-    note.style.top = `${e.clientY - rect.top + boardCanvas.scrollTop}px`;
-    note.rows = 1;
-    note.addEventListener("input", () => {
-      note.style.height = "auto";
-      note.style.height = `${Math.max(24, note.scrollHeight)}px`;
-    });
-    note.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") note.blur();
-    });
-    notesLayer.appendChild(note);
-    note.focus();
+    if (e.target.closest(".board-card, .board-note-wrap, .board-note, button")) return;
+    const point = getBoardPoint(e);
+    addNoteAt(point.x, point.y);
   });
 }
 
@@ -564,6 +985,144 @@ async function deleteCard() {
   closeCardModal();
 }
 
+function deleteSelectedCards() {
+  if (!selectedCardIds.size) return false;
+  const selected = new Set(selectedCardIds);
+  const cards = state.boardCards
+    .filter(card => !selected.has(card.id))
+    .map(card => ({ ...card, arrows: (card.arrows || []).filter(id => !selected.has(id)) }));
+  selectedCardIds.clear();
+  setBoardCards(cards);
+  return true;
+}
+
+function duplicateSelectedCards() {
+  if (!selectedCardIds.size) return false;
+  const selected = state.boardCards.filter(card => selectedCardIds.has(card.id));
+  if (!selected.length) return false;
+  const idMap = new Map(selected.map(card => [card.id, makeId("c")]));
+  const clones = selected.map((card, index) => ({
+    ...card,
+    id: idMap.get(card.id),
+    title: `${card.title || t("未命名")} 副本`,
+    x: (Number(card.x) || 0) + 32 + index * 8,
+    y: (Number(card.y) || 0) + 32 + index * 8,
+    arrows: (card.arrows || []).map(id => idMap.get(id) || id),
+    _isToolStep: false,
+  }));
+  selectedCardIds = new Set(clones.map(card => card.id));
+  setBoardCards([...state.boardCards, ...clones]);
+  return true;
+}
+
+function autoLayoutCards() {
+  const cards = state.boardCards || [];
+  if (!cards.length) return;
+  const indegree = new Map(cards.map(card => [card.id, 0]));
+  const outgoing = new Map(cards.map(card => [card.id, []]));
+  for (const card of cards) {
+    for (const target of card.arrows || []) {
+      if (!indegree.has(target)) continue;
+      indegree.set(target, indegree.get(target) + 1);
+      outgoing.get(card.id).push(target);
+    }
+  }
+  const level = new Map();
+  const queue = cards.filter(card => (indegree.get(card.id) || 0) === 0).map(card => card.id);
+  for (const id of queue) level.set(id, 0);
+  while (queue.length) {
+    const id = queue.shift();
+    const base = level.get(id) || 0;
+    for (const target of outgoing.get(id) || []) {
+      const next = Math.max(level.get(target) || 0, base + 1);
+      if (next !== level.get(target)) {
+        level.set(target, next);
+        queue.push(target);
+      }
+    }
+  }
+  cards.forEach((card, index) => {
+    if (!level.has(card.id)) level.set(card.id, Math.floor(index / 4));
+  });
+  const groups = new Map();
+  for (const card of cards) {
+    const l = level.get(card.id) || 0;
+    if (!groups.has(l)) groups.set(l, []);
+    groups.get(l).push(card);
+  }
+  const laidOut = cards.map(card => {
+    const l = level.get(card.id) || 0;
+    const group = groups.get(l) || [];
+    const row = group.findIndex(item => item.id === card.id);
+    return {
+      ...card,
+      x: CARD_LAYOUT.startX + l * (CARD_LAYOUT.width + 90),
+      y: CARD_LAYOUT.startY + row * (118 + CARD_LAYOUT.gapY),
+    };
+  });
+  setBoardCards(laidOut);
+  requestAnimationFrame(focusBoardContent);
+}
+
+function focusBoardContent() {
+  if (!boardCanvas) return;
+  const cards = state.boardCards || [];
+  if (!cards.length && !(state.boardNotes || []).length && !strokes.length) {
+    boardCanvas.scrollTo({ left: 0, top: 0, behavior: "smooth" });
+    return;
+  }
+  const xs = [
+    ...cards.map(card => Number(card.x) || 0),
+    ...(state.boardNotes || []).map(note => Number(note.x) || 0),
+    ...strokes.flatMap(stroke => (stroke.points || []).map(p => Number(p.x) || 0)),
+  ];
+  const ys = [
+    ...cards.map(card => Number(card.y) || 0),
+    ...(state.boardNotes || []).map(note => Number(note.y) || 0),
+    ...strokes.flatMap(stroke => (stroke.points || []).map(p => Number(p.y) || 0)),
+  ];
+  boardCanvas.scrollTo({
+    left: Math.max(0, Math.min(...xs) - 40),
+    top: Math.max(0, Math.min(...ys) - 40),
+    behavior: "smooth",
+  });
+}
+
+function setupBoardShortcuts() {
+  if (!boardCanvas) return;
+  boardCanvas.tabIndex = 0;
+  boardCanvas.addEventListener("click", (e) => {
+    if (currentToolMode === "select" && !e.target.closest(".board-card, .board-note-wrap, button")) {
+      clearSelection();
+    }
+  });
+  boardCanvas.addEventListener("keydown", async (e) => {
+    const tag = document.activeElement?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    if (e.key === "Escape") {
+      clearSelection();
+      setToolMode("select");
+      return;
+    }
+    if ((e.key === "Delete" || e.key === "Backspace") && selectedCardIds.size) {
+      e.preventDefault();
+      if (await dlgConfirm(t("删除选中的 {n} 张卡片？", { n: selectedCardIds.size }), { danger: true, okText: t("删除") })) {
+        deleteSelectedCards();
+      }
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
+      e.preventDefault();
+      duplicateSelectedCards();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "l") {
+      e.preventDefault();
+      autoLayoutCards();
+    }
+  });
+}
+
 function renderColorOptions() {
   cardColorOptions.innerHTML = "";
   for (const color of CARD_COLORS) {
@@ -633,6 +1192,16 @@ function exportBoard() {
   }
 
   lines.push("## JSON", "", "```json", JSON.stringify(cards, null, 2), "```", "");
+  if ((state.boardNotes || []).length) {
+    lines.push("## Notes", "");
+    for (const note of state.boardNotes) {
+      if (note.text?.trim()) lines.push(`- ${note.text.trim()}`);
+    }
+    lines.push("");
+  }
+  if ((state.boardStrokes || []).length) {
+    lines.push("## Drawing", "", `${t("笔画数量")}: ${state.boardStrokes.length}`, "");
+  }
 
   const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -771,6 +1340,7 @@ async function aiOrganize() {
     });
 
     setBoardCards(updatedCards);
+    requestAnimationFrame(autoLayoutCards);
     dlgToast(t("AI 重构完成"));
   } catch (e) {
     dlgToast(t("AI 整理失败：{msg}", { msg: e.message }));
@@ -809,6 +1379,8 @@ function initWhiteboard() {
   boardEmpty = document.getElementById("board-empty");
   drawCanvas = document.getElementById("board-draw-canvas");
   notesLayer = document.getElementById("board-notes");
+  selectionInfo = document.getElementById("board-selection-info");
+  boardViewPanel = document.getElementById("board-view-panel");
   mermaidPreview = document.getElementById("mermaid-preview");
   mermaidCode = document.getElementById("mermaid-code");
   mermaidRenderArea = document.getElementById("mermaid-render-area");
@@ -826,6 +1398,8 @@ function initWhiteboard() {
 
   // 添加卡片按钮
   document.getElementById("btn-add-card").addEventListener("click", () => openCardModal());
+  document.getElementById("btn-layout-board")?.addEventListener("click", autoLayoutCards);
+  document.getElementById("btn-focus-board")?.addEventListener("click", focusBoardContent);
 
   // AI 整理按钮
   document.getElementById("btn-ai-organize").addEventListener("click", aiOrganize);
@@ -840,7 +1414,12 @@ function initWhiteboard() {
 
   // 清空黑板
   document.getElementById("btn-clear-board").addEventListener("click", async () => {
-    if (await dlgConfirm(t("确认清空黑板？"), { danger: true, okText: t("清空") })) setBoardCards([]);
+    if (await dlgConfirm(t("确认清空黑板？"), { danger: true, okText: t("清空") })) {
+      selectedCardIds.clear();
+      setBoardCards([]);
+      setBoardNotes([]);
+      setBoardStrokes([]);
+    }
   });
 
   // 模态框按钮
@@ -860,8 +1439,13 @@ function initWhiteboard() {
 
   setupDragDrop();
   setupBoardTools();
+  document.querySelectorAll(".board-view-btn").forEach(btn => {
+    btn.addEventListener("click", () => setBoardView(btn.dataset.view || "canvas"));
+  });
   setupDrawing();
   setupTextNotes();
+  setupBoardShortcuts();
+  strokes = Array.isArray(state.boardStrokes) ? [...state.boardStrokes] : [];
   resizeDrawCanvas();
   if (window.ResizeObserver && boardCanvas) {
     new ResizeObserver(resizeDrawCanvas).observe(boardCanvas);
@@ -894,9 +1478,18 @@ function initWhiteboard() {
   subscribe("boardCards", () => {
     renderAllCards();
     renderMermaid();
+    renderBoardView();
+  });
+  subscribe("boardNotes", renderNotes);
+  subscribe("boardStrokes", (next) => {
+    strokes = Array.isArray(next) ? [...next] : [];
+    redrawStrokes();
   });
 
   renderAllCards();
+  renderNotes();
+  redrawStrokes();
+  setBoardView(currentBoardView);
 }
 
 // ── 自动记录：工具执行步骤可视化 ─────────────────────────────────

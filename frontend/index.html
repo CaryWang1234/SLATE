@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260818-103">
+  <link rel="stylesheet" href="./css/style.css?v=20260818-108">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏    document.documentElement.classList.add("i18n-pending");
     setTimeout(function () { document.documentElement.classList.remove("i18n-pending"); }, 2500);
@@ -183,6 +183,8 @@
         <div class="panel-actions">
           <button id="btn-add-card" class="icon-btn" title="添加卡片">+</button>
                     <button id="btn-wf-stop" class="send-btn stop-btn hidden">停止</button>
+          <button id="btn-layout-board" class="icon-btn" title="自动整理布局">▦</button>
+          <button id="btn-focus-board" class="icon-btn" title="回到内容区">⌖</button>
           <button id="btn-ai-organize" class="icon-btn" title="AI 整理成流程图">◇</button>
           <button id="btn-toggle-mermaid" class="icon-btn" title="显示/隐藏流程图">📊</button>
           <button id="btn-export-board" class="icon-btn" title="导出黑板">⇩</button>
@@ -191,11 +193,20 @@
       </div>
       <!-- 工具栏） -->
       <div id="board-toolbar" class="board-toolbar">
+        <div id="board-view-modes" class="board-view-modes" aria-label="黑板显示模式">
+          <button class="board-view-btn active" data-view="canvas" title="自由画布">画布</button>
+          <button class="board-view-btn" data-view="git" title="Git 树视图">Git</button>
+          <button class="board-view-btn" data-view="flow" title="流程视图">流程</button>
+          <button class="board-view-btn" data-view="kanban" title="看板视图">看板</button>
+          <button class="board-view-btn" data-view="outline" title="纲要视图">纲要</button>
+        </div>
+        <span class="board-toolbar-sep"></span>
         <button class="board-tool-btn active" data-mode="select" title="选择/移动">✋</button>
         <button class="board-tool-btn" data-mode="connect" title="连线">🔗</button>
         <button class="board-tool-btn" data-mode="draw" title="画笔">✏️</button>
         <button class="board-tool-btn" data-mode="text" title="文字">T</button>
         <span class="board-toolbar-sep"></span>
+        <span id="board-selection-info" class="board-selection-info"></span>
         <button id="btn-undo-stroke" class="icon-btn" title="撤销笔画">↩</button>
         <button id="btn-clear-strokes" class="icon-btn" title="清除所有笔">🗑</button>
       </div>
@@ -216,6 +227,7 @@
           <p class="hint">点击 + 添加卡片，或选择工具开始创造</p>
         </div>
       </div>
+      <div id="board-view-panel" class="board-view-panel hidden"></div>
       <div id="mermaid-preview" class="mermaid-preview hidden">
         <div class="mermaid-preview-header">
           <span>流程图预览</span>
@@ -1085,7 +1097,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260818-103"></script>
+  <script type="module" src="./js/app.js?v=20260818-108"></script>
 
 </body>
 </html>

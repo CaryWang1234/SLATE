@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260818-103";
+import { makeId } from "./services/utils.js?v=20260818-108";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -47,6 +47,8 @@ const state = {
 
   // 黑板
   boardCards: [],
+  boardNotes: [],
+  boardStrokes: [],
 
   // 宪法
   constitution: null,
@@ -139,6 +141,8 @@ function buildPersistentData() {
     customModels: state.customModels,
     currentModelId: state.currentModel?.id || state._pendingModelId || null,
     boardCards: state.boardCards,
+    boardNotes: state.boardNotes,
+    boardStrokes: state.boardStrokes,
     memories: state.memories,
     userProfile: state.userProfile,
     promptSnippets: state.promptSnippets,
@@ -210,6 +214,8 @@ function loadPersistent() {
     state.modelKeys = data.modelKeys || {};
     state.customModels = data.customModels || [];
     state.boardCards = data.boardCards || [];
+    state.boardNotes = Array.isArray(data.boardNotes) ? data.boardNotes : [];
+    state.boardStrokes = Array.isArray(data.boardStrokes) ? data.boardStrokes : [];
     state.memories = data.memories || [];
     state.userProfile = data.userProfile || {};
     state.promptSnippets = data.promptSnippets || [];
@@ -494,6 +500,18 @@ function addBoardCard(card) {
   notify("boardCards", state.boardCards);
 }
 
+function setBoardNotes(notes) {
+  state.boardNotes = Array.isArray(notes) ? notes : [];
+  savePersistent();
+  notify("boardNotes", state.boardNotes);
+}
+
+function setBoardStrokes(strokes) {
+  state.boardStrokes = Array.isArray(strokes) ? strokes : [];
+  savePersistent();
+  notify("boardStrokes", state.boardStrokes);
+}
+
 function setConstitution(data) {
   state.constitution = data;
   notify("constitution", data);
@@ -632,7 +650,7 @@ export {
   getConversationTodos, setConversationTodos,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage,
-  setConversations, setBoardCards, addBoardCard,
+  setConversations, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,
   setConstitution, setSkills, setModelRegistry,
   setProject, setProjectFileTree,
   setMemories, addMemory, updateMemory, removeMemory,

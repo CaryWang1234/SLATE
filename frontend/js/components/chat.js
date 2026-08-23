@@ -1,21 +1,21 @@
 /**
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输入 */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260818-103";
-import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260818-103";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260818-103";
-import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt } from "../services/tools.js?v=20260818-103";
-import { renderMarkdown } from "../services/markdown.js?v=20260818-103";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260818-103";
-import { getExpertsCached } from "./experts.js?v=20260818-103";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-103";
-import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260818-103";
-import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260818-103";
-import { fileTypeIcon } from "../services/file_icons.js?v=20260818-103";
-import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260818-103";
-import * as grindSvc from "../services/grind.js?v=20260818-103";
-import { t } from "../services/i18n.js?v=20260818-103";
-import { notifyTaskComplete } from "../services/notify.js?v=20260818-103";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260818-108";
+import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260818-108";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260818-108";
+import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt } from "../services/tools.js?v=20260818-108";
+import { renderMarkdown } from "../services/markdown.js?v=20260818-108";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260818-108";
+import { getExpertsCached } from "./experts.js?v=20260818-108";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260818-108";
+import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260818-108";
+import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260818-108";
+import { fileTypeIcon } from "../services/file_icons.js?v=20260818-108";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260818-108";
+import * as grindSvc from "../services/grind.js?v=20260818-108";
+import { t } from "../services/i18n.js?v=20260818-108";
+import { notifyTaskComplete } from "../services/notify.js?v=20260818-108";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -57,15 +57,15 @@ function autoScroll(force = false) {
 let harnessStatusEl = null;
 let btnHarness = null;
 
-const HARNESS_PREFIX = `[Harness 自主执行模式 · 六阶段闭环]
-请自主完成以下任务，不要向我提问，严格按六阶段推进：
-1. 目标：开篇用一句话明确本次任务的目标与验收标准。
-2. 计划：面临大任务（多步骤 / 多文件 / 复杂修改）必须先调用 todo_manage(action=init) 建立 TODOLIST，拆解为可执行、可验证的步骤；简单任务可跳过。
-3. 执行：统筹清单全局推进，能并行的多项一起处理；每完成一项或一批事项，立即调用 todo_manage(action=update) 批量更新状态，让清单随时反映真实进度；受阻项标为 blocked 并说明原因；需要信息或操作时直接调用 MCP 工具。
-4. 验证：每步完成后自行验证结果（重新读取文件 / 执行命令 / 核对输出），失败则修复后重新验证。
-5. 汇报：全部完成后输出完结报告，逐条核对 TODOLIST（done / blocked + 原因），未全部了结不得宣称任务完成。
-6. 追溯：用 1-3 句总结本次任务的关键决策、踩坑与可复用经验。
-注意：系统会在每轮工具结果开头标注当前轮次（[Harness · x/N 轮]），请留意剩余轮数预算，临近上限时优先收尾并输出汇报与追溯。
+const HARNESS_PREFIX = `[Harness 自主执行模式 · Agent Loop]
+请自主完成以下任务，不要向我反复确认，按 Observe → Plan → Act → Verify → Report 推进：
+1. 目标：先明确本次目标与可验证完成标准。
+2. 计划：多文件、多步骤、排查或实现类任务必须先调用 todo_manage(action=init) 建立 TODOLIST；简单单步任务可跳过。
+3. 观察：先读取项目事实，不凭记忆猜测；无依赖读取/扫描可以一轮批量调用。
+4. 执行：按清单推进，能合并的一批一起完成；每完成一项或一批立即 todo_manage(action=update)。
+5. 验证：修改或生成后必须读取、运行命令、检查输出或执行测试；失败则继续修复。
+6. 汇报：全部 done 或 blocked 后再收尾，逐条核对结果、验证方式和剩余风险。
+注意：系统会在每轮工具结果开头标注 [Harness · x/N 轮]。接近轮数上限时优先完成验证和收尾，不要空转。
 
 任务：`;
 
@@ -948,6 +948,41 @@ function getInspectionQueries(content) {
   return [...new Set(queries)].slice(0, 3);
 }
 
+function classifyAgentTask(content) {
+  const text = stripCodeForStallCheck(content);
+  const wantsEnv = userWantsEnvironmentAction(text);
+  const modifies = /(修复|修改|编辑|创建|生成|保存|写入|优化|重构|实现|删除|commit|提交|fix|edit|create|write|optimi[sz]e|refactor|implement|delete|commit)/i.test(text);
+  const verifies = /(测试|验证|构建|运行|CI|报错|失败|bug|检查|排查|test|verify|build|run|ci|error|fail|bug|scan)/i.test(text);
+  const broad = /(全面|所有|整个|尽可能|排查|扫描|项目|仓库|多文件|全局|complete|all|entire|project|repo|multi)/i.test(text);
+  const needsPlan = wantsEnv && (broad || (modifies && verifies) || text.length > 80);
+  return { wantsEnv, modifies, verifies, broad, needsPlan };
+}
+
+function buildAgentRuntimeContext(content, harnessOn) {
+  const cls = classifyAgentTask(content);
+  if (!cls.wantsEnv) return "";
+  const lines = [
+    "",
+    "[Agent Runtime]",
+    "本条消息被识别为需要环境操作的任务。请按以下运行时规则执行：",
+    "- 下一步若需要项目事实，直接调用工具；不要只说计划或等待。",
+    "- 先观察再修改：读取相关目录/文件/配置，确认现状后再写入。",
+    "- 修改或生成后必须验证：重新读取、运行检查/测试/构建，或解释无法验证的具体原因。",
+    "- 工具失败时换参数或换工具，不重复完全相同的调用。",
+    "- 只有任务完成、验证完成或明确受阻时才给最终汇报。",
+  ];
+  if (cls.needsPlan && !harnessOn) {
+    lines.push("- 这是复杂任务；如果需要多步推进，先用 todo_manage(action=init) 建立短清单。");
+  }
+  if (cls.broad) {
+    lines.push("- 任务范围较大；优先扫描入口文件、配置、最近相关模块，再分批推进。");
+  }
+  if (cls.modifies) {
+    lines.push("- 文件修改优先使用 file_edit；新文件才用 file_create。");
+  }
+  return "\n" + lines.join("\n");
+}
+
 function getAllModels() {
   const allModels = [];
   for (const models of Object.values(state.modelRegistry || {})) {
@@ -1163,6 +1198,42 @@ function formatSuggestedCalls(calls) {
   return calls.map(call => `- ${call.name}: ${JSON.stringify(call.params || {})}`).join("\n");
 }
 
+function toolCallSignature(call) {
+  return `${call?.name || ""}:${JSON.stringify(call?.params || {})}`;
+}
+
+function dedupeToolCalls(calls) {
+  const seen = new Set();
+  const unique = [];
+  for (const call of calls || []) {
+    const sig = toolCallSignature(call);
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    unique.push(call);
+  }
+  return unique;
+}
+
+function buildToolFollowupInstruction({ harnessOn, round, maxRounds, results }) {
+  const failed = (results || []).filter(r => r.success === false);
+  const lines = [
+    "",
+    "[Agent Loop 指令]",
+    `当前工具轮次：${round + 1}/${maxRounds}。`,
+    "- 先吸收工具结果，再决定下一步；不要复述工具原文。",
+    "- 若目标仍未完成，继续调用最小必要工具推进。",
+    "- 若刚完成文件修改/生成，优先验证：读取文件、运行检查/测试/构建或说明无法验证原因。",
+    "- 若已完成并验证，输出简短最终汇报，不再调用工具。",
+  ];
+  if (harnessOn) {
+    lines.push("- Harness 模式下：如有 TODOLIST，完成一批就 todo_manage(action=update)，全部 done/blocked 后再收尾。");
+  }
+  if (failed.length) {
+    lines.push(`- 有 ${failed.length} 个工具失败：请换参数、换工具或先读取更多上下文，不要重复完全相同的失败调用。`);
+  }
+  return lines.join("\n");
+}
+
 function scheduleAutoAdvanceNudge(msgEl, calls, reason = "stalled") {
   const lastMsg = state.messages[state.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return false;
@@ -1264,6 +1335,23 @@ function getToolCallStatus(result) {
   return "已执行";
 }
 
+function getToolCallMeta(call) {
+  const params = call?.params || {};
+  if (params.file_path) return params.file_path;
+  if (params.path) return params.path;
+  if (params.query) return params.query;
+  if (params.skill) return params.skill;
+  if (params.command) return params.command;
+  if (params.name) return params.name;
+  return call?.name || "";
+}
+
+function setToolCallExpanded(el, header, body, expanded) {
+  el.classList.toggle("is-open", expanded);
+  body.hidden = !expanded;
+  header.setAttribute("aria-expanded", String(expanded));
+}
+
 // 从工具输出中提取多模态预览信息（chart/qrcode 返回图片，apidoc 等返回文档）
 const IMAGE_EXTS = [".svg", ".png", ".jpg", ".jpeg", ".webp", ".gif"];
 function extractToolImage(output) {
@@ -1289,10 +1377,10 @@ function renderToolCallGroup(items) {
   if (normalized.length === 0) return document.createDocumentFragment();
   if (normalized.length === 1) return renderToolCallCard(normalized[0].call, normalized[0].result);
 
-  const group = document.createElement("details");
+  const group = document.createElement("section");
   group.className = "tool-call-group";
 
-  const summary = document.createElement("summary");
+  const summary = document.createElement("div");
   summary.className = "tool-call-group-summary";
   const labels = normalized.map(item => getToolCallLabel(item.call)).slice(0, 3).join(" / ");
   const title = document.createElement("span");
@@ -1313,27 +1401,43 @@ function renderToolCallGroup(items) {
 }
 
 function renderToolCallCard(call, result) {
-  const el = document.createElement("details");
+  const el = document.createElement("section");
   el.className = "tool-call-card";
-  el.open = result?._structured?._type === "file_edit" || result?._structured?._type === "file_create" || result?._structured?._type === "file_append";
+  const defaultOpen = result?.success === false || result?._structured?._type === "file_edit" || result?._structured?._type === "file_create" || result?._structured?._type === "file_append";
 
-  const header = document.createElement("summary");
+  const header = document.createElement("button");
+  header.type = "button";
   header.className = "tool-call-header";
+  header.setAttribute("aria-label", t("展开或收起工具调用详情"));
+  const titleWrap = document.createElement("span");
+  titleWrap.className = "tool-call-title";
   const label = document.createElement("span");
   label.className = "tool-call-name";
   label.textContent = getToolCallLabel(call);
+  titleWrap.appendChild(label);
+  const metaText = getToolCallMeta(call);
+  if (metaText) {
+    const meta = document.createElement("span");
+    meta.className = "tool-call-card-meta";
+    meta.textContent = metaText;
+    titleWrap.appendChild(meta);
+  }
   const status = document.createElement("span");
   const applied = ["file_edit", "file_create", "file_append"].includes(result?._structured?._type) && result._structured.applied === "auto";
   status.className = result?.success === false
     ? "tool-call-status-pill failed"
     : applied ? "tool-call-status-pill applied" : "tool-call-status-pill";
   status.textContent = getToolCallStatus(result);
-  header.appendChild(label);
+  header.appendChild(titleWrap);
   header.appendChild(status);
   el.appendChild(header);
 
   const body = document.createElement("div");
   body.className = "tool-call-body";
+  setToolCallExpanded(el, header, body, defaultOpen);
+  header.addEventListener("click", () => {
+    setToolCallExpanded(el, header, body, body.hidden);
+  });
 
   if (call.params && Object.keys(call.params).length > 0) {
     const input = document.createElement("div");
@@ -1375,7 +1479,7 @@ function renderToolCallCard(call, result) {
     // 多模态输出预览：工具返回 preview_url 时内联展示（图片直接渲染，文档提供链接）
     const imgInfo = extractToolImage(result?.output);
     if (imgInfo) {
-      el.open = true;
+      setToolCallExpanded(el, header, body, true);
       const wrap = document.createElement("div");
       if (imgInfo.kind === "image") {
         wrap.className = "tool-call-image";
@@ -1795,7 +1899,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     if (signal?.aborted || !stuck) break;
     const contPrompt = buildContinuePrompt(content);
     try {
-      const { toast } = await import("../app.js?v=20260818-103");
+      const { toast } = await import("../app.js?v=20260818-108");
       toast(t("输出达到长度上限，自动续写中（{x}/{n}）…", { x: round, n: MAX_CONTINUE_ROUNDS }));
     } catch {}
 
@@ -1837,7 +1941,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
   // 轮数耗尽仍未闭合：提示用户，后续由工具循环的截断守卫接管（拒执行并要求拆分重试）
   if (!signal?.aborted && hasTruncatedTail(content)) {
     try {
-      const { toast } = await import("../app.js?v=20260818-103");
+      const { toast } = await import("../app.js?v=20260818-108");
       toast("输出仍不完整，已要求模型拆分重试", 3200);
     } catch {}
   }
@@ -1860,7 +1964,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     const lastMsg = state.messages[state.messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") break;
 
-    const calls = detectToolCalls(lastMsg.content);
+    let calls = dedupeToolCalls(detectToolCalls(lastMsg.content));
     let nudged = false;
     // 上一轮生成异常：失败报错或零输出（Harness 下不退出，催其重新生成继续推进）
     const replyFailed = !(lastMsg.content || "").trim() || /^(续写失败|请求失败)/.test(lastMsg.content);
@@ -1992,7 +2096,10 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
       // Keep tool results in model context without rendering them as chat bubbles.
       // Harness 下每轮结果开头标注轮次，让模型感知当前进度与剩余轮数预算
       const roundTag = harnessOn ? `[Harness · ${round + 1}/${maxRounds} 轮]\n` : "";
-      const toolResultText = roundTag + results.map((r, i) => formatToolResultForModel(calls[i], r)).join("\n\n");
+      const toolResultText = roundTag
+        + results.map((r, i) => formatToolResultForModel(calls[i], r)).join("\n\n")
+        + "\n\n"
+        + buildToolFollowupInstruction({ harnessOn, round, maxRounds, results });
       addMessage({ role: "user", content: toolResultText, model: "[tool_results]", hidden: true });
     }
 
@@ -2078,7 +2185,7 @@ async function sendMessage(queuedPayload = null) {
   if (isGenerating) {
     if (queuedPayload) inputQueue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260818-103");
+      const { toast } = await import("../app.js?v=20260818-108");
       toast(t("已加入输入队列（{n}）", { n: inputQueue.length }));
     }
     updateSendState();
@@ -2104,7 +2211,7 @@ async function sendMessage(queuedPayload = null) {
   const grindActive = grindSession && ["grinding", "collecting"].includes(grindSession.state);
   const isFreshConv = !state.currentConversationId || state.messages.length === 0;
   if (!queuedPayload && !grindActive && isFreshConv && isAbstractTask(text)) {
-    const { dlgConfirm } = await import("../services/dialog.js?v=20260818-103");
+    const { dlgConfirm } = await import("../services/dialog.js?v=20260818-108");
     const confirmed = await dlgConfirm(
       t("检测到抽象任务「{text}」，建议先进入磨墨模式细化需求后再执行。是否切换？", { text: text.slice(0, 30) }),
       { title: t("磨墨建议"), okText: t("进入磨墨"), cancelText: t("直接发送") }
@@ -2184,7 +2291,8 @@ async function sendMessage(queuedPayload = null) {
 
   const mentionContext = await resolveMentions(text);
   const harnessOn = state.harness?.enabled === true;
-  const fullText = (harnessOn ? HARNESS_PREFIX : "") + text + mentionContext + fileContext;
+  const agentRuntimeContext = buildAgentRuntimeContext(text, harnessOn);
+  const fullText = (harnessOn ? HARNESS_PREFIX : "") + text + agentRuntimeContext + mentionContext + fileContext;
   await refreshKnowledgeContext(fullText);
   // display：气泡只展示用户输入的原文；注入的 Skill 定义 / Harness 指令 / 文件内容只进模型上下文，与后端持久化的干净文本保持一致。
   const userMsg = { role: "user", content: fullText, display: text, model: "", files: fileMeta.length > 0 ? fileMeta : undefined };
@@ -2337,7 +2445,7 @@ async function sendMessage(queuedPayload = null) {
 
   } catch (err) {
     console.error("发送失败", err);
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输出 · Harness 保持开启" : "已停止输出") : t("发送失败: {msg}", { msg: err.message }));
   } finally {
   isGenerating = false;
@@ -2382,7 +2490,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
 
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast(t("上下文已压缩：{n} 条消息已摘要", { n: compress_count }));
   } catch (e) {
     console.warn("上下文压缩检查失败", e);
@@ -2462,7 +2570,7 @@ async function handleGrindReply(content, msgEl) {
     renderGrindPanel();
     updateSendState();
     appendDraftActions(msgEl, draft);
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast("墨稿已成：可送入 Harness / 投到白板 / 存为模板");
     return;
   }
@@ -2575,20 +2683,20 @@ function appendDraftActions(msgEl, draft) {
     state.harness.enabled = true;
     btnHarness?.classList.add("active");
     savePersistent();
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast("墨稿已送入 Harness，自主执行中…");
     await sendMessage({ text: grindSvc.draftToHarnessTask(draft), files: [] });
   }));
 
   bar.appendChild(mkBtn("投到白板", "作为白板卡片保存", async () => {
     addBoardCard(grindSvc.draftToBoardCard(draft));
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast("已投到白板");
   }));
 
   bar.appendChild(mkBtn("存为模板", "存入知识库作为可复用任务书模板", async () => {
     const ok = await grindSvc.saveDraftAsTemplate(draft);
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast(ok ? "已存为磨墨模板（知识中心可见）" : "保存失败");
   }));
 
@@ -2598,7 +2706,7 @@ function appendDraftActions(msgEl, draft) {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260818-103").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260818-108").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -2622,7 +2730,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -2655,7 +2763,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(t("上下文已压缩：{n} 条消息已摘要", { n: res.data.compress_count || 0 }));
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -3139,7 +3247,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260818-103");
+      const { toast } = await import("../app.js?v=20260818-108");
       toast(t("文件过大，已跳过: {name}", { name: file.name }));
       continue;
     }
@@ -3155,11 +3263,11 @@ async function handleFiles(fileList) {
         if (res.code === 0 && res.data?.content) {
           pendingFiles.push({ name: file.name, size: file.size, content: res.data.content, type: "text" });
         } else {
-          const { toast } = await import("../app.js?v=20260818-103");
+          const { toast } = await import("../app.js?v=20260818-108");
           toast(res.message || t("解析失败: {name}", { name: file.name }));
         }
       } catch (e) {
-        const { toast } = await import("../app.js?v=20260818-103");
+        const { toast } = await import("../app.js?v=20260818-108");
         toast(t("解析失败: {name}（{msg}）", { name: file.name, msg: e.message }));
       }
       continue;
@@ -3200,7 +3308,7 @@ async function handleFiles(fileList) {
   */
 async function regenerateMessage(msg, msgEl) {
   if (isGenerating) {
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast("正在生成中，请稍候");
     return;
   }
@@ -3208,7 +3316,7 @@ async function regenerateMessage(msg, msgEl) {
   if (idx < 0) return;
   const after = state.messages.slice(idx + 1).filter(m => !m.hidden && m.role !== "system");
   if (after.length > 0) {
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast("只能重新生成最后一条助手回复");
     return;
   }
@@ -3216,7 +3324,7 @@ async function regenerateMessage(msg, msgEl) {
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast("请先在设置中配置该模型的 API Key");
     return;
   }
@@ -3226,7 +3334,7 @@ async function regenerateMessage(msg, msgEl) {
     .filter(m => !m.hidden && m.role !== "system")
     .map(m => ({ role: m.role, content: m.content }));
   if (!history.some(m => m.role === "user")) {
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast("没有可重新生成的上下文");
     return;
   }
@@ -3342,7 +3450,7 @@ function initChat() {
     markActivity(); // 防止重复触发
     try { activeGenerationController?.abort(); } catch {}
     try {
-      const { toast } = await import("../app.js?v=20260818-103");
+      const { toast } = await import("../app.js?v=20260818-108");
       toast("连接长时间无响应，已自动中断，可重试");
     } catch {}
   }, 15000);
@@ -3373,7 +3481,7 @@ function initChat() {
     state.harness.enabled = !state.harness.enabled;
     btnHarness.classList.toggle("active", state.harness.enabled);
     savePersistent();
-    const { toast } = await import("../app.js?v=20260818-103");
+    const { toast } = await import("../app.js?v=20260818-108");
     toast(state.harness.enabled ? "Harness 已开启：目标→计划→执行→验证→汇报→追溯，六阶段自主闭环，大任务自动建议 TODOLIST" : "Harness 已关闭");
     showHarnessIdle();
   });
@@ -3413,18 +3521,18 @@ function initChat() {
     const id = expertSelect.value;
     if (!id) {
       setActiveExpertId("");
-      const { toast } = await import("../app.js?v=20260818-103");
+      const { toast } = await import("../app.js?v=20260818-108");
       toast("已退出专家模式");
       return;
     }
     try {
-      const { getExpert } = await import("../services/experts.js?v=20260818-103");
+      const { getExpert } = await import("../services/experts.js?v=20260818-108");
       const detail = await getExpert(id, { force: true });
       setActiveExpertId(id, detail);
-      const { toast } = await import("../app.js?v=20260818-103");
+      const { toast } = await import("../app.js?v=20260818-108");
       toast(t("已启用专家包：{name}", { name: detail.name || id }));
     } catch (e) {
-      const { toast } = await import("../app.js?v=20260818-103");
+      const { toast } = await import("../app.js?v=20260818-108");
       toast(t("专家包加载失败: {msg}", { msg: e.message }));
       expertSelect.value = state.activeExpertId || "";
     }
@@ -3569,7 +3677,7 @@ function startVoice(btn) {
   };
   _voiceRecognition.onerror = (e) => {
     if (e.error !== "aborted" && e.error !== "no-speech") {
-      try { import("../app.js?v=20260818-103").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
+      try { import("../app.js?v=20260818-108").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
     }
     stopVoice();
   };

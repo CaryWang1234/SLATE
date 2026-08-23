@@ -12,11 +12,11 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-103";
-import { post } from "../services/api.js?v=20260818-103";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-103";
-import { t } from "./i18n.js?v=20260818-103";
-import { makeId } from "./utils.js?v=20260818-103";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260818-108";
+import { post } from "../services/api.js?v=20260818-108";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260818-108";
+import { t } from "./i18n.js?v=20260818-108";
+import { makeId } from "./utils.js?v=20260818-108";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -787,6 +787,23 @@ const SKILL_RUN_QUICK_LIST = [
   "python_api_extract", "html_bundle", "ppt_create", "word_create", "excel_tool",
 ];
 
+const CORE_AGENT_TOOLS = [
+  "project_info", "project_files", "project_find_file", "project_read_file",
+  "skill_run", "file_edit", "file_create", "file_append",
+  "todo_manage", "board_read", "board_batch",
+];
+
+const AGENT_TOOL_DECISION_RULES = [
+  "需要仓库事实：先 project_files / project_find_file / project_read_file，再回答或修改。",
+  "修改已有文件：先读现状与行号，再 file_edit；改完后读取或运行检查验证。",
+  "创建新文件：file_create 用原样格式；长文件分段 file_append，不要省略内容。",
+  "运行命令/测试/构建/Git：skill_run terminal 或 git_tool，默认会注入项目目录。",
+  "搜索实时信息：web_search / web_fetch；有本地证据优先本地。",
+  "桌面/浏览器操作：优先 browser_automation；必须操作系统 UI 时再 computer_use。",
+  "复杂多步任务：用 todo_manage 维护状态；完成一批就更新，不等最后。",
+  "可视化梳理：用 board_batch 一次性组织卡片和依赖。",
+];
+
 function compactDescription(text, limit = 260) {
   const clean = String(text || "").replace(/\s+/g, " ").trim();
   return clean.length > limit ? `${clean.slice(0, limit)}...` : clean;
@@ -1117,17 +1134,18 @@ async function executeToolCalls(calls) {
 
 // ── 系统提示词工具段 ──────────────────────────
 
-function getToolsSystemPrompt({ minimal = false } = {}) {
+function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   let s = "\n\n[可用工具]\n";
   s += "你拥有工具，可以直接操作用户的工作环境。\n\n";
-  s += "**调用纪律**\n";
+  s += "**Agent 调用纪律**\n";
   s += "1. 必须使用下方格式实际发出调用，不要只描述意图；禁止说“我先看看”“我需要查看”后停住。\n";
-  s += "2. 任务需要查看文件、目录、项目结构或执行操作时，当前回复必须包含工具调用块；不要回答“我无法查看”——你可以。\n";
-  s += "3. 你只是在问用户是否继续、是否要你动手时，不要调用工具，等待用户确认。\n";
-  s += "4. 同一回复可以发出多个独立工具块；无依赖的读取/扫描可以批量调用，有依赖的先拿结果再继续。\n";
-  s += "5. 只知道文件名但不知道相对路径时，先调用 project_find_file；拿到匹配路径后再调用 project_read_file。\n\n";
+  s += "2. 任务需要查看文件、目录、项目结构、执行命令或写文件时，当前回复必须包含工具调用块。\n";
+  s += "3. 同一回复可批量调用互不依赖的读取/扫描工具；有依赖的等工具结果后再继续。\n";
+  s += "4. 工具失败后换参数、换工具或读取更多上下文；不要重复完全相同的失败调用。\n";
+  s += "5. 等待用户选择、确认、补充隐私信息或许可时，不调用工具。\n\n";
   s += "**工具选择速查**\n";
   for (const [scene, route] of TOOL_USE_RECIPES) s += `- ${scene}: ${route}\n`;
+  for (const rule of AGENT_TOOL_DECISION_RULES) s += `- ${rule}\n`;
   s += "\n";
   s += "**调用格式**：每次调用独占一块，◈◈◈ 与 ◈◆◆ 是固定标记，不可省略；一次回复可多次调用：\n";
   s += "◈◈◈tool_name\n{JSON参数}\n◈◆◆\n\n";
@@ -1148,7 +1166,12 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
     s += "\n";
   }
 
-  for (const [key, tool] of Object.entries(TOOLS)) {
+  const toolEntries = compact || minimal
+    ? CORE_AGENT_TOOLS.filter(key => TOOLS[key]).map(key => [key, TOOLS[key]])
+    : Object.entries(TOOLS);
+
+  s += compact || minimal ? "**核心 Agent 工具**\n" : "**工具目录**\n";
+  for (const [key, tool] of toolEntries) {
     const desc = key === "skill_run"
       ? `调用内置工具/远程 MCP/自定义技能。常用内置工具：${SKILL_RUN_QUICK_LIST.join(", ")}。复杂参数按工具名传入 params。`
       : compactDescription(tool.description);
@@ -1169,6 +1192,13 @@ function getToolsSystemPrompt({ minimal = false } = {}) {
       }
     }
     s += `示例:\n◈◈◈${key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
+  }
+
+  if (compact || minimal) {
+    const extraNames = Object.keys(TOOLS).filter(key => !CORE_AGENT_TOOLS.includes(key));
+    if (extraNames.length) {
+      s += `其他可用工具名：${extraNames.join(", ")}。不确定参数时优先使用 skill_run 调用内置技能或先读取相关上下文。\n\n`;
+    }
   }
 
   // 远程 MCP 工具（动态注入）
