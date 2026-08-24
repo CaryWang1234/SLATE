@@ -9,7 +9,7 @@
 *Local AI collaboration studio — turn sparks of ideas into structured plans.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-1a1a1a.svg)](LICENSE)
-[![Website](https://img.shields.io/badge/Website-carywang1234.github.io%2FSLATE-1a1a1a.svg)](https://carywang1234.github.io/SLATE/docs/zh/index.html)
+[![Website](https://img.shields.io/badge/Website-carywang1234.github.io%2FSLATE-1a1a1a.svg)](https://carywang1234.github.io/SLATE/)
 [![Guide](https://img.shields.io/badge/%E6%95%99%E7%A8%8B-%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97-d4a24e.svg)](https://carywang1234.github.io/SLATE/docs/guide.html)
 [![Python](https://img.shields.io/badge/Python-3.13%2B-1a1a1a.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-1a1a1a.svg)]()

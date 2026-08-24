@@ -139,8 +139,8 @@ function bin(cmd) {
 
 function commandExists(cmd, args = ["--version"]) {
   const res = process.platform === "win32"
-    ? spawnSync([cmd, ...args].map(quoteShellArg).join(" "), { cwd: root, encoding: "utf8", shell: true })
-    : spawnSync(cmd, args, { cwd: root, encoding: "utf8", shell: false });
+    ? spawnSync([cmd, ...args].map(quoteShellArg).join(" "), { cwd: root, encoding: "utf8", shell: true, timeout: 5000 })
+    : spawnSync(cmd, args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
   return !res.error && res.status === 0;
 }
 
@@ -155,6 +155,18 @@ function checkJsSyntax() {
   const npx = bin("npx");
   const node = process.execPath;
 
+  const checkWithNode = () => {
+    if (!existsSync(node)) return false;
+    for (const file of jsFiles) {
+      try {
+        execFileSync(node, ["--check", file], { cwd: root, encoding: "utf8", stdio: "pipe", timeout: 5000 });
+      } catch (err) {
+        fail(file, 0, "JavaScript syntax check failed via node --check", String(err.stderr || err.message).trim());
+      }
+    }
+    return true;
+  };
+
   if (commandExists(npx, ["--version"])) {
     const acornArgs = ["--yes", "acorn", "--silent", "--module", "--ecma2022", ...jsFiles];
     const res = process.platform === "win32"
@@ -163,27 +175,26 @@ function checkJsSyntax() {
         encoding: "utf8",
         shell: true,
         maxBuffer: 1024 * 1024 * 20,
+        timeout: 15000,
       })
       : spawnSync(npx, acornArgs, {
         cwd: root,
         encoding: "utf8",
         shell: false,
         maxBuffer: 1024 * 1024 * 20,
+        timeout: 15000,
       });
+    if (res.error?.code === "ETIMEDOUT") {
+      warn("frontend/js", 0, "acorn syntax check timed out; fell back to node --check");
+      if (checkWithNode()) return;
+    }
     if (res.status !== 0) {
       fail("frontend/js", 0, "ES module syntax check failed via acorn", (res.stderr || res.stdout || "").trim());
     }
     return;
   }
 
-  if (existsSync(node)) {
-    for (const file of jsFiles) {
-      try {
-        execFileSync(node, ["--check", file], { cwd: root, encoding: "utf8", stdio: "pipe" });
-      } catch (err) {
-        fail(file, 0, "JavaScript syntax check failed via node --check", String(err.stderr || err.message).trim());
-      }
-    }
+  if (checkWithNode()) {
     warn("frontend/js", 0, "npx was not available; fell back to node --check, which is weaker for ES modules");
     return;
   }

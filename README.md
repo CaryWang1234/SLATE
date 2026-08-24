@@ -9,7 +9,7 @@
 *SLATE（砚）— Grind inspiration into polished deliverables.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-1a1a1a.svg)](LICENSE)
-[![Website](https://img.shields.io/badge/Website-carywang1234.github.io%2FSLATE-1a1a1a.svg)](https://carywang1234.github.io/SLATE/docs/index.html)
+[![Website](https://img.shields.io/badge/Website-carywang1234.github.io%2FSLATE-1a1a1a.svg)](https://carywang1234.github.io/SLATE/)
 [![Guide](https://img.shields.io/badge/Guide-User%20Tutorial-d4a24e.svg)](https://carywang1234.github.io/SLATE/docs/guide.html)
 [![Python](https://img.shields.io/badge/Python-3.13%2B-1a1a1a.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-1a1a1a.svg)]()

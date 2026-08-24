@@ -4,9 +4,9 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define MyAppName "SLATE 砚"
-#define MyAppVersion "0.3.2"
+#define MyAppVersion "0.3.3"
 ; 构建号（yyyyMMddHHmm），每次发布构建时更新
-#define MyAppBuild "202608231955"
+#define MyAppBuild "202608240953"
 #define MyAppPublisher "SLATE"
 #define MyAppURL "https://github.com/CaryWang1234/SLATE"
 #define MyAppExeName "SLATE.exe"
@@ -60,9 +60,9 @@ VersionInfoCopyright=Copyright (c) {#MyAppPublisher}
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加快捷方式："; Flags: checkedonce
-Name: "autostart"; Description: "开机自动启动 {#MyAppName}"; GroupDescription: "附加选项："; Flags: unchecked
-Name: "userdata"; Description: "卸载时保留用户数据（聊天记录 / 技能 / 设置）"; GroupDescription: "卸载行为："; Flags: checkedonce
+Name: "desktopicon"; Description: "创建桌面快捷方式 Add Desktop Shortcut"; GroupDescription: "附加快捷方式："; Flags: checkedonce
+Name: "autostart"; Description: "开机自动启动 {#MyAppName} Auto start {#MyAppName} while setup"; GroupDescription: "附加选项："; Flags: unchecked
+Name: "userdata"; Description: "卸载时保留用户数据（聊天记录 / 技能 / 设置）keep data when uninstall"; GroupDescription: "卸载行为："; Flags: checkedonce
 
 [Registry]
 ; 开机自启（随 autostart 任务创建，卸载时自动移除）

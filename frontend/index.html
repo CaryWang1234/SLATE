@@ -180,6 +180,12 @@
     <section id="panel-whiteboard" class="panel">
       <div class="panel-header">
         <span class="panel-title">黑板</span>
+        <div id="board-view-modes" class="board-view-modes board-view-modes-header" aria-label="黑板显示模式">
+          <button class="board-view-btn" data-view="git" title="Git 树视图">Git</button>
+          <button class="board-view-btn" data-view="flow" title="流程视图">流程</button>
+          <button class="board-view-btn" data-view="kanban" title="看板视图">看板</button>
+          <button class="board-view-btn" data-view="outline" title="纲要视图">纲要</button>
+        </div>
         <div class="panel-actions">
           <button id="btn-add-card" class="icon-btn" title="添加卡片">+</button>
                     <button id="btn-wf-stop" class="send-btn stop-btn hidden">停止</button>
@@ -193,14 +199,6 @@
       </div>
       <!-- 工具栏） -->
       <div id="board-toolbar" class="board-toolbar">
-        <div id="board-view-modes" class="board-view-modes" aria-label="黑板显示模式">
-          <button class="board-view-btn active" data-view="canvas" title="自由画布">画布</button>
-          <button class="board-view-btn" data-view="git" title="Git 树视图">Git</button>
-          <button class="board-view-btn" data-view="flow" title="流程视图">流程</button>
-          <button class="board-view-btn" data-view="kanban" title="看板视图">看板</button>
-          <button class="board-view-btn" data-view="outline" title="纲要视图">纲要</button>
-        </div>
-        <span class="board-toolbar-sep"></span>
         <button class="board-tool-btn active" data-mode="select" title="选择/移动">✋</button>
         <button class="board-tool-btn" data-mode="connect" title="连线">🔗</button>
         <button class="board-tool-btn" data-mode="draw" title="画笔">✏️</button>

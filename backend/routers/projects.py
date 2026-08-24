@@ -77,6 +77,68 @@ def _is_text_project_file(path: Path) -> bool:
     return path.suffix.lower() in TEXT_EXTS or path.name.lower() in TEXT_NAMES
 
 
+def _run_git(project_dir: Path, args: list[str], timeout: int = 10) -> tuple[int, str, str]:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout,
+        **hidden_subprocess_kwargs(),
+    )
+    return result.returncode, result.stdout.strip(), result.stderr.strip()
+
+
+def _split_git_record(line: str) -> list[str]:
+    return line.split("\x1f")
+
+
+def _parse_porcelain_status(text: str) -> dict[str, list[dict[str, str]]]:
+    staged: list[dict[str, str]] = []
+    unstaged: list[dict[str, str]] = []
+    untracked: list[dict[str, str]] = []
+    for raw in text.splitlines():
+        if not raw or raw.startswith("##"):
+            continue
+        xy = raw[:2]
+        path = raw[3:].strip()
+        if not path:
+            continue
+        item = {"status": xy.strip() or "?", "path": path}
+        if xy == "??":
+            untracked.append(item)
+            continue
+        if xy[0] != " ":
+            staged.append({"status": xy[0], "path": path})
+        if xy[1] != " ":
+            unstaged.append({"status": xy[1], "path": path})
+    return {"staged": staged, "unstaged": unstaged, "untracked": untracked}
+
+
+def _parse_worktrees(text: str) -> list[dict[str, str | bool]]:
+    worktrees: list[dict[str, str | bool]] = []
+    current: dict[str, str | bool] = {}
+    for line in [*text.splitlines(), ""]:
+        if not line:
+            if current:
+                worktrees.append(current)
+                current = {}
+            continue
+        if line.startswith("worktree "):
+            current["path"] = line.removeprefix("worktree ").strip()
+        elif line.startswith("HEAD "):
+            current["head"] = line.removeprefix("HEAD ").strip()[:12]
+        elif line.startswith("branch "):
+            current["branch"] = line.removeprefix("branch ").strip().removeprefix("refs/heads/")
+        elif line == "bare":
+            current["bare"] = True
+        elif line == "detached":
+            current["detached"] = True
+    return worktrees
+
+
 # ── 请求模型 ──────────────────────────────────
 
 class OpenProjectRequest(BaseModel):
@@ -360,6 +422,170 @@ async def review_diff(req: ReviewDiffRequest):
             "mode": req.mode,
         },
         "message": "ok",
+    }
+
+
+@router.get("/git/graph")
+async def git_graph() -> dict[str, Any]:
+    """Return a read-only Git graph for the currently opened project."""
+    if not _current_project:
+        return {"code": 1, "message": "未打开项目"}
+    project_dir = Path(_current_project["path"])
+
+    try:
+        code, root, err = _run_git(project_dir, ["rev-parse", "--show-toplevel"])
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return {"code": 1, "message": "该项目不是 Git 仓库"}
+    if code != 0:
+        return {"code": 1, "message": f"该项目不是 Git 仓库: {err or project_dir}"}
+
+    repo_dir = Path(root)
+    _code, current_branch, _err = _run_git(repo_dir, ["rev-parse", "--abbrev-ref", "HEAD"])
+    _code, head_full, _err = _run_git(repo_dir, ["rev-parse", "HEAD"])
+    _code, status_text, _err = _run_git(repo_dir, ["status", "--porcelain=v1", "-b"])
+    status = _parse_porcelain_status(status_text)
+
+    _code, branch_text, _err = _run_git(
+        repo_dir,
+        [
+            "branch",
+            "--format=%(refname:short)\x1f%(objectname:short)\x1f%(upstream:short)\x1f%(upstream:trackshort)\x1f%(HEAD)",
+        ],
+    )
+    branches = []
+    for line in branch_text.splitlines():
+        parts = _split_git_record(line)
+        if len(parts) < 5:
+            continue
+        branches.append({
+            "name": parts[0],
+            "hash": parts[1],
+            "upstream": parts[2],
+            "track": parts[3],
+            "current": parts[4] == "*",
+        })
+
+    _code, remote_branch_text, _err = _run_git(
+        repo_dir,
+        ["branch", "-r", "--format=%(refname:short)\x1f%(objectname:short)"],
+    )
+    remote_branches = []
+    for line in remote_branch_text.splitlines():
+        parts = _split_git_record(line)
+        if len(parts) >= 2 and "HEAD" not in parts[0]:
+            remote_branches.append({"name": parts[0], "hash": parts[1]})
+
+    _code, remote_text, _err = _run_git(repo_dir, ["remote", "-v"])
+    remotes: dict[str, dict[str, str]] = {}
+    for line in remote_text.splitlines():
+        parts = line.split()
+        if len(parts) >= 3:
+            entry = remotes.setdefault(parts[0], {})
+            direction = parts[2].strip("()")
+            entry[direction] = parts[1]
+
+    _code, tag_text, _err = _run_git(
+        repo_dir,
+        ["for-each-ref", "refs/tags", "--sort=-creatordate", "--format=%(refname:short)\x1f%(objectname:short)\x1f%(creatordate:short)"],
+    )
+    tags = []
+    for line in tag_text.splitlines()[:40]:
+        parts = _split_git_record(line)
+        if len(parts) >= 2:
+            tags.append({"name": parts[0], "hash": parts[1], "date": parts[2] if len(parts) > 2 else ""})
+
+    _code, stash_text, _err = _run_git(repo_dir, ["stash", "list", "--format=%gd\x1f%h\x1f%cr\x1f%s"])
+    stashes = []
+    for line in stash_text.splitlines()[:20]:
+        parts = _split_git_record(line)
+        if len(parts) >= 4:
+            stashes.append({"name": parts[0], "hash": parts[1], "date": parts[2], "subject": parts[3]})
+
+    _code, worktree_text, _err = _run_git(repo_dir, ["worktree", "list", "--porcelain"])
+    worktrees = _parse_worktrees(worktree_text)
+
+    _code, log_text, _err = _run_git(
+        repo_dir,
+        [
+            "log",
+            "--all",
+            "--decorate=short",
+            "--date=format:%Y-%m-%d %H:%M",
+            "--pretty=format:%h\x1f%H\x1f%p\x1f%D\x1f%an\x1f%ad\x1f%s",
+            "--max-count=40",
+        ],
+        timeout=20,
+    )
+    commits = []
+    for line in log_text.splitlines():
+        parts = _split_git_record(line)
+        if len(parts) < 7:
+            continue
+        commits.append({
+            "hash": parts[0],
+            "full_hash": parts[1],
+            "parents": [p[:7] for p in parts[2].split() if p],
+            "refs": parts[3],
+            "author": parts[4],
+            "date": parts[5],
+            "subject": parts[6],
+        })
+
+    upstream = ""
+    ahead = behind = 0
+    unpushed = []
+    code, upstream_text, _err = _run_git(repo_dir, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"])
+    if code == 0 and upstream_text:
+        upstream = upstream_text
+        code, counts, _err = _run_git(repo_dir, ["rev-list", "--left-right", "--count", f"{upstream}...HEAD"])
+        if code == 0:
+            vals = counts.split()
+            if len(vals) >= 2:
+                behind = int(vals[0] or 0)
+                ahead = int(vals[1] or 0)
+        code, unpushed_text, _err = _run_git(
+            repo_dir,
+            [
+                "log",
+                f"{upstream}..HEAD",
+                "--date=format:%Y-%m-%d %H:%M",
+                "--pretty=format:%h\x1f%H\x1f%an\x1f%ad\x1f%s",
+                "--max-count=20",
+            ],
+        )
+        if code == 0:
+            for line in unpushed_text.splitlines():
+                parts = _split_git_record(line)
+                if len(parts) >= 5:
+                    unpushed.append({
+                        "hash": parts[0],
+                        "full_hash": parts[1],
+                        "author": parts[2],
+                        "date": parts[3],
+                        "subject": parts[4],
+                    })
+
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": {
+            "repo": str(repo_dir),
+            "project_path": str(project_dir),
+            "current_branch": current_branch,
+            "head": head_full[:12],
+            "upstream": upstream,
+            "ahead": ahead,
+            "behind": behind,
+            "branches": branches,
+            "remote_branches": remote_branches,
+            "remotes": remotes,
+            "tags": tags,
+            "stashes": stashes,
+            "worktrees": worktrees,
+            "status": status,
+            "unpushed": unpushed,
+            "commits": commits,
+        },
     }
 
 

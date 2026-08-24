@@ -3,7 +3,7 @@
  */
 
 import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260818-108";
-import { streamChat } from "../services/api.js?v=20260818-108";
+import { get, streamChat } from "../services/api.js?v=20260818-108";
 import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-108";
 import { t } from "../services/i18n.js?v=20260818-108";
 import { makeId } from "../services/utils.js?v=20260818-108";
@@ -15,14 +15,21 @@ let editingCardId = null;
 let selectedColor = "default";
 let svgOverlay = null;
 let mermaidVisible = false;
-let currentBoardView = "canvas";
+let currentBoardView = "";
+let boardViewCollapsed = false;
 let currentToolMode = "select";
 let connectSourceId = null;
 let strokes = [];
 let currentStroke = null;
 let activeCardDrag = null;
+let activeGitNodeDrag = null;
+let activeGitPan = null;
 let suppressCardClickUntil = 0;
 let selectedCardIds = new Set();
+let gitGraphState = { loading: false, data: null, error: "", repo: "" };
+let gitNodePositions = {};
+let gitGraphPan = { x: 0, y: 0 };
+let boardOutlineCollapsed = new Set();
 
 const CARD_LAYOUT = {
   width: 220,
@@ -44,7 +51,6 @@ const CARD_COLORS = [
 ];
 
 const BOARD_VIEW_LABELS = {
-  canvas: "画布",
   git: "Git 树",
   flow: "流程",
   kanban: "看板",
@@ -60,6 +66,71 @@ const COLOR_META = {
   blue: { label: "信息", icon: "i" },
   purple: { label: "创意", icon: "◇" },
 };
+
+const GIT_POSITION_KEY = "slate_git_graph_positions";
+const OUTLINE_COLLAPSED_KEY = "slate_board_outline_collapsed";
+const KANBAN_COLORS = ["red", "orange", "yellow", "blue", "purple", "green", "default"];
+
+function loadGitNodePositions() {
+  try {
+    gitNodePositions = JSON.parse(localStorage.getItem(GIT_POSITION_KEY) || "{}") || {};
+  } catch (e) {
+    gitNodePositions = {};
+  }
+}
+
+function loadOutlineCollapsed() {
+  try {
+    boardOutlineCollapsed = new Set(JSON.parse(localStorage.getItem(OUTLINE_COLLAPSED_KEY) || "[]"));
+  } catch (e) {
+    boardOutlineCollapsed = new Set();
+  }
+}
+
+function saveOutlineCollapsed() {
+  try { localStorage.setItem(OUTLINE_COLLAPSED_KEY, JSON.stringify([...boardOutlineCollapsed])); } catch (e) {}
+}
+
+function saveGitNodePositions() {
+  try { localStorage.setItem(GIT_POSITION_KEY, JSON.stringify(gitNodePositions)); } catch (e) {}
+}
+
+function gitRepoKey(repo = gitGraphState.data?.repo || "") {
+  return String(repo || state.project?.path || "default");
+}
+
+function gitNodeKey(nodeId, repo = gitGraphState.data?.repo || "") {
+  return `${gitRepoKey(repo)}::${nodeId}`;
+}
+
+function getGitNodePosition(node, fallback) {
+  const saved = gitNodePositions[gitNodeKey(node.id)];
+  if (saved && Number.isFinite(Number(saved.x)) && Number.isFinite(Number(saved.y))) {
+    return { x: Number(saved.x), y: Number(saved.y) };
+  }
+  return fallback;
+}
+
+function setGitNodePosition(nodeId, x, y) {
+  gitNodePositions[gitNodeKey(nodeId)] = {
+    x: Math.max(12, Math.round(x)),
+    y: Math.max(12, Math.round(y)),
+  };
+  saveGitNodePositions();
+}
+
+function resetGitNodePositions() {
+  const repoPrefix = `${gitRepoKey()}::`;
+  for (const key of Object.keys(gitNodePositions)) {
+    if (key.startsWith(repoPrefix)) delete gitNodePositions[key];
+  }
+  gitGraphPan = { x: 0, y: 0 };
+  saveGitNodePositions();
+}
+
+function gitId(type, value = "") {
+  return `git-${type}-${String(value || "root").replace(/[^a-zA-Z0-9_.-]+/g, "-")}`;
+}
 
 // ── 卡片渲染 ─────────────────────────────────
 
@@ -209,7 +280,7 @@ function boardCardSummary(card) {
   node.dataset.cardId = card.id;
   node.addEventListener("click", () => {
     selectedCardIds = new Set([card.id]);
-    setBoardView("canvas");
+    setBoardView("");
     requestAnimationFrame(() => {
       const el = boardCards?.querySelector(`[data-card-id="${card.id}"]`);
       if (el) {
@@ -243,18 +314,172 @@ function boardCardSummary(card) {
   return node;
 }
 
+function makeViewIconButton(text, title, onClick) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "board-view-icon-btn";
+  btn.textContent = text;
+  btn.title = title;
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick?.(e);
+  });
+  return btn;
+}
+
+function makeCardActionRow(card, actions = []) {
+  const wrap = document.createElement("div");
+  wrap.className = "board-view-card-wrap";
+  wrap.dataset.cardId = card.id;
+  wrap.appendChild(boardCardSummary(card));
+  if (actions.length) {
+    const row = document.createElement("div");
+    row.className = "board-view-card-actions";
+    actions.forEach(action => row.appendChild(makeViewIconButton(action.text, action.title, action.onClick)));
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
+function createBoardCard({ title, body = "", color = "default", arrows = [], parentId = "" }) {
+  const card = placeNewCard({
+    id: makeId("c"),
+    title: title || t("未命名"),
+    body,
+    arrows,
+    color,
+  });
+  const cards = [...state.boardCards];
+  if (parentId) {
+    let linked = false;
+    for (let i = 0; i < cards.length; i += 1) {
+      if (cards[i].id !== parentId) continue;
+      const nextArrows = Array.isArray(cards[i].arrows) ? [...cards[i].arrows] : [];
+      if (!nextArrows.includes(card.id)) nextArrows.push(card.id);
+      cards[i] = { ...cards[i], arrows: nextArrows };
+      linked = true;
+      break;
+    }
+    if (linked) {
+      setBoardCards([...cards, card]);
+      return card;
+    }
+  }
+  addBoardCard(card);
+  return card;
+}
+
+function patchBoardCard(cardId, patch) {
+  setBoardCards((state.boardCards || []).map(card => (
+    card.id === cardId ? { ...card, ...patch } : card
+  )));
+}
+
+function moveCardToColor(cardId, color) {
+  if (!KANBAN_COLORS.includes(color)) return;
+  patchBoardCard(cardId, { color });
+}
+
+function addChildCard(parentCard, color = parentCard?.color || "default") {
+  if (!parentCard) return;
+  createBoardCard({
+    title: t("新子卡片"),
+    body: "",
+    color,
+    parentId: parentCard.id,
+  });
+}
+
+function removeCardLink(parentId, childId) {
+  setBoardCards((state.boardCards || []).map(card => {
+    if (card.id !== parentId) return card;
+    return { ...card, arrows: (card.arrows || []).filter(id => id !== childId) };
+  }));
+}
+
+function buildFlowLevels(cards) {
+  const { incoming, outgoing, roots, cardMap } = buildBoardGraph(cards);
+  const level = new Map();
+  const queue = roots.map(card => card.id);
+  roots.forEach(card => level.set(card.id, 0));
+  const relaxLimit = Math.max(cards.length * cards.length, cards.length + 1);
+  let relaxCount = 0;
+  while (queue.length && relaxCount < relaxLimit) {
+    const id = queue.shift();
+    const base = level.get(id) || 0;
+    for (const childId of outgoing.get(id) || []) {
+      const next = Math.max(level.get(childId) ?? 0, base + 1);
+      if (next !== level.get(childId)) {
+        level.set(childId, next);
+        queue.push(childId);
+        relaxCount += 1;
+      }
+    }
+  }
+  cards.forEach((card, index) => {
+    if (!level.has(card.id)) level.set(card.id, Math.floor(index / 4));
+  });
+  const columns = new Map();
+  for (const card of cards) {
+    const lane = level.get(card.id) || 0;
+    if (!columns.has(lane)) columns.set(lane, []);
+    columns.get(lane).push(card);
+  }
+  return { incoming, outgoing, cardMap, columns: [...columns.entries()].sort((a, b) => a[0] - b[0]) };
+}
+
 function renderBoardView() {
-  if (!boardViewPanel || currentBoardView === "canvas") return;
+  if (!boardViewPanel || !currentBoardView) return;
+  boardViewPanel.classList.toggle("git-mode", currentBoardView === "git" && !boardViewCollapsed);
+  if (boardViewCollapsed) {
+    boardViewPanel.innerHTML = "";
+    const strip = document.createElement("div");
+    strip.className = "board-view-collapse-strip";
+    const label = document.createElement("span");
+    label.textContent = `${BOARD_VIEW_LABELS[currentBoardView] || t("视图")} 已收起`;
+    const expand = document.createElement("button");
+    expand.type = "button";
+    expand.className = "board-view-collapse-btn";
+    expand.textContent = "展开";
+    expand.title = t("展开模式区域");
+    expand.addEventListener("click", () => {
+      boardViewCollapsed = false;
+      setBoardView(currentBoardView, { preserveCollapse: true });
+    });
+    strip.append(label, expand);
+    boardViewPanel.appendChild(strip);
+    return;
+  }
   const cards = state.boardCards || [];
   boardViewPanel.innerHTML = "";
   const header = document.createElement("div");
   header.className = "board-view-header";
+  const titleGroup = document.createElement("div");
+  titleGroup.className = "board-view-title-group";
   const title = document.createElement("strong");
   title.textContent = BOARD_VIEW_LABELS[currentBoardView] || t("视图");
+  titleGroup.append(title);
+  const actions = document.createElement("div");
+  actions.className = "board-view-header-actions";
   const meta = document.createElement("span");
   meta.textContent = t("{n} 张卡片", { n: cards.length });
-  header.append(title, meta);
+  const collapse = document.createElement("button");
+  collapse.type = "button";
+  collapse.className = "board-view-collapse-btn";
+  collapse.textContent = "收起";
+  collapse.title = t("收起模式区域");
+  collapse.addEventListener("click", () => {
+    boardViewCollapsed = true;
+    setBoardView(currentBoardView, { preserveCollapse: true });
+  });
+  actions.append(meta, collapse);
+  header.append(titleGroup, actions);
   boardViewPanel.appendChild(header);
+  if (currentBoardView === "git") {
+    renderGitTreeView(meta);
+    return;
+  }
   if (!cards.length) {
     const empty = document.createElement("div");
     empty.className = "board-view-empty";
@@ -262,85 +487,506 @@ function renderBoardView() {
     boardViewPanel.appendChild(empty);
     return;
   }
-  if (currentBoardView === "git") renderGitTreeView(cards);
-  else if (currentBoardView === "flow") renderFlowView(cards);
+  if (currentBoardView === "flow") renderFlowView(cards);
   else if (currentBoardView === "kanban") renderKanbanView(cards);
   else if (currentBoardView === "outline") renderOutlineView(cards);
 }
 
-function renderGitTreeView(cards) {
-  const { incoming, outgoing, roots } = buildBoardGraph(cards);
-  const lanes = [];
-  const levels = new Map();
-  const queue = roots.map(card => card.id);
-  roots.forEach(card => levels.set(card.id, 0));
-  while (queue.length) {
-    const id = queue.shift();
-    const base = levels.get(id) || 0;
-    for (const child of outgoing.get(id) || []) {
-      const next = Math.max(levels.get(child) || 0, base + 1);
-      if (next !== levels.get(child)) {
-        levels.set(child, next);
-        queue.push(child);
-      }
+async function refreshGitGraph(force = false) {
+  if (!state.project) {
+    gitGraphState = { loading: false, data: null, error: "未打开项目", repo: "" };
+    return;
+  }
+  if (gitGraphState.loading) return;
+  if (!force && gitGraphState.data && gitGraphState.repo === state.project.path) return;
+  gitGraphState = { ...gitGraphState, loading: true, error: "", repo: state.project.path };
+  renderBoardView();
+  try {
+    const res = await get("/projects/git/graph");
+    if (res.code !== 0) {
+      gitGraphState = { loading: false, data: null, error: res.message || "Git 图谱读取失败", repo: state.project.path };
+    } else {
+      gitGraphState = { loading: false, data: res.data, error: "", repo: state.project.path };
+    }
+  } catch (e) {
+    gitGraphState = { loading: false, data: null, error: e.message || "Git 图谱读取失败", repo: state.project.path };
+  }
+  renderBoardView();
+}
+
+function makeGitNodes(data) {
+  const nodes = [];
+  const edges = [];
+  const branchByHash = new Map();
+
+  const addNode = (node) => {
+    if (!node?.id || nodes.some(existing => existing.id === node.id)) return;
+    nodes.push(node);
+  };
+  const addEdge = (from, to, kind = "") => {
+    if (from && to && from !== to) edges.push({ from, to, kind });
+  };
+
+  addNode({
+    id: gitId("repo", data.repo),
+    type: "repo",
+    lane: "repo",
+    title: data.repo?.split(/[\\/]/).pop() || "Repository",
+    eyebrow: "REPOSITORY",
+    body: data.repo || "",
+    badge: data.current_branch || "HEAD",
+  });
+  addNode({
+    id: gitId("head", data.head),
+    type: "head",
+    lane: "refs",
+    title: `HEAD ${data.head || ""}`.trim(),
+    eyebrow: "HEAD",
+    body: data.upstream ? `${data.upstream} · ahead ${data.ahead || 0} / behind ${data.behind || 0}` : "no upstream",
+    badge: data.current_branch || "detached",
+  });
+  addEdge(gitId("repo", data.repo), gitId("head", data.head), "contains");
+
+  for (const branch of data.branches || []) {
+    const id = gitId("branch", branch.name);
+    addNode({
+      id,
+      type: branch.current ? "branch-current" : "branch",
+      lane: "refs",
+      title: branch.name,
+      eyebrow: branch.current ? "CURRENT BRANCH" : "BRANCH",
+      body: branch.upstream ? `${branch.upstream} ${branch.track || ""}`.trim() : "local branch",
+      badge: branch.hash,
+    });
+    if (branch.hash) {
+      const list = branchByHash.get(branch.hash) || [];
+      list.push(id);
+      branchByHash.set(branch.hash, list);
+    }
+    if (branch.current) addEdge(id, gitId("head", data.head), "points");
+  }
+
+  for (const branch of data.remote_branches || []) {
+    const id = gitId("remote", branch.name);
+    addNode({
+      id,
+      type: "remote",
+      lane: "refs",
+      title: branch.name,
+      eyebrow: "REMOTE",
+      body: "remote tracking branch",
+      badge: branch.hash,
+    });
+    if (branch.hash) {
+      const list = branchByHash.get(branch.hash) || [];
+      list.push(id);
+      branchByHash.set(branch.hash, list);
     }
   }
-  cards.forEach((card, index) => {
-    const level = levels.has(card.id) ? levels.get(card.id) : Math.floor(index / 4);
-    if (!lanes[level]) lanes[level] = [];
-    lanes[level].push(card);
-  });
-  const wrap = document.createElement("div");
-  wrap.className = "board-git-tree";
-  lanes.forEach((laneCards, idx) => {
-    const lane = document.createElement("div");
-    lane.className = "board-git-lane";
-    const laneTitle = document.createElement("div");
-    laneTitle.className = "board-git-lane-title";
-    laneTitle.textContent = idx === 0 ? t("root") : t("level {n}", { n: idx });
-    lane.appendChild(laneTitle);
-    laneCards.forEach(card => {
-      const item = document.createElement("div");
-      item.className = "board-git-node";
-      const parents = incoming.get(card.id) || [];
-      item.appendChild(boardCardSummary(card));
-      if (parents.length) {
-        const parentText = document.createElement("div");
-        parentText.className = "board-git-parents";
-        parentText.textContent = "↤ " + parents.join(", ");
-        item.appendChild(parentText);
-      }
-      lane.appendChild(item);
+
+  for (const tag of data.tags || []) {
+    const id = gitId("tag", tag.name);
+    addNode({
+      id,
+      type: "tag",
+      lane: "refs",
+      title: tag.name,
+      eyebrow: "TAG",
+      body: tag.date || "tag",
+      badge: tag.hash,
     });
-    wrap.appendChild(lane);
+    if (tag.hash) {
+      const list = branchByHash.get(tag.hash) || [];
+      list.push(id);
+      branchByHash.set(tag.hash, list);
+    }
+  }
+
+  Object.entries(data.remotes || {}).forEach(([name, urls]) => {
+    addNode({
+      id: gitId("remote-name", name),
+      type: "remote",
+      lane: "repo",
+      title: name,
+      eyebrow: "REMOTE ORIGIN",
+      body: urls.fetch || urls.push || "",
+      badge: "remote",
+    });
+    addEdge(gitId("repo", data.repo), gitId("remote-name", name), "remote");
   });
+
+  for (const wt of data.worktrees || []) {
+    const id = gitId("worktree", wt.path);
+    addNode({
+      id,
+      type: wt.path === data.repo ? "worktree-current" : "worktree",
+      lane: "worktree",
+      title: wt.path?.split(/[\\/]/).pop() || "worktree",
+      eyebrow: wt.path === data.repo ? "CURRENT WORKTREE" : "WORKTREE",
+      body: wt.path || "",
+      badge: wt.branch || wt.head || "detached",
+    });
+    addEdge(gitId("repo", data.repo), id, "worktree");
+  }
+
+  for (const stash of data.stashes || []) {
+    const id = gitId("stash", stash.name);
+    addNode({
+      id,
+      type: "stash",
+      lane: "worktree",
+      title: stash.subject,
+      eyebrow: "STASH",
+      body: `${stash.name} · ${stash.date}`,
+      badge: stash.hash,
+    });
+    addEdge(gitId("head", data.head), id, "stash");
+  }
+
+  const statusGroups = [
+    ["staged", "暂存区", "STAGED", data.status?.staged || []],
+    ["unstaged", "工作区变更", "CHANGES", data.status?.unstaged || []],
+    ["untracked", "未跟踪", "UNTRACKED", data.status?.untracked || []],
+  ];
+  for (const [kind, title, eyebrow, files] of statusGroups) {
+    const groupId = gitId(kind, "group");
+    addNode({
+      id: groupId,
+      type: kind,
+      lane: "worktree",
+      title,
+      eyebrow,
+      body: files.length ? `${files.length} 个文件` : "无变更",
+      badge: String(files.length),
+    });
+    addEdge(gitId("head", data.head), groupId, "status");
+  }
+
+  for (const commit of data.unpushed || []) {
+    const id = gitId("unpushed", commit.hash);
+    addNode({
+      id,
+      type: "unpushed",
+      lane: "unpushed",
+      title: commit.subject,
+      eyebrow: "UNPUSHED COMMIT",
+      body: `${commit.author} · ${commit.date}`,
+      badge: commit.hash,
+    });
+    addEdge(gitId("head", data.head), id, "ahead");
+  }
+
+  for (const commit of (data.commits || []).slice(0, 28)) {
+    const id = gitId("commit", commit.hash);
+    addNode({
+      id,
+      type: "commit",
+      lane: "commits",
+      title: commit.subject,
+      eyebrow: commit.refs || "COMMIT",
+      body: `${commit.author} · ${commit.date}`,
+      badge: commit.hash,
+    });
+    for (const refId of branchByHash.get(commit.hash) || []) addEdge(refId, id, "ref");
+    for (const parent of commit.parents || []) addEdge(id, gitId("commit", parent), "parent");
+  }
+
+  return { nodes, edges };
+}
+
+function defaultGitNodePosition(node, index) {
+  const lanes = { repo: 0, refs: 1, worktree: 2, unpushed: 3, commits: 4 };
+  const lane = lanes[node.lane] ?? 0;
+  const laneCounts = defaultGitNodePosition._laneCounts || (defaultGitNodePosition._laneCounts = {});
+  const row = laneCounts[node.lane] || 0;
+  laneCounts[node.lane] = row + 1;
+  const offset = node.compact ? 84 : 118;
+  return {
+    x: 28 + lane * 280,
+    y: 28 + row * offset + (lane % 2) * 20 + Math.floor(index / 18) * 28,
+  };
+}
+
+function renderGitTreeView(metaEl) {
+  if (metaEl) metaEl.textContent = gitGraphState.loading ? "Git 读取中" : "";
+  if (!state.project) {
+    const empty = document.createElement("div");
+    empty.className = "board-view-empty";
+    empty.textContent = t("未打开项目");
+    boardViewPanel.appendChild(empty);
+    return;
+  }
+  if (!gitGraphState.data && !gitGraphState.error) {
+    refreshGitGraph();
+    return;
+  }
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "board-git-toolbar";
+  const status = document.createElement("div");
+  status.className = "board-git-status";
+  const actions = document.createElement("div");
+  actions.className = "board-git-actions";
+  const focus = document.createElement("button");
+  focus.type = "button";
+  focus.className = "board-git-refresh";
+  focus.textContent = "聚焦 HEAD";
+  focus.disabled = gitGraphState.loading || !!gitGraphState.error || !gitGraphState.data;
+  const reset = document.createElement("button");
+  reset.type = "button";
+  reset.className = "board-git-refresh";
+  reset.textContent = "重置布局";
+  reset.disabled = gitGraphState.loading || !!gitGraphState.error || !gitGraphState.data;
+  reset.addEventListener("click", () => {
+    resetGitNodePositions();
+    renderBoardView();
+  });
+  const refresh = document.createElement("button");
+  refresh.type = "button";
+  refresh.className = "board-git-refresh";
+  refresh.textContent = "刷新";
+  refresh.disabled = gitGraphState.loading;
+  refresh.addEventListener("click", () => refreshGitGraph(true));
+  actions.append(focus, reset, refresh);
+  toolbar.append(status, actions);
+  boardViewPanel.appendChild(toolbar);
+
+  if (gitGraphState.loading) {
+    status.textContent = "正在读取 Git 状态…";
+    return;
+  }
+  if (gitGraphState.error) {
+    status.textContent = gitGraphState.error;
+    return;
+  }
+
+  const data = gitGraphState.data;
+  const { nodes, edges } = makeGitNodes(data);
+  if (metaEl) metaEl.textContent = `${nodes.length} 个 Git 节点`;
+  status.innerHTML = "";
+  [
+    `${data.current_branch || "HEAD"} @ ${data.head || ""}`,
+    `ahead ${data.ahead || 0}`,
+    `behind ${data.behind || 0}`,
+    `staged ${data.status?.staged?.length || 0}`,
+    `changed ${(data.status?.unstaged?.length || 0) + (data.status?.untracked?.length || 0)}`,
+  ].forEach(text => {
+    const chip = document.createElement("span");
+    chip.className = "board-git-chip";
+    chip.textContent = text;
+    status.appendChild(chip);
+  });
+
+  defaultGitNodePosition._laneCounts = {};
+  const wrap = document.createElement("div");
+  wrap.className = "board-git-graph";
+  wrap.title = t("按住空白区域拖动视野");
+  const layer = document.createElement("div");
+  layer.className = "board-git-layer";
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "board-git-edges");
+  layer.appendChild(svg);
+
+  const positions = new Map();
+  nodes.forEach((node, index) => {
+    const pos = getGitNodePosition(node, defaultGitNodePosition(node, index));
+    positions.set(node.id, pos);
+    const el = document.createElement("div");
+    el.className = `board-git-card board-git-type-${node.type}`;
+    if (node.compact) el.classList.add("compact");
+    el.dataset.gitNodeId = node.id;
+    el.style.left = `${pos.x}px`;
+    el.style.top = `${pos.y}px`;
+
+    const eyebrow = document.createElement("div");
+    eyebrow.className = "board-git-eyebrow";
+    eyebrow.textContent = node.eyebrow || node.type;
+    const title = document.createElement("div");
+    title.className = "board-git-title";
+    title.textContent = node.title || node.id;
+    const body = document.createElement("div");
+    body.className = "board-git-body";
+    body.textContent = node.body || "";
+    const badge = document.createElement("span");
+    badge.className = "board-git-badge";
+    badge.textContent = node.badge || "";
+    el.append(eyebrow, title);
+    if (node.body) el.appendChild(body);
+    if (node.badge) el.appendChild(badge);
+
+    el.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      activeGitNodeDrag = {
+        id: node.id,
+        pointerX: e.clientX,
+        pointerY: e.clientY,
+        startX: parseFloat(el.style.left) || 0,
+        startY: parseFloat(el.style.top) || 0,
+        moved: false,
+      };
+      el.classList.add("dragging");
+      el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (!activeGitNodeDrag || activeGitNodeDrag.id !== node.id) return;
+      const dx = e.clientX - activeGitNodeDrag.pointerX;
+      const dy = e.clientY - activeGitNodeDrag.pointerY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) activeGitNodeDrag.moved = true;
+      el.style.left = `${Math.max(12, Math.round(activeGitNodeDrag.startX + dx))}px`;
+      el.style.top = `${Math.max(12, Math.round(activeGitNodeDrag.startY + dy))}px`;
+      drawGitEdges(layer, svg, edges);
+    });
+    const finish = (e) => {
+      if (!activeGitNodeDrag || activeGitNodeDrag.id !== node.id) return;
+      activeGitNodeDrag = null;
+      el.classList.remove("dragging");
+      try { el.releasePointerCapture(e.pointerId); } catch (err) {}
+      setGitNodePosition(node.id, parseFloat(el.style.left) || 0, parseFloat(el.style.top) || 0);
+      drawGitEdges(layer, svg, edges);
+    };
+    el.addEventListener("pointerup", finish);
+    el.addEventListener("pointercancel", finish);
+    layer.appendChild(el);
+  });
+
+  const maxX = Math.max(...[...positions.values()].map(p => p.x), 900) + 260;
+  const maxY = Math.max(...[...positions.values()].map(p => p.y), 520) + 150;
+  layer.style.width = `${maxX}px`;
+  layer.style.height = `${maxY}px`;
+  svg.setAttribute("width", String(maxX));
+  svg.setAttribute("height", String(maxY));
+  wrap.appendChild(layer);
   boardViewPanel.appendChild(wrap);
+  applyGitGraphPan(layer);
+  setupGitGraphPan(wrap, layer);
+  focus.disabled = false;
+  focus.addEventListener("click", () => centerGitNode(wrap, layer, gitId("head", data.head)));
+  requestAnimationFrame(() => drawGitEdges(layer, svg, edges));
+}
+
+function applyGitGraphPan(layer) {
+  layer.style.transform = `translate(${Math.round(gitGraphPan.x)}px, ${Math.round(gitGraphPan.y)}px)`;
+}
+
+function clampGitGraphPan(wrap, layer, x, y) {
+  const margin = 90;
+  const viewW = wrap.clientWidth || 0;
+  const viewH = wrap.clientHeight || 0;
+  const layerW = layer.offsetWidth || viewW;
+  const layerH = layer.offsetHeight || viewH;
+  return {
+    x: Math.min(margin, Math.max(viewW - layerW - margin, x)),
+    y: Math.min(margin, Math.max(viewH - layerH - margin, y)),
+  };
+}
+
+function centerGitNode(wrap, layer, nodeId) {
+  const node = layer.querySelector(`[data-git-node-id="${nodeId}"]`);
+  if (!node) return;
+  gitGraphPan = clampGitGraphPan(
+    wrap,
+    layer,
+    (wrap.clientWidth || 0) / 2 - (node.offsetLeft + node.offsetWidth / 2),
+    (wrap.clientHeight || 0) / 2 - (node.offsetTop + node.offsetHeight / 2),
+  );
+  applyGitGraphPan(layer);
+}
+
+function setupGitGraphPan(wrap, layer) {
+  wrap.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest(".board-git-card, button, a, input, textarea, select")) return;
+    e.preventDefault();
+    activeGitPan = {
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      startX: gitGraphPan.x,
+      startY: gitGraphPan.y,
+    };
+    wrap.classList.add("panning");
+    wrap.setPointerCapture(e.pointerId);
+  });
+  wrap.addEventListener("pointermove", (e) => {
+    if (!activeGitPan) return;
+    e.preventDefault();
+    gitGraphPan = clampGitGraphPan(
+      wrap,
+      layer,
+      activeGitPan.startX + (e.clientX - activeGitPan.pointerX),
+      activeGitPan.startY + (e.clientY - activeGitPan.pointerY),
+    );
+    applyGitGraphPan(layer);
+  });
+  const finish = (e) => {
+    if (!activeGitPan) return;
+    activeGitPan = null;
+    wrap.classList.remove("panning");
+    try { wrap.releasePointerCapture(e.pointerId); } catch (err) {}
+  };
+  wrap.addEventListener("pointerup", finish);
+  wrap.addEventListener("pointercancel", finish);
+}
+
+function drawGitEdges(layer, svg, edges) {
+  if (!layer || !svg) return;
+  svg.innerHTML = "";
+  const rect = layer.getBoundingClientRect();
+  for (const edge of edges) {
+    const from = layer.querySelector(`[data-git-node-id="${edge.from}"]`);
+    const to = layer.querySelector(`[data-git-node-id="${edge.to}"]`);
+    if (!from || !to) continue;
+    const a = from.getBoundingClientRect();
+    const b = to.getBoundingClientRect();
+    const x1 = a.left - rect.left + a.width;
+    const y1 = a.top - rect.top + a.height / 2;
+    const x2 = b.left - rect.left;
+    const y2 = b.top - rect.top + b.height / 2;
+    const mid = Math.max(24, Math.abs(x2 - x1) * 0.45);
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", `M ${x1} ${y1} C ${x1 + mid} ${y1}, ${x2 - mid} ${y2}, ${x2} ${y2}`);
+    path.setAttribute("class", `board-git-edge board-git-edge-${edge.kind || "link"}`);
+    svg.appendChild(path);
+  }
 }
 
 function renderFlowView(cards) {
-  const { incoming, outgoing, roots, cardMap } = buildBoardGraph(cards);
+  const { incoming, outgoing, columns } = buildFlowLevels(cards);
+  const actionBar = document.createElement("div");
+  actionBar.className = "board-view-actionbar";
+  actionBar.append(
+    makeViewIconButton("排布", t("按流程层级重新排布画布卡片"), () => {
+      autoLayoutCards();
+      dlgToast(t("已按流程排布画布卡片"));
+    }),
+    makeViewIconButton("根卡", t("创建一个新的流程起点"), () => createBoardCard({ title: t("新流程起点"), color: "blue" })),
+  );
+  boardViewPanel.appendChild(actionBar);
+
   const wrap = document.createElement("div");
   wrap.className = "board-flow-view";
-  const seen = new Set();
-  const visit = (card, depth = 0) => {
-    if (!card || seen.has(card.id)) return;
-    seen.add(card.id);
-    const row = document.createElement("div");
-    row.className = "board-flow-row";
-    row.style.marginLeft = `${depth * 24}px`;
-    row.appendChild(boardCardSummary(card));
-    const children = outgoing.get(card.id) || [];
-    if (children.length) {
-      const arrow = document.createElement("span");
-      arrow.className = "board-flow-arrow";
-      arrow.textContent = "→";
-      row.appendChild(arrow);
+  for (const [level, levelCards] of columns) {
+    const lane = document.createElement("div");
+    lane.className = "board-flow-lane";
+    const head = document.createElement("div");
+    head.className = "board-flow-lane-head";
+    head.textContent = `${t("阶段")} ${level + 1} (${levelCards.length})`;
+    lane.appendChild(head);
+    for (const card of levelCards) {
+      const inbound = incoming.get(card.id)?.length || 0;
+      const outbound = outgoing.get(card.id)?.length || 0;
+      const item = makeCardActionRow(card, [
+        { text: "+", title: t("添加后续卡片"), onClick: () => addChildCard(card) },
+        { text: "编", title: t("编辑卡片"), onClick: () => openCardModal(card) },
+      ]);
+      const meta = document.createElement("div");
+      meta.className = "board-flow-meta";
+      meta.textContent = `${t("输入")} ${inbound} · ${t("输出")} ${outbound}`;
+      item.appendChild(meta);
+      lane.appendChild(item);
     }
-    wrap.appendChild(row);
-    children.forEach(child => visit(cardMap.get(child), depth + 1));
-  };
-  roots.forEach(root => visit(root));
-  cards.filter(card => !seen.has(card.id)).forEach(card => visit(card));
+    wrap.appendChild(lane);
+  }
   if ([...incoming.values()].some(list => list.length > 1)) {
     const hint = document.createElement("div");
     hint.className = "board-view-hint";
@@ -351,17 +997,70 @@ function renderFlowView(cards) {
 }
 
 function renderKanbanView(cards) {
+  const actionBar = document.createElement("div");
+  actionBar.className = "board-view-actionbar";
+  actionBar.append(
+    makeViewIconButton("新增", t("在未分类列新增卡片"), () => createBoardCard({ title: t("新卡片"), color: "default" })),
+    makeViewIconButton("排布", t("把看板列同步排布到画布"), () => {
+      const columnIndex = new Map(KANBAN_COLORS.map((color, index) => [color, index]));
+      const rowCounts = new Map();
+      const nextCards = cards.map(card => {
+        const color = card.color || "default";
+        const col = columnIndex.get(color) ?? columnIndex.get("default");
+        const row = rowCounts.get(color) || 0;
+        rowCounts.set(color, row + 1);
+        return {
+          ...card,
+          x: CARD_LAYOUT.startX + col * (CARD_LAYOUT.width + 60),
+          y: CARD_LAYOUT.startY + row * (118 + CARD_LAYOUT.gapY),
+        };
+      });
+      setBoardCards(nextCards);
+      dlgToast(t("已按看板列排布画布卡片"));
+    }),
+  );
+  boardViewPanel.appendChild(actionBar);
+
   const wrap = document.createElement("div");
   wrap.className = "board-kanban-view";
-  for (const color of ["red", "orange", "yellow", "blue", "purple", "green", "default"]) {
+  for (const color of KANBAN_COLORS) {
     const colCards = cards.filter(card => (card.color || "default") === color);
     const col = document.createElement("div");
     col.className = `board-kanban-col board-view-color-${color}`;
+    col.dataset.color = color;
+    col.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      col.classList.add("drag-over");
+    });
+    col.addEventListener("dragleave", () => col.classList.remove("drag-over"));
+    col.addEventListener("drop", (e) => {
+      e.preventDefault();
+      col.classList.remove("drag-over");
+      const cardId = e.dataTransfer.getData("text/plain");
+      if (cardId) moveCardToColor(cardId, color);
+    });
+
     const head = document.createElement("div");
     head.className = "board-kanban-head";
-    head.textContent = `${COLOR_META[color].label} (${colCards.length})`;
+    const title = document.createElement("span");
+    title.textContent = `${COLOR_META[color].label} (${colCards.length})`;
+    const add = makeViewIconButton("+", t("在此列新增卡片"), () => createBoardCard({ title: COLOR_META[color].label, color }));
+    head.append(title, add);
     col.appendChild(head);
-    colCards.forEach(card => col.appendChild(boardCardSummary(card)));
+    colCards.forEach(card => {
+      const item = makeCardActionRow(card, [
+        { text: "编", title: t("编辑卡片"), onClick: () => openCardModal(card) },
+      ]);
+      const cardBtn = item.querySelector(".board-view-card");
+      cardBtn.draggable = true;
+      cardBtn.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", card.id);
+        e.dataTransfer.effectAllowed = "move";
+        item.classList.add("dragging");
+      });
+      cardBtn.addEventListener("dragend", () => item.classList.remove("dragging"));
+      col.appendChild(item);
+    });
     wrap.appendChild(col);
   }
   boardViewPanel.appendChild(wrap);
@@ -369,17 +1068,57 @@ function renderKanbanView(cards) {
 
 function renderOutlineView(cards) {
   const { outgoing, roots, cardMap } = buildBoardGraph(cards);
+  const actionBar = document.createElement("div");
+  actionBar.className = "board-view-actionbar";
+  actionBar.append(
+    makeViewIconButton("全部展开", t("展开所有纲要节点"), () => {
+      boardOutlineCollapsed.clear();
+      saveOutlineCollapsed();
+      renderBoardView();
+    }),
+    makeViewIconButton("全部折叠", t("折叠所有有子项的节点"), () => {
+      for (const card of cards) {
+        if ((outgoing.get(card.id) || []).length) boardOutlineCollapsed.add(card.id);
+      }
+      saveOutlineCollapsed();
+      renderBoardView();
+    }),
+    makeViewIconButton("根卡", t("新增顶层纲要卡片"), () => createBoardCard({ title: t("新顶层卡片"), color: "blue" })),
+  );
+  boardViewPanel.appendChild(actionBar);
+
   const seen = new Set();
-  const makeList = (items, depth = 0) => {
+  const makeList = (items, depth = 0, parentId = "") => {
     const ul = document.createElement("ul");
     ul.className = depth === 0 ? "board-outline-root" : "board-outline-children";
     for (const card of items) {
       if (!card || seen.has(card.id)) continue;
       seen.add(card.id);
       const li = document.createElement("li");
-      li.appendChild(boardCardSummary(card));
       const children = (outgoing.get(card.id) || []).map(id => cardMap.get(id)).filter(Boolean);
-      if (children.length) li.appendChild(makeList(children, depth + 1));
+      li.className = children.length ? "has-children" : "";
+      const collapsed = boardOutlineCollapsed.has(card.id);
+      const row = document.createElement("div");
+      row.className = "board-outline-row";
+      if (children.length) {
+        row.appendChild(makeViewIconButton(collapsed ? "+" : "-", collapsed ? t("展开") : t("折叠"), () => {
+          if (boardOutlineCollapsed.has(card.id)) boardOutlineCollapsed.delete(card.id);
+          else boardOutlineCollapsed.add(card.id);
+          saveOutlineCollapsed();
+          renderBoardView();
+        }));
+      } else {
+        const spacer = document.createElement("span");
+        spacer.className = "board-outline-spacer";
+        row.appendChild(spacer);
+      }
+      row.appendChild(makeCardActionRow(card, [
+        { text: "+", title: t("添加子卡片"), onClick: () => addChildCard(card) },
+        { text: "编", title: t("编辑卡片"), onClick: () => openCardModal(card) },
+        ...(parentId ? [{ text: "断", title: t("断开与父卡片的连接"), onClick: () => removeCardLink(parentId, card.id) }] : []),
+      ]));
+      li.appendChild(row);
+      if (children.length && !collapsed) li.appendChild(makeList(children, depth + 1, card.id));
       ul.appendChild(li);
     }
     return ul;
@@ -395,24 +1134,32 @@ function renderOutlineView(cards) {
   }
 }
 
-function setBoardView(view) {
-  currentBoardView = view || "canvas";
-  const canvasMode = currentBoardView === "canvas";
-  boardCanvas?.classList.toggle("hidden", !canvasMode);
-  boardViewPanel?.classList.toggle("hidden", canvasMode);
+function setBoardView(view, options = {}) {
+  const nextView = BOARD_VIEW_LABELS[view] ? view : "";
+  if (!options.preserveCollapse || !nextView) boardViewCollapsed = false;
+  currentBoardView = nextView;
+  const mainBoardMode = !currentBoardView;
+  const showCanvas = mainBoardMode || boardViewCollapsed;
+  boardCanvas?.classList.toggle("hidden", !showCanvas);
+  boardViewPanel?.classList.toggle("hidden", mainBoardMode);
+  boardViewPanel?.classList.toggle("collapsed", boardViewCollapsed && !mainBoardMode);
+  boardViewPanel?.classList.toggle("git-mode", currentBoardView === "git" && !mainBoardMode && !boardViewCollapsed);
   document.querySelectorAll(".board-view-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === currentBoardView);
   });
   document.querySelectorAll(".board-tool-btn, #btn-undo-stroke, #btn-clear-strokes").forEach(el => {
-    el.disabled = !canvasMode;
+    el.disabled = !showCanvas;
   });
-  if (canvasMode) {
+  if (showCanvas) {
     renderAllCards();
     renderNotes();
     redrawStrokes();
-  } else {
+  }
+  if (!mainBoardMode) {
     clearSelection();
     renderBoardView();
+  } else if (boardViewPanel) {
+    boardViewPanel.innerHTML = "";
   }
 }
 
@@ -1030,7 +1777,9 @@ function autoLayoutCards() {
   const level = new Map();
   const queue = cards.filter(card => (indegree.get(card.id) || 0) === 0).map(card => card.id);
   for (const id of queue) level.set(id, 0);
-  while (queue.length) {
+  const relaxLimit = Math.max(cards.length * cards.length, cards.length + 1);
+  let relaxCount = 0;
+  while (queue.length && relaxCount < relaxLimit) {
     const id = queue.shift();
     const base = level.get(id) || 0;
     for (const target of outgoing.get(id) || []) {
@@ -1038,6 +1787,7 @@ function autoLayoutCards() {
       if (next !== level.get(target)) {
         level.set(target, next);
         queue.push(target);
+        relaxCount += 1;
       }
     }
   }
@@ -1374,6 +2124,8 @@ function parseCardsFromLLM(text) {
 // ── 初始化 ──────────────────────────────────
 
 function initWhiteboard() {
+  loadGitNodePositions();
+  loadOutlineCollapsed();
   boardCanvas = document.getElementById("whiteboard-canvas");
   boardCards = document.getElementById("board-cards");
   boardEmpty = document.getElementById("board-empty");
@@ -1440,7 +2192,10 @@ function initWhiteboard() {
   setupDragDrop();
   setupBoardTools();
   document.querySelectorAll(".board-view-btn").forEach(btn => {
-    btn.addEventListener("click", () => setBoardView(btn.dataset.view || "canvas"));
+    btn.addEventListener("click", () => {
+      const view = btn.dataset.view || "";
+      setBoardView(view === currentBoardView ? "" : view);
+    });
   });
   setupDrawing();
   setupTextNotes();
@@ -1484,6 +2239,10 @@ function initWhiteboard() {
   subscribe("boardStrokes", (next) => {
     strokes = Array.isArray(next) ? [...next] : [];
     redrawStrokes();
+  });
+  subscribe("project", () => {
+    gitGraphState = { loading: false, data: null, error: "", repo: state.project?.path || "" };
+    if (currentBoardView === "git") renderBoardView();
   });
 
   renderAllCards();
