@@ -10,6 +10,47 @@
 </head>
 <body>
 
+  <!-- ═══ 移动端抽屉导航 ═══ -->
+  <div class="mobile-drawer-overlay" id="mobile-drawer-overlay">
+    <nav class="mobile-drawer" id="mobile-drawer">
+      <div class="drawer-header">
+        <img src="../icon.png" alt="SLATE" class="drawer-logo">
+        <span class="drawer-title">SLATE · 砚</span>
+        <button class="drawer-close" id="drawer-close" aria-label="关闭">✕</button>
+      </div>
+      <div class="drawer-links">
+        <a href="#features"><span class="drawer-icon">✦</span> 功能</a>
+        <a href="#highlights"><span class="drawer-icon">⚡</span> 亮点</a>
+        <a href="#scenes"><span class="drawer-icon">🎯</span> 场景</a>
+        <a href="#tools"><span class="drawer-icon">🛠</span> 工具箱</a>
+        <a href="#stack"><span class="drawer-icon">⚙</span> 技术栈</a>
+        <a href="#start"><span class="drawer-icon">🚀</span> 快速开始</a>
+        <a href="../guide.html"><span class="drawer-icon">📜</span> 教程</a>
+      </div>
+      <div class="drawer-footer">
+        <a class="drawer-action" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ 下载安装包</a>
+        <a class="drawer-action ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">★ Star on GitHub</a>
+        <a class="drawer-lang" href="../index.html">中文 / English</a>
+      </div>
+    </nav>
+  </div>
+
+  <!-- ═══ 移动端底部操作栏 ═══ -->
+  <div class="mobile-bottom-bar" id="mobile-bottom-bar">
+    <a class="bottom-btn" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">
+      <span class="bottom-icon">⬇</span>
+      <span class="bottom-label">下载</span>
+    </a>
+    <a class="bottom-btn primary" href="#start">
+      <span class="bottom-icon">🚀</span>
+      <span class="bottom-label">开始</span>
+    </a>
+    <a class="bottom-btn" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">
+      <span class="bottom-icon">★</span>
+      <span class="bottom-label">GitHub</span>
+    </a>
+  </div>
+
   <!-- ═══ 页面滚动进度条 ═══ -->
   <div class="scroll-progress" aria-hidden="true"><span id="progress-bar"></span></div>
 
@@ -33,6 +74,9 @@
         <a class="nav-lang" href="../index.html">EN</a>
         <button class="theme-toggle" id="theme-toggle" title="切换主题">☾</button>
         <a class="nav-github" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub ↗</a>
+        <button class="nav-hamburger" id="nav-hamburger" aria-label="菜单">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
   </nav>
@@ -40,26 +84,66 @@
   <!-- ═══ Hero ═══ -->
   <header class="hero" id="top">
     <div class="hero-grid" id="hero-grid" aria-hidden="true"></div>
-    <div class="container">
-      <img class="hero-logo" src="../icon.png" alt="SLATE Logo">
-      <h1 class="hero-title">SLATE<span class="ink">（砚）</span></h1>
-      <p class="hero-sub">本地 AI 协作调度台 · 将灵感转化为结构化方案</p>
-      <p class="hero-en">Local AI collaboration studio — turn sparks into structured plans.</p>
-      <p class="hero-type" id="hero-type"></p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ 下载安装包</a>
-        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">查看源码 →</a>
+    <div class="container hero-layout">
+      <div class="hero-copy">
+        <div class="hero-mark">
+          <img class="hero-logo" src="../icon.png" alt="SLATE Logo">
+          <span>local-first agent studio</span>
+        </div>
+        <h1 class="hero-title">SLATE<span class="ink">（砚）</span></h1>
+        <p class="hero-sub">本地 AI 协作调度台 · 将灵感转化为结构化方案</p>
+        <p class="hero-en">一句话交代目标，一张可见计划，一组真正会动手的工具。</p>
+        <p class="hero-type" id="hero-type"></p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ 下载安装包</a>
+          <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">查看源码 →</a>
+        </div>
+        <div class="hero-badges">
+          <span class="badge">MIT License</span>
+          <span class="badge">Python 3.13+</span>
+          <span class="badge">零 npm · 零构建</span>
+          <span class="badge">本地优先</span>
+          <span class="badge">双主题</span>
+        </div>
+        <p class="section-note">
+          SLATE 是一个<strong>装在你自己电脑上的 AI 工作台</strong>：你只管说一次需求，Autopilot 负责拆任务、调工具、验证并交付结果，全部数据留在本地。
+        </p>
       </div>
-      <div class="hero-badges">
-        <span class="badge">MIT License</span>
-        <span class="badge">Python 3.13+</span>
-        <span class="badge">零 npm · 零构建</span>
-        <span class="badge">本地优先</span>
-        <span class="badge">双主题</span>
+      <div class="hero-console reveal from-right" aria-label="SLATE 工作台预览">
+        <div class="console-top">
+          <span></span><span></span><span></span>
+          <strong>Autopilot Mission Deck</strong>
+        </div>
+        <div class="console-body">
+          <div class="mission-card">
+            <div class="mission-kicker">当前任务</div>
+            <h2>优化项目工具，并验证发布路径</h2>
+            <div class="mission-progress"><i style="width: 72%"></i></div>
+            <div class="mission-meta">
+              <span>第 7/28 轮</span>
+              <span>3 个工具运行</span>
+              <span>本地工作区</span>
+            </div>
+          </div>
+          <div class="agent-stream">
+            <div><b>计划</b><span>扫描仓库、文档、测试</span></div>
+            <div><b>工具</b><span>file_edit · terminal · git_tree</span></div>
+            <div><b>验证</b><span>前端完整性通过</span></div>
+          </div>
+          <div class="console-grid">
+            <div class="signal-panel">
+              <small>Git 树</small>
+              <p>main → 87e9a85</p>
+              <p>暂存 · 干净 · 已推送</p>
+            </div>
+            <div class="signal-panel accent">
+              <small>黑板</small>
+              <p>Git · 流程 · 看板</p>
+              <p>卡片和视野都可拖动</p>
+            </div>
+          </div>
+        </div>
       </div>
-      <p class="section-note" style="margin: 30px auto 0;">
-        一句话解释：SLATE 是一个<strong>装在你自己电脑上的 AI 工作台</strong>——你只管说一次需求，Autopilot 负责拆任务、调工具、验证并交付结果，全部数据留在本地。
-      </p>
     </div>
   </header>
 
@@ -536,6 +620,42 @@
     applyTheme(saved);
     themeBtn.addEventListener("click", () => {
       applyTheme(document.body.dataset.theme === "light" ? "dark" : "light");
+    });
+
+    // ── 移动端抽屉导航 ──
+    const hamburger = document.getElementById("nav-hamburger");
+    const drawerOverlay = document.getElementById("mobile-drawer-overlay");
+    const drawer = document.getElementById("mobile-drawer");
+    const drawerClose = document.getElementById("drawer-close");
+
+    function openDrawer() {
+      drawerOverlay.classList.add("open");
+      hamburger.classList.add("active");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeDrawer() {
+      drawerOverlay.classList.remove("open");
+      hamburger.classList.remove("active");
+      document.body.style.overflow = "";
+    }
+
+    hamburger?.addEventListener("click", () => {
+      drawerOverlay.classList.contains("open") ? closeDrawer() : openDrawer();
+    });
+
+    drawerClose?.addEventListener("click", closeDrawer);
+
+    drawerOverlay?.addEventListener("click", (e) => {
+      if (e.target === drawerOverlay) closeDrawer();
+    });
+
+    drawer?.querySelectorAll("a[href^='#']").forEach((link) => {
+      link.addEventListener("click", closeDrawer);
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && drawerOverlay?.classList.contains("open")) closeDrawer();
     });
 
     // ── 错落入场：同组元素按序号写入递增延迟 ──

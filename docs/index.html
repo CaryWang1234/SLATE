@@ -84,26 +84,66 @@
   <!-- ═══ Hero ═══ -->
   <header class="hero" id="top">
     <div class="hero-grid" id="hero-grid" aria-hidden="true"></div>
-    <div class="container">
-      <img class="hero-logo" src="./icon.png" alt="SLATE Logo">
-      <h1 class="hero-title">SLATE</h1>
-      <p class="hero-sub">Local AI Collaboration Studio — Turn Sparks into Structured Plans</p>
-      <p class="hero-en">Grind inspiration into polished deliverables.</p>
-      <p class="hero-type" id="hero-type"></p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ Download Installer</a>
-        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">View Source →</a>
+    <div class="container hero-layout">
+      <div class="hero-copy">
+        <div class="hero-mark">
+          <img class="hero-logo" src="./icon.png" alt="SLATE Logo">
+          <span>local-first agent studio</span>
+        </div>
+        <h1 class="hero-title">SLATE</h1>
+        <p class="hero-sub">Local AI Collaboration Studio — Turn Sparks into Structured Plans</p>
+        <p class="hero-en">One prompt. A visible plan. Tools that actually move.</p>
+        <p class="hero-type" id="hero-type"></p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ Download Installer</a>
+          <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">View Source →</a>
+        </div>
+        <div class="hero-badges">
+          <span class="badge">MIT License</span>
+          <span class="badge">Python 3.13+</span>
+          <span class="badge">Zero npm · Zero Build</span>
+          <span class="badge">Local-First</span>
+          <span class="badge">Dual Theme</span>
+        </div>
+        <p class="section-note">
+          SLATE is an <strong>AI workbench installed on your own computer</strong>: describe what you need once, then Autopilot breaks down tasks, calls tools, verifies, and delivers results. Your data stays local.
+        </p>
       </div>
-      <div class="hero-badges">
-        <span class="badge">MIT License</span>
-        <span class="badge">Python 3.13+</span>
-        <span class="badge">Zero npm · Zero Build</span>
-        <span class="badge">Local-First</span>
-        <span class="badge">Dual Theme</span>
+      <div class="hero-console reveal from-right" aria-label="SLATE workspace preview">
+        <div class="console-top">
+          <span></span><span></span><span></span>
+          <strong>Autopilot Mission Deck</strong>
+        </div>
+        <div class="console-body">
+          <div class="mission-card">
+            <div class="mission-kicker">CURRENT RUN</div>
+            <h2>Refactor project tools and verify the release path</h2>
+            <div class="mission-progress"><i style="width: 72%"></i></div>
+            <div class="mission-meta">
+              <span>Round 7/28</span>
+              <span>3 tools active</span>
+              <span>local workspace</span>
+            </div>
+          </div>
+          <div class="agent-stream">
+            <div><b>plan</b><span>scan repo, docs, tests</span></div>
+            <div><b>tool</b><span>file_edit · terminal · git_tree</span></div>
+            <div><b>check</b><span>frontend integrity passed</span></div>
+          </div>
+          <div class="console-grid">
+            <div class="signal-panel">
+              <small>Git Tree</small>
+              <p>main → 87e9a85</p>
+              <p>staged · clean · pushed</p>
+            </div>
+            <div class="signal-panel accent">
+              <small>Whiteboard</small>
+              <p>Git · Flow · Kanban</p>
+              <p>drag cards and viewport</p>
+            </div>
+          </div>
+        </div>
       </div>
-      <p class="section-note" style="margin: 30px auto 0;">
-        In one sentence: SLATE is an <strong>AI workbench installed on your own computer</strong> — you describe what you need once, Autopilot breaks down tasks, calls tools, verifies, and delivers results. All data stays local.
-      </p>
     </div>
   </header>
 
