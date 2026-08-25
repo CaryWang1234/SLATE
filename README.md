@@ -23,7 +23,7 @@
 
 SLATE is a **lightweight local AI collaboration tool** focused on prompt engineering, context management, and project ideation.
 
-It features multi-model chat, MCP tool calling, Harness autonomous execution, Grind Mode, AI team debates, and a whiteboard-style logic chain. It can either drive built-in tools to complete tasks directly, or generate high-quality prompts for external Coding Agents (Claude Code, Codex, Cursor, etc.).
+It features multi-model chat, Agent Autopilot, MCP tool calling, Harness autonomous execution, Grind Mode, AI team debates, and a whiteboard-style logic chain. It can either drive built-in tools to complete tasks directly, or generate high-quality prompts for external Coding Agents (Claude Code, Codex, Cursor, etc.).
 
 **Zero npm dependencies. Zero build tools. Native tech stack. Local-first.**
 
@@ -32,20 +32,20 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 ## ✨ Highlights
 
 - 🗣️ **Unified Multi-Model Access** — Major LLMs worldwide + custom OpenAI-compatible endpoints + local models (Ollama / LM Studio)
-- ⚡ **Harness Autonomous Execution** — Six-phase closed-loop with 50 rounds by default; auto-generates TODOLIST for large tasks; stop doesn't quit — only manual stop / rounds exhausted / checklist done ends the session
+- ⚡ **Agent Autopilot + Harness** — Ordinary project requests now auto-run in an Agent loop without needing repeated "continue" prompts; Harness remains the explicit six-phase, 50-round closed-loop mode for large tasks
 - 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Harness
 - 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
-- 🛠️ **26 Built-in MCP Tools** — File read/write/edit/append, terminal sandbox, PPT/Word generation, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, MCP Factory for self-production, screenshot-to-code, browser & desktop automation
+- 🛠️ **30 Built-in MCP Tools** — File read/write/edit/append, Unicode-safe terminal, PPT/Word/Excel/PDF tools, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, MCP Factory for self-production, screenshot-to-code, browser & desktop automation
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
 - 🔍 **Code Review** — Read git diff (staged/unstaged/commit range), AI reviews across code quality, security, performance, and maintainability with structured report and line-level comments
 - 🔔 **Task Completion Notifications** — Chime sound + system notification when Harness/team/workflow finishes; both toggleable in settings
-- 📡 **LAN Remote Control** — Opens port 8001 on launch; scan QR from phone/tablet browser for the full interface
+- 📡 **LAN Remote Control with Auth** — Opens port 8001 on launch; scan QR from phone/tablet browser for the full interface; optional LAN password prevents other devices on the network from operating SLATE
 - 🛡️ **High-Risk Command Approval** — Dual-layer frontend+backend interception with hardcoded rules; AI explains command purpose before approval; catastrophic commands unconditionally blocked
 - 👥 **AI Team Multi-Round Debate** — Multi-role propose/oppose/decide with light/heavy model division; plus DAG workflow pipeline with **8 built-in templates** (Dev Flow, Code Review, Doc Generation, Data Analysis, Research Report, Product Requirements, Bug Investigation, Parallel Research); stop button for mid-debate interruption; **9 built-in team presets** (Code Review, Product Brainstorm, Red-Blue Debate, etc.) + custom configuration; workflow import/export/delete
 - ⏰ **Scheduled Chat Tasks** — Auto-execute preset prompts on schedule, results archived as separate sessions
-- 🧠 **Whiteboard Logic Chain** — Card + connector brainstorming, Mermaid-rendered flowcharts & mindmaps; auto-logs tool execution steps as colored status cards with arrow connections
+- 🧠 **Upgraded Whiteboard** — Card + connector brainstorming, Mermaid-rendered flowcharts & mindmaps, flow/kanban/outline modes, draggable Git tree view for branches/commits/worktrees/staged/unpushed state, and auto-logged tool execution steps
 - 💾 **Long-Term Memory & Knowledge Base** — Auto-distill chat highlights, cross-session recall; **overwrite outdated memories and delete obsolete ones** via AI-driven add/overwrite/delete actions; **✨ Spark** — auto-capture technical insights when conversations end, archive as knowledge docs for future RAG injection
 - 🗜️ **Smart Context Compression** — Auto-summarize over threshold, four-layer truncation defense with auto-continuation, four-layer timeout prevention
 - 🏭 **Prompt Factory** — Constitution + context + constraints integrated into a deliverable prompt
@@ -60,8 +60,16 @@ It features multi-model chat, MCP tool calling, Harness autonomous execution, Gr
 
 - Preset models: GPT / Claude / Gemini, DeepSeek / Kimi / Qwen / GLM / Doubao / MiniMax / ERNIE, etc.
 - Custom models (any OpenAI-compatible API) and local models supported
+- Optional Responses API mode for compatible OpenAI-style models
 - One-click sidebar switching, API Keys encrypted locally
 - Streaming output, code block copy, smart scroll follow, regenerate last reply
+
+### Agent Autopilot
+
+- Project/action requests are detected automatically and run through an Agent loop without requiring you to type "continue"
+- Default loop budget: 18 rounds for ordinary environment tasks, 28 rounds for broad project-wide tasks; Harness keeps its configurable 50-round strong mode
+- If a model only says it will inspect/edit/verify, SLATE nudges it to call tools; if it claims completion without tool evidence, SLATE asks it to verify or actually act
+- Tool results are fed back invisibly so the model can observe → act → verify → report in one run
 
 ### Harness Autonomous Execution
 
@@ -85,9 +93,9 @@ Built-in tools (`backend/skills/`):
 | Tool | Description |
 |------|-------------|
 | `file_tree` / `file_peek` | Browse project structure / Read files |
-| `file_create` / `file_edit` | Create files / Diff-preview editing |
+| `file_create` / `file_edit` | Create files / Diff-preview editing; preserves UTF-8/BOM/GB18030/GBK/UTF-16 and handles Chinese/emoji safely |
 | `file_append` | Append to files, segmented writes for long content |
-| `terminal` | Sandboxed command execution |
+| `terminal` | Sandboxed command execution; hidden Windows subprocesses and Unicode-safe native output capture |
 | `html_render` / `css_color` | HTML skeleton generation / CSS color tuning |
 | `doc_write` / `text_summarize` | Markdown writing / Text summarization |
 | `ppt_create` / `word_create` | .pptx presentations / .docx Word documents |
@@ -135,6 +143,7 @@ Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention i
 - Rename sessions, export as Markdown, batch manage/delete; messages support individual edit/delete
 - One-click backup: all data (chats/memories/assets/settings) exported as JSON, import to restore
 - Storage management: itemized usage, database compression, clear chats, WebView cache cleanup
+- LAN access settings: QR/code URL display, optional remote password, and clear warnings when LAN auth is not configured
 - First-launch onboarding guide
 - Auto-check for updates on startup, prompts upgrade when new GitHub Release found
 
@@ -151,6 +160,8 @@ Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention i
 
 - Idea/feature/thought cards, drag-to-layout, arrow connectors for dependencies and data flow
 - Mermaid.js rendered flowcharts & mindmaps
+- Display modes: main freeform board, Git tree, flow, kanban, and outline
+- Git tree recognizes the opened project's repository state: HEAD, local/remote branches, commits, tags, remotes, worktrees, staged/changed/untracked counts, stashes, and unpushed commits; nodes and canvas are draggable in SLATE style
 - **Auto-logging**: Tool execution steps automatically create step cards with icons, descriptions, and status colors (yellow=running, green=done, red=error)
 - **Thinking process display**: Model reasoning/thinking shown in collapsible panel, auto-collapses after thinking completes
 
@@ -160,6 +171,7 @@ Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention i
 - 💾 **Long-Term Memory**: Auto-distill chat highlights, cross-session persistence
 - 📚 **Knowledge Base**: Local knowledge snippet retrieval and injection
 - 🛡️ **Terminal Security**: Hardcoded high-risk command rules, frontend approval + backend interception dual defense, catastrophic commands (`rm -rf /`, `format`, etc.) unconditionally blocked
+- 🔤 **Unicode-Safe Local Tools**: File editing and terminal output handle Chinese, emoji, UTF-8 BOM, GB18030/GBK, and UTF-16 without mojibake or accidental re-encoding
 - 🔒 **Full Sandbox Protection**: Path traversal prevention (sensitive system dirs blacklisted), credential file access blocked, output truncation (50K chars), file size limits (5MB), request body size cap (20MB), upload filename sanitization, ReDoS timeout protection, env var cleanup — all transparent to users, zero friction
 - 🗜️ **Context Compression**: Auto-summarize over token threshold, manual compression supported
 - 🏭 **Prompt Factory**: Constitution summary → context snippets → task description → constraints → delivery requirements
@@ -250,7 +262,7 @@ SLATE/
 │   │   ├── update.py           # Startup update check (GitHub Releases)
 │   │   ├── workflows.py        # Team workflow DAG definition
 │   │   └── files.py            # Multimodal file parsing
-│   └── skills/                 # 24 built-in MCP tool implementations (incl. high-risk command dual interception)
+│   └── skills/                 # 30 built-in MCP tool implementations (incl. Unicode-safe file/terminal tools and high-risk command dual interception)
 ├── frontend/
 │   ├── index.html              # Three-column layout entry (Chat / Whiteboard / Factory+Capabilities)
 │   ├── css/style.css           # Global styles (dual theme)

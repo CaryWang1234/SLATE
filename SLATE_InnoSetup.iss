@@ -61,8 +61,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式 Add Desktop Shortcut"; GroupDescription: "附加快捷方式："; Flags: checkedonce
-Name: "autostart"; Description: "开机自动启动 {#MyAppName} Auto start {#MyAppName} while setup"; GroupDescription: "附加选项："; Flags: unchecked
-Name: "userdata"; Description: "卸载时保留用户数据（聊天记录 / 技能 / 设置）keep data when uninstall"; GroupDescription: "卸载行为："; Flags: checkedonce
+Name: "autostart"; Description: "开机自动启动 {#MyAppName} Auto start SLATE while setup"; GroupDescription: "附加选项："; Flags: unchecked
+Name: "userdata"; Description: "卸载时保留用户数据（聊天记录 / 技能 / 设置）Keep data when uninstall"; GroupDescription: "卸载行为："; Flags: checkedonce
 
 [Registry]
 ; 开机自启（随 autostart 任务创建，卸载时自动移除）

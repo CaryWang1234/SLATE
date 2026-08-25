@@ -12,19 +12,20 @@
 1. [SLATE 是什么？](#1-slate-是什么)
 2. [安装与启动](#2-安装与启动)
 3. [多模型对话](#3-多模型对话)
-4. [Harness 自主执行](#4-harness-自主执行)
-5. [磨墨模式](#5-磨墨模式)
-6. [团队模式](#6-团队模式)
-7. [白板逻辑链](#7-白板逻辑链)
-8. [MCP 工具箱](#8-mcp-工具箱)
-9. [专家包](#9-专家包)
-10. [工作流模板](#10-工作流模板)
-11. [知识库与灵光](#11-知识库与灵光)
-12. [Code Review](#12-code-review)
-13. [语音输入](#13-语音输入)
-14. [截图转代码](#14-截图转代码)
-15. [定时任务](#15-定时任务)
-16. [设置与个性化](#16-设置与个性化)
+4. [Agent Autopilot](#4-agent-autopilot)
+5. [Harness 自主执行](#5-harness-自主执行)
+6. [磨墨模式](#6-磨墨模式)
+7. [团队模式](#7-团队模式)
+8. [白板逻辑链](#8-白板逻辑链)
+9. [MCP 工具箱](#9-mcp-工具箱)
+10. [专家包](#10-专家包)
+11. [工作流模板](#11-工作流模板)
+12. [知识库与灵光](#12-知识库与灵光)
+13. [Code Review](#13-code-review)
+14. [语音输入](#14-语音输入)
+15. [截图转代码](#15-截图转代码)
+16. [定时任务](#16-定时任务)
+17. [设置与个性化](#17-设置与个性化)
 
 ---
 
@@ -78,7 +79,27 @@ SLATE 支持同时接入多个模型，在对话界面顶部下拉框随时切�
 
 ---
 
-### 4. Harness 自主执行
+### 4. Agent Autopilot
+
+Autopilot 是默认的“少打继续”执行层。只要你的消息明显是在要求 SLATE 查看项目、修改文件、运行命令、排查 bug、提交代码或生成文件，它会自动进入多轮 Agent Loop。
+
+**你怎么用：**
+- 直接说“修复 xxx”“排查项目 bug”“优化工具调用”“跑一下测试并修掉报错”
+- 不需要手动开启 Harness，也不需要反复发送“继续”
+- 普通任务最多自动推进 18 轮；全面扫描、项目级、多文件任务最多 28 轮
+
+**它会自动做：**
+1. 读取相关目录、文件、配置或 Git 状态
+2. 调用 `file_edit` / `terminal` / `git_tool` / `code_scan` 等工具推进
+3. 把工具结果隐藏回灌给模型，让它继续下一步
+4. 修改后重新读取、运行检查、测试或构建
+5. 没有工具记录却口头说“完成”时，系统会要求它先验证
+
+**什么时候还用 Harness：** 需要更强约束、明确 TODOLIST、长任务 50 轮闭环时，点击 ⚡ Harness。
+
+---
+
+### 5. Harness 自主执行
 
 Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模型自主规划、调用工具、多轮执行直至完成。
 
@@ -102,7 +123,7 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 
 ---
 
-### 5. 磨墨模式
+### 6. 磨墨模式
 
 把粗糙想法研磨成结构化任务书（墨稿）的交互式引导。
 
@@ -128,7 +149,7 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 
 ---
 
-### 6. 团队模式
+### 7. 团队模式
 
 多个 AI 角色围绕你的问题进行多轮辩论，最终输出共识结论。
 
@@ -146,7 +167,7 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 
 ---
 
-### 7. 白板逻辑链
+### 8. 白板逻辑链
 
 可视化的卡片 + 连线系统，用于梳理思路、推演方案。
 
@@ -154,6 +175,8 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 - 点击「黑板」标签进入
 - AI 可自动创建卡片（分析结果、方案对比等）
 - 手动拖拽卡片、建立连线
+- 顶栏可切换 Git / 流程 / 看板 / 纲要等显示模式；主黑板就是默认自由画布
+- Git 树会识别当前项目的 Git 要素：HEAD、branch、remote branch、commit、tag、remote、worktree、stash、暂存 / 修改 / 未跟踪、未推送提交；节点和视野都可拖动
 - 支持 4 种 AI 白板工具：
   - `card_create` 创建卡片
   - `card_edit` 编辑卡片
@@ -162,7 +185,7 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 
 ---
 
-### 8. MCP 工具箱
+### 9. MCP 工具箱
 
 SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 
@@ -184,9 +207,14 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 | 扩展 | `mcp_factory`（动态注册外部 MCP 工具） |
 | 样式 | `css_color` |
 
+**特殊字符与编码：**
+- `file_peek` / `file_edit` 自动识别 UTF-8、UTF-8 BOM、GB18030、GBK、UTF-16 等常见文本编码
+- 中文、emoji、全角符号会原样保留；如果旧编码无法表达新字符，工具会安全升级写入编码而不是丢字符
+- Windows 下 `terminal` 会隐藏 PowerShell 子窗口，并对 Python / Node / Git / npm / rg 等原生命令做 Unicode-safe 输出捕获
+
 ---
 
-### 9. 专家包
+### 10. 专家包
 
 预制的角色知识包，让 AI 以特定专家身份回答。
 
@@ -205,7 +233,7 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 
 ---
 
-### 10. 工作流模板
+### 11. 工作流模板
 
 预定义的 DAG 工作流，多节点并行执行复杂任务。
 
@@ -227,7 +255,7 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 
 ---
 
-### 11. 知识库与灵光
+### 12. 知识库与灵光
 
 **知识库：** 长期存储项目知识，对话时自动注入相关上下文。
 
@@ -243,7 +271,7 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 
 ---
 
-### 12. Code Review
+### 13. Code Review
 
 对 Git 仓库的变更进行 AI 四维度结构化审查。
 
@@ -255,7 +283,7 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 
 ---
 
-### 13. 语音输入
+### 14. 语音输入
 
 浏览器端语音转文字，免打字输入。
 
@@ -269,7 +297,7 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 
 ---
 
-### 14. 截图转代码
+### 15. 截图转代码
 
 将截图还原为 HTML/CSS 代码。
 
@@ -282,7 +310,7 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 
 ---
 
-### 15. 定时任务
+### 16. 定时任务
 
 让 AI 定时或按事件自动执行任务。
 
@@ -297,19 +325,20 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 
 ---
 
-### 16. 设置与个性化
+### 17. 设置与个性化
 
 **主要设置项：**
 
 | 设置 | 说明 |
 |------|------|
-| 模型管理 | 添加/删除 API Key，配置自定义端点 |
+| 模型管理 | 添加/删除 API Key，配置自定义端点，可选启用 Responses API |
 | 输出控制 | 最大 Token 数、流式输出开关 |
+| 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 |
 | 安全模式 | 高危命令审批策略 |
+| 局域网遥控 | 查看访问地址与二维码，设置局域网访问密码 |
 | 主题 | 深色/浅色切换 |
 | 语言 | 中文/English |
 | 上下文压缩 | 自动/手动压缩历史对话 |
-| 短回复审阅 | 模型回复后自动检查是否需要推进 |
 
 ---
 
@@ -321,19 +350,20 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 1. [What is SLATE?](#1-what-is-slate)
 2. [Installation & Quick Start](#2-installation--quick-start)
 3. [Multi-Model Chat](#3-multi-model-chat)
-4. [Harness Autonomous Execution](#4-harness-autonomous-execution)
-5. [Grind Mode](#5-grind-mode)
-6. [Team Mode](#6-team-mode)
-7. [Whiteboard Logic Chain](#7-whiteboard-logic-chain)
-8. [MCP Toolbox](#8-mcp-toolbox)
-9. [Expert Packs](#9-expert-packs)
-10. [Workflow Templates](#10-workflow-templates)
-11. [Knowledge Base & Sparks](#11-knowledge-base--sparks)
-12. [Code Review](#12-code-review)
-13. [Voice Input](#13-voice-input)
-14. [Screenshot to Code](#14-screenshot-to-code)
-15. [Scheduled Tasks](#15-scheduled-tasks)
-16. [Settings & Customization](#16-settings--customization)
+4. [Agent Autopilot](#4-agent-autopilot-1)
+5. [Harness Autonomous Execution](#5-harness-autonomous-execution)
+6. [Grind Mode](#6-grind-mode)
+7. [Team Mode](#7-team-mode)
+8. [Whiteboard Logic Chain](#8-whiteboard-logic-chain)
+9. [MCP Toolbox](#9-mcp-toolbox)
+10. [Expert Packs](#10-expert-packs)
+11. [Workflow Templates](#11-workflow-templates)
+12. [Knowledge Base & Sparks](#12-knowledge-base--sparks)
+13. [Code Review](#13-code-review)
+14. [Voice Input](#14-voice-input)
+15. [Screenshot to Code](#15-screenshot-to-code)
+16. [Scheduled Tasks](#16-scheduled-tasks)
+17. [Settings & Customization](#17-settings--customization)
 
 ---
 
@@ -387,7 +417,27 @@ SLATE supports multiple models simultaneously — switch anytime from the top dr
 
 ---
 
-### 4. Harness Autonomous Execution
+### 4. Agent Autopilot
+
+Autopilot is the default "do not make me type continue" execution layer. When your message clearly asks SLATE to inspect a project, edit files, run commands, debug, commit, or generate files, it automatically enters a multi-round Agent Loop.
+
+**How to use it:**
+- Say things like "fix xxx", "scan the project for bugs", "optimize tool calling", or "run tests and fix failures"
+- You do not need to enable Harness manually, and you do not need to keep sending "continue"
+- Ordinary tasks can auto-advance up to 18 rounds; broad project-wide or multi-file tasks can auto-advance up to 28 rounds
+
+**What it does automatically:**
+1. Reads relevant directories, files, config, or Git state
+2. Calls tools such as `file_edit`, `terminal`, `git_tool`, or `code_scan`
+3. Feeds tool results back into the model invisibly so it can continue
+4. Re-reads files or runs checks/tests/builds after changes
+5. If the model claims completion without tool evidence, SLATE asks it to verify or actually act first
+
+**When to use Harness:** use the ⚡ Harness button when you want the stronger six-phase mode, explicit TODOLIST enforcement, and a 50-round long-task loop.
+
+---
+
+### 5. Harness Autonomous Execution
 
 Harness is SLATE's "autopilot" — state your goal, and the model autonomously plans, calls tools, and executes in multiple rounds until done.
 
@@ -411,7 +461,7 @@ Harness is SLATE's "autopilot" — state your goal, and the model autonomously p
 
 ---
 
-### 5. Grind Mode
+### 6. Grind Mode
 
 Interactive refinement: turn rough ideas into structured task briefs.
 
@@ -437,7 +487,7 @@ Interactive refinement: turn rough ideas into structured task briefs.
 
 ---
 
-### 6. Team Mode
+### 7. Team Mode
 
 Multiple AI roles debate your question across rounds, producing a consensus conclusion.
 
@@ -455,7 +505,7 @@ Multiple AI roles debate your question across rounds, producing a consensus conc
 
 ---
 
-### 7. Whiteboard Logic Chain
+### 8. Whiteboard Logic Chain
 
 Visual cards + connections system for reasoning and planning.
 
@@ -463,6 +513,8 @@ Visual cards + connections system for reasoning and planning.
 - Click "Whiteboard" tab to enter
 - AI auto-creates cards (analysis results, comparisons)
 - Drag cards, create connections manually
+- Switch display modes from the whiteboard header: Git, Flow, Kanban, and Outline. The main whiteboard is the default freeform canvas.
+- Git Tree recognizes the opened project's Git elements: HEAD, branches, remote branches, commits, tags, remotes, worktrees, stash, staged/changed/untracked counts, and unpushed commits. Nodes and the canvas viewport are draggable.
 - 4 AI whiteboard tools:
   - `card_create` — Create cards
   - `card_edit` — Edit cards
@@ -471,7 +523,7 @@ Visual cards + connections system for reasoning and planning.
 
 ---
 
-### 8. MCP Toolbox
+### 9. MCP Toolbox
 
 SLATE includes 30 built-in MCP tools. The model decides when to use them during conversations.
 
@@ -493,9 +545,14 @@ SLATE includes 30 built-in MCP tools. The model decides when to use them during 
 | Extension | `mcp_factory` (dynamically register external MCP tools) |
 | Style | `css_color` |
 
+**Unicode and encoding:**
+- `file_peek` / `file_edit` auto-detect UTF-8, UTF-8 BOM, GB18030, GBK, UTF-16, and other common text encodings
+- Chinese, emoji, and full-width symbols are preserved as-is; if a legacy encoding cannot represent a new character, the tool safely upgrades the write encoding instead of losing text
+- On Windows, `terminal` hides PowerShell windows and captures Unicode-safe output for native commands such as Python / Node / Git / npm / rg
+
 ---
 
-### 9. Expert Packs
+### 10. Expert Packs
 
 Pre-built role knowledge packages that let AI answer as a specific expert.
 
@@ -514,7 +571,7 @@ Pre-built role knowledge packages that let AI answer as a specific expert.
 
 ---
 
-### 10. Workflow Templates
+### 11. Workflow Templates
 
 Pre-defined DAG workflows for complex multi-node parallel execution.
 
@@ -536,7 +593,7 @@ Pre-defined DAG workflows for complex multi-node parallel execution.
 
 ---
 
-### 11. Knowledge Base & Sparks
+### 12. Knowledge Base & Sparks
 
 **Knowledge Base:** Long-term project knowledge storage, auto-injected into conversations.
 
@@ -552,7 +609,7 @@ Pre-defined DAG workflows for complex multi-node parallel execution.
 
 ---
 
-### 12. Code Review
+### 13. Code Review
 
 AI-powered four-dimensional structured review of Git repository changes.
 
@@ -564,7 +621,7 @@ AI-powered four-dimensional structured review of Git repository changes.
 
 ---
 
-### 13. Voice Input
+### 14. Voice Input
 
 Browser-based speech-to-text for hands-free input.
 
@@ -578,7 +635,7 @@ Browser-based speech-to-text for hands-free input.
 
 ---
 
-### 14. Screenshot to Code
+### 15. Screenshot to Code
 
 Convert screenshots to HTML/CSS code.
 
@@ -591,7 +648,7 @@ Convert screenshots to HTML/CSS code.
 
 ---
 
-### 15. Scheduled Tasks
+### 16. Scheduled Tasks
 
 Let AI automatically execute tasks on schedule or by events.
 
@@ -606,19 +663,20 @@ Let AI automatically execute tasks on schedule or by events.
 
 ---
 
-### 16. Settings & Customization
+### 17. Settings & Customization
 
 **Main Settings:**
 
 | Setting | Description |
 |---------|-------------|
-| Model Management | Add/remove API keys, configure custom endpoints |
+| Model Management | Add/remove API keys, configure custom endpoints, optionally enable Responses API |
 | Output Control | Max tokens, streaming toggle |
+| Auto-Advance | Autopilot / short-reply review / long-stall review |
 | Safety Mode | High-risk command approval policy |
+| LAN Remote | View LAN URL / QR code, configure remote access password |
 | Theme | Dark/Light toggle |
 | Language | Chinese / English |
 | Context Compression | Auto/manual compression of history |
-| Short Reply Review | Auto-check if model reply needs follow-up |
 
 ---
 

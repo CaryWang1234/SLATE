@@ -74,7 +74,7 @@ const state = {
     enabled: true,
     modelId: "",
     minChars: 120,
-    reviewLongStall: false, // 长回复停顿审查默认关，避免正常总结后误触发工具
+    reviewLongStall: true, // 默认积极审查长回复停顿，避免需要用户反复发送“继续”
   },
 
   // 输出控制：单次输出上限与“输出文件不限量”开关

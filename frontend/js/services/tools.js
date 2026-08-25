@@ -354,7 +354,7 @@ const TOOLS = {
 
   file_edit: {
     name: "编辑文件",
-    description: "文件编辑：view 带行号查看 / edit 精确文本替换 / replace_range 按行号替换 / read / insert / delete / copy / paste / cut。默认自动应用写入（用户在设置关闭自动确认时改为预览后手动接受）。参数名 file_path（不是 path）。",
+    description: "文件编辑：view 带行号查看 / edit 精确文本替换 / replace_range 按行号替换 / read / insert / delete / copy / paste / cut。自动识别并保留 UTF-8/BOM/GB18030/GBK/UTF-16 等文本编码，中文和 emoji 会原样传递；必要时可传 encoding 强制指定。默认自动应用写入（用户在设置关闭自动确认时改为预览后手动接受）。参数名 file_path（不是 path）。",
     params: {
       file_path: { type: "string", description: "目标文件相对路径（相对于项目根目录）", required: true },
       action: { type: "string", description: "操作类型：edit / replace_range / view / read / insert / delete / copy / paste / cut" },
@@ -364,8 +364,9 @@ const TOOLS = {
       content: { type: "string", description: "插入或替换内容（insert/replace_range 操作）" },
       start_line: { type: "number", description: "起始行号（1-based，用于 replace_range/view/read/insert/delete/copy/paste/cut）" },
       end_line: { type: "number", description: "结束行号（1-based，用于 replace_range/view/read/delete/copy/cut）" },
+      encoding: { type: "string", description: "可选文件编码，如 utf-8、utf-8-sig、gb18030、gbk、utf-16；留空自动检测并保留原编码" },
     },
-    async execute({ file_path, action = "edit", edits, content = "", old_str = "", new_str = "", start_line = 0, end_line = 0, clipboard_name = "default", _truncated }) {
+    async execute({ file_path, action = "edit", edits, content = "", old_str = "", new_str = "", start_line = 0, end_line = 0, clipboard_name = "default", encoding = "", _truncated }) {
       if (!state.project) return "未打开项目";
       if (!file_path) return "缺少 file_path";
       const normalizedAction = String(action || "edit").trim().toLowerCase();
@@ -415,6 +416,7 @@ const TOOLS = {
         start_line: Number.parseInt(start_line, 10) || 0,
         end_line: Number.parseInt(end_line, 10) || 0,
         clipboard_name,
+        encoding,
       };
       if (normalizedAction === "edit") params.edits = JSON.stringify(editList);
       let res;
@@ -482,6 +484,7 @@ const TOOLS = {
         stats: data.stats || { edits_total: editsTotal, edits_applied: data.new_content ? 1 : 0, lines_added: 0, lines_removed: 0 },
         errors: data.errors || [],
         applied: data.applied || [],
+        encoding: data.encoding || "",
       };
 
       // 自动确认：预览无错误时直接写入（部分编辑未命中时保留手动确认，避免半套写入）
@@ -1252,6 +1255,8 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   s += "核心原则：你说改它就真改，你不说它绝不碰。\n";
   s += "- file_path: 相对于项目根目录的路径\n";
   s += "- file_path 只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
+  s += "- 中文、emoji、全角符号等特殊字符必须原样放入 old_text/new_text/content，不要写成 Unicode 转义、HTML 实体或乱码占位；工具会自动识别并保留常见文本编码\n";
+  s += "- 遇到非 UTF-8 文件时，先用 file_peek auto_detect=true 或 file_edit action=view 确认内容；必要时给 file_edit 传 encoding（如 gb18030、utf-16、utf-8-sig）\n";
   s += "- 修改前必须先用 project_read_file、file_peek 或 file_edit action=view/read 确认最新内容与行号\n";
   s += "- 推荐路径：已确认行号时使用 action=replace_range，传 start_line、end_line、content，按完整行范围替换，最稳妥\n";
   s += "- 小范围且 old_text 唯一时可使用 action=edit，edits 为 JSON 数组，每项包含 old_text 和 new_text\n";
@@ -1266,6 +1271,7 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   s += "当用户要求创建新文件时，你必须使用 file_create 工具。\n";
   s += "专用格式（重要，不是 JSON）：◈◈◈file_create 后第一行写相对路径，第二行起原样直写文件完整内容，最后用 ◈◆◆ 闭合。\n";
   s += "内容区严禁 JSON 包裹、严禁转义换行/引号、严禁代码围栏（```）——像平常写代码一样直接写。\n";
+  s += "中文、emoji、全角符号等必须原样直写，禁止替换成 ?、□、\\uXXXX 或 HTML 实体。\n";
   s += "- 路径只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
   s += "- 如果用户只要求输出文件但没有指定位置，默认放到 outputs/ 下，并使用清晰的文件名\n";
   s += "- 内容必须输出完整，绝不允许用“…其余省略” / “同上”等方式缩写\n";

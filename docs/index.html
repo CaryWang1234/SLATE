@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE · Local AI Collaboration Studio</title>
-  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Harness autonomous execution, Grind Mode, 30 tools, external MCP Server support, Expert Packs, AI team debates & 8 DAG workflow templates, Code Review, voice input, whiteboard logic chains, full sandbox security. Open source, install and use.">
+  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Agent Autopilot, Harness autonomous execution, Grind Mode, 30 Unicode-safe tools, external MCP Server support, Expert Packs, AI team debates & 8 DAG workflow templates, Code Review, voice input, upgraded whiteboard with Git tree, full sandbox security. Open source, install and use.">
   <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -102,7 +102,7 @@
         <span class="badge">Dual Theme</span>
       </div>
       <p class="section-note" style="margin: 30px auto 0;">
-        In one sentence: SLATE is an <strong>AI workbench installed on your own computer</strong> — you just describe what you need, it breaks down tasks, calls tools, and delivers results. All data stays local.
+        In one sentence: SLATE is an <strong>AI workbench installed on your own computer</strong> — you describe what you need once, Autopilot breaks down tasks, calls tools, verifies, and delivers results. All data stays local.
       </p>
     </div>
   </header>
@@ -202,9 +202,9 @@
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">⚡</div>
-          <div class="feature-name">Harness Autonomous Execution</div>
-          <div class="feature-desc">Model autonomously plans, calls tools for up to 50 rounds until the task is done, following a six-phase loop: Goal → Plan → Execute → Verify → Report → Trace. Large tasks auto-generate a TODOLIST for batch tracking. Stop only interrupts the current round without quitting.</div>
-          <div class="feature-plain">Like delegating to a reliable intern — state the goal, they finish, check, and report. You can pause anytime without losing progress.</div>
+          <div class="feature-name">Agent Autopilot + Harness</div>
+          <div class="feature-desc">Ordinary project/action requests automatically enter an Agent loop, so you do not need to keep sending "continue". Autopilot can advance 18 rounds by default, 28 for broad project tasks; Harness remains the explicit 50-round six-phase loop with TODOLIST enforcement.</div>
+          <div class="feature-plain">Say what you need once. SLATE keeps observing, acting, verifying, and reporting until there is a real result or a clear blocker.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🖌️</div>
@@ -215,7 +215,7 @@
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🛠️</div>
           <div class="feature-name">30 Built-in Tools</div>
-          <div class="feature-desc">File read/write/edit with clipboard, terminal sandbox, PPT / Word / Excel generation, PDF text & table extraction, SVG charts & QR codes, code & document security scanning, repo stats, regex testing, web search & page scraping, screenshot-to-code, browser & desktop automation — @mention in chat to use, model autonomously calls and displays results. Charts and QR codes render inline.</div>
+          <div class="feature-desc">File read/write/edit with clipboard, Unicode-safe terminal, PPT / Word / Excel generation, PDF text & table extraction, SVG charts & QR codes, code & document security scanning, repo stats, regex testing, web search & page scraping, screenshot-to-code, browser & desktop automation — @mention in chat to use, model autonomously calls and displays results. File edits preserve UTF-8/BOM/GB18030/GBK/UTF-16 and handle Chinese/emoji safely.</div>
           <div class="feature-plain">Tools are "AI's hands" — plug in tools and it doesn't just talk, it acts.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -263,7 +263,7 @@
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🧠</div>
           <div class="feature-name">Whiteboard Logic Chain</div>
-          <div class="feature-desc">Turn ideas into cards, drag to layout, connect with arrows to mark dependencies and data flow. Mermaid renders flowcharts and mindmaps — untangle the knots in your head by spreading them out on the desk.</div>
+          <div class="feature-desc">Turn ideas into cards, drag to layout, connect with arrows to mark dependencies and data flow. Switch between freeform board, Git tree, flow, kanban, and outline. The Git tree recognizes branches, commits, worktrees, staged/changed/untracked counts, stash, and unpushed commits with draggable nodes.</div>
           <div class="feature-plain">A whiteboard covered in sticky notes — turning "I have an idea" into "here's the implementation path."</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -311,7 +311,7 @@
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">📡</div>
           <div class="feature-name">LAN Remote Control</div>
-          <div class="feature-desc">Opens port 8001 on launch for LAN access. Phone / tablet browser gets the full interface. Settings page and top-bar 📡 button prominently display the access URL and QR code — scan to connect.</div>
+          <div class="feature-desc">Opens port 8001 on launch for LAN access. Phone / tablet browser gets the full interface. Settings page and top-bar 📡 button display the access URL and QR code, and optional LAN password protection prevents other devices from operating SLATE without permission.</div>
           <div class="feature-plain">Turn SLATE into a "home radio station" — scan a QR code from your phone, command AI from the couch.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -341,10 +341,11 @@
 
       <div class="highlight">
         <div class="highlight-text reveal from-left">
-          <h3>⚡ Harness: Let the Model Finish It</h3>
-          <p>With Harness enabled, the model follows a six-phase loop: Goal → Plan → Execute → Verify → Report → Trace. Large tasks auto-generate a TODOLIST for batch tracking — no sign-off until all items are resolved. No need to feed instructions step by step.</p>
-          <div class="highlight-plain">Harness is "hands-free mode." Assign the task, go grab a coffee, come back to review results. Want to pause? One-click brake.</div>
+          <h3>⚡ Autopilot + Harness: Let the Model Finish It</h3>
+          <p>For normal project tasks, Autopilot automatically keeps the Agent loop running so you do not need to feed "continue" step by step. For bigger tasks, Harness adds the six-phase loop: Goal → Plan → Execute → Verify → Report → Trace, with TODOLIST enforcement.</p>
+          <div class="highlight-plain">Autopilot is the default "keep going" layer. Harness is the stronger hands-free mode when you want a 50-round closed loop.</div>
           <ul>
+            <li>Autopilot: 18 rounds by default, 28 rounds for broad project-wide tasks</li>
             <li>50 tool-call rounds by default, long tasks stay connected, model sees current round and remaining budget each turn</li>
             <li>Exits only on: manual stop / rounds exhausted / TODOLIST done — stop doesn't quit Harness</li>
             <li>Model failures, zero output, repeated calls all auto-intercepted and recovered, loop never breaks</li>
@@ -356,7 +357,7 @@
           <div class="code-box-bar"><i></i><i></i><i></i></div>
           <pre><span class="c-muted"># Enable ⚡ then send a task</span>
 <span class="c-prompt">You ▸</span> <span class="c-text">Catalog all APIs in this project and generate documentation</span>
-<span class="c-muted">Harness autonomous · Round 3/50 · Checklist 2/5</span>
+<span class="c-muted">Autopilot · Round 4/28 · verified changes</span>
 <span class="c-prompt">SLATE ▸</span> <span class="c-text">✓ Final report: generated docs/api.md …</span></pre>
         </div>
       </div>
@@ -463,8 +464,8 @@
         <div class="tool-item reveal" data-stagger><code>file_tree</code><span>Browse project structure, see the big picture first</span></div>
         <div class="tool-item reveal" data-stagger><code>file_peek</code><span>Read-only file preview</span></div>
         <div class="tool-item reveal" data-stagger><code>file_create</code><span>Create files from scratch</span></div>
-        <div class="tool-item reveal" data-stagger><code>file_edit</code><span>Diff-preview editing, see what you change</span></div>
-        <div class="tool-item reveal" data-stagger><code>terminal</code><span>Sandboxed commands, high-risk ops require approval</span></div>
+        <div class="tool-item reveal" data-stagger><code>file_edit</code><span>Diff-preview editing, Unicode-safe for Chinese / emoji</span></div>
+        <div class="tool-item reveal" data-stagger><code>terminal</code><span>Sandboxed commands, hidden Windows windows, Unicode output</span></div>
         <div class="tool-item reveal" data-stagger><code>html_render</code><span>HTML skeleton generation, quick page start</span></div>
         <div class="tool-item reveal" data-stagger><code>css_color</code><span>CSS color tuning, no more guessing</span></div>
         <div class="tool-item reveal" data-stagger><code>doc_write</code><span>Structured document writing</span></div>

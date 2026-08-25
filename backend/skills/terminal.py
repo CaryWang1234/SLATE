@@ -38,6 +38,8 @@ TIMEOUT = 30
 MAX_COMMAND_LENGTH = 10_000
 # 最大输出大小
 MAX_OUTPUT = MAX_OUTPUT_CHARS
+# Terminal pipes use UTF-8 regardless of the Windows ANSI/OEM code page.
+TERMINAL_ENCODING = "utf-8"
 # 禁止的命令前缀（无条件拦截）
 BLOCKED_PREFIXES = ("rm -rf /", "format", "mkfs", "dd if=")
 
@@ -73,6 +75,20 @@ PIPE_TO_SHELL = re.compile(
     re.I,
 )
 
+WINDOWS_NATIVE_PREFIXES = (
+    "python", "py", "node", "npm", "pnpm", "yarn", "npx",
+    "git", "rg", "ripgrep", "grep", "findstr",
+    "pip", "uv", "pytest", "ruff", "mypy",
+    "cargo", "go", "java", "javac", "dotnet",
+)
+
+POWERSHELL_HINTS = re.compile(
+    r"(^|\s)(Get-|Set-|New-|Remove-|Select-|Where-|ForEach-|Write-|Test-|"
+    r"Start-|Stop-|Copy-|Move-|Invoke-)|\$env:|Select-String|Out-File|"
+    r"\b(Measure-Object|Sort-Object|Format-Table|Format-List)\b",
+    re.I,
+)
+
 
 def check_high_risk(command: str) -> str:
     """返回命中的高危原因；未命中返回空字符串。"""
@@ -104,6 +120,12 @@ def _get_shell() -> list[str]:
 def _command_with_marker(command: str, marker: str) -> str:
     if sys.platform == "win32":
         return (
+            "[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)\n"
+            "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)\n"
+            "$OutputEncoding = [System.Text.UTF8Encoding]::new($false)\n"
+            "$env:PYTHONIOENCODING = 'utf-8'\n"
+            "$env:PYTHONUTF8 = '1'\n"
+            "chcp.com 65001 > $null\n"
             f"{command}\n"
             "$slateExit = if ($LASTEXITCODE -ne $null) { $LASTEXITCODE } elseif ($?) { 0 } else { 1 }\n"
             f'Write-Output "{marker}:$slateExit"'
@@ -126,6 +148,23 @@ def _strip_completion_marker(output: str, marker: str) -> tuple[str, int | None]
     return "\n".join(kept).strip(), exit_code
 
 
+def _looks_like_windows_native_command(command: str) -> bool:
+    """Prefer direct subprocess capture for native commands on Windows.
+
+    Windows PowerShell 5 decodes native stdout through the legacy code page in
+    many cases, which corrupts UTF-8 output from Python/Node/Git. Direct capture
+    keeps those bytes under Python's UTF-8 decoder.
+    """
+    if sys.platform != "win32":
+        return False
+    cmd = (command or "").strip()
+    if not cmd or "\n" in cmd or POWERSHELL_HINTS.search(cmd):
+        return False
+    first = re.split(r"\s+", cmd, 1)[0].strip("\"'").lower()
+    base = Path(first).stem.lower()
+    return base in WINDOWS_NATIVE_PREFIXES
+
+
 class TerminalSession:
     """持久化终端会话。"""
 
@@ -133,6 +172,9 @@ class TerminalSession:
         self.session_id = session_id
         self.cwd = Path(cwd).resolve()
         self.env = os.environ.copy()
+        self.env["PYTHONIOENCODING"] = "utf-8"
+        self.env["PYTHONUTF8"] = "1"
+        self.env.setdefault("DOTNET_CLI_UI_LANGUAGE", "en")
         # 清理敏感环境变量
         for key in list(self.env.keys()):
             if key.upper() in ("AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "DATABASE_URL", "SECRET_KEY", "PRIVATE_KEY"):
@@ -160,6 +202,8 @@ class TerminalSession:
             cwd=str(self.cwd),
             env=self.env,
             text=True,
+            encoding=TERMINAL_ENCODING,
+            errors="replace",
             bufsize=1,  # 行缓冲
             **hidden_subprocess_kwargs(),
         )
@@ -191,9 +235,59 @@ class TerminalSession:
         stderr_thread.start()
         stdout_thread.join()
         stderr_thread.join()
+
+    def _run_command_direct(self, command: str, timeout: float = TIMEOUT) -> dict[str, Any]:
+        """Run a Windows native command without PowerShell's text transcoding."""
+        self.current_command = command
+        self.running = True
+        try:
+            proc = subprocess.run(
+                command,
+                cwd=str(self.cwd),
+                env=self.env,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding=TERMINAL_ENCODING,
+                errors="replace",
+                timeout=max(float(timeout or TIMEOUT), 0.1),
+                **hidden_subprocess_kwargs(),
+            )
+            output = (proc.stdout or "").strip()
+            errors = (proc.stderr or "").strip()
+            if errors:
+                output += f"\n[STDERR]\n{errors}"
+            output, was_truncated = truncate_output(output or "(无输出)")
+            return {
+                "command": command,
+                "session_id": self.session_id,
+                "work_dir": str(self.cwd),
+                "output": output,
+                "exit_code": proc.returncode,
+                "truncated": was_truncated,
+            }
+        except subprocess.TimeoutExpired as e:
+            partial = "\n".join(part for part in (e.stdout, e.stderr) if part)
+            partial, was_truncated = truncate_output(partial or "(无输出)")
+            return {
+                "error": f"命令超时（{timeout}s）",
+                "command": command,
+                "session_id": self.session_id,
+                "work_dir": str(self.cwd),
+                "output": partial,
+                "truncated": was_truncated,
+            }
+        except Exception as e:
+            return {"error": f"执行失败: {e}"}
+        finally:
+            self.running = False
+            self.current_command = ""
     
     def run_command(self, command: str, timeout: float = TIMEOUT) -> dict[str, Any]:
         """在会话中执行命令。"""
+        if _looks_like_windows_native_command(command):
+            return self._run_command_direct(command, timeout)
+
         if not self.process or self.process.poll() is not None:
             self.start()
         

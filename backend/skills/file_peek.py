@@ -14,24 +14,20 @@ from pathlib import Path
 from typing import Any
 
 from backend.skills.sandbox import is_path_safe, validate_file_size, truncate_output
+from backend.skills.text_io import COMMON_TEXT_ENCODINGS, detect_text_encoding
 
 MAX_LINES = 50
 DEFAULT_LINES = 30
 
 # 常用编码列表（按优先级排序）
-COMMON_ENCODINGS = ["utf-8", "gbk", "gb2312", "gb18030", "latin-1", "cp1252"]
+COMMON_ENCODINGS = list(COMMON_TEXT_ENCODINGS)
 
 
 def _detect_encoding(file_path: Path) -> str:
     """尝试多种编码读取文件，返回第一个成功的编码。"""
-    for enc in COMMON_ENCODINGS:
-        try:
-            with file_path.open("r", encoding=enc) as f:
-                f.read(4096)  # 读取前 4KB 测试
-            return enc
-        except (UnicodeDecodeError, UnicodeError):
-            continue
-    return "utf-8"  # 默认回退
+    raw = file_path.read_bytes()[:8192]
+    enc, _with_errors = detect_text_encoding(raw)
+    return enc
 
 
 def _read_lines_fast(file_path: Path, encoding: str, errors: str = "replace") -> list[str]:

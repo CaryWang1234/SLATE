@@ -11,6 +11,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from backend.subprocess_utils import hidden_subprocess_kwargs
+from backend.skills.text_io import read_text_file, write_text_file
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -678,8 +679,17 @@ async def apply_file_edit(req: ApplyEditRequest):
         return {"code": 1, "message": "文件不存在"}
 
     try:
-        target.write_text(req.content, encoding="utf-8")
-        return {"code": 0, "data": {"file": str(target.relative_to(project_dir))}, "message": "ok"}
+        existing = read_text_file(target)
+        written = write_text_file(target, req.content, existing.encoding)
+        return {
+            "code": 0,
+            "data": {
+                "file": str(target.relative_to(project_dir)),
+                "encoding": written.encoding,
+                "encoding_changed": written.encoding_changed,
+            },
+            "message": "ok",
+        }
     except Exception as e:
         return {"code": 1, "message": f"写入失败: {e}"}
 
@@ -712,8 +722,16 @@ async def create_file(req: CreateFileRequest):
     try:
         # 自动创建父目录
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(req.content, encoding="utf-8")
-        return {"code": 0, "data": {"file": str(target.relative_to(project_dir))}, "message": "ok"}
+        written = write_text_file(target, req.content, "utf-8")
+        return {
+            "code": 0,
+            "data": {
+                "file": str(target.relative_to(project_dir)),
+                "encoding": written.encoding,
+                "encoding_changed": written.encoding_changed,
+            },
+            "message": "ok",
+        }
     except Exception as e:
         return {"code": 1, "message": f"创建失败: {e}"}
 
@@ -745,9 +763,17 @@ async def append_file(req: AppendFileRequest):
         return {"code": 1, "message": "文件不存在，请先用 file_create 创建"}
 
     try:
-        with open(target, "a", encoding="utf-8", newline="") as f:
-            f.write(req.content)
-        return {"code": 0, "data": {"file": str(target.relative_to(project_dir))}, "message": "ok"}
+        existing = read_text_file(target)
+        written = write_text_file(target, existing.content + req.content, existing.encoding)
+        return {
+            "code": 0,
+            "data": {
+                "file": str(target.relative_to(project_dir)),
+                "encoding": written.encoding,
+                "encoding_changed": written.encoding_changed,
+            },
+            "message": "ok",
+        }
     except Exception as e:
         return {"code": 1, "message": f"追加失败: {e}"}
 

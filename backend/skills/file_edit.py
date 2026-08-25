@@ -23,51 +23,52 @@ from pathlib import Path
 from typing import Any
 
 from backend.skills.sandbox import is_path_safe, validate_file_size
+from backend.skills.text_io import read_text_file, write_text_file
 
 # 全局剪贴板存储（支持多个命名剪贴板）
 _clipboards: dict[str, str] = {}
 
 
-def _read_file(file_path: str) -> tuple[str | None, str | None]:
-    """安全读取文件，返回 (content, error)。"""
+def _read_file(file_path: str, encoding: str = "") -> tuple[str | None, str | None, str]:
+    """安全读取文件，返回 (content, error, detected_encoding)。"""
     target = Path(file_path)
     
     # 沙箱路径验证
     safe, reason = is_path_safe(file_path)
     if not safe:
-        return None, reason
+        return None, reason, ""
     
     # 文件大小检查
     size_ok, size_reason = validate_file_size(file_path)
     if not size_ok:
-        return None, size_reason
+        return None, size_reason, ""
     
     if not target.is_file():
-        return None, f"文件不存在: {file_path}"
+        return None, f"文件不存在: {file_path}", ""
     
     # 禁止二进制文件
     blocked_suffixes = {".exe", ".dll", ".so", ".dylib", ".bin", ".png", ".jpg", ".gif", ".ico"}
     if target.suffix.lower() in blocked_suffixes:
-        return None, "不支持编辑二进制文件"
+        return None, "不支持编辑二进制文件", ""
     
     try:
-        content = target.read_text(encoding="utf-8")
-        return content, None
+        read = read_text_file(target, encoding)
+        return read.content, None, read.encoding
     except PermissionError:
-        return None, f"无权限读取: {file_path}"
-    except UnicodeDecodeError:
-        return None, "文件不是 UTF-8 文本"
+        return None, f"无权限读取: {file_path}", ""
+    except Exception as e:
+        return None, f"读取失败: {e}", ""
 
 
-def _read_with_lines(file_path: str) -> tuple[list[str], str, str, str | None]:
-    """共享辅助函数：读取文件，返回 (lines, content, line_ending, error)。
+def _read_with_lines(file_path: str, encoding: str = "") -> tuple[list[str], str, str, str, str | None]:
+    """共享辅助函数：读取文件，返回 (lines, content, line_ending, encoding, error)。
 
     line_ending 为 '\n' 或 '\r\n'，用于写回时保持原换行符。
     lines 不含行尾换行符。
     """
-    content, error = _read_file(file_path)
+    content, error, detected_encoding = _read_file(file_path, encoding)
     if error:
-        return [], "", "\n", error
+        return [], "", "\n", "", error
 
     # 检测换行符
     line_ending = "\r\n" if "\r\n" in content else "\n"
@@ -75,24 +76,24 @@ def _read_with_lines(file_path: str) -> tuple[list[str], str, str, str | None]:
     # 拆分为行（去掉所有行尾换行）
     lines = content.splitlines()
 
-    return lines, content, line_ending, None
+    return lines, content, line_ending, detected_encoding, None
 
 
-def _write_file(file_path: str, content: str) -> str | None:
-    """写入文件，返回 error 或 None。"""
+def _write_file(file_path: str, content: str, encoding: str = "") -> tuple[str | None, str, bool]:
+    """写入文件，返回 (error, encoding_used, encoding_changed)。"""
     target = Path(file_path)
     
     safe, reason = is_path_safe(file_path)
     if not safe:
-        return reason
+        return reason, "", False
     
     try:
-        target.write_text(content, encoding="utf-8")
-        return None
+        info = write_text_file(target, content, encoding or "utf-8")
+        return None, info.encoding, info.encoding_changed
     except PermissionError:
-        return f"无权限写入: {file_path}"
+        return f"无权限写入: {file_path}", "", False
     except Exception as e:
-        return f"写入失败: {e}"
+        return f"写入失败: {e}", "", False
 
 
 def _generate_diff(original: str, content: str, filename: str) -> str:
@@ -125,12 +126,13 @@ def _execute_view(
     file_path: str,
     start_line: int | None = None,
     end_line: int | None = None,
+    encoding: str = "",
 ) -> dict[str, Any]:
     """view 操作：带行号读取文件内容。
 
     每行格式为 "{行号}: {代码内容}"，行号右对齐占 4 位。
     """
-    lines, content, _le, error = _read_with_lines(file_path)
+    lines, content, _le, detected_encoding, error = _read_with_lines(file_path, encoding)
     if error:
         return {"error": error}
 
@@ -162,6 +164,7 @@ def _execute_view(
         "range": f"{s + 1}-{e}" if (start_line or end_line) else f"1-{total}",
         "content": "\n".join(numbered),
         "line_count": e - s,
+        "encoding": detected_encoding,
     }
 
 
@@ -169,6 +172,7 @@ def _execute_replace(
     file_path: str,
     old_str: str,
     new_str: str,
+    encoding: str = "",
 ) -> dict[str, Any]:
     """replace 操作：精确字符串替换，唯一匹配 + 自动备份。
 
@@ -181,7 +185,7 @@ def _execute_replace(
     if old_str is None or old_str == "":
         return {"error": "old_str 不能为空"}
 
-    _lines, content, _line_ending, error = _read_with_lines(file_path)
+    _lines, content, _line_ending, detected_encoding, error = _read_with_lines(file_path, encoding)
     if error:
         return {"error": error}
 
@@ -210,7 +214,7 @@ def _execute_replace(
     target = Path(file_path)
     bak_path = target.with_suffix(target.suffix + ".bak")
     try:
-        bak_path.write_text(content, encoding="utf-8")
+        write_text_file(bak_path, content, detected_encoding or "utf-8")
     except Exception as e:
         return {"error": f"创建备份失败 ({bak_path}): {e}"}
 
@@ -218,12 +222,9 @@ def _execute_replace(
     new_content = content.replace(old_str, new_str, 1)
 
     # 写回（保持原换行符）
-    try:
-        target.write_text(new_content, encoding="utf-8")
-    except PermissionError:
-        return {"error": f"无权限写入: {file_path}"}
-    except Exception as e:
-        return {"error": f"写入失败: {e}"}
+    write_error, written_encoding, encoding_changed = _write_file(file_path, new_content, detected_encoding)
+    if write_error:
+        return {"error": write_error}
 
     # 计算替换位置信息
     pos = content.index(old_str)
@@ -237,11 +238,13 @@ def _execute_replace(
         "backup": str(bak_path),
         "old_chars": len(old_str),
         "new_chars": len(new_str),
+        "encoding": written_encoding,
+        "encoding_changed": encoding_changed,
         "message": f"已替换第 {line_no} 行附近的唯一匹配，备份至 {bak_path.name}",
     }
 
 
-def _execute_edit(file_path: str, edits: Any) -> dict[str, Any]:
+def _execute_edit(file_path: str, edits: Any, encoding: str = "") -> dict[str, Any]:
     """执行 diff 编辑（原有逻辑）。"""
     # 解析 edits
     if isinstance(edits, str):
@@ -257,7 +260,7 @@ def _execute_edit(file_path: str, edits: Any) -> dict[str, Any]:
     if not edit_list or not isinstance(edit_list, list):
         return {"error": "edits 不能为空"}
     
-    _lines, content, line_ending, error = _read_with_lines(file_path)
+    _lines, content, line_ending, detected_encoding, error = _read_with_lines(file_path, encoding)
     if error:
         return {"error": error}
     
@@ -305,6 +308,7 @@ def _execute_edit(file_path: str, edits: Any) -> dict[str, Any]:
             "errors": errors,
             "stats": {"edits_total": len(edit_list), "edits_applied": 0, "lines_added": 0, "lines_removed": 0},
             "new_content": original,
+            "encoding": detected_encoding,
             "note": "所有编辑均未匹配。请检查 old_text 是否与文件内容完全一致。",
         }
     
@@ -324,18 +328,19 @@ def _execute_edit(file_path: str, edits: Any) -> dict[str, Any]:
             "lines_removed": removed,
         },
         "new_content": content,
+        "encoding": detected_encoding,
         "note": "编辑已预览。用户可选择「接受」写入文件、「拒绝」放弃、「复制」拷贝 diff。",
     }
 
 
-def _execute_replace_range(file_path: str, content: str, start_line: int, end_line: int) -> dict[str, Any]:
+def _execute_replace_range(file_path: str, content: str, start_line: int, end_line: int, encoding: str = "") -> dict[str, Any]:
     """按 1-based 行号范围替换内容，适合先 view/read 后精确修改。"""
     if start_line < 1:
         return {"error": "start_line 必须 >= 1"}
     if end_line < start_line:
         return {"error": "end_line 必须 >= start_line"}
 
-    lines, original, line_ending, error = _read_with_lines(file_path)
+    lines, original, line_ending, detected_encoding, error = _read_with_lines(file_path, encoding)
     if error:
         return {"error": error}
 
@@ -384,13 +389,14 @@ def _execute_replace_range(file_path: str, content: str, start_line: int, end_li
             "lines_removed": removed,
         },
         "new_content": new_content,
+        "encoding": detected_encoding,
         "note": "行范围替换已预览。用户可选择「接受」写入文件、「拒绝」放弃、「复制」拷贝 diff。",
     }
 
 
-def _execute_read(file_path: str, start_line: int = 0, end_line: int = 0) -> dict[str, Any]:
+def _execute_read(file_path: str, start_line: int = 0, end_line: int = 0, encoding: str = "") -> dict[str, Any]:
     """读取文件内容（支持行号范围）。"""
-    content, error = _read_file(file_path)
+    content, error, detected_encoding = _read_file(file_path, encoding)
     if error:
         return {"error": error}
     
@@ -408,6 +414,7 @@ def _execute_read(file_path: str, start_line: int = 0, end_line: int = 0) -> dic
             "range": f"{start + 1}-{end}",
             "content": "".join(selected),
             "line_count": len(selected),
+            "encoding": detected_encoding,
         }
     
     return {
@@ -415,17 +422,18 @@ def _execute_read(file_path: str, start_line: int = 0, end_line: int = 0) -> dic
         "total_lines": total,
         "content": content,
         "line_count": total,
+        "encoding": detected_encoding,
     }
 
 
-def _execute_insert(file_path: str, content: str, start_line: int) -> dict[str, Any]:
+def _execute_insert(file_path: str, content: str, start_line: int, encoding: str = "") -> dict[str, Any]:
     """在指定行插入内容。"""
     if not content:
         return {"error": "content 不能为空"}
     if start_line < 1:
         return {"error": "start_line 必须 >= 1"}
     
-    original, error = _read_file(file_path)
+    original, error, detected_encoding = _read_file(file_path, encoding)
     if error:
         return {"error": error}
     
@@ -433,8 +441,10 @@ def _execute_insert(file_path: str, content: str, start_line: int) -> dict[str, 
     insert_pos = min(start_line - 1, len(lines))  # 0-based
     
     # 确保插入内容有换行符
-    if not content.endswith("\n"):
-        content += "\n"
+    line_ending = "\r\n" if "\r\n" in original else "\n"
+    content = _normalize_newlines(content, line_ending)
+    if not content.endswith(line_ending):
+        content += line_ending
     
     lines.insert(insert_pos, content)
     new_content = "".join(lines)
@@ -445,18 +455,19 @@ def _execute_insert(file_path: str, content: str, start_line: int) -> dict[str, 
         "line": start_line,
         "inserted_lines": content.count("\n"),
         "new_content": new_content,
+        "encoding": detected_encoding,
         "note": "插入已预览。用户可选择「接受」写入文件。",
     }
 
 
-def _execute_delete(file_path: str, start_line: int, end_line: int) -> dict[str, Any]:
+def _execute_delete(file_path: str, start_line: int, end_line: int, encoding: str = "") -> dict[str, Any]:
     """删除指定行范围。"""
     if start_line < 1:
         return {"error": "start_line 必须 >= 1"}
     if end_line < start_line:
         return {"error": "end_line 必须 >= start_line"}
     
-    original, error = _read_file(file_path)
+    original, error, detected_encoding = _read_file(file_path, encoding)
     if error:
         return {"error": error}
     
@@ -477,13 +488,14 @@ def _execute_delete(file_path: str, start_line: int, end_line: int) -> dict[str,
         "deleted_lines": len(deleted),
         "deleted_content": "".join(deleted),
         "new_content": new_content,
+        "encoding": detected_encoding,
         "note": "删除已预览。用户可选择「接受」写入文件。",
     }
 
 
-def _execute_copy(file_path: str, start_line: int = 0, end_line: int = 0, clipboard_name: str = "default") -> dict[str, Any]:
+def _execute_copy(file_path: str, start_line: int = 0, end_line: int = 0, clipboard_name: str = "default", encoding: str = "") -> dict[str, Any]:
     """复制内容到剪贴板。"""
-    content, error = _read_file(file_path)
+    content, error, detected_encoding = _read_file(file_path, encoding)
     if error:
         return {"error": error}
     
@@ -505,10 +517,11 @@ def _execute_copy(file_path: str, start_line: int = 0, end_line: int = 0, clipbo
         "copied_lines": selected.count("\n"),
         "copied_chars": len(selected),
         "preview": selected[:200] + ("..." if len(selected) > 200 else ""),
+        "encoding": detected_encoding,
     }
 
 
-def _execute_paste(file_path: str, start_line: int, clipboard_name: str = "default") -> dict[str, Any]:
+def _execute_paste(file_path: str, start_line: int, clipboard_name: str = "default", encoding: str = "") -> dict[str, Any]:
     """从剪贴板粘贴到指定位置。"""
     if clipboard_name not in _clipboards:
         return {"error": f"剪贴板 '{clipboard_name}' 为空"}
@@ -518,12 +531,14 @@ def _execute_paste(file_path: str, start_line: int, clipboard_name: str = "defau
     if start_line < 1:
         return {"error": "start_line 必须 >= 1"}
     
-    original, error = _read_file(file_path)
+    original, error, detected_encoding = _read_file(file_path, encoding)
     if error:
         return {"error": error}
     
     lines = original.splitlines(keepends=True)
     insert_pos = min(start_line - 1, len(lines))
+    line_ending = "\r\n" if "\r\n" in original else "\n"
+    clipboard_content = _normalize_newlines(clipboard_content, line_ending)
     
     lines.insert(insert_pos, clipboard_content)
     new_content = "".join(lines)
@@ -535,18 +550,19 @@ def _execute_paste(file_path: str, start_line: int, clipboard_name: str = "defau
         "line": start_line,
         "pasted_lines": clipboard_content.count("\n"),
         "new_content": new_content,
+        "encoding": detected_encoding,
         "note": "粘贴已预览。用户可选择「接受」写入文件。",
     }
 
 
-def _execute_cut(file_path: str, start_line: int, end_line: int, clipboard_name: str = "default") -> dict[str, Any]:
+def _execute_cut(file_path: str, start_line: int, end_line: int, clipboard_name: str = "default", encoding: str = "") -> dict[str, Any]:
     """剪切内容（复制到剪贴板 + 删除）。"""
     if start_line < 1:
         return {"error": "start_line 必须 >= 1"}
     if end_line < start_line:
         return {"error": "end_line 必须 >= start_line"}
     
-    original, error = _read_file(file_path)
+    original, error, detected_encoding = _read_file(file_path, encoding)
     if error:
         return {"error": error}
     
@@ -570,6 +586,7 @@ def _execute_cut(file_path: str, start_line: int, end_line: int, clipboard_name:
         "cut_lines": len(cut_content.splitlines()),
         "cut_chars": len(cut_content),
         "new_content": new_content,
+        "encoding": detected_encoding,
         "note": "剪切已预览（内容已存入剪贴板）。用户可选择「接受」写入文件。",
     }
 
@@ -584,6 +601,7 @@ def execute(
     start_line: int = 0,
     end_line: int = 0,
     clipboard_name: str = "default",
+    encoding: str = "",
     **_kw: Any,
 ) -> dict[str, Any]:
     """
@@ -592,6 +610,7 @@ def execute(
     Args:
         file_path: 目标文件路径
         action: 操作类型 - view/replace/edit/replace_range/read/insert/delete/copy/paste/cut
+        encoding: 可选编码；留空自动检测并尽量保留原编码
         edits: JSON 数组（edit 操作），每项含 old_text 和 new_text
         content: 要插入或替换的内容（insert/replace_range 操作）
         old_str: 要被替换的精确字符串（replace 操作）
@@ -610,35 +629,36 @@ def execute(
             file_path,
             start_line=start_line if start_line > 0 else None,
             end_line=end_line if end_line > 0 else None,
+            encoding=encoding,
         )
     
     if action == "replace":
-        return _execute_replace(file_path, old_str, new_str)
+        return _execute_replace(file_path, old_str, new_str, encoding)
     
     if action == "edit":
         if edits is None:
             return {"error": "edit 操作需要 edits 参数"}
-        return _execute_edit(file_path, edits)
+        return _execute_edit(file_path, edits, encoding)
 
     if action == "replace_range":
-        return _execute_replace_range(file_path, content, start_line, end_line)
+        return _execute_replace_range(file_path, content, start_line, end_line, encoding)
     
     if action == "read":
-        return _execute_read(file_path, start_line, end_line)
+        return _execute_read(file_path, start_line, end_line, encoding)
     
     if action == "insert":
-        return _execute_insert(file_path, content, start_line)
+        return _execute_insert(file_path, content, start_line, encoding)
     
     if action == "delete":
-        return _execute_delete(file_path, start_line, end_line)
+        return _execute_delete(file_path, start_line, end_line, encoding)
     
     if action == "copy":
-        return _execute_copy(file_path, start_line, end_line, clipboard_name)
+        return _execute_copy(file_path, start_line, end_line, clipboard_name, encoding)
     
     if action == "paste":
-        return _execute_paste(file_path, start_line, clipboard_name)
+        return _execute_paste(file_path, start_line, clipboard_name, encoding)
     
     if action == "cut":
-        return _execute_cut(file_path, start_line, end_line, clipboard_name)
+        return _execute_cut(file_path, start_line, end_line, clipboard_name, encoding)
     
     return {"error": f"未知操作: {action}，可选: view/replace/edit/replace_range/read/insert/delete/copy/paste/cut"}

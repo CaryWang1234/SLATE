@@ -46,7 +46,7 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "file_path": {"type": "string", "description": "文件路径"},
                 "lines": {"type": "integer", "description": "读取行数（默认 30，上限 50）"},
-                "encoding": {"type": "string", "description": "文件编码（如 'utf-8', 'gbk', 'gb2312'）"},
+                "encoding": {"type": "string", "description": "文件编码（如 'utf-8', 'utf-8-sig', 'gb18030', 'gbk', 'utf-16'）"},
                 "auto_detect": {"type": "boolean", "description": "是否自动检测编码"},
                 "start_line": {"type": "integer", "description": "起始行号（1-based）"},
                 "end_line": {"type": "integer", "description": "结束行号（1-based）"},
@@ -89,6 +89,7 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "start_line": {"type": "integer", "description": "起始行号（1-based，用于 view/replace_range/insert/delete/copy/paste/cut）"},
                 "end_line": {"type": "integer", "description": "结束行号（1-based，用于 view/replace_range/delete/copy/cut）"},
                 "clipboard_name": {"type": "string", "description": "剪贴板名称（默认 'default'）"},
+                "encoding": {"type": "string", "description": "可选文本编码；留空自动检测并保留原编码，支持中文/emoji 与 BOM"},
             },
         },
     },
@@ -96,7 +97,7 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "要执行的命令（action 为空时必填）"},
+                "command": {"type": "string", "description": "要执行的命令（action 为空时必填）；终端管道使用 UTF-8，支持中文和 emoji"},
                 "work_dir": {"type": "string", "description": "工作目录（创建新会话时使用）"},
                 "action": {"type": "string", "description": "操作类型: create 创建会话 / list 列出所有会话 / close 关闭会话 / kill 终止进程 / 空串执行命令"},
                 "session_id": {"type": "string", "description": "会话 ID（默认 'default'，可自定义）"},

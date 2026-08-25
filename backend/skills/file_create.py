@@ -6,11 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from backend.skills.sandbox import is_path_safe, MAX_FILE_SIZE
+from backend.skills.text_io import DEFAULT_TEXT_ENCODING
 
 
 def execute(
     file_path: str = "",
     content: str = "",
+    encoding: str = DEFAULT_TEXT_ENCODING,
     **_kw: Any,
 ) -> dict[str, Any]:
     """
@@ -19,6 +21,7 @@ def execute(
     参数:
         file_path: 新文件的绝对路径
         content: 文件内容
+        encoding: 写入编码，默认 utf-8
     """
     if not file_path:
         return {"error": "文件路径不能为空"}
@@ -66,6 +69,7 @@ def execute(
         "file_path_rel": str(target.parent),
         "diff": diff_text,
         "content": content,
+        "encoding": encoding or DEFAULT_TEXT_ENCODING,
         "stats": {
             "lines": line_count,
             "chars": len(content),

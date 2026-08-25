@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE（砚）· 本地 AI 协作调度台</title>
-  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Harness 自主执行、磨墨模式、30 个内置工具 + 外部 MCP Server 连接、专家包、AI 团队辩论与 DAG 工作流、白板式逻辑链、项目理解三档扫描，将灵感转化为结构化方案。开源免费，安装即用。">
+  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Agent Autopilot、Harness 自主执行、磨墨模式、30 个 Unicode-safe 内置工具 + 外部 MCP Server 连接、专家包、AI 团队辩论与 DAG 工作流、带 Git 树的升级黑板、项目理解三档扫描，将灵感转化为结构化方案。开源免费，安装即用。">
   <link rel="icon" type="image/png" href="../icon.png">
   <link rel="stylesheet" href="../style.css">
 </head>
@@ -58,7 +58,7 @@
         <span class="badge">双主题</span>
       </div>
       <p class="section-note" style="margin: 30px auto 0;">
-        一句话解释：SLATE 是一个<strong>装在你自己电脑上的 AI 工作台</strong>——你只管提需求，它负责拆任务、调工具、出结果，全部数据留在本地。
+        一句话解释：SLATE 是一个<strong>装在你自己电脑上的 AI 工作台</strong>——你只管说一次需求，Autopilot 负责拆任务、调工具、验证并交付结果，全部数据留在本地。
       </p>
     </div>
   </header>
@@ -158,9 +158,9 @@
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">⚡</div>
-          <div class="feature-name">Harness 自主执行</div>
-          <div class="feature-desc">模型自主规划、最多 50 轮调用工具直至任务完成，按“目标→计划→执行→验证→汇报→追溯”六阶段推进，大任务自动建立 TODOLIST 统筹批量销账；停止仅中断当轮不退出，仅手动停止 / 轮数用完 / 清单了结才结束，模型侧异常自动恢复推进。</div>
-          <div class="feature-plain">像派活给靠谱实习生——说清目标，他自己干完、自己检查、交报告；中途喊一嗓子也不会撂挑子不干。</div>
+          <div class="feature-name">Agent Autopilot + Harness</div>
+          <div class="feature-desc">普通项目/操作类请求会自动进入 Agent 循环，不再需要反复发送“继续”。Autopilot 普通任务默认最多 18 轮，项目级大任务最多 28 轮；Harness 仍是显式 50 轮六阶段强闭环，带 TODOLIST 约束。</div>
+          <div class="feature-plain">你只管说目标，SLATE 会持续观察、动手、验证、汇报，直到有真实结果或明确阻塞。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🖌️</div>
@@ -171,7 +171,7 @@
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🛠️</div>
           <div class="feature-name">30 个内置工具</div>
-          <div class="feature-desc">文件读写编辑追加（含复制/粘贴/剪切）、终端沙箱、PPT / Word / Excel 文档生成、PDF 文本与表格提取、SVG 图表与二维码、代码与文档安全扫描、仓库统计、正则测试、联网搜索与网页抓取等，聊天时 @提及即用，模型按需自主调用并展示执行结果，图表/二维码等图片产出直接内联预览。</div>
+          <div class="feature-desc">文件读写编辑追加（含复制/粘贴/剪切）、Unicode-safe 终端、PPT / Word / Excel 文档生成、PDF 文本与表格提取、SVG 图表与二维码、代码与文档安全扫描、仓库统计、正则测试、联网搜索与网页抓取等，聊天时 @提及即用。文件编辑可保留 UTF-8/BOM/GB18030/GBK/UTF-16，中文和 emoji 安全写入。</div>
           <div class="feature-plain">工具就是“AI 的双手”——给 AI 接上工具，它不但会说，还会动手做。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -219,7 +219,7 @@
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🧠</div>
           <div class="feature-name">白板式逻辑链</div>
-          <div class="feature-desc">灵感卡片化，拖拽布局、箭头连线标识依赖与数据流，Mermaid 渲染流程图与思维导图——脑子里的线团，摊开在桌面上理清楚。</div>
+          <div class="feature-desc">灵感卡片化，拖拽布局、箭头连线标识依赖与数据流；可在自由黑板、Git 树、流程、看板、纲要之间切换。Git 树识别 branch、commit、worktree、stash、暂存/修改/未跟踪计数和未推送提交，节点与视野均可拖动。</div>
           <div class="feature-plain">一块贴满便利贴的白板，把"我有个想法"变成"这是实现路径"。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -249,7 +249,7 @@
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">📡</div>
           <div class="feature-name">局域网遥控</div>
-          <div class="feature-desc">应用启动即在 8001 端口开放局域网访问，手机 / 平板浏览器打开即是完整同一界面；设置页与顶栏 📡 按钮醒目展示访问网址与二维码，扫码即连。</div>
+          <div class="feature-desc">应用启动即在 8001 端口开放局域网访问，手机 / 平板浏览器打开即是完整同一界面；设置页与顶栏 📡 按钮展示访问网址与二维码，并可设置局域网访问密码，防止同网段设备未经授权操作。</div>
           <div class="feature-plain">把 SLATE 变成家里的“公共电台”——手机扫个码，沙发上也能指挥 AI 干活。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -273,10 +273,11 @@
 
       <div class="highlight">
         <div class="highlight-text reveal from-left">
-          <h3>⚡ Harness：让模型自己干完</h3>
-          <p>开启 Harness 后，模型按"目标 → 计划 → 执行 → 验证 → 汇报 → 追溯"六阶段自主推进，大任务先建 TODOLIST 统筹批量销账，未完成不许收尾——无需人工逐步喂指令。</p>
-          <div class="highlight-plain">Harness 就是"放手模式"。你布置任务后可以起身倒杯咖啡，回来验收结果；中途想喊停，一键刹车。</div>
+          <h3>⚡ Autopilot + Harness：让模型自己干完</h3>
+          <p>普通项目任务默认由 Autopilot 自动续跑 Agent Loop，不需要你一步步喂“继续”。更大的任务再开启 Harness，按"目标 → 计划 → 执行 → 验证 → 汇报 → 追溯"六阶段推进，并用 TODOLIST 约束未完成项。</p>
+          <div class="highlight-plain">Autopilot 是默认的“继续干”层；Harness 是更强的 50 轮放手模式。</div>
           <ul>
+            <li>Autopilot 普通任务默认 18 轮，项目级大任务默认 28 轮</li>
             <li>工具调用轮数默认 50 轮，长任务不断线，模型每轮可见当前轮次与剩余预算</li>
             <li>仅三种情况退出：手动停止 / 轮数用完 / TODOLIST 全部了结，停止不退出 Harness</li>
             <li>模型侧失败、零输出、重复调用均自动拦截并恢复推进，循环不中断</li>
@@ -288,7 +289,7 @@
           <div class="code-box-bar"><i></i><i></i><i></i></div>
           <pre><span class="c-muted"># 开启 ⚡ 后发送任务</span>
 <span class="c-prompt">你 ▸</span> <span class="c-text">整理本项目全部 API 并生成文档</span>
-<span class="c-muted">Harness 自主执行 · 第 3/50 轮 · 清单 2/5</span>
+<span class="c-muted">Autopilot 自主推进 · 第 4/28 轮 · 已验证修改</span>
 <span class="c-prompt">砚 ▸</span> <span class="c-text">✓ 完结报告：已生成 docs/api.md …</span></pre>
         </div>
       </div>
@@ -395,8 +396,8 @@
         <div class="tool-item reveal" data-stagger><code>file_tree</code><span>项目目录浏览，先看清全貌再动手</span></div>
         <div class="tool-item reveal" data-stagger><code>file_peek</code><span>文件读取预览，只看不改也安心</span></div>
         <div class="tool-item reveal" data-stagger><code>file_create</code><span>文件创建，从零起草</span></div>
-        <div class="tool-item reveal" data-stagger><code>file_edit</code><span>差异预览式编辑，改哪看得见</span></div>
-        <div class="tool-item reveal" data-stagger><code>terminal</code><span>受限沙箱命令，高危操作需审批</span></div>
+        <div class="tool-item reveal" data-stagger><code>file_edit</code><span>差异预览式编辑，中文 / emoji 安全写入</span></div>
+        <div class="tool-item reveal" data-stagger><code>terminal</code><span>受限沙箱命令，隐藏 Windows 窗口，Unicode 输出</span></div>
         <div class="tool-item reveal" data-stagger><code>html_render</code><span>HTML 骨架生成，页面起步快</span></div>
         <div class="tool-item reveal" data-stagger><code>css_color</code><span>CSS 调色，配色不再凭感觉</span></div>
         <div class="tool-item reveal" data-stagger><code>doc_write</code><span>文档编写，结构化输出</span></div>

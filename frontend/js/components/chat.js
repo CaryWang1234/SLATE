@@ -56,6 +56,8 @@ function autoScroll(force = false) {
 // 开启后：发送时注入六阶段指令，大任务强制建议TODOLIST，工具循环轮数上限提升到 maxRounds
 let harnessStatusEl = null;
 let btnHarness = null;
+const AGENT_AUTOPILOT_DEFAULT_ROUNDS = 18;
+const AGENT_AUTOPILOT_BROAD_ROUNDS = 28;
 
 const HARNESS_PREFIX = `[Harness 自主执行模式 · Agent Loop]
 请自主完成以下任务，不要向我反复确认，按 Observe → Plan → Act → Verify → Report 推进：
@@ -963,13 +965,15 @@ function buildAgentRuntimeContext(content, harnessOn) {
   if (!cls.wantsEnv) return "";
   const lines = [
     "",
-    "[Agent Runtime]",
-    "本条消息被识别为需要环境操作的任务。请按以下运行时规则执行：",
+    "[Agent Runtime · Autopilot]",
+    "本条消息被识别为需要环境操作的任务。请像现代 Coding Agent 一样自主执行到完成：",
+    "- 不要让用户反复说“继续”；除非缺少关键权限/选择或高风险操作需要确认，否则自行做保守合理决策并推进。",
     "- 下一步若需要项目事实，直接调用工具；不要只说计划或等待。",
     "- 先观察再修改：读取相关目录/文件/配置，确认现状后再写入。",
     "- 修改或生成后必须验证：重新读取、运行检查/测试/构建，或解释无法验证的具体原因。",
     "- 工具失败时换参数或换工具，不重复完全相同的调用。",
     "- 只有任务完成、验证完成或明确受阻时才给最终汇报。",
+    "- 如果一轮回复结束时还没完成，请继续发起下一批工具调用；系统会自动把工具结果喂回给你。",
   ];
   if (cls.needsPlan && !harnessOn) {
     lines.push("- 这是复杂任务；如果需要多步推进，先用 todo_manage(action=init) 建立短清单。");
@@ -1214,7 +1218,7 @@ function dedupeToolCalls(calls) {
   return unique;
 }
 
-function buildToolFollowupInstruction({ harnessOn, round, maxRounds, results }) {
+function buildToolFollowupInstruction({ harnessOn, autopilotOn = false, round, maxRounds, results }) {
   const failed = (results || []).filter(r => r.success === false);
   const lines = [
     "",
@@ -1225,6 +1229,9 @@ function buildToolFollowupInstruction({ harnessOn, round, maxRounds, results }) 
     "- 若刚完成文件修改/生成，优先验证：读取文件、运行检查/测试/构建或说明无法验证原因。",
     "- 若已完成并验证，输出简短最终汇报，不再调用工具。",
   ];
+  if (autopilotOn && !harnessOn) {
+    lines.push("- Autopilot 模式下：不要等用户说“继续”；任务未完成就继续观察、修改或验证。");
+  }
   if (harnessOn) {
     lines.push("- Harness 模式下：如有 TODOLIST，完成一批就 todo_manage(action=update)，全部 done/blocked 后再收尾。");
   }
@@ -1949,10 +1956,22 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
   return content;
 }
 
-async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperature: 0.7, max_tokens: getOutputMaxTokens() }, signal = null, maxRounds = 5) {
+async function runToolLoop(
+  msgEl,
+  modelId,
+  apiKey,
+  baseUrl,
+  params = { temperature: 0.7, max_tokens: getOutputMaxTokens() },
+  signal = null,
+  maxRounds = 5,
+  options = {},
+) {
   const harnessOn = state.harness?.enabled === true;
+  const autopilotOn = harnessOn || options.autopilot === true;
+  const taskText = String(options.taskText || getLastVisibleUserContent() || "");
   // Harness 循环仅三种退出：手动停止 / 轮数用完 / TODO 全部了结；模型侧异常不再中断循环
   let todoNudges = 0;
+  let autopilotNudges = 0;
   let prevCallsSig = ""; // 上一轮工具调用指纹，用于拦截原地打转的相同调用
   let dupRounds = 0;
   let exitReason = "";
@@ -1976,7 +1995,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
       const sig = JSON.stringify(calls.map(c => [c.name, c.params]));
       if (sig === prevCallsSig) {
         dupRounds++;
-        if (dupRounds >= 2 && !harnessOn) break;
+        if (dupRounds >= 2 && !autopilotOn) break;
         // Harness 下仅拦截重复调用并催其换思路，不直接退出。
         addMessage({
           role: "user",
@@ -1994,6 +2013,7 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     if (calls.length === 0) {
       const pending = getConversationTodos(state.currentConversationId)
         .filter(t => t.status !== "done" && t.status !== "blocked");
+      const hasToolResults = state.messages.some(m => Array.isArray(m?.toolResults) && m.toolResults.length > 0);
       if (lastMsg.autoAdvanceNudge && round < maxRounds - 1) {
         addMessage({
           role: "user",
@@ -2004,20 +2024,20 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
         delete lastMsg.autoAdvanceNudge;
         delete lastMsg.autoAdvanceSuggestedCalls;
         nudged = true;
-      } else if (harnessOn && round < maxRounds - 1) {
+      } else if (autopilotOn && round < maxRounds - 1) {
         if (replyFailed) {
           // 模型侧失败零输出：不退出循环，注入提示让其忽略异常继续推进
           addMessage({
             role: "user",
-            content: `[系统] ${round + 1}/${maxRounds} 轮：上一轮生成异常（失败或无输出），Harness 仍在执行，请忽略异常内容，直接继续推进任务。`,
+            content: `[系统] ${round + 1}/${maxRounds} 轮：上一轮生成异常（失败或无输出），自主推进仍在执行，请忽略异常内容，直接继续推进任务。`,
             model: "[retry]",
             hidden: true,
           });
           nudged = true;
         } else if (pending.length > 0) {
-          // Harness 闭环强制：模型想收尾但 TODOLIST 仍有未完成项，注入系统催办继续推进。
+          // 闭环强制：模型想收尾但 TODOLIST 仍有未完成项，注入系统催办继续推进。
           todoNudges++;
-          setHarnessProgress(t("Harness 闭环校验 · 清单剩余 {n} 项，自动催办（第 {k} 次）", { n: pending.length, k: todoNudges }));
+          setHarnessProgress((harnessOn ? t("Harness 闭环校验 · 清单剩余 {n} 项，自动催办（第 {k} 次）", { n: pending.length, k: todoNudges }) : t("Autopilot 闭环校验 · 清单剩余 {n} 项，自动催办（第 {k} 次）", { n: pending.length, k: todoNudges })));
           addMessage({
             role: "user",
             content: `[系统校验] ${round + 1}/${maxRounds} 轮：任务尚未完成，TODOLIST 仍有 ${pending.length} 项未了结：\n${pending.map(t => `- [${t.id}] ${t.content}`).join("\n")}\n请统筹批量推进剩余事项（能一起完成的多项不要拆开磨），每完成一批立即调用 todo_manage 批量更新状态，让清单实时反映进度，全部了结后再输出汇报与追溯。`,
@@ -2025,19 +2045,39 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
             hidden: true,
           });
           nudged = true;
+        } else if (!looksLikeCompletedReply(lastMsg.content) && (asksUserToDecide(lastMsg.content) || looksLikeActionStall(lastMsg.content) || looksLikeInspectionStall(lastMsg.content))) {
+          autopilotNudges++;
+          addMessage({
+            role: "user",
+            content: `[系统自动推进] ${round + 1}/${maxRounds} 轮：用户希望一句话交代任务后由你完成，不要在可自行决策时等待“继续”或询问是否要做。当前任务是：\n${taskText.slice(0, 2000)}\n\n请直接选择最小必要的下一步工具调用继续推进；如果确实已经完成，请给出包含验证方式的简短最终汇报。`,
+            model: "[autopilot]",
+            hidden: true,
+          });
+          setHarnessProgress(t("Autopilot 自主推进 · 自动续跑（第 {k} 次）", { k: autopilotNudges }));
+          nudged = true;
+        } else if (!harnessOn && autopilotOn && !hasToolResults && looksLikeCompletedReply(lastMsg.content)) {
+          autopilotNudges++;
+          addMessage({
+            role: "user",
+            content: `[系统自动推进] ${round + 1}/${maxRounds} 轮：你刚才像是在汇报完成，但本轮任务没有任何工具执行记录。用户要求你像 Agent 一样把活做完，而不是口头承诺。请先读取/检查/修改/运行验证；如果确实无法操作，请说明具体阻塞原因。任务：\n${taskText.slice(0, 2000)}`,
+            model: "[autopilot]",
+            hidden: true,
+          });
+          setHarnessProgress(t("Autopilot 自主推进 · 校验口头完成（第 {k} 次）", { k: autopilotNudges }));
+          nudged = true;
         }
       }
       if (!nudged) {
-        if (harnessOn) exitReason = pending.length === 0 ? "TODO 清单已了结，任务完成" : "模型收尾退出";
+        if (autopilotOn) exitReason = pending.length === 0 ? "任务完成或模型已收尾" : "模型收尾退出";
         break;
       }
     }
 
-    if (harnessOn) {
+    if (autopilotOn) {
       const todos = getConversationTodos(state.currentConversationId);
       const doneCount = todos.filter(t => t.status === "done").length;
       const todoText = todos.length ? t(" · 清单 {done}/{total}", { done: doneCount, total: todos.length }) : "";
-      setHarnessProgress(t("Harness 自主执行 · 第 {x}/{n} 轮", { x: round + 1, n: maxRounds }) + todoText);
+      setHarnessProgress((harnessOn ? t("Harness 自主执行 · 第 {x}/{n} 轮", { x: round + 1, n: maxRounds }) : t("Autopilot 自主推进 · 第 {x}/{n} 轮", { x: round + 1, n: maxRounds })) + todoText);
     }
 
     // 更新最后一条 assistant 消息（去掉工具标记）
@@ -2095,11 +2135,11 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
 
       // Keep tool results in model context without rendering them as chat bubbles.
       // Harness 下每轮结果开头标注轮次，让模型感知当前进度与剩余轮数预算
-      const roundTag = harnessOn ? `[Harness · ${round + 1}/${maxRounds} 轮]\n` : "";
+      const roundTag = autopilotOn ? `[${harnessOn ? "Harness" : "Autopilot"} · ${round + 1}/${maxRounds} 轮]\n` : "";
       const toolResultText = roundTag
         + results.map((r, i) => formatToolResultForModel(calls[i], r)).join("\n\n")
         + "\n\n"
-        + buildToolFollowupInstruction({ harnessOn, round, maxRounds, results });
+        + buildToolFollowupInstruction({ harnessOn, autopilotOn, round, maxRounds, results });
       addMessage({ role: "user", content: toolResultText, model: "[tool_results]", hidden: true });
     }
 
@@ -2170,12 +2210,16 @@ async function runToolLoop(msgEl, modelId, apiKey, baseUrl, params = { temperatu
     msgEl = await autoAdvanceIfStalled(followEl, modelId, apiKey, baseUrl, params);
     msgEl = await autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal);
   }
-  if (harnessOn && !exitReason && !(signal?.aborted)) exitReason = t("已达 {n} 轮上限", { n: maxRounds });
-  if (maxRounds > 5) showHarnessIdle(exitReason ? exitReason + t(" · Harness 保持开启，下一条消息继续自主执行（点 ⚡ 手动退出）") : "");
+  if (autopilotOn && !exitReason && !(signal?.aborted)) exitReason = t("已达 {n} 轮上限", { n: maxRounds });
+  if (harnessOn && maxRounds > 5) {
+    showHarnessIdle(exitReason ? exitReason + t(" · Harness 保持开启，下一条消息继续自主执行（点 ⚡ 手动退出）") : "");
+  } else if (!harnessOn && autopilotOn) {
+    setHarnessProgress(null);
+  }
 
   // 任务完成通知（非手动停止时触发）
-  if (harnessOn && exitReason && !exitReason.includes("手动停止")) {
-    notifyTaskComplete(t("Harness 任务完成"), exitReason);
+  if (autopilotOn && exitReason && !exitReason.includes("手动停止")) {
+    notifyTaskComplete(harnessOn ? t("Harness 任务完成") : t("Autopilot 任务完成"), exitReason);
   }
 }
 
@@ -2291,6 +2335,8 @@ async function sendMessage(queuedPayload = null) {
 
   const mentionContext = await resolveMentions(text);
   const harnessOn = state.harness?.enabled === true;
+  const agentTask = classifyAgentTask(text);
+  const autopilotOn = harnessOn || agentTask.wantsEnv;
   const agentRuntimeContext = buildAgentRuntimeContext(text, harnessOn);
   const fullText = (harnessOn ? HARNESS_PREFIX : "") + text + agentRuntimeContext + mentionContext + fileContext;
   await refreshKnowledgeContext(fullText);
@@ -2424,10 +2470,18 @@ async function sendMessage(queuedPayload = null) {
     msgEl = await autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal);
   }
 
-  // 工具调用循环（默认 5 轮；Harness 模式提升 maxRounds，上限 50 轮）
-  const toolRounds = harnessOn ? Math.max(10, Math.min(50, state.harness?.maxRounds || 50)) : 5;
-  if (harnessOn) setHarnessProgress(t("自主执行已启动 · 最多 {n} 轮 · 仅手动停止 / 轮数用完 / 清单了结才退出", { n: toolRounds }));
-  if (!signal.aborted) await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal, toolRounds);
+  // 工具调用循环：环境任务默认进入 Autopilot，避免用户反复说“继续”；Harness 是显式强模式。
+  const toolRounds = harnessOn
+    ? Math.max(10, Math.min(50, state.harness?.maxRounds || 50))
+    : (autopilotOn
+      ? (agentTask.broad ? AGENT_AUTOPILOT_BROAD_ROUNDS : AGENT_AUTOPILOT_DEFAULT_ROUNDS)
+      : 5);
+  if (harnessOn) {
+    setHarnessProgress(t("自主执行已启动 · 最多 {n} 轮 · 仅手动停止 / 轮数用完 / 清单了结才退出", { n: toolRounds }));
+  } else if (autopilotOn) {
+    setHarnessProgress(t("Autopilot 自主推进已启动 · 最多 {n} 轮", { n: toolRounds }));
+  }
+  if (!signal.aborted) await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal, toolRounds, { autopilot: autopilotOn, taskText: text });
   else if (harnessOn) showHarnessIdle(); // 启动前即被停止：runToolLoop 未运行，保持待机指示
 
   // 后台检查上下文压缩
