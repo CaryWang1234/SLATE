@@ -9,7 +9,7 @@
  * - 模型生成内容与用户输入不翻译（SKIP_SELECTOR / data-i18n-skip 标记）。
  */
 
-import { EN_DICT } from "./i18n_dict.js?v=20260826-109";
+import { EN_DICT } from "./i18n_dict.js?v=20260826-110";
 
 let LANG = "zh";
 let observer = null;
