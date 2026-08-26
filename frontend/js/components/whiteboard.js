@@ -2,11 +2,11 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260818-108";
-import { get, streamChat } from "../services/api.js?v=20260818-108";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260818-108";
-import { t } from "../services/i18n.js?v=20260818-108";
-import { makeId } from "../services/utils.js?v=20260818-108";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260826-109";
+import { get, streamChat } from "../services/api.js?v=20260826-109";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260826-109";
+import { t } from "../services/i18n.js?v=20260826-109";
+import { makeId } from "../services/utils.js?v=20260826-109";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -15,7 +15,9 @@ let editingCardId = null;
 let selectedColor = "default";
 let svgOverlay = null;
 let mermaidVisible = false;
-let currentBoardView = "";
+const DEFAULT_BOARD_VIEW = "kanban";
+
+let currentBoardView = DEFAULT_BOARD_VIEW;
 let boardViewCollapsed = false;
 let currentToolMode = "select";
 let connectSourceId = null;
@@ -1163,6 +1165,15 @@ function setBoardView(view, options = {}) {
   }
 }
 
+function refreshWhiteboard() {
+  if (!boardCanvas) return;
+  boardViewCollapsed = false;
+  resizeDrawCanvas();
+  updateBoardLayerSize();
+  if (!currentBoardView) currentBoardView = DEFAULT_BOARD_VIEW;
+  setBoardView(currentBoardView);
+}
+
 function renderCard(card) {
   const el = document.createElement("div");
   el.className = "board-card";
@@ -2248,7 +2259,7 @@ function initWhiteboard() {
   renderAllCards();
   renderNotes();
   redrawStrokes();
-  setBoardView(currentBoardView);
+  refreshWhiteboard();
 }
 
 // ── 自动记录：工具执行步骤可视化 ─────────────────────────────────
@@ -2341,4 +2352,4 @@ function clearToolStepCards() {
   setBoardCards(nonStepCards);
 }
 
-export { initWhiteboard, parseCardsFromLLM, cardsToMermaid, addToolStepCard, updateToolStepCard, clearToolStepCards };
+export { initWhiteboard, refreshWhiteboard, parseCardsFromLLM, cardsToMermaid, addToolStepCard, updateToolStepCard, clearToolStepCards };
