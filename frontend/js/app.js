@@ -2,25 +2,25 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260827-114";
-import { initI18n, t } from "./services/i18n.js?v=20260827-114";
-import { get, post, put } from "./services/api.js?v=20260827-114";
-import { dlgConfirm } from "./services/dialog.js?v=20260827-114";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260827-114";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260827-114";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260827-114";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260827-114";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260827-114";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260827-114";
-import { initTeamPanel } from "./components/team.js?v=20260827-114";
-import { initProjectBar } from "./components/project_bar.js?v=20260827-114";
-import { initMemoryPanel } from "./components/memory.js?v=20260827-114";
-import { initExpertsPanel } from "./components/experts.js?v=20260827-114";
-import { initSchedule } from "./components/schedule.js?v=20260827-114";
-import { initRiskGuard } from "./services/riskguard.js?v=20260827-114";
-import { initUnderstandPanel } from "./components/understand.js?v=20260827-114";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260827-114";
-import { setProject, setProjectFileTree } from "./store.js?v=20260827-114";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260827-115";
+import { initI18n, t } from "./services/i18n.js?v=20260827-115";
+import { get, post, put } from "./services/api.js?v=20260827-115";
+import { dlgConfirm } from "./services/dialog.js?v=20260827-115";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260827-115";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260827-115";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260827-115";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260827-115";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260827-115";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260827-115";
+import { initTeamPanel } from "./components/team.js?v=20260827-115";
+import { initProjectBar } from "./components/project_bar.js?v=20260827-115";
+import { initMemoryPanel } from "./components/memory.js?v=20260827-115";
+import { initExpertsPanel } from "./components/experts.js?v=20260827-115";
+import { initSchedule } from "./components/schedule.js?v=20260827-115";
+import { initRiskGuard } from "./services/riskguard.js?v=20260827-115";
+import { initUnderstandPanel } from "./components/understand.js?v=20260827-115";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260827-115";
+import { setProject, setProjectFileTree } from "./store.js?v=20260827-115";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -422,6 +422,7 @@ function openSettings(options = {}) {
   document.getElementById("setting-notif-system").checked = state.notifications?.systemNotifEnabled === true;
   updateNotifPermissionHint();
   renderPermissionModeSettings();
+  renderWebSearchSettings();
   if (state.constitution) {
     document.getElementById("setting-constitution").value = JSON.stringify(state.constitution, null, 2);
   }
@@ -965,7 +966,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260827-114").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260827-115").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1013,6 +1014,47 @@ function initPermissionModePersistence() {
   });
 }
 
+// 联网搜索配置：默认引擎 + JS 渲染策略，变更后立即持久化
+const WEB_SEARCH_ENGINE_HINTS = {
+  auto: "同时搜索 Bing 与 DuckDuckGo，合并去重，结果更全更准（推荐）",
+  bing: "仅用 Bing 搜索，中文结果质量好",
+  ddg: "仅用 DuckDuckGo 搜索",
+};
+const WEB_SEARCH_RENDER_HINTS = {
+  auto: "网页正文过短或直连失败时，自动用无头浏览器渲染后再提取（推荐）",
+  on: "所有网页都先用无头浏览器渲染再提取，速度较慢",
+  off: "不做 JS 渲染，只抓静态内容，动态页面可能为空",
+};
+
+function renderWebSearchSettings() {
+  const cfg = state.webSearch || { engine: "auto", renderJs: "auto" };
+  document.querySelectorAll("#web-search-engine-row .review-mode-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.value === cfg.engine);
+  });
+  document.querySelectorAll("#web-search-render-row .review-mode-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.value === cfg.renderJs);
+  });
+  const engineHint = document.getElementById("web-search-engine-hint");
+  if (engineHint) engineHint.textContent = WEB_SEARCH_ENGINE_HINTS[cfg.engine] || "";
+  const renderHint = document.getElementById("web-search-render-hint");
+  if (renderHint) renderHint.textContent = WEB_SEARCH_RENDER_HINTS[cfg.renderJs] || "";
+}
+
+function applyWebSearchSetting(key, value) {
+  state.webSearch = { ...(state.webSearch || {}), [key]: value };
+  savePersistent();
+  renderWebSearchSettings();
+}
+
+function initWebSearchPersistence() {
+  document.querySelectorAll("#web-search-engine-row .review-mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => applyWebSearchSetting("engine", btn.dataset.value));
+  });
+  document.querySelectorAll("#web-search-render-row .review-mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => applyWebSearchSetting("renderJs", btn.dataset.value));
+  });
+}
+
 async function saveSettings() {
   const maxTokens = parseInt(document.getElementById("setting-max-tokens").value) || 64000;
   state.maxTokens = maxTokens;
@@ -1039,7 +1081,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260827-114");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260827-115");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1243,6 +1285,7 @@ async function init() {
   initAutoReviewPersistence();
   initNotificationPersistence();
   initPermissionModePersistence();
+  initWebSearchPersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
   // 设置页导航与关于
@@ -1263,7 +1306,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260827-114");
+      const { openProject } = await import("./services/project.js?v=20260827-115");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

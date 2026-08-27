@@ -5,9 +5,9 @@
  * - 用户批准后注入 approved 参数放行；拒绝后返回拒绝结果给模型
  */
 
-import { state, getModelKey } from "../store.js?v=20260827-114";
-import { post } from "./api.js?v=20260827-114";
-import { t } from "./i18n.js?v=20260827-114";
+import { state, getModelKey } from "../store.js?v=20260827-115";
+import { post } from "./api.js?v=20260827-115";
+import { t } from "./i18n.js?v=20260827-115";
 
 // 高危命令规则（写死）：命中任一条即要求批准
 const HIGH_RISK_PATTERNS = [

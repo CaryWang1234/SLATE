@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260827-114";
+import { makeId } from "./services/utils.js?v=20260827-115";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -120,6 +120,9 @@ const state = {
 
   // 命令权限模式：ask=人工审批（高危命令弹窗询问）auto=自动审批（高危命令自动放行）full=完全访问（跳过高危判定；灾难级命令始终拦截）
   permissionMode: "ask",
+
+  // 联网搜索配置：engine=auto（Bing+DDG 合并）/ bing / ddg；renderJs=auto（正文过短自动渲染）/ on / off
+  webSearch: { engine: "auto", renderJs: "auto" },
 };
 
 // ── 订阅者 ──────────────────────────────────
@@ -163,6 +166,7 @@ function buildPersistentData() {
     useResponses: state.useResponses,
     onboardingSeen: state.onboardingSeen === true,
     permissionMode: state.permissionMode,
+    webSearch: normalizeWebSearch(state.webSearch),
   };
 }
 
@@ -172,6 +176,14 @@ function normalizeTheme(value) {
 
 function normalizePermissionMode(value) {
   return ["ask", "auto", "full"].includes(value) ? value : "ask";
+}
+
+function normalizeWebSearch(value) {
+  const v = value && typeof value === "object" ? value : {};
+  return {
+    engine: ["auto", "bing", "ddg"].includes(v.engine) ? v.engine : "auto",
+    renderJs: ["auto", "on", "off"].includes(v.renderJs) ? v.renderJs : "auto",
+  };
 }
 
 function saveLocalPersistent(data = buildPersistentData()) {
@@ -201,6 +213,7 @@ function getSharedPersistentData(data = buildPersistentData()) {
     useResponses: data.useResponses === true,
     onboardingSeen: data.onboardingSeen === true,
     permissionMode: normalizePermissionMode(data.permissionMode),
+    webSearch: normalizeWebSearch(data.webSearch),
   };
 }
 
@@ -263,6 +276,7 @@ function loadPersistent() {
     state.useResponses = data.useResponses === true;
     state.onboardingSeen = data.onboardingSeen === true;
     state.permissionMode = normalizePermissionMode(data.permissionMode);
+    state.webSearch = normalizeWebSearch(data.webSearch);
   } catch (e) {}
 }
 
@@ -325,6 +339,9 @@ async function loadSharedPersistent() {
     }
     if (Object.prototype.hasOwnProperty.call(data, "permissionMode")) {
       state.permissionMode = normalizePermissionMode(data.permissionMode);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "webSearch")) {
+      state.webSearch = normalizeWebSearch(data.webSearch);
     }
     saveLocalPersistent();
   } catch (e) {}

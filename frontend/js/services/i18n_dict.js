@@ -1320,6 +1320,24 @@ export const EN_DICT = {
   "高危命令自动放行执行，不再弹窗；灾难级命令（rm -rf /、format 等）仍强制拦截": "High-risk commands run automatically without popups; catastrophic commands (rm -rf /, format, etc.) are still blocked",
   "跳过高危判定，所有命令直接执行；灾难级命令（rm -rf /、format 等）仍强制拦截": "Skips high-risk checks and runs all commands directly; catastrophic commands (rm -rf /, format, etc.) are still blocked",
 
+  // ── 联网搜索设置 ─────────────────────────────
+  "联网搜索": "Web Search",
+  "控制 AI 联网搜索与网页获取的方式；Bing 与 DuckDuckGo 双引擎免 Key": "Controls how AI searches the web and fetches pages; Bing + DuckDuckGo dual engines, no API key required",
+  "默认搜索引擎": "Default Search Engine",
+  "网页 JS 渲染": "Page JS Rendering",
+  "🔄 自动（双引擎合并）": "🔄 Auto (dual-engine merge)",
+  "🔍 Bing": "🔍 Bing",
+  "🦆 DuckDuckGo": "🦆 DuckDuckGo",
+  "⚙️ 自动（正文过短时渲染）": "⚙️ Auto (render when content is short)",
+  "🌐 始终渲染": "🌐 Always render",
+  "🚫 不渲染": "🚫 Never render",
+  "同时搜索 Bing 与 DuckDuckGo，合并去重，结果更全更准（推荐）": "Searches both Bing and DuckDuckGo and merges deduplicated results for broader coverage (recommended)",
+  "仅用 Bing 搜索，中文结果质量好": "Search Bing only; good Chinese results",
+  "仅用 DuckDuckGo 搜索": "Search DuckDuckGo only",
+  "网页正文过短或直连失败时，自动用无头浏览器渲染后再提取（推荐）": "When page content is too short or direct fetch fails, automatically render with a headless browser before extracting (recommended)",
+  "所有网页都先用无头浏览器渲染再提取，速度较慢": "Always render pages with a headless browser before extracting; slower",
+  "不做 JS 渲染，只抓静态内容，动态页面可能为空": "No JS rendering; only static content, dynamic pages may be empty",
+
   // ── 文库（Vault）─────────────────────────────
   "文库": "Vault",
   "搜索文库...": "Search vault...",

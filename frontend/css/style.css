@@ -7357,14 +7357,17 @@ html.i18n-pending body {
   border-color: var(--accent);
 }
 
-/* 设置页：命令权限模式三选一 */
-.permission-mode-row {
+/* 设置页：命令权限 / 联网搜索 模式选择 */
+.permission-mode-row,
+.web-search-mode-row {
   display: flex;
   gap: 8px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
-.permission-mode-row .review-mode-btn {
+.permission-mode-row .review-mode-btn,
+.web-search-mode-row .review-mode-btn {
   max-width: 220px;
 }
 

@@ -2,11 +2,11 @@
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）。
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260827-114";
-import { get, post, del, upload } from "../services/api.js?v=20260827-114";
-import { guardSkillParams } from "../services/riskguard.js?v=20260827-114";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260827-114";
-import { t } from "../services/i18n.js?v=20260827-114";
+import { state, subscribe, setSkills } from "../store.js?v=20260827-115";
+import { get, post, del, upload } from "../services/api.js?v=20260827-115";
+import { guardSkillParams } from "../services/riskguard.js?v=20260827-115";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260827-115";
+import { t } from "../services/i18n.js?v=20260827-115";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -116,12 +116,14 @@ const SKILL_PARAM_DEFS = {
   web_search: [
     { key: "query", label: "搜索关键词 / URL", type: "text", placeholder: "FastAPI 最新版本号（fetch 模式填 URL）" },
     { key: "mode", label: "模式", type: "text", placeholder: "search / fetch" },
+    { key: "engine", label: "搜索引擎", type: "text", placeholder: "auto（默认）/ bing / ddg" },
     { key: "max_results", label: "结果数（≤10）", type: "number", placeholder: "5" },
   ],
   web_fetch: [
     { key: "url", label: "网页 URL", type: "text", placeholder: "https://example.com/article" },
     { key: "mode", label: "模式", type: "text", placeholder: "text / html" },
-    { key: "max_chars", label: "截断长度（≤30000）", type: "number", placeholder: "8000" },
+    { key: "render_js", label: "JS 渲染", type: "text", placeholder: "auto（默认）/ on / off" },
+    { key: "max_chars", label: "截断长度（≤60000）", type: "number", placeholder: "20000" },
   ],
   chart_create: [
     { key: "data", label: "数据（JSON 或 标签:值）", type: "textarea", placeholder: "Q1:120, Q2:90, Q3:150" },

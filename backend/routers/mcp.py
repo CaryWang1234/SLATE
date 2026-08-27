@@ -209,6 +209,8 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "query": {"type": "string", "description": "搜索关键词或 URL"},
                 "mode": {"type": "string", "enum": ["search", "fetch"], "description": "search 或 fetch"},
+                "max_results": {"type": "integer", "description": "结果数（≤10）"},
+                "engine": {"type": "string", "enum": ["auto", "bing", "ddg"], "description": "auto 双引擎合并 / bing / ddg"},
             },
             "required": ["query"],
         },
@@ -219,7 +221,8 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "properties": {
                 "url": {"type": "string", "description": "网页 URL"},
                 "mode": {"type": "string", "enum": ["text", "html"], "description": "text 或 html"},
-                "max_chars": {"type": "integer", "description": "内容截断长度"},
+                "max_chars": {"type": "integer", "description": "内容截断长度（≤60000）"},
+                "render_js": {"type": "string", "enum": ["auto", "on", "off"], "description": "JS 渲染降级策略"},
             },
             "required": ["url"],
         },
