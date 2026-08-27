@@ -31,6 +31,101 @@ REQUEST_TIMEOUT = httpx.Timeout(connect=15.0, read=120.0, write=30.0, pool=10.0)
 _http_clients: dict[str, httpx.AsyncClient] = {}
 
 
+def _compact_error_text(text: str, max_len: int = 1200) -> str:
+    text = re.sub(r"\s+", " ", str(text or "")).strip()
+    return text[:max_len] + "…" if len(text) > max_len else text
+
+
+async def _read_response_text(resp: httpx.Response) -> str:
+    try:
+        await resp.aread()
+        return resp.text
+    except Exception:
+        return ""
+
+
+def _diagnose_status(status: int) -> str:
+    if status in (401, 403):
+        return "鉴权失败：请检查 API Key、Base URL、账号权限或服务商访问权限。"
+    if status == 404:
+        return "接口或模型不存在：请检查模型 ID、Base URL，以及是否误用了 Responses API。"
+    if status == 408 or status == 504:
+        return "上游响应超时：可能是网络波动、模型排队或代理链路过慢。"
+    if status == 413:
+        return "请求体过大：请压缩上下文、减少附件或降低历史消息数量。"
+    if status == 429:
+        return "触发限流或额度不足：请稍后重试，或检查服务商额度。"
+    if status >= 500:
+        return "上游服务器错误：通常不是本地输入问题，可稍后重试或切换模型。"
+    if status == 400:
+        return "请求格式被拒绝：常见原因是模型不支持当前参数、消息格式异常或 Responses API 不兼容。"
+    return "上游请求失败。"
+
+
+def _sse_error(message: str, *, trace_id: str = "", status: int | None = None, code: str = "upstream_error") -> str:
+    payload = {
+        "error": {
+            "message": message,
+            "type": code,
+            "status": status,
+            "trace_id": trace_id,
+        }
+    }
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+async def _sse_error_from_response(resp: httpx.Response, *, trace_id: str, api_name: str) -> str:
+    text = _compact_error_text(await _read_response_text(resp))
+    message = f"{api_name} 返回 HTTP {resp.status_code} {resp.reason_phrase or ''}。{_diagnose_status(resp.status_code)}"
+    if text:
+        message += f" 上游详情：{text}"
+    logger.warning("[%s] %s", trace_id, message)
+    return _sse_error(message, trace_id=trace_id, status=resp.status_code, code="http_error")
+
+
+def _sse_error_from_exception(exc: Exception, *, trace_id: str, api_name: str) -> str:
+    if isinstance(exc, httpx.ConnectTimeout):
+        msg = f"{api_name} 连接超时：无法在限定时间内连接到上游 Base URL。请检查网络、代理/VPN、防火墙和 Base URL。"
+        code = "connect_timeout"
+    elif isinstance(exc, httpx.ReadTimeout):
+        msg = f"{api_name} 读超时：已连接上游，但长时间没有收到新数据。可能是模型排队、长思考或代理链路中断。"
+        code = "read_timeout"
+    elif isinstance(exc, httpx.ConnectError):
+        msg = f"{api_name} 连接失败：无法连接到上游。请检查 Base URL、DNS、代理/VPN、防火墙或本地模型服务是否启动。"
+        code = "connect_error"
+    elif isinstance(exc, httpx.RemoteProtocolError):
+        msg = f"{api_name} 协议错误：上游提前断开或返回了不完整的流式响应。"
+        code = "protocol_error"
+    elif isinstance(exc, httpx.HTTPError):
+        msg = f"{api_name} HTTP 客户端错误：{exc}"
+        code = "http_client_error"
+    else:
+        msg = f"{api_name} 代理异常：{exc}"
+        code = "proxy_error"
+    logger.exception("[%s] %s", trace_id, msg)
+    return _sse_error(msg, trace_id=trace_id, code=code)
+
+
+async def _json_or_error(resp: httpx.Response, *, trace_id: str, api_name: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """读取非流式响应；失败时返回统一诊断对象。"""
+    if resp.status_code >= 400:
+        text = _compact_error_text(resp.text)
+        message = f"{api_name} 返回 HTTP {resp.status_code} {resp.reason_phrase or ''}。{_diagnose_status(resp.status_code)}"
+        if text:
+            message += f" 上游详情：{text}"
+        logger.warning("[%s] %s", trace_id, message)
+        return None, {"code": -1, "data": None, "message": message}
+    try:
+        return resp.json(), None
+    except json.JSONDecodeError:
+        text = _compact_error_text(resp.text)
+        message = f"{api_name} 返回了非 JSON 响应。请检查 Base URL 是否指向正确 API 端点。"
+        if text:
+            message += f" 响应片段：{text}"
+        logger.warning("[%s] %s", trace_id, message)
+        return None, {"code": -1, "data": None, "message": message}
+
+
 def _get_client(base_url: str) -> httpx.AsyncClient:
     """获取或创建共享的 httpx 客户端（按 base_url 分组，复用连接池）。"""
     if base_url not in _http_clients:
@@ -262,46 +357,69 @@ def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, Any]):
+async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, Any], trace_id: str = ""):
     """流式转发 OpenAI 兼容 API（共享客户端连接池）。
     标准化 reasoning 字段：delta.reasoning_content / delta.reasoning → delta.reasoning
     """
     client = _get_stream_client(url.rsplit("/", 2)[0])  # 提取 base_url
-    async with client.stream("POST", url, json=payload, headers=headers) as resp:
-        async for line in resp.aiter_lines():
-            if not line:
-                continue
-            trimmed = line.strip()
-            if not trimmed.startswith("data:"):
-                yield f"{line}\n\n"
-                continue
-            data_str = trimmed[5:].strip()
-            if data_str == "[DONE]":
-                yield f"{line}\n\n"
-                continue
-            try:
-                parsed = json.loads(data_str)
-                delta = parsed.get("choices", [{}])[0].get("delta", {})
-                # 标准化 reasoning 字段
-                reasoning = delta.get("reasoning_content") or delta.get("reasoning") or delta.get("thinking")
-                if reasoning:
-                    delta["reasoning"] = reasoning
-                    # 移除原始字段，保持干净
-                    for k in ("reasoning_content", "reasoning", "thinking"):
-                        if k in delta and k != "reasoning":
-                            del delta[k]
-                    parsed["choices"][0]["delta"] = delta
-                yield f"data: {json.dumps(parsed, ensure_ascii=False)}\n\n"
-            except json.JSONDecodeError:
-                yield f"{line}\n\n"
+    yielded = False
+    try:
+        async with client.stream("POST", url, json=payload, headers=headers) as resp:
+            if resp.status_code >= 400:
+                yield await _sse_error_from_response(resp, trace_id=trace_id, api_name="Chat Completions")
+                yield "data: [DONE]\n\n"
+                return
+            async for line in resp.aiter_lines():
+                if not line:
+                    continue
+                trimmed = line.strip()
+                if not trimmed.startswith("data:"):
+                    yield f"{line}\n\n"
+                    continue
+                data_str = trimmed[5:].strip()
+                if data_str == "[DONE]":
+                    yield f"{line}\n\n"
+                    return
+                try:
+                    parsed = json.loads(data_str)
+                    if parsed.get("error"):
+                        yield _sse_error(_compact_error_text(json.dumps(parsed["error"], ensure_ascii=False)), trace_id=trace_id)
+                        yield "data: [DONE]\n\n"
+                        return
+                    delta = parsed.get("choices", [{}])[0].get("delta", {})
+                    # 标准化 reasoning 字段
+                    reasoning = delta.get("reasoning_content") or delta.get("reasoning") or delta.get("thinking")
+                    if reasoning:
+                        delta["reasoning"] = reasoning
+                        # 移除原始字段，保持干净
+                        for k in ("reasoning_content", "reasoning", "thinking"):
+                            if k in delta and k != "reasoning":
+                                del delta[k]
+                        parsed["choices"][0]["delta"] = delta
+                    if delta.get("content") or delta.get("reasoning"):
+                        yielded = True
+                    yield f"data: {json.dumps(parsed, ensure_ascii=False)}\n\n"
+                except json.JSONDecodeError:
+                    yield f"{line}\n\n"
+            if not yielded:
+                yield _sse_error("Chat Completions 连接正常结束，但上游没有返回任何文本增量或完成信号。请检查模型是否支持流式输出、是否被内容过滤，或服务商是否返回了非标准 SSE。", trace_id=trace_id, code="empty_stream")
+                yield "data: [DONE]\n\n"
+    except Exception as exc:
+        yield _sse_error_from_exception(exc, trace_id=trace_id, api_name="Chat Completions")
+        yield "data: [DONE]\n\n"
 
 
-async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str, Any]):
+async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str, Any], trace_id: str = ""):
     """流式调用 Responses API，将事件转换为前端已适配的 Chat Completions SSE 格式。"""
     client = _get_stream_client(url.rsplit("/", 2)[0])
-    async with client.stream("POST", url, json=payload, headers=headers) as resp:
-            resp.raise_for_status()
+    try:
+        async with client.stream("POST", url, json=payload, headers=headers) as resp:
+            if resp.status_code >= 400:
+                yield await _sse_error_from_response(resp, trace_id=trace_id, api_name="Responses API")
+                yield "data: [DONE]\n\n"
+                return
             sent_text_delta = False
+            saw_completed = False
             async for line in resp.aiter_lines():
                 if not line.startswith("data:"):
                     continue
@@ -316,6 +434,11 @@ async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str
 
                 # Responses API 流式事件解析
                 obj_type = data.get("type", "")
+                if obj_type in ("error", "response.failed", "response.incomplete"):
+                    err = data.get("error") or data.get("response", {}).get("error") or data
+                    yield _sse_error(f"Responses API 返回错误事件：{_compact_error_text(json.dumps(err, ensure_ascii=False))}", trace_id=trace_id)
+                    yield "data: [DONE]\n\n"
+                    return
 
                 # 文本增量：response.output_text.delta
                 if obj_type in ("response.output_text.delta", "response.text.delta"):
@@ -349,6 +472,7 @@ async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str
 
                 # 完成信号
                 elif obj_type == "response.completed":
+                    saw_completed = True
                     response = data.get("response", {}) or {}
                     if not sent_text_delta:
                         final_text = _extract_responses_text(response)
@@ -367,12 +491,24 @@ async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str
                 elif "delta" in data and isinstance(data["delta"], str):
                     chunk = {"choices": [{"delta": {"content": data["delta"]}, "index": 0}]}
                     yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+            if not sent_text_delta and not saw_completed:
+                yield _sse_error("Responses API 连接正常结束，但没有收到文本增量或 completed 事件。请确认该模型/服务商是否真正支持 Responses API 流式输出，必要时关闭 Responses API 选项。", trace_id=trace_id, code="empty_stream")
+                yield "data: [DONE]\n\n"
+    except Exception as exc:
+        yield _sse_error_from_exception(exc, trace_id=trace_id, api_name="Responses API")
+        yield "data: [DONE]\n\n"
 
 
-async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str, Any]):
+async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str, Any], trace_id: str = ""):
     """流式转发 Anthropic API，转换为 OpenAI 兼容 SSE 格式（共享客户端）。"""
     client = _get_stream_client(url.rsplit("/", 2)[0])
-    async with client.stream("POST", url, json=payload, headers=headers) as resp:
+    yielded = False
+    try:
+        async with client.stream("POST", url, json=payload, headers=headers) as resp:
+            if resp.status_code >= 400:
+                yield await _sse_error_from_response(resp, trace_id=trace_id, api_name="Anthropic")
+                yield "data: [DONE]\n\n"
+                return
             buffer = ""
             async for line in resp.aiter_lines():
                 buffer += line + "\n"
@@ -403,6 +539,7 @@ async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str
                                 chunk = {
                                     "choices": [{"delta": {"reasoning": thinking}, "index": 0}]
                                 }
+                                yielded = True
                                 yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
                         # 普通文本块
                         else:
@@ -411,9 +548,21 @@ async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str
                                 chunk = {
                                     "choices": [{"delta": {"content": text}, "index": 0}]
                                 }
+                                yielded = True
                                 yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
                     elif event_type == "message_stop":
                         yield "data: [DONE]\n\n"
+                        return
+                    elif event_type == "error":
+                        yield _sse_error(f"Anthropic 返回错误事件：{_compact_error_text(data_str)}", trace_id=trace_id)
+                        yield "data: [DONE]\n\n"
+                        return
+            if not yielded:
+                yield _sse_error("Anthropic 连接正常结束，但没有返回任何文本增量或完成信号。", trace_id=trace_id, code="empty_stream")
+                yield "data: [DONE]\n\n"
+    except Exception as exc:
+        yield _sse_error_from_exception(exc, trace_id=trace_id, api_name="Anthropic")
+        yield "data: [DONE]\n\n"
 
 
 @router.post("/chat")
@@ -453,16 +602,24 @@ async def proxy_chat(request: Request) -> Any:
         if is_stream:
             logger.info(f"[{trace_id}] Anthropic 流式请求: {url}")
             return StreamingResponse(
-                _stream_anthropic(url, headers, payload),
+                _stream_anthropic(url, headers, payload, trace_id),
                 media_type="text/event-stream",
             )
 
         client = _get_client(base_url)
-        resp = await client.post(url, json=payload, headers=headers)
-        data = resp.json()
+        try:
+            resp = await client.post(url, json=payload, headers=headers)
+            data, error = await _json_or_error(resp, trace_id=trace_id, api_name="Anthropic")
+            if error:
+                return error
+        except httpx.HTTPError as exc:
+            msg = _sse_error_from_exception(exc, trace_id=trace_id, api_name="Anthropic")
+            return {"code": -1, "data": None, "message": json.loads(msg[6:].strip()).get("error", {}).get("message", str(exc))}
         content = ""
         if "content" in data and data["content"]:
             content = data["content"][0].get("text", "")
+        if not content.strip():
+            return {"code": -1, "data": None, "message": "Anthropic 返回成功，但没有可显示文本。可能是内容过滤、工具调用块或服务商返回格式变化。"}
         logger.info(f"[{trace_id}] Anthropic 完成: {len(content)} 字符")
         return {
             "code": 0,
@@ -487,12 +644,20 @@ async def proxy_chat(request: Request) -> Any:
             payload["generationConfig"] = {"temperature": body["temperature"]}
 
         client = _get_client(base_url)
-        resp = await client.post(url, json=payload, headers=headers)
-        data = resp.json()
+        try:
+            resp = await client.post(url, json=payload, headers=headers)
+            data, error = await _json_or_error(resp, trace_id=trace_id, api_name="Google")
+            if error:
+                return error
+        except httpx.HTTPError as exc:
+            msg = _sse_error_from_exception(exc, trace_id=trace_id, api_name="Google")
+            return {"code": -1, "data": None, "message": json.loads(msg[6:].strip()).get("error", {}).get("message", str(exc))}
         text = ""
         if "candidates" in data and data["candidates"]:
             parts = data["candidates"][0].get("content", {}).get("parts", [])
             text = "".join(p.get("text", "") for p in parts)
+        if not text.strip():
+            return {"code": -1, "data": None, "message": "Google 返回成功，但没有可显示文本。请检查候选项是否被安全策略拦截，或模型返回格式是否变化。"}
         logger.info(f"[{trace_id}] Google 完成: {len(text)} 字符")
         return {
             "code": 0,
@@ -519,15 +684,23 @@ async def proxy_chat(request: Request) -> Any:
         if is_stream:
             logger.info(f"[{trace_id}] Responses API 流式请求: {url}")
             return StreamingResponse(
-                _stream_responses(url, headers, payload),
+                _stream_responses(url, headers, payload, trace_id),
                 media_type="text/event-stream",
             )
 
         client = _get_client(base_url)
-        resp = await client.post(url, json=payload, headers=headers)
-        data = resp.json()
+        try:
+            resp = await client.post(url, json=payload, headers=headers)
+            data, error = await _json_or_error(resp, trace_id=trace_id, api_name="Responses API")
+            if error:
+                return error
+        except httpx.HTTPError as exc:
+            msg = _sse_error_from_exception(exc, trace_id=trace_id, api_name="Responses API")
+            return {"code": -1, "data": None, "message": json.loads(msg[6:].strip()).get("error", {}).get("message", str(exc))}
         # 将 Responses API 响应转换为 Chat Completions 格式
         text = _extract_responses_text(data)
+        if not text.strip():
+            return {"code": -1, "data": None, "message": "Responses API 返回成功，但没有可显示文本。该模型/服务商可能不完整支持 Responses API，建议关闭 Responses API 选项后重试。"}
         logger.info(f"[{trace_id}] Responses API 完成: {len(text)} 字符")
         return {
             "code": 0,
@@ -545,12 +718,21 @@ async def proxy_chat(request: Request) -> Any:
     if is_stream:
         logger.info(f"[{trace_id}] OpenAI 兼容流式请求: {url}")
         return StreamingResponse(
-            _stream_openai(url, headers, payload),
+            _stream_openai(url, headers, payload, trace_id),
             media_type="text/event-stream",
         )
 
     client = _get_client(base_url)
-    resp = await client.post(url, json=payload, headers=headers)
-    data = resp.json()
+    try:
+        resp = await client.post(url, json=payload, headers=headers)
+        data, error = await _json_or_error(resp, trace_id=trace_id, api_name="Chat Completions")
+        if error:
+            return error
+    except httpx.HTTPError as exc:
+        msg = _sse_error_from_exception(exc, trace_id=trace_id, api_name="Chat Completions")
+        return {"code": -1, "data": None, "message": json.loads(msg[6:].strip()).get("error", {}).get("message", str(exc))}
+    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    if not str(content or "").strip():
+        return {"code": -1, "data": None, "message": "Chat Completions 返回成功，但没有可显示文本。可能是模型只返回了工具调用、内容过滤，或服务商返回格式变化。"}
     logger.info(f"[{trace_id}] OpenAI 兼容完成")
     return {"code": 0, "data": data, "message": "ok"}

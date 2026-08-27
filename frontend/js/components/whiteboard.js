@@ -2,11 +2,11 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260826-112";
-import { get, streamChat } from "../services/api.js?v=20260826-112";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260826-112";
-import { t } from "../services/i18n.js?v=20260826-112";
-import { makeId } from "../services/utils.js?v=20260826-112";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260826-113";
+import { get, streamChat } from "../services/api.js?v=20260826-113";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260826-113";
+import { t } from "../services/i18n.js?v=20260826-113";
+import { makeId } from "../services/utils.js?v=20260826-113";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
