@@ -1,21 +1,21 @@
 /**
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输入 */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260826-110";
-import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260826-110";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260826-110";
-import { detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt } from "../services/tools.js?v=20260826-110";
-import { renderMarkdown } from "../services/markdown.js?v=20260826-110";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260826-110";
-import { getExpertsCached } from "./experts.js?v=20260826-110";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260826-110";
-import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260826-110";
-import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260826-110";
-import { fileTypeIcon } from "../services/file_icons.js?v=20260826-110";
-import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260826-110";
-import * as grindSvc from "../services/grind.js?v=20260826-110";
-import { t } from "../services/i18n.js?v=20260826-110";
-import { notifyTaskComplete } from "../services/notify.js?v=20260826-110";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260826-112";
+import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260826-112";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260826-112";
+import { TOOLS, detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt } from "../services/tools.js?v=20260826-112";
+import { renderMarkdown } from "../services/markdown.js?v=20260826-112";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260826-112";
+import { getExpertsCached } from "./experts.js?v=20260826-112";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260826-112";
+import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260826-112";
+import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260826-112";
+import { fileTypeIcon } from "../services/file_icons.js?v=20260826-112";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260826-112";
+import * as grindSvc from "../services/grind.js?v=20260826-112";
+import { t } from "../services/i18n.js?v=20260826-112";
+import { notifyTaskComplete } from "../services/notify.js?v=20260826-112";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -151,41 +151,311 @@ function renderTodoPanel() {
   todoPanelEl.appendChild(body);
 }
 
-// ── @ 提及 MCP / Skill / 专家包────────────────
+// ── @ 提及：项目文件 / Skill / 内置工具 / MCP / 专家包────────────
 let mentionPopup = null;
 let mentionCandidates = [];
 let mentionIndex = 0;
+let mentionQuery = "";
+let mentionSearchSeq = 0;
+let mentionSearchTimer = null;
+let mentionHighlightLayer = null;
 
-function getMentionCandidates(query) {
+function normalizeMentionText(text) {
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFKC")
+    .replace(/[\\/_\-.:\s()[\]{}"'`]+/g, "");
+}
+
+function subsequenceScore(needle, haystack) {
+  if (!needle) return 0;
+  let pos = 0;
+  let gaps = 0;
+  for (const ch of needle) {
+    const next = haystack.indexOf(ch, pos);
+    if (next < 0) return -1;
+    gaps += Math.max(0, next - pos);
+    pos = next + 1;
+  }
+  return Math.max(1, 45 - gaps);
+}
+
+function scoreMentionCandidate(candidate, query) {
+  const q = String(query || "").trim().toLowerCase();
+  const nq = normalizeMentionText(q);
+  if (!q && !nq) return 80 - (candidate.priority || 0);
+  const fields = [
+    candidate.name,
+    candidate.label,
+    candidate.desc,
+    candidate.path,
+    ...(candidate.aliases || []),
+  ].map(x => String(x || "").toLowerCase());
+  const normalized = fields.map(normalizeMentionText);
+  let best = -1;
+  for (const field of fields) {
+    if (!field) continue;
+    if (field === q) best = Math.max(best, 120);
+    else if (field.startsWith(q)) best = Math.max(best, 105);
+    else if (field.includes(q)) best = Math.max(best, 85);
+  }
+  for (const field of normalized) {
+    if (!field || !nq) continue;
+    if (field === nq) best = Math.max(best, 118);
+    else if (field.startsWith(nq)) best = Math.max(best, 102);
+    else if (field.includes(nq)) best = Math.max(best, 80);
+    else best = Math.max(best, subsequenceScore(nq, field));
+  }
+  if (best < 0) return -1;
+  return best - (candidate.priority || 0);
+}
+
+function addMentionCandidate(map, candidate) {
+  const key = `${candidate.kind || candidate.type}:${candidate.mention || candidate.name}`;
+  if (!map.has(key)) map.set(key, candidate);
+}
+
+function flattenProjectEntries(entries, basePath = "", out = []) {
+  for (const entry of entries || []) {
+    const path = entry.path || [basePath, entry.name].filter(Boolean).join("/");
+    out.push({
+      kind: "file",
+      type: entry.type === "dir" ? "目录" : "文件",
+      name: path,
+      label: entry.name || path,
+      mention: path,
+      desc: entry.type === "dir" ? "项目目录" : `项目文件${entry.size ? ` · ${entry.size}B` : ""}`,
+      path,
+      priority: entry.type === "dir" ? 23 : 20,
+      aliases: [entry.name, path.replace(/\//g, " ")],
+    });
+    if (entry.children?.length) flattenProjectEntries(entry.children, path, out);
+  }
+  return out;
+}
+
+function collectRemoteMcpTools() {
+  const result = [];
+  const remoteTools = Array.isArray(state.skills?.remoteTools) ? state.skills.remoteTools : [];
+  for (const rt of remoteTools) {
+    const serverId = rt.serverId || rt.server_id || rt.server || "server";
+    const mention = rt.fullName || rt.id || `mcp__${serverId}__${rt.name}`;
+    result.push({
+      kind: "mcp",
+      type: "MCP",
+      name: mention,
+      label: rt.name || mention,
+      mention,
+      desc: `[${rt.server || rt.serverName || serverId}] ${rt.description || rt.desc || ""}`.trim(),
+      priority: 8,
+      aliases: [rt.name, rt.server, rt.serverName, serverId, mention],
+      raw: rt,
+    });
+  }
+  const remote = state.skills?.remote || {};
+  for (const [name, desc] of Object.entries(remote)) {
+    result.push({
+      kind: "mcp",
+      type: "MCP",
+      name,
+      label: name.replace(/^mcp__[^_]+__/, ""),
+      mention: name,
+      desc,
+      priority: 9,
+      aliases: [name, String(desc || "")],
+    });
+  }
+  return result;
+}
+
+function makeFileCandidate(item) {
+  const path = item.path || item.name || "";
+  return {
+    kind: "file",
+    type: item.type === "dir" ? "目录" : "文件",
+    name: path,
+    label: item.name || path,
+    mention: path,
+    desc: item.type === "dir" ? "项目目录" : `项目文件${item.size ? ` · ${item.size}B` : ""}`,
+    path,
+    priority: item.type === "dir" ? 23 : 20,
+    aliases: [item.name, path.replace(/\//g, " ")],
+  };
+}
+
+function getMentionCandidates(query, extraFiles = []) {
   const mcp = state.skills?.mcp || {};
   const skills = state.skills?.skills || {};
   const experts = getExpertsCached() || [];
-  const list = [
-    ...Object.entries(mcp).map(([name, desc]) => ({ name, desc, type: "工具" })),
-    ...Object.entries(skills).map(([name, desc]) => ({ name, desc, type: "Skill" })),
-    ...experts.map(x => ({
-      name: x.name || x.id,
-      desc: x.description || t("专家包 · 知识 {k} · 技能 {s}", { k: x.knowledge_count || 0, s: x.skills_count || 0 }),
-      type: "Expert",
-      id: x.id,
-    })),
-  ];
-  const q = query.toLowerCase();
-  if (!q) return list;
-  return list.filter(c => c.name.toLowerCase().includes(q) || String(c.desc).toLowerCase().includes(q));
+  const candidates = new Map();
+  const treeEntries = Array.isArray(state.projectFileTree?.entries)
+    ? state.projectFileTree.entries
+    : Array.isArray(state.projectFileTree)
+      ? state.projectFileTree
+      : [];
+
+  flattenProjectEntries(treeEntries).forEach(c => addMentionCandidate(candidates, c));
+  extraFiles.forEach(item => addMentionCandidate(candidates, makeFileCandidate(item)));
+  Object.entries(TOOLS || {}).forEach(([name, tool]) => addMentionCandidate(candidates, {
+    kind: "tool",
+    type: "工具",
+    name,
+    label: tool?.name || name,
+    mention: name,
+    desc: tool?.description || "",
+    priority: 5,
+    aliases: [tool?.name, name],
+  }));
+  Object.entries(mcp).forEach(([name, desc]) => addMentionCandidate(candidates, {
+    kind: "tool",
+    type: "工具",
+    name,
+    label: name,
+    mention: name,
+    desc,
+    priority: 6,
+  }));
+  collectRemoteMcpTools().forEach(c => addMentionCandidate(candidates, c));
+  Object.entries(skills).forEach(([name, desc]) => addMentionCandidate(candidates, {
+    kind: "skill",
+    type: "Skill",
+    name,
+    label: name,
+    mention: name,
+    desc,
+    priority: 1,
+    aliases: [name, String(desc || "").split(/[。.\n]/)[0]],
+  }));
+  experts.map(x => ({
+    kind: "expert",
+    type: "Expert",
+    name: x.name || x.id,
+    label: x.name || x.id,
+    mention: x.name || x.id,
+    desc: x.description || t("专家包 · 知识 {k} · 技能 {s}", { k: x.knowledge_count || 0, s: x.skills_count || 0 }),
+    priority: 30,
+    id: x.id,
+  })).forEach(c => addMentionCandidate(candidates, c));
+
+  return [...candidates.values()]
+    .map(c => ({ ...c, score: scoreMentionCandidate(c, query) }))
+    .filter(c => c.score >= 0)
+    .sort((a, b) => b.score - a.score || a.priority - b.priority || String(a.name).localeCompare(String(b.name)));
+}
+
+async function findMentionFiles(query) {
+  if (!state.project || !String(query || "").trim()) return [];
+  try {
+    const res = await post("/projects/find", { query: String(query).trim(), limit: 40 });
+    return res.code === 0 ? (res.data?.matches || []) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function readMentionTokens(text) {
+  const tokens = [];
+  const re = /@"((?:\\.|[^"\\])*)"|@([^\s@]+)/g;
+  let match;
+  while ((match = re.exec(text || ""))) {
+    const raw = match[1] !== undefined
+      ? match[1].replace(/\\"/g, "\"").replace(/\\\\/g, "\\")
+      : String(match[2] || "").replace(/[，。！？,.!?;；:：)）\]】]+$/g, "");
+    if (raw) tokens.push(raw);
+  }
+  return [...new Set(tokens)];
+}
+
+function escapeHtmlLocal(text) {
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function appendHighlightedMentionText(parent, text, query) {
+  const raw = String(text || "");
+  const q = String(query || "").trim();
+  const idx = q ? raw.toLowerCase().indexOf(q.toLowerCase()) : -1;
+  if (idx < 0) {
+    parent.appendChild(document.createTextNode(raw));
+    return;
+  }
+  parent.appendChild(document.createTextNode(raw.slice(0, idx)));
+  const mark = document.createElement("mark");
+  mark.className = "mention-match";
+  mark.textContent = raw.slice(idx, idx + q.length);
+  parent.appendChild(mark);
+  parent.appendChild(document.createTextNode(raw.slice(idx + q.length)));
+}
+
+function buildMentionHighlightHtml(text) {
+  const src = String(text || "");
+  const re = /@"((?:\\.|[^"\\])*)"|@([^\s@]+)/g;
+  let html = "";
+  let last = 0;
+  let match;
+  while ((match = re.exec(src))) {
+    html += escapeHtmlLocal(src.slice(last, match.index));
+    html += `<span class="mention-mark">${escapeHtmlLocal(match[0])}</span>`;
+    last = re.lastIndex;
+  }
+  html += escapeHtmlLocal(src.slice(last));
+  if (src.endsWith("\n")) html += " ";
+  return html;
+}
+
+function syncMentionHighlight() {
+  if (!chatInput || !mentionHighlightLayer) return;
+  const text = chatInput.value || "";
+  mentionHighlightLayer.innerHTML = buildMentionHighlightHtml(text);
+  mentionHighlightLayer.scrollTop = chatInput.scrollTop;
+  mentionHighlightLayer.scrollLeft = chatInput.scrollLeft;
+  chatInput.classList.toggle("mention-highlight-active", /@"(?:\\.|[^"\\])*"|@[^\s@]+/.test(text));
+}
+
+function setupMentionHighlight() {
+  if (!chatInput || chatInput.parentElement?.classList.contains("chat-input-wrap")) return;
+  const wrap = document.createElement("div");
+  wrap.className = "chat-input-wrap";
+  chatInput.parentNode.insertBefore(wrap, chatInput);
+  wrap.appendChild(chatInput);
+  mentionHighlightLayer = document.createElement("div");
+  mentionHighlightLayer.className = "mention-highlight-layer";
+  wrap.insertBefore(mentionHighlightLayer, chatInput);
+  chatInput.addEventListener("scroll", syncMentionHighlight);
+  syncMentionHighlight();
 }
 
 // 获取光标前正在输入的 @token；返回 { start, query } 或 null
 function detectMentionToken() {
   const pos = chatInput.selectionStart ?? chatInput.value.length;
   const before = chatInput.value.slice(0, pos);
-  const m = /(^|[\s])@([\w\u4e00-\u9fff.-]*)$/.exec(before);
+  const quoted = /(^|[\s])@"([^"\n]*)$/.exec(before);
+  if (quoted) return { start: pos - quoted[2].length - 2, query: quoted[2], quoted: true };
+  const m = /(^|[\s])@([^\s@]*)$/.exec(before);
   if (!m) return null;
   return { start: pos - m[2].length - 1, query: m[2] };
 }
 
-function hideMentionPopup() {
+function formatMentionInsert(candidate) {
+  const value = String(candidate.mention || candidate.name || "").trim();
+  if (!value) return "";
+  if (/[\s"@]/.test(value)) return `@"${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}" `;
+  return `@${value} `;
+}
+
+function hideMentionPopup(invalidate = true) {
   if (mentionPopup) { mentionPopup.remove(); mentionPopup = null; }
+  if (invalidate && mentionSearchTimer) {
+    clearTimeout(mentionSearchTimer);
+    mentionSearchTimer = null;
+  }
+  if (invalidate) {
+    mentionSearchSeq++;
+    mentionQuery = "";
+  }
   mentionCandidates = [];
   mentionIndex = 0;
 }
@@ -193,7 +463,7 @@ function hideMentionPopup() {
 function renderMentionPopup() {
   const area = document.getElementById("chat-input-area");
   if (!area) return;
-  if (!mentionCandidates.length) { hideMentionPopup(); return; }
+  if (!mentionCandidates.length) { hideMentionPopup(false); return; }
   if (!mentionPopup) {
     mentionPopup = document.createElement("div");
     mentionPopup.className = "mention-popup";
@@ -204,15 +474,21 @@ function renderMentionPopup() {
     const item = document.createElement("div");
     item.className = "mention-item" + (i === mentionIndex ? " active" : "");
     const badge = document.createElement("span");
-    const kindClass = c.type === "工具" ? "skill-kind-mcp" : c.type === "Skill" ? "skill-kind-skill" : "skill-kind-expert";
+    const kindClass = c.kind === "file"
+      ? "skill-kind-file"
+      : c.kind === "mcp" || c.type === "工具"
+        ? "skill-kind-mcp"
+        : c.type === "Skill"
+          ? "skill-kind-skill"
+          : "skill-kind-expert";
     badge.className = "skill-kind-badge " + kindClass;
     badge.textContent = c.type;
     const name = document.createElement("span");
     name.className = "mention-name";
-    name.textContent = c.name;
+    appendHighlightedMentionText(name, c.name, mentionQuery);
     const desc = document.createElement("span");
     desc.className = "mention-desc";
-    desc.textContent = c.desc;
+    appendHighlightedMentionText(desc, c.desc, mentionQuery);
     item.appendChild(badge);
     item.appendChild(name);
     item.appendChild(desc);
@@ -227,38 +503,84 @@ function renderMentionPopup() {
     hint.textContent = "暂无 Skill：在右侧「工具 / 技能」面板点击「导入技能」或「新建技能」添加 SKILL.md";
     mentionPopup.appendChild(hint);
   }
+  const hint = document.createElement("div");
+  hint.className = "mention-hint mention-search-hint";
+  hint.textContent = state.project ? "可搜索项目文件、Skill、内置工具和 MCP；路径支持 /，含空格会自动加引号" : "可搜索 Skill、内置工具和 MCP；打开项目后可提及项目文件";
+  mentionPopup.appendChild(hint);
 }
 
 function updateMentionPopup() {
   const token = detectMentionToken();
   if (!token) { hideMentionPopup(); return; }
-  mentionCandidates = getMentionCandidates(token.query).slice(0, 10);
+  mentionQuery = token.query || "";
+  const seq = ++mentionSearchSeq;
+  mentionCandidates = getMentionCandidates(mentionQuery).slice(0, 12);
   mentionIndex = 0;
   renderMentionPopup();
+  if (mentionSearchTimer) clearTimeout(mentionSearchTimer);
+  if (!state.project || !mentionQuery.trim()) return;
+  mentionSearchTimer = setTimeout(async () => {
+    mentionSearchTimer = null;
+    const files = await findMentionFiles(mentionQuery);
+    if (seq !== mentionSearchSeq) return;
+    mentionCandidates = getMentionCandidates(mentionQuery, files).slice(0, 14);
+    mentionIndex = Math.min(mentionIndex, Math.max(0, mentionCandidates.length - 1));
+    renderMentionPopup();
+  }, 120);
 }
 
 function applyMention(candidate) {
   const token = detectMentionToken();
   if (!token) { hideMentionPopup(); return; }
   const pos = chatInput.selectionStart ?? chatInput.value.length;
-  const insert = `@${candidate.name} `;
+  const insert = formatMentionInsert(candidate);
   chatInput.value = chatInput.value.slice(0, token.start) + insert + chatInput.value.slice(pos);
   const caret = token.start + insert.length;
   chatInput.setSelectionRange(caret, caret);
   chatInput.focus();
   hideMentionPopup();
+  syncMentionHighlight();
   try { localStorage.setItem(CHAT_DRAFT_KEY, chatInput.value); } catch (e) {}
 }
 
-// 发送时解析消息中的 @提及：工具注入调用提示，Skill 注入 SKILL.md 定义内容，专家包注入人格/规则/知识
+async function resolveMentionedProjectPath(name) {
+  if (!state.project) return "";
+  const looksLikePath = /[\\/]/.test(name) || /\.[A-Za-z0-9]{1,8}$/.test(name) || name.startsWith(".");
+  if (!looksLikePath) return "";
+  try {
+    const res = await post("/projects/browse", { path: name });
+    if (res.code !== 0 || !res.data) return "";
+    const d = res.data;
+    if (d.type === "file") {
+      return `\n\n[提及项目文件 ${d.path || name}]\n${String(d.content || "").slice(0, 10000)}`;
+    }
+    const entries = (d.entries || []).slice(0, 80).map(e => `${e.type === "dir" ? "[目录]" : "[文件]"} ${e.name}${e.size ? ` (${e.size}B)` : ""}`);
+    return `\n\n[提及项目目录 ${d.path || name}]\n${entries.join("\n") || "(空目录)"}`;
+  } catch (e) {
+    return "";
+  }
+}
+
+function resolveRemoteMention(name) {
+  const all = collectRemoteMcpTools();
+  const item = all.find(x => x.mention === name || x.name === name || x.label === name);
+  if (!item) return "";
+  return `\n\n[提及 MCP 工具] ${item.mention}\n${item.desc || ""}\n任务需要时请通过 skill_run 调用，skill 参数使用 ${item.mention}。`;
+}
+
+// 发送时解析消息中的 @提及：文件注入内容/目录，工具注入调用提示，Skill 注入 SKILL.md，MCP 注入远程工具提示，专家包注入人格/规则/知识
 async function resolveMentions(text) {
   const mcp = state.skills?.mcp || {};
   const skills = state.skills?.skills || {};
-  const tokens = [...new Set((text.match(/@[\w\u4e00-\u9fff.-]+/g) || []))];
+  const tokens = readMentionTokens(text);
   let context = "";
-  for (const token of tokens) {
-    const name = token.slice(1);
-    if (mcp[name]) {
+  for (const name of tokens) {
+    const fileContext = await resolveMentionedProjectPath(name);
+    if (fileContext) {
+      context += fileContext;
+    } else if (TOOLS?.[name]) {
+      context += `\n\n[提及内置工具] ${name} (${TOOLS[name].name || name})\n${TOOLS[name].description || ""}\n任务需要时请用该工具完成，不要把提及误当成普通文本。`;
+    } else if (mcp[name]) {
       context += `\n\n[提及工具] ${name} ${mcp[name]}。任务需要时请通过 skill_run 工具调用。`;
     } else if (skills[name]) {
       let injected = false;
@@ -273,7 +595,7 @@ async function resolveMentions(text) {
         context += `\n\n[提及技能 ${name}] ${skills[name]}`;
       }
     } else {
-      const injected = await resolveExpertMention(name);
+      const injected = resolveRemoteMention(name) || await resolveExpertMention(name);
       if (injected) context += injected;
     }
   }
@@ -906,6 +1228,24 @@ function settleAutopilotTodosOnCompletion() {
   return pending.length;
 }
 
+function getTodoLoopState() {
+  const todos = getConversationTodos(state.currentConversationId);
+  const pending = todos.filter(item => item.status !== "done" && item.status !== "blocked");
+  return {
+    todos,
+    pending,
+    closed: todos.length > 0 && pending.length === 0,
+  };
+}
+
+function clearAutoAdvanceHints(msg) {
+  if (!msg) return;
+  delete msg.autoAdvanceNudge;
+  delete msg.autoAdvanceSuggestedCalls;
+  delete msg.autoAdvanced;
+  delete msg.autoReviewed;
+}
+
 function looksLikeActionStall(content) {
   if (!content || detectToolCalls(content).length > 0) return false;
   if (looksLikeCompletedReply(content) || asksUserToDecide(content)) return false;
@@ -1271,6 +1611,7 @@ function scheduleAutoAdvanceNudge(msgEl, calls, reason = "stalled") {
 async function autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params) {
   const lastMsg = state.messages[state.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return msgEl;
+  if (state.harness?.enabled === true && getTodoLoopState().closed) return msgEl;
   if (lastMsg.autoAdvanced) return msgEl;
   if (looksLikeCompletedReply(lastMsg.content)) return msgEl;
   if (!userWantsEnvironmentAction(getLastVisibleUserContent())) return msgEl;
@@ -1302,6 +1643,7 @@ async function autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal = nul
   const lastMsg = state.messages[state.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return msgEl;
   if (signal?.aborted) return msgEl;
+  if (state.harness?.enabled === true && getTodoLoopState().closed) return msgEl;
   if (lastMsg.autoReviewed) return msgEl;
   if (!isReviewCandidate(lastMsg.content)) return msgEl;
 
@@ -1917,7 +2259,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     if (signal?.aborted || !stuck) break;
     const contPrompt = buildContinuePrompt(content);
     try {
-      const { toast } = await import("../app.js?v=20260826-110");
+      const { toast } = await import("../app.js?v=20260826-112");
       toast(t("输出达到长度上限，自动续写中（{x}/{n}）…", { x: round, n: MAX_CONTINUE_ROUNDS }));
     } catch {}
 
@@ -1959,7 +2301,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
   // 轮数耗尽仍未闭合：提示用户，后续由工具循环的截断守卫接管（拒执行并要求拆分重试）
   if (!signal?.aborted && hasTruncatedTail(content)) {
     try {
-      const { toast } = await import("../app.js?v=20260826-110");
+      const { toast } = await import("../app.js?v=20260826-112");
       toast("输出仍不完整，已要求模型拆分重试", 3200);
     } catch {}
   }
@@ -2023,9 +2365,14 @@ async function runToolLoop(
     }
 
     if (calls.length === 0) {
-      const pending = getConversationTodos(state.currentConversationId)
-        .filter(t => t.status !== "done" && t.status !== "blocked");
+      const todoState = getTodoLoopState();
+      const pending = todoState.pending;
       const completedReply = looksLikeCompletedReply(lastMsg.content);
+      if (harnessOn && todoState.closed && !replyFailed) {
+        clearAutoAdvanceHints(lastMsg);
+        exitReason = "TODOLIST 已全部了结，模型已收尾";
+        break;
+      }
       if (!harnessOn && autopilotOn && completedReply && successfulToolInThisLoop) {
         const settled = settleAutopilotTodosOnCompletion();
         exitReason = settled
@@ -2227,6 +2574,11 @@ async function runToolLoop(
     }
 
     if (signal?.aborted) { exitReason = "已手动停止"; break; }
+    if (harnessOn && getTodoLoopState().closed && !detectToolCalls(followContent2).length && followContent2.trim()) {
+      clearAutoAdvanceHints(followUp);
+      exitReason = "TODOLIST 已全部了结，模型已收尾";
+      break;
+    }
     msgEl = await autoAdvanceIfStalled(followEl, modelId, apiKey, baseUrl, params);
     msgEl = await autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal);
   }
@@ -2249,7 +2601,7 @@ async function sendMessage(queuedPayload = null) {
   if (isGenerating) {
     if (queuedPayload) inputQueue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260826-110");
+      const { toast } = await import("../app.js?v=20260826-112");
       toast(t("已加入输入队列（{n}）", { n: inputQueue.length }));
     }
     updateSendState();
@@ -2275,7 +2627,7 @@ async function sendMessage(queuedPayload = null) {
   const grindActive = grindSession && ["grinding", "collecting"].includes(grindSession.state);
   const isFreshConv = !state.currentConversationId || state.messages.length === 0;
   if (!queuedPayload && !grindActive && isFreshConv && isAbstractTask(text)) {
-    const { dlgConfirm } = await import("../services/dialog.js?v=20260826-110");
+    const { dlgConfirm } = await import("../services/dialog.js?v=20260826-112");
     const confirmed = await dlgConfirm(
       t("检测到抽象任务「{text}」，建议先进入磨墨模式细化需求后再执行。是否切换？", { text: text.slice(0, 30) }),
       { title: t("磨墨建议"), okText: t("进入磨墨"), cancelText: t("直接发送") }
@@ -2519,7 +2871,7 @@ async function sendMessage(queuedPayload = null) {
 
   } catch (err) {
     console.error("发送失败", err);
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输出 · Harness 保持开启" : "已停止输出") : t("发送失败: {msg}", { msg: err.message }));
   } finally {
   isGenerating = false;
@@ -2564,7 +2916,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
 
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast(t("上下文已压缩：{n} 条消息已摘要", { n: compress_count }));
   } catch (e) {
     console.warn("上下文压缩检查失败", e);
@@ -2644,7 +2996,7 @@ async function handleGrindReply(content, msgEl) {
     renderGrindPanel();
     updateSendState();
     appendDraftActions(msgEl, draft);
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast("墨稿已成：可送入 Harness / 投到白板 / 存为模板");
     return;
   }
@@ -2757,20 +3109,20 @@ function appendDraftActions(msgEl, draft) {
     state.harness.enabled = true;
     btnHarness?.classList.add("active");
     savePersistent();
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast("墨稿已送入 Harness，自主执行中…");
     await sendMessage({ text: grindSvc.draftToHarnessTask(draft), files: [] });
   }));
 
   bar.appendChild(mkBtn("投到白板", "作为白板卡片保存", async () => {
     addBoardCard(grindSvc.draftToBoardCard(draft));
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast("已投到白板");
   }));
 
   bar.appendChild(mkBtn("存为模板", "存入知识库作为可复用任务书模板", async () => {
     const ok = await grindSvc.saveDraftAsTemplate(draft);
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast(ok ? "已存为磨墨模板（知识中心可见）" : "保存失败");
   }));
 
@@ -2780,7 +3132,7 @@ function appendDraftActions(msgEl, draft) {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260826-110").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260826-112").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -2804,7 +3156,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -2837,7 +3189,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(t("上下文已压缩：{n} 条消息已摘要", { n: res.data.compress_count || 0 }));
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -3321,7 +3673,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260826-110");
+      const { toast } = await import("../app.js?v=20260826-112");
       toast(t("文件过大，已跳过: {name}", { name: file.name }));
       continue;
     }
@@ -3337,11 +3689,11 @@ async function handleFiles(fileList) {
         if (res.code === 0 && res.data?.content) {
           pendingFiles.push({ name: file.name, size: file.size, content: res.data.content, type: "text" });
         } else {
-          const { toast } = await import("../app.js?v=20260826-110");
+          const { toast } = await import("../app.js?v=20260826-112");
           toast(res.message || t("解析失败: {name}", { name: file.name }));
         }
       } catch (e) {
-        const { toast } = await import("../app.js?v=20260826-110");
+        const { toast } = await import("../app.js?v=20260826-112");
         toast(t("解析失败: {name}（{msg}）", { name: file.name, msg: e.message }));
       }
       continue;
@@ -3382,7 +3734,7 @@ async function handleFiles(fileList) {
   */
 async function regenerateMessage(msg, msgEl) {
   if (isGenerating) {
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast("正在生成中，请稍候");
     return;
   }
@@ -3390,7 +3742,7 @@ async function regenerateMessage(msg, msgEl) {
   if (idx < 0) return;
   const after = state.messages.slice(idx + 1).filter(m => !m.hidden && m.role !== "system");
   if (after.length > 0) {
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast("只能重新生成最后一条助手回复");
     return;
   }
@@ -3398,7 +3750,7 @@ async function regenerateMessage(msg, msgEl) {
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast("请先在设置中配置该模型的 API Key");
     return;
   }
@@ -3408,7 +3760,7 @@ async function regenerateMessage(msg, msgEl) {
     .filter(m => !m.hidden && m.role !== "system")
     .map(m => ({ role: m.role, content: m.content }));
   if (!history.some(m => m.role === "user")) {
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast("没有可重新生成的上下文");
     return;
   }
@@ -3502,6 +3854,7 @@ function initChat() {
   convSidebar = document.getElementById("conv-sidebar");
   initConvSearch();
   initConvManage();
+  setupMentionHighlight();
   filePreviewArea = document.getElementById("file-preview-area");
   btnAttachFile = document.getElementById("btn-attach-file");
   fileInput = document.getElementById("file-input");
@@ -3524,7 +3877,7 @@ function initChat() {
     markActivity(); // 防止重复触发
     try { activeGenerationController?.abort(); } catch {}
     try {
-      const { toast } = await import("../app.js?v=20260826-110");
+      const { toast } = await import("../app.js?v=20260826-112");
       toast("连接长时间无响应，已自动中断，可重试");
     } catch {}
   }, 15000);
@@ -3555,7 +3908,7 @@ function initChat() {
     state.harness.enabled = !state.harness.enabled;
     btnHarness.classList.toggle("active", state.harness.enabled);
     savePersistent();
-    const { toast } = await import("../app.js?v=20260826-110");
+    const { toast } = await import("../app.js?v=20260826-112");
     toast(state.harness.enabled ? "Harness 已开启：目标→计划→执行→验证→汇报→追溯，六阶段自主闭环，大任务自动建议 TODOLIST" : "Harness 已关闭");
     showHarnessIdle();
   });
@@ -3595,18 +3948,18 @@ function initChat() {
     const id = expertSelect.value;
     if (!id) {
       setActiveExpertId("");
-      const { toast } = await import("../app.js?v=20260826-110");
+      const { toast } = await import("../app.js?v=20260826-112");
       toast("已退出专家模式");
       return;
     }
     try {
-      const { getExpert } = await import("../services/experts.js?v=20260826-110");
+      const { getExpert } = await import("../services/experts.js?v=20260826-112");
       const detail = await getExpert(id, { force: true });
       setActiveExpertId(id, detail);
-      const { toast } = await import("../app.js?v=20260826-110");
+      const { toast } = await import("../app.js?v=20260826-112");
       toast(t("已启用专家包：{name}", { name: detail.name || id }));
     } catch (e) {
-      const { toast } = await import("../app.js?v=20260826-110");
+      const { toast } = await import("../app.js?v=20260826-112");
       toast(t("专家包加载失败: {msg}", { msg: e.message }));
       expertSelect.value = state.activeExpertId || "";
     }
@@ -3650,6 +4003,7 @@ function initChat() {
     chatInput.style.height = "auto";
     chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + "px";
     try { localStorage.setItem(CHAT_DRAFT_KEY, chatInput.value); } catch (e) {}
+    syncMentionHighlight();
     updateMentionPopup();
   });
 
@@ -3664,6 +4018,7 @@ function initChat() {
     if (draft && !chatInput.value) {
       chatInput.value = draft;
       chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + "px";
+      syncMentionHighlight();
     }
   } catch (e) {}
 
@@ -3751,7 +4106,7 @@ function startVoice(btn) {
   };
   _voiceRecognition.onerror = (e) => {
     if (e.error !== "aborted" && e.error !== "no-speech") {
-      try { import("../app.js?v=20260826-110").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
+      try { import("../app.js?v=20260826-112").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
     }
     stopVoice();
   };

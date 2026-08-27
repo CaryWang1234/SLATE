@@ -830,6 +830,39 @@ textarea::-webkit-scrollbar-thumb {
   transition: border-color var(--transition), background-color var(--transition);
 }
 
+.chat-input-wrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.mention-highlight-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: var(--font-main);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow: hidden;
+  word-break: break-word;
+  color: var(--text);
+  pointer-events: none;
+}
+
+.mention-mark {
+  color: var(--accent, #4a6fa5);
+  background: color-mix(in srgb, var(--accent, #4a6fa5) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #4a6fa5) 28%, transparent);
+  border-radius: 4px;
+  padding: 0 2px;
+  margin: 0 -2px;
+}
+
 /* @ 提及弹窗 */
 .mention-popup {
   position: absolute;
@@ -868,6 +901,10 @@ textarea::-webkit-scrollbar-thumb {
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
+  min-width: 0;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mention-desc {
@@ -887,6 +924,17 @@ textarea::-webkit-scrollbar-thumb {
   border-top: 1px dashed var(--border);
   margin-top: 4px;
   line-height: 1.4;
+}
+
+.mention-search-hint {
+  border-top-style: solid;
+}
+
+.mention-match {
+  color: var(--text);
+  background: color-mix(in srgb, var(--gold, #d9a441) 28%, transparent);
+  border-radius: 3px;
+  padding: 0 1px;
 }
 
 /* ── 代码块一键复制 ───────────────── */
@@ -1196,6 +1244,9 @@ textarea::-webkit-scrollbar-thumb {
 
 #chat-input {
   flex: 1;
+  position: relative;
+  z-index: 1;
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 8px 12px;
@@ -1210,6 +1261,17 @@ textarea::-webkit-scrollbar-thumb {
   background: var(--bg-input);
   color: var(--text);
   transition: border-color var(--transition), background-color var(--transition), color var(--transition);
+}
+
+#chat-input.mention-highlight-active {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+}
+
+#chat-input.mention-highlight-active::selection {
+  color: transparent;
+  background: color-mix(in srgb, var(--accent, #4a6fa5) 28%, transparent);
 }
 
 #chat-input:focus {
@@ -2497,6 +2559,12 @@ textarea::-webkit-scrollbar-thumb {
   color: var(--text-secondary);
   background: color-mix(in srgb, var(--text) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--text) 28%, transparent);
+}
+
+.skill-kind-file {
+  color: #6fbf9a;
+  background: rgba(111, 191, 154, 0.12);
+  border: 1px solid rgba(111, 191, 154, 0.35);
 }
 
 .skill-item-del {

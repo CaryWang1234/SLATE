@@ -4,9 +4,9 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define MyAppName "SLATE 砚"
-#define MyAppVersion "0.3.3"
+#define MyAppVersion "0.3.4"
 ; 构建号（yyyyMMddHHmm），每次发布构建时更新
-#define MyAppBuild "202608261847"
+#define MyAppBuild "202608270912"
 #define MyAppPublisher "SLATE"
 #define MyAppURL "https://github.com/CaryWang1234/SLATE"
 #define MyAppExeName "SLATE.exe"
@@ -23,7 +23,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
-AppComments=本地 AI 协作调度台：提示词工程与上下文管理 (Build {#MyAppBuild})
+AppComments=Local AI Agentic Platform (Build {#MyAppBuild})
 AppContact={#MyAppURL}/issues
 DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
@@ -52,7 +52,7 @@ RestartApplications=no
 ; 版本信息（写入安装包属性页）
 VersionInfoVersion={#MyAppVersion}
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription={#MyAppName} 安装程序 (Build {#MyAppBuild})
+VersionInfoDescription={#MyAppName} Installer (Build {#MyAppBuild})
 VersionInfoProductName={#MyAppName}
 VersionInfoCopyright=Copyright (c) {#MyAppPublisher}
 
