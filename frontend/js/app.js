@@ -2,25 +2,25 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260826-113";
-import { initI18n, t } from "./services/i18n.js?v=20260826-113";
-import { get, post, put } from "./services/api.js?v=20260826-113";
-import { dlgConfirm } from "./services/dialog.js?v=20260826-113";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260826-113";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260826-113";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260826-113";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260826-113";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260826-113";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260826-113";
-import { initTeamPanel } from "./components/team.js?v=20260826-113";
-import { initProjectBar } from "./components/project_bar.js?v=20260826-113";
-import { initMemoryPanel } from "./components/memory.js?v=20260826-113";
-import { initExpertsPanel } from "./components/experts.js?v=20260826-113";
-import { initSchedule } from "./components/schedule.js?v=20260826-113";
-import { initRiskGuard } from "./services/riskguard.js?v=20260826-113";
-import { initUnderstandPanel } from "./components/understand.js?v=20260826-113";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260826-113";
-import { setProject, setProjectFileTree } from "./store.js?v=20260826-113";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260827-114";
+import { initI18n, t } from "./services/i18n.js?v=20260827-114";
+import { get, post, put } from "./services/api.js?v=20260827-114";
+import { dlgConfirm } from "./services/dialog.js?v=20260827-114";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260827-114";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260827-114";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260827-114";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260827-114";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260827-114";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260827-114";
+import { initTeamPanel } from "./components/team.js?v=20260827-114";
+import { initProjectBar } from "./components/project_bar.js?v=20260827-114";
+import { initMemoryPanel } from "./components/memory.js?v=20260827-114";
+import { initExpertsPanel } from "./components/experts.js?v=20260827-114";
+import { initSchedule } from "./components/schedule.js?v=20260827-114";
+import { initRiskGuard } from "./services/riskguard.js?v=20260827-114";
+import { initUnderstandPanel } from "./components/understand.js?v=20260827-114";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260827-114";
+import { setProject, setProjectFileTree } from "./store.js?v=20260827-114";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -421,6 +421,7 @@ function openSettings(options = {}) {
   document.getElementById("setting-notif-sound").checked = state.notifications?.soundEnabled !== false;
   document.getElementById("setting-notif-system").checked = state.notifications?.systemNotifEnabled === true;
   updateNotifPermissionHint();
+  renderPermissionModeSettings();
   if (state.constitution) {
     document.getElementById("setting-constitution").value = JSON.stringify(state.constitution, null, 2);
   }
@@ -964,7 +965,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260826-113").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260827-114").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -982,6 +983,34 @@ function applyNotificationSettings() {
 function initNotificationPersistence() {
   document.getElementById("setting-notif-sound")?.addEventListener("change", applyNotificationSettings);
   document.getElementById("setting-notif-system")?.addEventListener("change", applyNotificationSettings);
+}
+
+// 命令权限模式：变更后立即持久化
+const PERMISSION_MODE_HINTS = {
+  ask: "高危命令（删除、提权、强制推送等）执行前弹窗询问，由你决定是否放行",
+  auto: "高危命令自动放行执行，不再弹窗；灾难级命令（rm -rf /、format 等）仍强制拦截",
+  full: "跳过高危判定，所有命令直接执行；灾难级命令（rm -rf /、format 等）仍强制拦截",
+};
+
+function renderPermissionModeSettings() {
+  const mode = state.permissionMode || "ask";
+  document.querySelectorAll(".permission-mode-row .review-mode-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.mode === mode);
+  });
+  const hint = document.getElementById("permission-mode-hint");
+  if (hint) hint.textContent = PERMISSION_MODE_HINTS[mode] || "";
+}
+
+function applyPermissionMode(mode) {
+  state.permissionMode = mode;
+  savePersistent();
+  renderPermissionModeSettings();
+}
+
+function initPermissionModePersistence() {
+  document.querySelectorAll(".permission-mode-row .review-mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => applyPermissionMode(btn.dataset.mode));
+  });
 }
 
 async function saveSettings() {
@@ -1010,7 +1039,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260826-113");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260827-114");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1213,6 +1242,7 @@ async function init() {
   document.getElementById("btn-lan-refresh")?.addEventListener("click", renderLanInfo);
   initAutoReviewPersistence();
   initNotificationPersistence();
+  initPermissionModePersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
   // 设置页导航与关于
@@ -1233,7 +1263,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260826-113");
+      const { openProject } = await import("./services/project.js?v=20260827-114");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

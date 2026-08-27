@@ -5,9 +5,9 @@
  * - 用户批准后注入 approved 参数放行；拒绝后返回拒绝结果给模型
  */
 
-import { state, getModelKey } from "../store.js?v=20260826-113";
-import { post } from "./api.js?v=20260826-113";
-import { t } from "./i18n.js?v=20260826-113";
+import { state, getModelKey } from "../store.js?v=20260827-114";
+import { post } from "./api.js?v=20260827-114";
+import { t } from "./i18n.js?v=20260827-114";
 
 // 高危命令规则（写死）：命中任一条即要求批准
 const HIGH_RISK_PATTERNS = [
@@ -119,13 +119,20 @@ function requestHighRiskApproval(command, reason) {
 }
 
 /**
- * 统一守卫入口：若为 terminal 且命令高危则弹框审批。
- * 批准后向 params 注入 approved 并返回 true；拒绝后返回 false。
+ * 统一守卫入口：若为 terminal 且命令高危则按权限模式处理。
+ * - 人工审批（ask，默认）：弹窗询问，批准后注入 approved 放行
+ * - 自动审批（auto）：直接注入 approved 放行，不再弹窗
+ * - 完全访问（full）：不做高危判定直接放行（灾难级命令仍由后端强制拦截）
  */
 async function guardSkillParams(skill, params) {
   if (skill !== "terminal" || !params?.command) return true;
+  if (state.permissionMode === "full") return true;
   const risk = isHighRiskCommand(params.command);
   if (!risk.risk) return true;
+  if (state.permissionMode === "auto") {
+    params.approved = true;
+    return true;
+  }
   const approved = await requestHighRiskApproval(params.command, risk.reason);
   if (approved) {
     params.approved = true;

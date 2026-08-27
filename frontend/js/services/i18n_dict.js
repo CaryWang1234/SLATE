@@ -1310,6 +1310,16 @@ export const EN_DICT = {
   "工作流完成": "Workflow complete",
   "{ok}/{n} 节点成功": "{ok}/{n} nodes succeeded",
 
+  // ── 命令权限设置 ─────────────────────────────
+  "命令权限": "Command Permissions",
+  "控制 AI 执行终端命令时的审批策略；灾难级命令（rm -rf /、format 等）任何模式下都强制拦截": "Controls the approval policy when AI runs terminal commands; catastrophic commands (rm -rf /, format, etc.) are always blocked in every mode",
+  "🛡 人工审批": "🛡 Manual Approval",
+  "⚡ 自动审批": "⚡ Auto Approval",
+  "🔓 完全访问": "🔓 Full Access",
+  "高危命令（删除、提权、强制推送等）执行前弹窗询问，由你决定是否放行": "High-risk commands (delete, privilege escalation, force push, etc.) pop up for your approval before execution",
+  "高危命令自动放行执行，不再弹窗；灾难级命令（rm -rf /、format 等）仍强制拦截": "High-risk commands run automatically without popups; catastrophic commands (rm -rf /, format, etc.) are still blocked",
+  "跳过高危判定，所有命令直接执行；灾难级命令（rm -rf /、format 等）仍强制拦截": "Skips high-risk checks and runs all commands directly; catastrophic commands (rm -rf /, format, etc.) are still blocked",
+
   // ── 文库（Vault）─────────────────────────────
   "文库": "Vault",
   "搜索文库...": "Search vault...",

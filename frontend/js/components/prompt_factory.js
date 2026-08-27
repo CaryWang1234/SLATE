@@ -2,11 +2,11 @@
  * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交付 Prompt
  */
 
-import { state, subscribe, addPromptSnippet } from "../store.js?v=20260826-113";
-import { get, post } from "../services/api.js?v=20260826-113";
-import { browseFiles } from "../services/project.js?v=20260826-113";
-import { t } from "../services/i18n.js?v=20260826-113";
-import { makeId } from "../services/utils.js?v=20260826-113";
+import { state, subscribe, addPromptSnippet } from "../store.js?v=20260827-114";
+import { get, post } from "../services/api.js?v=20260827-114";
+import { browseFiles } from "../services/project.js?v=20260827-114";
+import { t } from "../services/i18n.js?v=20260827-114";
+import { makeId } from "../services/utils.js?v=20260827-114";
 
 const FACTORY_PRESETS = {
   codex: {

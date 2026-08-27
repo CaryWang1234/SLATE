@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260826-113";
+import { makeId } from "./services/utils.js?v=20260827-114";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -117,6 +117,9 @@ const state = {
 
   // 首次启动引导：跨 localStorage / 桌面共享配置保存，避免 WebView profile 波动后反复弹出
   onboardingSeen: false,
+
+  // 命令权限模式：ask=人工审批（高危命令弹窗询问）auto=自动审批（高危命令自动放行）full=完全访问（跳过高危判定；灾难级命令始终拦截）
+  permissionMode: "ask",
 };
 
 // ── 订阅者 ──────────────────────────────────
@@ -159,11 +162,16 @@ function buildPersistentData() {
     activeExpertId: state.activeExpertId,
     useResponses: state.useResponses,
     onboardingSeen: state.onboardingSeen === true,
+    permissionMode: state.permissionMode,
   };
 }
 
 function normalizeTheme(value) {
   return value === "dark" ? "dark" : "light";
+}
+
+function normalizePermissionMode(value) {
+  return ["ask", "auto", "full"].includes(value) ? value : "ask";
 }
 
 function saveLocalPersistent(data = buildPersistentData()) {
@@ -192,6 +200,7 @@ function getSharedPersistentData(data = buildPersistentData()) {
     activeExpertId: data.activeExpertId || "",
     useResponses: data.useResponses === true,
     onboardingSeen: data.onboardingSeen === true,
+    permissionMode: normalizePermissionMode(data.permissionMode),
   };
 }
 
@@ -253,6 +262,7 @@ function loadPersistent() {
     state.activeExpertId = data.activeExpertId || "";
     state.useResponses = data.useResponses === true;
     state.onboardingSeen = data.onboardingSeen === true;
+    state.permissionMode = normalizePermissionMode(data.permissionMode);
   } catch (e) {}
 }
 
@@ -312,6 +322,9 @@ async function loadSharedPersistent() {
     }
     if (Object.prototype.hasOwnProperty.call(data, "onboardingSeen")) {
       state.onboardingSeen = data.onboardingSeen === true;
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "permissionMode")) {
+      state.permissionMode = normalizePermissionMode(data.permissionMode);
     }
     saveLocalPersistent();
   } catch (e) {}

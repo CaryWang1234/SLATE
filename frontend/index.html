@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260826-113">
+  <link rel="stylesheet" href="./css/style.css?v=20260827-114">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏    document.documentElement.classList.add("i18n-pending");
     setTimeout(function () { document.documentElement.classList.remove("i18n-pending"); }, 2500);
@@ -319,6 +319,7 @@
           <a class="settings-nav-item" data-target="settings-context">上下文与项目</a>
           <a class="settings-nav-item" data-target="settings-auto-review">自动推进</a>
             <a class="settings-nav-item" data-target="settings-notifications">通知</a>
+            <a class="settings-nav-item" data-target="settings-permission">命令权限</a>
         <a class="settings-nav-item" data-target="settings-skills">工具 / 技能</a>
           <a class="settings-nav-item" data-target="settings-data">数据备份</a>
           <a class="settings-nav-item" data-target="settings-lan">局域网遥控</a>
@@ -464,6 +465,21 @@
             <span>💻 任务完成时发送系统通知（需浏览器授权）</span>
           </label>
           <div id="notif-permission-hint" class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);"></div>
+        </section>
+
+        <section class="settings-block" id="settings-permission">
+          <div class="settings-block-head">
+            <div>
+              <h2>命令权限</h2>
+              <p>控制 AI 执行终端命令时的审批策略；灾难级命令（rm -rf /、format 等）任何模式下都强制拦截</p>
+            </div>
+          </div>
+          <div class="permission-mode-row">
+            <button class="review-mode-btn" data-mode="ask">🛡 人工审批</button>
+            <button class="review-mode-btn" data-mode="auto">⚡ 自动审批</button>
+            <button class="review-mode-btn" data-mode="full">🔓 完全访问</button>
+          </div>
+          <div id="permission-mode-hint" class="setting-hint" style="margin-top: 8px; font-size: 12px; color: var(--text-muted);"></div>
         </section>
 
         <section class="settings-block" id="settings-skills">
@@ -1095,7 +1111,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260826-113"></script>
+  <script type="module" src="./js/app.js?v=20260827-114"></script>
 
 </body>
 </html>
