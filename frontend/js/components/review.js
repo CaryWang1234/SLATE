@@ -3,22 +3,23 @@
  * 读取 git diff（staged/unstaged/commit range），AI 四维度结构化审查 + 行级评论
  */
 
-import { state, getModelKey } from "../store.js?v=20260827-115";
-import { post, streamChat } from "../services/api.js?v=20260827-115";
-import { renderMarkdown } from "../services/markdown.js?v=20260827-115";
-import { t } from "../services/i18n.js?v=20260827-115";
+import { state, getModelKey } from "../store.js?v=20260827-119";
+import { post, streamChat } from "../services/api.js?v=20260827-119";
+import { renderMarkdown } from "../services/markdown.js?v=20260827-119";
+import { t } from "../services/i18n.js?v=20260827-119";
+import { setIconText } from "../services/icons.js?v=20260827-119";
 
 const DIFF_MODES = {
-  unstaged: { label: "未暂存变更", icon: "📝" },
-  staged:   { label: "已暂存变更", icon: "📦" },
-  commit:   { label: "提交范围", icon: "🔀" },
+  unstaged: { label: "未暂存变更" },
+  staged:   { label: "已暂存变更" },
+  commit:   { label: "提交范围" },
 };
 
 const DIMENSIONS = {
-  quality:       { label: "代码质量", icon: "✨", color: "#4a9eff" },
-  security:      { label: "安全性",   icon: "🛡️", color: "#ff6b6b" },
-  performance:   { label: "性能",     icon: "⚡", color: "#ffd93d" },
-  maintainability: { label: "可维护性", icon: "🔧", color: "#6bcb77" },
+  quality:       { label: "代码质量", icon: "sparkles", color: "#4a9eff" },
+  security:      { label: "安全性",   icon: "shield", color: "#ff6b6b" },
+  performance:   { label: "性能",     icon: "zap", color: "#ffd93d" },
+  maintainability: { label: "可维护性", icon: "tool", color: "#6bcb77" },
 };
 
 const SEVERITY_LABELS = { critical: "严重", major: "重要", minor: "建议", info: "信息" };
@@ -47,7 +48,7 @@ function showView(name) {
 function openReviewModal() {
   bindReviewModal();
   if (!state.project) {
-    import("../app.js?v=20260827-115").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
+    import("../app.js?v=20260827-119").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
     return;
   }
   currentDiff = null;
@@ -93,7 +94,7 @@ async function startReview() {
   const model = state.currentModel;
   const apiKey = model?.id ? getModelKey(model.id) : "";
   if (!model?.id || !apiKey) {
-    import("../app.js?v=20260827-115").then(({ toast }) => toast("请先选择模型并配置 API Key")).catch(() => {});
+    import("../app.js?v=20260827-119").then(({ toast }) => toast("请先选择模型并配置 API Key")).catch(() => {});
     return;
   }
 
@@ -148,14 +149,14 @@ async function startReview() {
 
     renderReviewResult();
     showView("result");
-    import("../app.js?v=20260827-115").then(({ toast }) => toast(t("代码审查完成"))).catch(() => {});
+    import("../app.js?v=20260827-119").then(({ toast }) => toast(t("代码审查完成"))).catch(() => {});
   } catch (e) {
     if (e.name === "AbortError") {
       appendLog(t("已取消"));
       showView("setup");
     } else {
-      appendLog(t("✕ 审查失败: {msg}", { msg: e.message }));
-      import("../app.js?v=20260827-115").then(({ toast }) => toast(t("代码审查失败: {msg}", { msg: e.message }))).catch(() => {});
+      appendLog(t("审查失败: {msg}", { msg: e.message }));
+      import("../app.js?v=20260827-119").then(({ toast }) => toast(t("代码审查失败: {msg}", { msg: e.message }))).catch(() => {});
     }
   } finally {
     running = false;
@@ -359,7 +360,7 @@ function renderDimensionCards() {
 
     const title = document.createElement("div");
     title.className = "review-dimension-title";
-    title.textContent = `${meta.icon} ${meta.label}`;
+    setIconText(title, meta.icon, meta.label);
     card.appendChild(title);
 
     const content = document.createElement("div");
@@ -393,9 +394,9 @@ function renderDimensionCards() {
 async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
-    import("../app.js?v=20260827-115").then(({ toast }) => toast(t("已复制"))).catch(() => {});
+    import("../app.js?v=20260827-119").then(({ toast }) => toast(t("已复制"))).catch(() => {});
   } catch {
-    import("../app.js?v=20260827-115").then(({ toast }) => toast(t("复制失败"))).catch(() => {});
+    import("../app.js?v=20260827-119").then(({ toast }) => toast(t("复制失败"))).catch(() => {});
   }
 }
 

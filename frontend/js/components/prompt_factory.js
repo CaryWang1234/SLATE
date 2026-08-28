@@ -2,11 +2,12 @@
  * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交付 Prompt
  */
 
-import { state, subscribe, addPromptSnippet } from "../store.js?v=20260827-115";
-import { get, post } from "../services/api.js?v=20260827-115";
-import { browseFiles } from "../services/project.js?v=20260827-115";
-import { t } from "../services/i18n.js?v=20260827-115";
-import { makeId } from "../services/utils.js?v=20260827-115";
+import { state, subscribe, addPromptSnippet } from "../store.js?v=20260827-119";
+import { get, post } from "../services/api.js?v=20260827-119";
+import { browseFiles } from "../services/project.js?v=20260827-119";
+import { t } from "../services/i18n.js?v=20260827-119";
+import { iconSvg } from "../services/icons.js?v=20260827-119";
+import { makeId } from "../services/utils.js?v=20260827-119";
 
 const FACTORY_PRESETS = {
   codex: {
@@ -190,8 +191,8 @@ function renderShell() {
       <div class="prompt-output-header">
         <span>生成结果</span>
         <div class="factory-output-actions">
-          <button id="factory-btn-save-snippet" class="icon-btn" title="保存为素材" type="button">☆</button>
-          <button id="factory-btn-download" class="icon-btn" title="下载 Markdown" type="button">⬇</button>
+          <button id="factory-btn-save-snippet" class="icon-btn" title="保存为素材" type="button">${iconSvg("star")}</button>
+          <button id="factory-btn-download" class="icon-btn" title="下载 Markdown" type="button">${iconSvg("download")}</button>
           <button id="btn-copy-prompt" class="icon-btn" title="复制" type="button">⧉</button>
         </div>
       </div>
@@ -393,7 +394,7 @@ function renderChecklist() {
 
   checklistEl.innerHTML = checks.map(check => `
     <div class="factory-check ${check.ok ? "ok" : ""}">
-      <span>${check.ok ? "✓" : "·"}</span>
+      <span>${check.ok ? iconSvg("check") : ""}</span>
       ${check.label}
     </div>
   `).join("");

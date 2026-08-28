@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260827-115";
+import { makeId } from "./services/utils.js?v=20260827-119";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -34,7 +34,7 @@ const state = {
   // 每个对话的用量统计（convId → usage）
   conversationUsage: {},
 
-  // 每个对话的 TODOLIST（convId → items），Harness 六阶段闭环的任务清单
+  // 每个对话的 TODOLIST（convId → items），目标六阶段闭环的任务清单
   conversationTodos: {},
 
   // 模型列表
@@ -90,7 +90,7 @@ const state = {
     autoApply: true,
   },
 
-  // Harness 自主执行：模型自主多轮调用工具直至任务完成
+  // 目标自主执行：模型自主多轮调用工具直至任务完成
   harness: {
     enabled: false,
     maxRounds: 50,
@@ -455,7 +455,7 @@ function setConversationUsage(convId, usage) {
   state.conversationUsage[convId] = { ...usage };
 }
 
-// ── TODOLIST（按对话隔离，Harness 任务清单） ────────
+// ── TODOLIST（按对话隔离，目标任务清单） ────────
 
 function getConversationTodos(convId) {
   return state.conversationTodos[convId || "_scratch"] || [];

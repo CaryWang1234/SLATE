@@ -2,25 +2,26 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260827-115";
-import { initI18n, t } from "./services/i18n.js?v=20260827-115";
-import { get, post, put } from "./services/api.js?v=20260827-115";
-import { dlgConfirm } from "./services/dialog.js?v=20260827-115";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260827-115";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260827-115";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260827-115";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260827-115";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260827-115";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260827-115";
-import { initTeamPanel } from "./components/team.js?v=20260827-115";
-import { initProjectBar } from "./components/project_bar.js?v=20260827-115";
-import { initMemoryPanel } from "./components/memory.js?v=20260827-115";
-import { initExpertsPanel } from "./components/experts.js?v=20260827-115";
-import { initSchedule } from "./components/schedule.js?v=20260827-115";
-import { initRiskGuard } from "./services/riskguard.js?v=20260827-115";
-import { initUnderstandPanel } from "./components/understand.js?v=20260827-115";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260827-115";
-import { setProject, setProjectFileTree } from "./store.js?v=20260827-115";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260827-119";
+import { initI18n, t } from "./services/i18n.js?v=20260827-119";
+import { iconSvgEl } from "./services/icons.js?v=20260827-119";
+import { get, post, put } from "./services/api.js?v=20260827-119";
+import { dlgConfirm } from "./services/dialog.js?v=20260827-119";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260827-119";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260827-119";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260827-119";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260827-119";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260827-119";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260827-119";
+import { initTeamPanel } from "./components/team.js?v=20260827-119";
+import { initProjectBar } from "./components/project_bar.js?v=20260827-119";
+import { initMemoryPanel } from "./components/memory.js?v=20260827-119";
+import { initExpertsPanel } from "./components/experts.js?v=20260827-119";
+import { initSchedule } from "./components/schedule.js?v=20260827-119";
+import { initRiskGuard } from "./services/riskguard.js?v=20260827-119";
+import { initUnderstandPanel } from "./components/understand.js?v=20260827-119";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260827-119";
+import { setProject, setProjectFileTree } from "./store.js?v=20260827-119";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -310,7 +311,7 @@ function renderCustomModelManagement() {
 
     const editBtn = document.createElement("button");
     editBtn.className = "icon-btn";
-    editBtn.textContent = "✏️";
+    editBtn.appendChild(iconSvgEl("edit-2"));
     editBtn.title = "编辑";
     editBtn.addEventListener("click", () => openCustomModelModal(model));
 
@@ -373,7 +374,7 @@ function renderKeyManagement() {
 
     const saveBtn = document.createElement("button");
     saveBtn.className = "icon-btn key-mgmt-save";
-    saveBtn.textContent = "💾";
+    saveBtn.appendChild(iconSvgEl("check"));
     saveBtn.title = "保存";
     saveBtn.addEventListener("click", () => {
       const val = input.value.trim();
@@ -953,8 +954,8 @@ function updateNotifPermissionHint() {
     return;
   }
   const perm = Notification.permission;
-  if (perm === "granted") hint.textContent = t("\u2705 已授权系统通知");
-  else if (perm === "denied") hint.textContent = t("\u274c 系统通知权限已被拒绝，请在浏览器设置中手动开启");
+  if (perm === "granted") hint.textContent = t("已授权系统通知");
+  else if (perm === "denied") hint.textContent = t("系统通知权限已被拒绝，请在浏览器设置中手动开启");
   else hint.textContent = t("开启系统通知后将请求浏览器授权");
 }
 
@@ -966,7 +967,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260827-115").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260827-119").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1081,7 +1082,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260827-115");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260827-119");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1214,7 +1215,7 @@ async function checkAppUpdate() {
 
     const close = document.createElement("button");
     close.className = "update-banner-close";
-    close.textContent = "✕";
+    close.appendChild(iconSvgEl("x"));
     close.title = "忽略该版本";
     close.addEventListener("click", () => {
       banner.classList.add("hidden");
@@ -1278,7 +1279,7 @@ async function init() {
   // 设置弹窗
   document.getElementById("btn-settings").addEventListener("click", openSettings);
   document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
-  // 顶栏 📡：直达设置页“局域网遥控”区块（明显的网址获取入口
+  // 顶栏局域网入口：直达设置页“局域网遥控”区块（明显的网址获取入口）
   document.getElementById("btn-lan")?.addEventListener("click", () => openSettings({ focusLan: true }));
 
   document.getElementById("btn-lan-refresh")?.addEventListener("click", renderLanInfo);
@@ -1306,7 +1307,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260827-115");
+      const { openProject } = await import("./services/project.js?v=20260827-119");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

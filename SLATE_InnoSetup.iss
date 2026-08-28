@@ -6,7 +6,7 @@
 #define MyAppName "SLATE 砚"
 #define MyAppVersion "0.3.4"
 ; 构建号（yyyyMMddHHmm），每次发布构建时更新
-#define MyAppBuild "202608271512"
+#define MyAppBuild "202608280913"
 #define MyAppPublisher "SLATE"
 #define MyAppURL "https://github.com/CaryWang1234/SLATE"
 #define MyAppExeName "SLATE.exe"
@@ -23,7 +23,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
-AppComments=Local AI Agentic Platform (Build {#MyAppBuild})
+AppComments=本地 AI 智能体平台 / Local AI Agentic Platform (Build {#MyAppBuild})
 AppContact={#MyAppURL}/issues
 DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
@@ -52,17 +52,30 @@ RestartApplications=no
 ; 版本信息（写入安装包属性页）
 VersionInfoVersion={#MyAppVersion}
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription={#MyAppName} Installer (Build {#MyAppBuild})
+VersionInfoDescription={#MyAppName} 安装程序 Installer (Build {#MyAppBuild})
 VersionInfoProductName={#MyAppName}
 VersionInfoCopyright=Copyright (c) {#MyAppPublisher}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+; 向导页默认文案（英文 Default.isl）覆盖为中英双语显示
+[CustomMessages]
+SetupWindowTitle={#MyAppName} 安装程序 / SLATE Setup
+WelcomeLabel1=欢迎使用 {#MyAppName} 安装向导%nWelcome to the {#MyAppName} Setup Wizard
+WelcomeLabel2=安装程序将把 {#MyAppName} 安装到您的计算机。建议在继续前关闭所有其他应用程序。%n%nThis will install {#MyAppName} on your computer. It is recommended that you close all other applications before continuing.
+SelectTasksLabel1=请选择安装过程中要执行的其他任务，然后点击“下一步”。%nSelect the additional tasks you would like Setup to perform while installing {#MyAppName}, then click Next.
+SelectTasksLabel2=需要执行哪些附加任务？%nWhich additional tasks should be performed?
+ReadyLabel1=准备安装 / Start Installation
+ReadyLabel2=点击“安装”开始安装；如需检查或修改设置，请点击“上一步”。%n%nClick Install to continue with the installation, or click Back if you want to review or change any settings.
+FinishedLabel=安装程序已成功将 {#MyAppName} 安装到您的计算机，可通过选择安装的图标启动应用程序。%n%nSetup has finished installing {#MyAppName} on your computer. The application may be launched by selecting the installed icons.
+FinishedLabelNoIcons=安装程序已成功将 {#MyAppName} 安装到您的计算机。%nSetup has finished installing {#MyAppName} on your computer.
+ClickFinish=点击“完成”按钮退出安装程序。%nClick the Finish button to exit Setup.
+
 [Tasks]
-Name: "desktopicon"; Description: "创建桌面快捷方式 Add Desktop Shortcut"; GroupDescription: "附加快捷方式："; Flags: checkedonce
-Name: "autostart"; Description: "开机自动启动 {#MyAppName} Auto start SLATE while setup"; GroupDescription: "附加选项："; Flags: unchecked
-Name: "userdata"; Description: "卸载时保留用户数据（聊天记录 / 技能 / 设置）Keep data when uninstall"; GroupDescription: "卸载行为："; Flags: checkedonce
+Name: "desktopicon"; Description: "创建桌面快捷方式 Add Desktop Shortcut"; GroupDescription: "附加快捷方式：Additional shortcuts:"; Flags: checkedonce
+Name: "autostart"; Description: "开机自动启动 {#MyAppName} Auto start SLATE while setup"; GroupDescription: "附加选项：Additional options:"; Flags: unchecked
+Name: "userdata"; Description: "卸载时保留用户数据（聊天记录 / 技能 / 设置）Keep data when uninstall"; GroupDescription: "卸载行为：Uninstall behavior:"; Flags: checkedonce
 
 [Registry]
 ; 开机自启（随 autostart 任务创建，卸载时自动移除）
@@ -89,7 +102,7 @@ Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent shellexec
+Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName} Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent shellexec
 
 [InstallDelete]
 ; 清理旧版本 PyInstaller 产物，避免残留
@@ -168,8 +181,11 @@ begin
   begin
     if MsgBox(
       '未检测到 Microsoft Edge WebView2 运行时。' + #13#10 +
-      'SLATE 桌面窗口依赖该组件，缺少时可能无法显示界面。' + #13#10#13#10 +
-      '是否打开微软官方下载页面？（也可稍后自行安装）',
+      'WebView2 runtime not detected.' + #13#10#13#10 +
+      'SLATE 桌面窗口依赖该组件，缺少时可能无法显示界面。' + #13#10 +
+      'The SLATE desktop window depends on it; the UI may fail to display without it.' + #13#10#13#10 +
+      '是否打开微软官方下载页面？（也可稍后自行安装）' + #13#10 +
+      'Open the official Microsoft download page? (You can also install it later.)',
       mbConfirmation, MB_YESNO) = IDYES then
     begin
       ShellExec('open', 'https://developer.microsoft.com/microsoft-edge/webview2/',
@@ -200,7 +216,9 @@ begin
     begin
       if MsgBox(
         '是否同时删除用户数据（聊天记录、自定义技能、设置）？' + #13#10 +
-        '选择"否"将保留数据，重新安装后可继续使用。',
+        'Delete user data (chat history, custom skills, settings) as well?' + #13#10#13#10 +
+        '选择“否”将保留数据，重新安装后可继续使用。' + #13#10 +
+        'Choose "No" to keep the data and continue after reinstalling.',
         mbConfirmation, MB_YESNO) = IDYES then
       begin
         DelTree(ExpandConstant('{app}\data'), True, True, True);

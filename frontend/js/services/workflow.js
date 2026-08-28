@@ -6,11 +6,11 @@
  * - 支持 AbortController 中断
  */
 
-import { get, post } from "./api.js?v=20260827-115";
-import { state, getModelKey } from "../store.js?v=20260827-115";
-import { guardSkillParams } from "./riskguard.js?v=20260827-115";
-import { t } from "./i18n.js?v=20260827-115";
-import { makeId } from "./utils.js?v=20260827-115";
+import { get, post } from "./api.js?v=20260827-119";
+import { state, getModelKey } from "../store.js?v=20260827-119";
+import { guardSkillParams } from "./riskguard.js?v=20260827-119";
+import { t } from "./i18n.js?v=20260827-119";
+import { makeId } from "./utils.js?v=20260827-119";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 
@@ -357,7 +357,7 @@ async function runWorkflow(wf, userInput, members, hooks = {}) {
 // ── 产物写入 knowledge（复用现有 /knowledge/docs 链路） ──
 
 async function saveRunToKnowledge(wf, result) {
-  const icons = { success: "✅", failed: "❌", skipped: "⏭", waiting: "⏳", running: "🔄" };
+  const statusMark = { success: "成功", failed: "失败", skipped: "跳过", waiting: "等待", running: "运行中" };
   const recs = result.order.map(id => result.records[id]);
   const okCount = recs.filter(r => r.status === STATUS.SUCCESS).length;
   const finalNodeId = [...result.order].reverse().find(id => result.records[id].status === STATUS.SUCCESS);
@@ -371,7 +371,7 @@ async function saveRunToKnowledge(wf, result) {
   content += `- 并行执行: ${result.parallel ? "是" : "否"}\n\n`;
   content += `## 节点摘要\n\n`;
   for (const r of recs) {
-    content += `### ${icons[r.status] || ""} ${r.name}（${r.outputKey}）\n`;
+    content += `### ${statusMark[r.status] || ""} ${r.name}（${r.outputKey}）\n`;
     content += `绑定: ${r.modelLabel || "无"} · 状态: ${r.status}`;
     if (r.startedAt && r.finishedAt) content += ` · 耗时 ${((r.finishedAt - r.startedAt) / 1000).toFixed(1)}s`;
     content += "\n\n";

@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20260827-115";
-import { getToolsSystemPrompt } from "./tools.js?v=20260827-115";
+import { state } from "../store.js?v=20260827-119";
+import { getToolsSystemPrompt } from "./tools.js?v=20260827-119";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -19,7 +19,7 @@ const SYSTEM_BASE = `你是 SLATE（砚），一个本地 AI 协作调度台助�
 ## Agent 工作协议
 - 先判断任务类型：纯问答直接回答；需要环境事实或副作用的任务进入 Observe → Plan → Act → Verify → Report 循环。
 - Observe：缺少项目事实时优先读取目录、文件、配置、日志或命令输出；不要臆测仓库现状。
-- Plan：复杂任务用 3-6 个内部步骤收束，不必把完整计划冗长输出给用户；Harness/TODOLIST 开启时按清单推进。
+- Plan：复杂任务用 3-6 个内部步骤收束，不必把完整计划冗长输出给用户；目标/TODOLIST 开启时按清单推进。
 - Act：能用工具完成的动作就发出工具调用；同一轮可批量调用互不依赖的读取/扫描工具。
 - Verify：修改、生成、构建、修复后必须用读取、检查、测试或命令结果自证；验证失败继续修，不急着汇报完成。
 - Report：只有在任务完成或确实受阻时才收尾；汇报要短，说明改了什么、验证了什么、剩余风险。

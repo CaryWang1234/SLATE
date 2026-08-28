@@ -12,11 +12,11 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260827-115";
-import { post } from "../services/api.js?v=20260827-115";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260827-115";
-import { t } from "./i18n.js?v=20260827-115";
-import { makeId } from "./utils.js?v=20260827-115";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260827-119";
+import { post } from "../services/api.js?v=20260827-119";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260827-119";
+import { t } from "./i18n.js?v=20260827-119";
+import { makeId } from "./utils.js?v=20260827-119";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -69,7 +69,7 @@ const TOOLS = {
       const d = res.data;
       if (d.type === "file") return `[${d.name}] (${d.size} bytes)\n${d.content?.slice(0, 5000) || ""}`;
       if (!d.entries?.length) return `[${d.path}] 空目录`;
-      return d.entries.map(e => `${e.type === "dir" ? "📁" : "📄"} ${e.name}${e.size ? ` (${e.size}B)` : ""}`).join("\n");
+      return d.entries.map(e => `${e.type === "dir" ? "[目录]" : "[文件]"} ${e.name}${e.size ? ` (${e.size}B)` : ""}`).join("\n");
     },
   },
 
@@ -101,7 +101,7 @@ const TOOLS = {
       if (res.code !== 0) return res.message || "查找失败";
       const matches = res.data?.matches || [];
       if (!matches.length) return `未找到 ${query}`;
-      return matches.map(item => `${item.type === "dir" ? "📁" : "📄"} ${item.path}${item.size ? ` (${item.size}B)` : ""}`).join("\n");
+      return matches.map(item => `${item.type === "dir" ? "[目录]" : "[文件]"} ${item.path}${item.size ? ` (${item.size}B)` : ""}`).join("\n");
     },
   },
 
@@ -742,9 +742,9 @@ const TOOLS = {
 
       setConversationTodos(convId, list);
       if (!list.length) return "TODOLIST 已清空";
-      const icons = { done: "✓", in_progress: "…", blocked: "!", pending: "·" };
+      const labels = { done: "done", in_progress: "doing", blocked: "blocked", pending: "todo" };
       const done = list.filter(t => t.status === "done").length;
-      const lines = list.map(t => `${icons[t.status] || ""} [${t.id}] ${t.content}`);
+      const lines = list.map(t => `[${labels[t.status] || "todo"}] [${t.id}] ${t.content}`);
       return `TODOLIST 已更新（${done}/${list.length} 完成）：\n${lines.join("\n")}` +
         (done === list.length
           ? "\n全部完成，进入验证与汇报阶段。"

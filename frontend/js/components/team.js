@@ -3,17 +3,17 @@
  * 轻量模型初步讨论，重型模型最终决策。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260827-115";
-import { notifyTaskComplete } from "../services/notify.js?v=20260827-115";
-import { streamChat } from "../services/api.js?v=20260827-115";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260827-115";
-import { renderMarkdown } from "../services/markdown.js?v=20260827-115";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260827-115";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260827-115";
-import { getExpertsCached } from "./experts.js?v=20260827-115";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260827-115";
-import { t } from "../services/i18n.js?v=20260827-115";
-import { makeId } from "../services/utils.js?v=20260827-115";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260827-119";
+import { notifyTaskComplete } from "../services/notify.js?v=20260827-119";
+import { streamChat } from "../services/api.js?v=20260827-119";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260827-119";
+import { renderMarkdown } from "../services/markdown.js?v=20260827-119";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260827-119";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260827-119";
+import { getExpertsCached } from "./experts.js?v=20260827-119";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260827-119";
+import { t } from "../services/i18n.js?v=20260827-119";
+import { makeId } from "../services/utils.js?v=20260827-119";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -42,7 +42,6 @@ const TEAM_PRESETS = [
   {
     "id": "classic",
     "name": "经典三人组",
-    "icon": "🎯",
     "desc": "分析师 + 创意者 + 决策者",
     "members": [
       {
@@ -68,7 +67,6 @@ const TEAM_PRESETS = [
   {
     "id": "code-review",
     "name": "代码审查组",
-    "icon": "🔍",
     "desc": "安全专家 + 性能专家 + 架构师",
     "members": [
       {
@@ -94,7 +92,6 @@ const TEAM_PRESETS = [
   {
     "id": "product-brainstorm",
     "name": "产品头脑风暴",
-    "icon": "💡",
     "desc": "产品经理 + 设计师 + 用户代言 + 技术负责人",
     "members": [
       {
@@ -126,7 +123,6 @@ const TEAM_PRESETS = [
   {
     "id": "tech-selection",
     "name": "技术选型",
-    "icon": "⚙️",
     "desc": "前端专家 + 后端专家 + 基础设施专家",
     "members": [
       {
@@ -158,7 +154,6 @@ const TEAM_PRESETS = [
   {
     "id": "red-blue",
     "name": "红蓝对抗",
-    "icon": "⚔️",
     "desc": "正方辩手 + 反方辩手 + 裁判",
     "members": [
       {
@@ -184,7 +179,6 @@ const TEAM_PRESETS = [
   {
     "id": "fullstack-review",
     "name": "全栈评审",
-    "icon": "🏗️",
     "desc": "前端 + 后端 + 数据库 + 运维",
     "members": [
       {
@@ -222,7 +216,6 @@ const TEAM_PRESETS = [
   {
     "id": "writing-workshop",
     "name": "写作工坊",
-    "icon": "✍️",
     "desc": "内容策划 + 文案写手 + 编辑",
     "members": [
       {
@@ -248,7 +241,6 @@ const TEAM_PRESETS = [
   {
     "id": "startup-advisory",
     "name": "创业顾问团",
-    "icon": "🚀",
     "desc": "市场顾问 + 技术顾问 + 财务顾问 + 运营顾问",
     "members": [
       {
@@ -286,7 +278,6 @@ const TEAM_PRESETS = [
   {
     "id": "academic-seminar",
     "name": "学术研讨",
-    "icon": "🎓",
     "desc": "方法论专家 + 实证研究者 + 批判者",
     "members": [
       {
@@ -1244,13 +1235,13 @@ function initTeamPanel() {
     // 自定义选项
     const customOpt = document.createElement("option");
     customOpt.value = "custom";
-    customOpt.textContent = "\u270f\ufe0f " + t("自定义");
+    customOpt.textContent = t("自定义");
     presetSelect.appendChild(customOpt);
     // 预设选项
     for (const preset of TEAM_PRESETS) {
       const opt = document.createElement("option");
       opt.value = preset.id;
-      opt.textContent = preset.icon + " " + t(preset.name);
+      opt.textContent = t(preset.name);
       presetSelect.appendChild(opt);
     }
     // 默认选中第一个预设

@@ -1,9 +1,9 @@
 /**
  * SLATE 磨墨模式服务：把粗糙想法研磨为结构化墨稿（任务书）。
- * 提示词注入、墨迹解析、墨稿检测与三个动作（送入 Harness / 投到白板 / 存为模板）。
+ * 提示词注入、墨迹解析、墨稿检测与三个动作（送入目标 / 投到白板 / 存为模板）。
  */
 
-import { get, post, del, patch } from "./api.js?v=20260827-115";
+import { get, post, del, patch } from "./api.js?v=20260827-119";
 
 const MAX_ROUNDS = 10;
 
@@ -132,7 +132,7 @@ async function endSession(convId) {
 
 // ── 墨稿动作 ────────────────────────────────
 
-/** 墨稿转 Harness 任务描述 */
+/** 墨稿转目标任务描述 */
 function draftToHarnessTask(draft) {
   const lines = [
     `【磨墨墨稿 · ${draft.title || "未命名任务"}】`,

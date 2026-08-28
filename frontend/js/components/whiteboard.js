@@ -2,11 +2,12 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260827-115";
-import { get, streamChat } from "../services/api.js?v=20260827-115";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260827-115";
-import { t } from "../services/i18n.js?v=20260827-115";
-import { makeId } from "../services/utils.js?v=20260827-115";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260827-119";
+import { get, streamChat } from "../services/api.js?v=20260827-119";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260827-119";
+import { t } from "../services/i18n.js?v=20260827-119";
+import { iconSvgEl } from "../services/icons.js?v=20260827-119";
+import { makeId } from "../services/utils.js?v=20260827-119";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -60,13 +61,13 @@ const BOARD_VIEW_LABELS = {
 };
 
 const COLOR_META = {
-  default: { label: "未分类", icon: "·" },
-  red: { label: "风险", icon: "!" },
-  orange: { label: "待处理", icon: "…" },
-  yellow: { label: "想法", icon: "*" },
-  green: { label: "完成", icon: "✓" },
-  blue: { label: "信息", icon: "i" },
-  purple: { label: "创意", icon: "◇" },
+  default: { label: "未分类", icon: "info" },
+  red: { label: "风险", icon: "alert-triangle" },
+  orange: { label: "待处理", icon: "clock" },
+  yellow: { label: "想法", icon: "lightbulb" },
+  green: { label: "完成", icon: "check" },
+  blue: { label: "信息", icon: "info" },
+  purple: { label: "创意", icon: "sparkles" },
 };
 
 const GIT_POSITION_KEY = "slate_git_graph_positions";
@@ -301,7 +302,7 @@ function boardCardSummary(card) {
   head.className = "board-view-card-head";
   const badge = document.createElement("span");
   badge.className = "board-view-card-badge";
-  badge.textContent = meta.icon;
+  badge.appendChild(iconSvgEl(meta.icon));
   const title = document.createElement("strong");
   title.textContent = card.title || t("未命名");
   head.append(badge, title);
@@ -439,11 +440,11 @@ function renderBoardView() {
     const strip = document.createElement("div");
     strip.className = "board-view-collapse-strip";
     const label = document.createElement("span");
-    label.textContent = `${BOARD_VIEW_LABELS[currentBoardView] || t("视图")} 已收起`;
+    label.textContent = `${t(BOARD_VIEW_LABELS[currentBoardView] || "视图")} ${t("已收起")}`;
     const expand = document.createElement("button");
     expand.type = "button";
     expand.className = "board-view-collapse-btn";
-    expand.textContent = "展开";
+    expand.textContent = t("展开");
     expand.title = t("展开模式区域");
     expand.addEventListener("click", () => {
       boardViewCollapsed = false;
@@ -460,7 +461,7 @@ function renderBoardView() {
   const titleGroup = document.createElement("div");
   titleGroup.className = "board-view-title-group";
   const title = document.createElement("strong");
-  title.textContent = BOARD_VIEW_LABELS[currentBoardView] || t("视图");
+  title.textContent = t(BOARD_VIEW_LABELS[currentBoardView] || "视图");
   titleGroup.append(title);
   const actions = document.createElement("div");
   actions.className = "board-view-header-actions";
@@ -469,7 +470,7 @@ function renderBoardView() {
   const collapse = document.createElement("button");
   collapse.type = "button";
   collapse.className = "board-view-collapse-btn";
-  collapse.textContent = "收起";
+  collapse.textContent = t("收起");
   collapse.title = t("收起模式区域");
   collapse.addEventListener("click", () => {
     boardViewCollapsed = true;
@@ -1002,8 +1003,8 @@ function renderKanbanView(cards) {
   const actionBar = document.createElement("div");
   actionBar.className = "board-view-actionbar";
   actionBar.append(
-    makeViewIconButton("新增", t("在未分类列新增卡片"), () => createBoardCard({ title: t("新卡片"), color: "default" })),
-    makeViewIconButton("排布", t("把看板列同步排布到画布"), () => {
+    makeViewIconButton(t("新增"), t("在未分类列新增卡片"), () => createBoardCard({ title: t("新卡片"), color: "default" })),
+    makeViewIconButton(t("排布"), t("把看板列同步排布到画布"), () => {
       const columnIndex = new Map(KANBAN_COLORS.map((color, index) => [color, index]));
       const rowCounts = new Map();
       const nextCards = cards.map(card => {
@@ -1045,8 +1046,8 @@ function renderKanbanView(cards) {
     const head = document.createElement("div");
     head.className = "board-kanban-head";
     const title = document.createElement("span");
-    title.textContent = `${COLOR_META[color].label} (${colCards.length})`;
-    const add = makeViewIconButton("+", t("在此列新增卡片"), () => createBoardCard({ title: COLOR_META[color].label, color }));
+    title.textContent = `${t(COLOR_META[color].label)} (${colCards.length})`;
+    const add = makeViewIconButton("+", t("在此列新增卡片"), () => createBoardCard({ title: t(COLOR_META[color].label), color }));
     head.append(title, add);
     col.appendChild(head);
     colCards.forEach(card => {
@@ -1891,7 +1892,7 @@ function renderColorOptions() {
     btn.className = "card-color-btn" + (selectedColor === color.id ? " active" : "");
     btn.style.background = color.bg;
     btn.style.borderColor = color.border;
-    btn.title = color.name;
+    btn.title = t(color.name);
     btn.addEventListener("click", () => {
       selectedColor = color.id;
       renderColorOptions();
@@ -2270,15 +2271,6 @@ function addToolStepCard(toolName, params, status = "running") {
   const stepCards = state.boardCards.filter(c => c._isToolStep);
   const stepNum = stepCards.length + 1;
   
-  // 工具图标映射
-  const toolIcons = {
-    file_tree: "📁", file_peek: "👀", file_edit: "✏️", file_create: "📄",
-    terminal: "💻", code_scan: "🔍", todo_scan: "✓", board_add: "🗒",
-    board_update: "🗒", board_batch: "🗒", board_read: "🗒",
-    knowledge_search: "🔎", knowledge_add: "📚", memory_manage: "🧠",
-  };
-  const icon = toolIcons[toolName] || "⚙️";
-  
   // 工具描述映射
   const toolDescs = {
     file_tree: "查看目录结构", file_peek: "读取文件内容", file_edit: "编辑文件",
@@ -2304,7 +2296,7 @@ function addToolStepCard(toolName, params, status = "running") {
   // 创建步骤卡片
   const card = placeNewCard({
     id: makeId("step_"),
-    title: `${icon} 步骤 ${stepNum}: ${desc}`,
+    title: `步骤 ${stepNum}: ${desc}`,
     body: summary || "(无参数)",
     color,
     arrows: [],
@@ -2339,7 +2331,7 @@ function updateToolStepCard(cardId, status, result = "") {
     const maxLen = 100;
     card.body = result.length > maxLen ? result.slice(0, maxLen) + "..." : result;
   } else if (status === "error") {
-    card.body = "❌ " + (result || "执行失败");
+    card.body = "失败：" + (result || "执行失败");
   }
   
   // 触发更新

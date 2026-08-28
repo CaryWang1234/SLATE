@@ -272,7 +272,31 @@ select:focus {
   border-color: var(--gold);
 }
 
-/* 功能开启中的高亮（Harness / 磨墨等） */
+/* 内联 SVG 图标（替代 emoji，与文字同字号对齐） */
+.svg-icon {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  flex: none;
+  vertical-align: -0.125em;
+  color: currentColor;
+}
+
+.icon-btn .svg-icon,
+.board-tool-btn .svg-icon,
+.send-btn .svg-icon {
+  width: 1.05em;
+  height: 1.05em;
+}
+
+.icon-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+
+/* 功能开启中的高亮（目标 / 磨墨等） */
 .icon-btn.active {
   color: var(--gold);
   border-color: var(--gold);
@@ -1187,6 +1211,10 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .skill-result-doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
   color: var(--accent, #4a6fa5);
   text-decoration: none;
 }
@@ -3263,7 +3291,7 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .team-preset-select:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-bg);
 }
 
 .team-label {
@@ -5178,7 +5206,7 @@ img.file-type-icon {
   border-color: var(--gold);
 }
 
-/* ── Harness 自主执行 ─────────────── */
+/* ── 目标自主执行 ─────────────── */
 
 #btn-harness.active {
   background: var(--gold);
@@ -5199,7 +5227,7 @@ img.file-type-icon {
   border-radius: var(--radius);
 }
 
-/* ── TODOLIST 任务清单面板（Harness 六阶段闭环） ─── */
+/* ── TODOLIST 任务清单面板（目标六阶段闭环） ─── */
 
 .todo-panel {
   width: 280px;
@@ -6664,7 +6692,7 @@ img.file-type-icon {
   font-weight: 600;
 }
 
-/* 墨稿下方三个动作：送入 Harness / 投到白板 / 存为模板 */
+/* 墨稿下方三个动作：送入目标 / 投到白板 / 存为模板 */
 .grind-draft-actions {
   display: flex;
   align-items: center;
@@ -7348,13 +7376,13 @@ html.i18n-pending body {
 }
 
 .review-mode-btn:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-bg);
 }
 
 .review-mode-btn.active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent-fg);
+  border-color: var(--accent-bg);
 }
 
 /* 设置页：命令权限 / 联网搜索 模式选择 */
@@ -7391,7 +7419,7 @@ html.i18n-pending body {
 }
 
 .review-commit-input:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-bg);
 }
 
 .review-diff-summary {
@@ -7449,8 +7477,8 @@ html.i18n-pending body {
 }
 
 .review-tab.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-bg);
+  color: var(--accent-fg);
 }
 
 .review-result-meta {
@@ -7532,7 +7560,7 @@ html.i18n-pending body {
 
 .review-comment-loc {
   font-family: var(--font-mono);
-  color: var(--accent);
+  color: var(--accent-bg);
   font-size: 12px;
 }
 

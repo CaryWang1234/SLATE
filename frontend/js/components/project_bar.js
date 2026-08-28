@@ -2,10 +2,11 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260827-115";
-import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260827-115";
-import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260827-115";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260827-115";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260827-119";
+import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260827-119";
+import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260827-119";
+import { iconSvgEl, setIconText } from "../services/icons.js?v=20260827-119";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260827-119";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let fileTreeContainer, projectInfoEl, projectCloseBtn;
@@ -35,7 +36,7 @@ function renderProjectBar() {
 
     const icon = document.createElement("span");
     icon.className = "project-bar-icon";
-    icon.textContent = "📁";
+    icon.appendChild(iconSvgEl("folder"));
     info.appendChild(icon);
 
     const name = document.createElement("span");
@@ -55,10 +56,10 @@ function renderProjectBar() {
 
     const understandBtn = document.createElement("button");
     understandBtn.className = "icon-btn";
-    understandBtn.textContent = "📖";
+    understandBtn.appendChild(iconSvgEl("book-open"));
     understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册";
     understandBtn.addEventListener("click", () => {
-      import("./understand.js?v=20260827-115")
+      import("./understand.js?v=20260827-119")
         .then(({ openUnderstandModal }) => openUnderstandModal())
         .catch(() => {});
     });
@@ -66,10 +67,10 @@ function renderProjectBar() {
 
     const reviewBtn = document.createElement("button");
     reviewBtn.className = "icon-btn";
-    reviewBtn.textContent = "\u{1F50D}";
+    reviewBtn.appendChild(iconSvgEl("search"));
     reviewBtn.title = "Code Review\uff1aAI \u4ee3\u7801\u5ba1\u67e5\uff08git diff \u00b7 \u56db\u7ef4\u5ea6 \u00b7 \u884c\u7ea7\u8bc4\u8bba\uff09";
     reviewBtn.addEventListener("click", () => {
-      import("./review.js?v=20260827-115")
+      import("./review.js?v=20260827-119")
         .then(({ openReviewModal }) => openReviewModal())
         .catch(() => {});
     });
@@ -78,7 +79,7 @@ function renderProjectBar() {
 
     const configBtn = document.createElement("button");
     configBtn.className = "icon-btn";
-    configBtn.textContent = "⚙";
+    configBtn.appendChild(iconSvgEl("settings"));
     configBtn.title = "项目设置";
     configBtn.addEventListener("click", openProjectSettings);
     actions.appendChild(configBtn);
@@ -102,7 +103,7 @@ function renderProjectBar() {
 
     const openBtn = document.createElement("button");
     openBtn.className = "project-bar-open";
-    openBtn.textContent = "📂 打开项目…";
+    setIconText(openBtn, "folder-open", "打开项目…");
     openBtn.addEventListener("click", openProjectModal);
     projectBar.appendChild(openBtn);
     projectBar.appendChild(actions);

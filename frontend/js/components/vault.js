@@ -3,10 +3,11 @@
  * 文件夹/笔记树形浏览、编辑器+实时预览、[[wiki-link]] 双向链接、搜索与标签
  */
 
-import { get, post, put, del } from "../services/api.js?v=20260827-115";
-import { renderMarkdown } from "../services/markdown.js?v=20260827-115";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260827-115";
-import { t } from "../services/i18n.js?v=20260827-115";
+import { get, post, put, del } from "../services/api.js?v=20260827-119";
+import { renderMarkdown } from "../services/markdown.js?v=20260827-119";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260827-119";
+import { t } from "../services/i18n.js?v=20260827-119";
+import { iconSvgEl } from "../services/icons.js?v=20260827-119";
 
 let vaultSidebar, vaultEditorEmpty, vaultEditorActive;
 let vaultSearchInput, vaultTagsBar;
@@ -24,7 +25,7 @@ let previewTimer = null;
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260827-115");
+    const { toast: showToast } = await import("../app.js?v=20260827-119");
     showToast(msg);
   } catch { console.warn(msg); }
 }
@@ -95,7 +96,7 @@ function renderTreeItems(items, container, depth) {
 
       const icon = document.createElement("span");
       icon.className = "vault-tree-icon";
-      icon.textContent = "📁";
+      icon.appendChild(iconSvgEl("folder"));
       el.appendChild(icon);
 
       const name = document.createElement("span");
@@ -140,7 +141,7 @@ function renderTreeItems(items, container, depth) {
 
       const icon = document.createElement("span");
       icon.className = "vault-tree-icon";
-      icon.textContent = "📄";
+      icon.appendChild(iconSvgEl("file"));
       el.appendChild(icon);
 
       const name = document.createElement("span");
@@ -348,7 +349,7 @@ function renderSearchResults(results) {
 
     const icon = document.createElement("span");
     icon.className = "vault-tree-icon";
-    icon.textContent = "📄";
+    icon.appendChild(iconSvgEl("file"));
     el.appendChild(icon);
 
     const nameWrap = document.createElement("span");
