@@ -12,11 +12,11 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260828-129";
-import { post } from "../services/api.js?v=20260828-129";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260828-129";
-import { t } from "./i18n.js?v=20260828-129";
-import { makeId } from "./utils.js?v=20260828-129";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260828-134";
+import { post } from "../services/api.js?v=20260828-134";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260828-134";
+import { t } from "./i18n.js?v=20260828-134";
+import { makeId } from "./utils.js?v=20260828-134";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -868,7 +868,8 @@ function validateToolCall(name, params) {
   if (!tool) return "";
   const missing = [];
   for (const [key, spec] of Object.entries(tool.params || {})) {
-    if (spec.required && (params?.[key] === undefined || params?.[key] === null || params?.[key] === "")) {
+    // 空字符串是合法值（如 file_create 的 content="" 创建空文件）
+    if (spec.required && (params?.[key] === undefined || params?.[key] === null)) {
       missing.push(key);
     }
   }

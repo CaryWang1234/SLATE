@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260828-129">
+  <link rel="stylesheet" href="./css/style.css?v=20260828-134">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -69,7 +69,7 @@
             <div class="panel-actions">
               <button id="btn-brainstorm" class="icon-btn" title="头脑风暴模式"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4.9 12 4 4 0 0 0-1.9 3H9a4 4 0 0 0-1.9-3A7 7 0 0 1 12 2z"/></svg></button>
               <button id="btn-grind" class="icon-btn" title="磨墨模式：把粗糙想法研磨成结构化任务书（也可输入 /grind 想法）"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></button>
-              <button id="btn-harness" class="icon-btn" title="目标自主执行：模型自主多轮调用工具直至任务完成"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></button>
+              <button id="btn-harness" class="icon-btn" title="目标模式：模型自主多轮调用工具直至任务完成"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></button>
               <button id="btn-schedule" class="icon-btn" title="定时任务"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></button>
               <button id="btn-compress" class="icon-btn" title="手动压缩上下文">⟲</button>
               <button id="btn-memory" class="icon-btn" title="记忆与画像"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></button>
@@ -105,15 +105,21 @@
             <!-- 文件附件预览区 -->
             <div id="file-preview-area" class="file-preview-area hidden"></div>
             <div id="chat-input-area">
-              <button id="btn-attach-file" class="icon-btn" title="添加附件">+</button>
-              <input type="file" id="file-input" multiple hidden accept=".txt,.md,.csv,.tsv,.json,.py,.js,.html,.css,.yaml,.yml,.xml,.sh,.bat,.docx,.xlsx,.pdf,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg">
-              <select id="expert-select" class="expert-select" title="选择专家包（注入人格与规则）">
-                <option value="">无专题</option>
-              </select>
-              <textarea id="chat-input" placeholder="输入消息 (Enter 发送 Shift+Enter 换行)" rows="1"></textarea>
-              <div class="input-actions">
-                <button id="btn-voice" class="icon-btn voice-btn" title="语音输入" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
-                <button id="btn-send" class="send-btn">发送</button>
+              <div class="input-editor-zone">
+                <textarea id="chat-input" placeholder="输入消息 (Enter 发送 Shift+Enter 换行)" rows="1"></textarea>
+              </div>
+              <div class="input-toolbar">
+                <div class="input-toolbar-left">
+                  <button id="btn-attach-file" class="icon-btn" title="添加附件"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                  <input type="file" id="file-input" multiple hidden accept=".txt,.md,.csv,.tsv,.json,.py,.js,.html,.css,.yaml,.yml,.xml,.sh,.bat,.docx,.xlsx,.pdf,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg">
+                  <select id="expert-select" class="expert-select" title="选择专家包（注入人格与规则）">
+                    <option value="">无专题</option>
+                  </select>
+                </div>
+                <div class="input-toolbar-right">
+                  <button id="btn-voice" class="icon-btn voice-btn" title="语音输入" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+                  <button id="btn-send" class="send-btn">发送</button>
+                </div>
               </div>
             </div>
           </div>
@@ -458,7 +464,7 @@
           <div class="settings-block-head">
             <div>
               <h2>通知</h2>
-              <p>大任务结束时的音效与系统通知（目标自主执行、团队讨论、工作流完成时触发）</p>
+              <p>大任务结束时的音效与系统通知（目标模式、团队讨论、工作流完成时触发）</p>
             </div>
           </div>
           <label class="setting-check">
@@ -1098,17 +1104,17 @@
             </div>
           </div>
           <div class="onboarding-card">
-            <span class="onboarding-icon"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+            <span class="onboarding-icon"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
             <div class="onboarding-card-body">
-              <b>目标自主执行</b>
-              <p>输入区「目标」按钮开启：模型自主多轮调用工具直至任务完成，大任务自动建 TODOLIST。</p>
+              <b>目标模式</b>
+              <p>输入区「目标模式」按钮开启：模型自主多轮调用工具直至任务完成，大任务自动建 TODOLIST。</p>
             </div>
           </div>
           <div class="onboarding-card">
             <span class="onboarding-icon"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></span>
             <div class="onboarding-card-body">
               <b>磨墨模式</b>
-              <p>输入 /grind 想法：AI 三段式追问，把粗糙想法研磨成结构化任务书，一键送入目标</p>
+              <p>输入 /grind 想法：AI 三段式追问，把粗糙想法研磨成结构化任务书，一键送入目标模式</p>
             </div>
           </div>
           <div class="onboarding-card">
@@ -1143,7 +1149,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260828-129"></script>
+  <script type="module" src="./js/app.js?v=20260828-134"></script>
 
 </body>
 </html>

@@ -264,7 +264,16 @@ async def search_notes(body: dict[str, Any]) -> dict[str, Any]:
             searchable = f"{title} {note_body}".lower()
             if query not in searchable:
                 continue
-            snippet_start = max(0, searchable.find(query) - 60)
+            # 在 searchable 中找到 query 位置，然后映射回 note_body
+            abs_pos = searchable.find(query)
+            title_len = len(title) + 1  # title + 空格
+            if abs_pos < title_len:
+                # query 在 title 中，从正文开头取摘要
+                snippet_start = 0
+            else:
+                # query 在正文中，计算相对位置
+                rel_pos = abs_pos - title_len
+                snippet_start = max(0, rel_pos - 60)
             snippet = note_body[snippet_start:snippet_start + 200].strip()
             if snippet_start > 0:
                 snippet = "..." + snippet

@@ -2,26 +2,26 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260828-129";
-import { initI18n, t } from "./services/i18n.js?v=20260828-129";
-import { iconSvgEl } from "./services/icons.js?v=20260828-129";
-import { get, post, put } from "./services/api.js?v=20260828-129";
-import { dlgConfirm } from "./services/dialog.js?v=20260828-129";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260828-129";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260828-129";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260828-129";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260828-129";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260828-129";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260828-129";
-import { initTeamPanel } from "./components/team.js?v=20260828-129";
-import { initProjectBar } from "./components/project_bar.js?v=20260828-129";
-import { initMemoryPanel } from "./components/memory.js?v=20260828-129";
-import { initExpertsPanel } from "./components/experts.js?v=20260828-129";
-import { initSchedule } from "./components/schedule.js?v=20260828-129";
-import { initRiskGuard } from "./services/riskguard.js?v=20260828-129";
-import { initUnderstandPanel } from "./components/understand.js?v=20260828-129";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260828-129";
-import { setProject, setProjectFileTree } from "./store.js?v=20260828-129";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260828-134";
+import { initI18n, t } from "./services/i18n.js?v=20260828-134";
+import { iconSvgEl } from "./services/icons.js?v=20260828-134";
+import { get, post, put } from "./services/api.js?v=20260828-134";
+import { dlgConfirm } from "./services/dialog.js?v=20260828-134";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260828-134";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260828-134";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260828-134";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260828-134";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260828-134";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260828-134";
+import { initTeamPanel } from "./components/team.js?v=20260828-134";
+import { initProjectBar } from "./components/project_bar.js?v=20260828-134";
+import { initMemoryPanel } from "./components/memory.js?v=20260828-134";
+import { initExpertsPanel } from "./components/experts.js?v=20260828-134";
+import { initSchedule } from "./components/schedule.js?v=20260828-134";
+import { initRiskGuard } from "./services/riskguard.js?v=20260828-134";
+import { initUnderstandPanel } from "./components/understand.js?v=20260828-134";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260828-134";
+import { setProject, setProjectFileTree } from "./store.js?v=20260828-134";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -840,11 +840,11 @@ async function checkUpdateNow(btn) {
     const dlBtn = document.createElement("button");
     dlBtn.className = "send-btn send-btn-sm";
     dlBtn.textContent = "下载更新";
-    dlBtn.addEventListener("click", () => post("/update/open-url", { url: d.downloadUrl }));
+    dlBtn.addEventListener("click", () => post("/update/open-url", { url: d.downloadUrl }).catch(() => {}));
     const relBtn = document.createElement("button");
     relBtn.className = "icon-btn";
     relBtn.textContent = "更新说明";
-    relBtn.addEventListener("click", () => post("/update/open-url", { url: d.releaseUrl }));
+    relBtn.addEventListener("click", () => post("/update/open-url", { url: d.releaseUrl }).catch(() => {}));
     actions.appendChild(dlBtn);
     actions.appendChild(relBtn);
     info.appendChild(actions);
@@ -967,7 +967,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260828-129").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260828-134").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1082,7 +1082,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260828-129");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260828-134");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1300,21 +1300,23 @@ async function init() {
 
   await loadModels();
 
-  // 自动恢复上次打开的项目
+  // 自动恢复上次打开的项目（失败不中断启动）
   if (state._lastProjectPath) {
-
-    const res = await getCurrentProject();
-    if (res.code === 0 && res.data) {
-      setProject(res.data);
-    } else {
-      const { openProject } = await import("./services/project.js?v=20260828-129");
-      const openRes = await openProject(state._lastProjectPath);
-      if (openRes.code === 0) setProject(openRes.data);
+    try {
+      const res = await getCurrentProject();
+      if (res.code === 0 && res.data) {
+        setProject(res.data);
+      } else {
+        const { openProject } = await import("./services/project.js?v=20260828-134");
+        const openRes = await openProject(state._lastProjectPath);
+        if (openRes.code === 0) setProject(openRes.data);
+      }
+      // 确保文件树加载
+      const browseRes = await browseFiles("");
+      if (browseRes.code === 0) setProjectFileTree(browseRes.data);
+    } catch (e) {
+      console.warn("[SLATE] 恢复项目失败:", e);
     }
-    // 确保文件树加载
-    const browseRes = await browseFiles("");
-
-    if (browseRes.code === 0) setProjectFileTree(browseRes.data);
   }
 
   // 启动时自动检查更新（不阻塞初始化，失败静默）

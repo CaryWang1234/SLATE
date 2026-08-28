@@ -2,12 +2,12 @@
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）。
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260828-129";
-import { get, post, del, upload } from "../services/api.js?v=20260828-129";
-import { guardSkillParams } from "../services/riskguard.js?v=20260828-129";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260828-129";
-import { t } from "../services/i18n.js?v=20260828-129";
-import { setIconText } from "../services/icons.js?v=20260828-129";
+import { state, subscribe, setSkills } from "../store.js?v=20260828-134";
+import { get, post, del, upload } from "../services/api.js?v=20260828-134";
+import { guardSkillParams } from "../services/riskguard.js?v=20260828-134";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260828-134";
+import { t } from "../services/i18n.js?v=20260828-134";
+import { setIconText } from "../services/icons.js?v=20260828-134";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -528,14 +528,14 @@ async function handleDiscoverPlugins() {
       let imported = 0;
       for (const skill of localSkills) {
         try {
-          await post("/skills/import-path", { path: skill.path, name: skill.name });
-          imported++;
+          const res = await post("/skills/import-path", { path: skill.path, name: skill.name });
+          if (res?.code === 0) imported++;
         } catch (e) {}
       }
       for (const plugin of codexPlugins) {
         try {
-          await post("/skills/import-path", { path: plugin.path, name: plugin.name });
-          imported++;
+          const res = await post("/skills/import-path", { path: plugin.path, name: plugin.name });
+          if (res?.code === 0) imported++;
         } catch (e) {}
       }
       showToast(`成功导入 ${imported} 个插件`);

@@ -243,7 +243,12 @@ def execute(
             fpath = Path(root) / fname
             if fpath.suffix.lower() not in SCAN_EXTENSIONS:
                 continue
-            if fpath.stat().st_size > MAX_FILE_SIZE:
+            try:
+                if fpath.stat().st_size > MAX_FILE_SIZE:
+                    skipped_count += 1
+                    continue
+            except OSError:
+                # 断链或权限错误，跳过
                 skipped_count += 1
                 continue
             files_to_scan.append(fpath)

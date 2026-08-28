@@ -103,13 +103,18 @@ def _execute_sync(
 
     # ── launch: 启动/重启浏览器 ──────────────────────
     if action == "launch":
-        # 先关闭已有实例
+        # 先关闭已有实例（包括 playwright driver）
         if _browser:
             try:
                 _browser.close()
             except Exception:
                 pass
-            _browser = _context = _page = _playwright = None
+        if _playwright:
+            try:
+                _playwright.stop()
+            except Exception:
+                pass
+        _browser = _context = _page = _playwright = None
         _headless = headless
         page = _ensure_browser()
         return {
@@ -163,10 +168,12 @@ def _execute_sync(
                 el.screenshot(path=path)
             else:
                 page.screenshot(path=path, full_page=full_page)
+            # 生成合法的 file URL（Windows 路径需转换为正斜杠）
+            preview_url = Path(path).as_uri()
             return {
                 "status": "ok",
                 "screenshot_path": path,
-                "preview_url": f"file://{path}",
+                "preview_url": preview_url,
             }
 
         # ── click ────────────────────────────────────

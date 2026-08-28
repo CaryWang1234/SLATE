@@ -188,8 +188,11 @@ async def export_workflow(workflow_id: str) -> dict[str, Any]:
     for entry in _load_workflows():
         if entry.get("id") == workflow_id:
             path = WORKFLOWS_DIR / entry["file"]
-            workflow = json.loads(path.read_text(encoding="utf-8"))
-            return {"code": 0, "data": workflow, "message": "ok"}
+            try:
+                workflow = json.loads(path.read_text(encoding="utf-8"))
+                return {"code": 0, "data": workflow, "message": "ok"}
+            except json.JSONDecodeError:
+                return {"code": -1, "data": None, "message": f"工作流文件损坏: {entry['file']}"}
     return {"code": -1, "data": None, "message": f"工作流不存在: {workflow_id}"}
 
 

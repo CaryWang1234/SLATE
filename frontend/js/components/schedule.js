@@ -3,10 +3,10 @@
  * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话。
  */
 
-import { state } from "../store.js?v=20260828-129";
-import { get, post, del, patch } from "../services/api.js?v=20260828-129";
-import { dlgConfirm } from "../services/dialog.js?v=20260828-129";
-import { t as tr } from "../services/i18n.js?v=20260828-129"; // 任务变量也叫 t，此处别名避免遮蔽
+import { state } from "../store.js?v=20260828-134";
+import { get, post, del, patch } from "../services/api.js?v=20260828-134";
+import { dlgConfirm } from "../services/dialog.js?v=20260828-134";
+import { t as tr } from "../services/i18n.js?v=20260828-134"; // 任务变量也叫 t，此处别名避免遮蔽
 
 let modal, listEl;
 let pollTimer = null;
@@ -26,7 +26,7 @@ function formatTs(ts) {
 
 async function toast(msg) {
   try {
-    const app = await import("../app.js?v=20260828-129");
+    const app = await import("../app.js?v=20260828-134");
     app.toast(msg);
   } catch {}
 }
@@ -111,8 +111,13 @@ async function renderList() {
     toggle.checked = !!t.enabled;
     toggle.title = "启用/停用";
     toggle.addEventListener("change", async () => {
-      await patch(`/schedule/tasks/${t.id}`, { enabled: toggle.checked });
-      renderList();
+      try {
+        await patch(`/schedule/tasks/${t.id}`, { enabled: toggle.checked });
+        renderList();
+      } catch (e) {
+        console.warn("[SLATE] 切换任务状态失败:", e);
+        toggle.checked = !toggle.checked; // 回滚UI
+      }
     });
     actions.appendChild(toggle);
 
@@ -121,12 +126,17 @@ async function renderList() {
     btnRun.textContent = "▶";
     btnRun.title = "立即运行";
     btnRun.addEventListener("click", async () => {
-      const res = await post(`/schedule/tasks/${t.id}/run`);
-      if (res.code === 0) {
-        toast("任务已触发，结果稍后归档到 [定时] 会话");
-        startPolling();
-      } else {
-        toast(res.message || "触发失败");
+      try {
+        const res = await post(`/schedule/tasks/${t.id}/run`);
+        if (res.code === 0) {
+          toast("任务已触发，结果稍后归档到 [定时] 会话");
+          startPolling();
+        } else {
+          toast(res.message || "触发失败");
+        }
+      } catch (e) {
+        console.warn("[SLATE] 触发任务失败:", e);
+        toast("触发失败：" + e.message);
       }
     });
     actions.appendChild(btnRun);
@@ -137,8 +147,13 @@ async function renderList() {
     btnDel.title = "删除任务";
     btnDel.addEventListener("click", async () => {
       if (!await dlgConfirm(tr("删除定时任务「{name}」？", { name: t.name }), { danger: true, okText: "删除" })) return;
-      await del(`/schedule/tasks/${t.id}`);
-      renderList();
+      try {
+        await del(`/schedule/tasks/${t.id}`);
+        renderList();
+      } catch (e) {
+        console.warn("[SLATE] 删除任务失败:", e);
+        toast("删除失败：" + e.message);
+      }
     });
     actions.appendChild(btnDel);
 

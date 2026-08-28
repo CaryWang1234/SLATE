@@ -205,17 +205,19 @@ def _extract_text_xlsx(filepath: Path) -> str:
     except ImportError:
         raise RuntimeError("openpyxl 未安装")
     wb = load_workbook(str(filepath), read_only=True, data_only=True)
-    parts: list[str] = []
-    for ws in wb.worksheets:
-        sheet_parts: list[str] = [f"[Sheet: {ws.title}]"]
-        for row in ws.iter_rows(values_only=True):
-            cells = [str(c).strip() for c in row if c is not None]
-            if cells:
-                sheet_parts.append(" | ".join(cells))
-        if len(sheet_parts) > 1:
-            parts.append("\n".join(sheet_parts))
-    wb.close()
-    return "\n".join(parts)
+    try:
+        parts: list[str] = []
+        for ws in wb.worksheets:
+            sheet_parts: list[str] = [f"[Sheet: {ws.title}]"]
+            for row in ws.iter_rows(values_only=True):
+                cells = [str(c).strip() for c in row if c is not None]
+                if cells:
+                    sheet_parts.append(" | ".join(cells))
+            if len(sheet_parts) > 1:
+                parts.append("\n".join(sheet_parts))
+        return "\n".join(parts)
+    finally:
+        wb.close()
 
 
 def _extract_text_pdf(filepath: Path) -> str:
@@ -285,8 +287,12 @@ def _scan_text(text: str, rules: list[DocSecurityRule], file_label: str,
                 matched = match.group()
                 if len(matched) > 8:
                     masked = matched[:3] + "*" * (len(matched) - 6) + matched[-3:]
-                else:
+                elif len(matched) >= 5:
                     masked = matched[:2] + "***" + matched[-2:]
+                elif len(matched) >= 3:
+                    masked = matched[0] + "*" * (len(matched) - 2) + matched[-1]
+                else:
+                    masked = "*" * len(matched)
 
                 findings.append({
                     "line": line_num,
