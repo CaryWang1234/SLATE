@@ -23,7 +23,7 @@
 
 SLATE is a **lightweight local AI collaboration tool** focused on prompt engineering, context management, and project ideation.
 
-It features multi-model chat, Agent Autopilot, MCP tool calling, Harness autonomous execution, Grind Mode, AI team debates, and a whiteboard-style logic chain. It can either drive built-in tools to complete tasks directly, or generate high-quality prompts for external Coding Agents (Claude Code, Codex, Cursor, etc.).
+It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode autonomous execution, Grind Mode, AI team debates, and a whiteboard-style logic chain. It can either drive built-in tools to complete tasks directly, or generate high-quality prompts for external Coding Agents (Claude Code, Codex, Cursor, etc.).
 
 **Zero npm dependencies. Zero build tools. Native tech stack. Local-first.**
 
@@ -32,8 +32,8 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Harness autonom
 ## ✨ Highlights
 
 - 🗣️ **Unified Multi-Model Access** — Major LLMs worldwide + custom OpenAI-compatible endpoints + local models (Ollama / LM Studio)
-- ⚡ **Agent Autopilot + Harness** — Ordinary project requests now auto-run in an Agent loop without needing repeated "continue" prompts; Harness remains the explicit six-phase, 50-round closed-loop mode for large tasks
-- 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Harness
+- ⚡ **Agent Autopilot + Target Mode** — Ordinary project requests now auto-run in an Agent loop without needing repeated "continue" prompts; Target Mode remains the explicit six-phase, 50-round closed-loop mode for large tasks
+- 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Target Mode
 - 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
 - 🛠️ **30 Built-in MCP Tools** — File read/write/edit/append, Unicode-safe terminal, PPT/Word/Excel/PDF tools, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, MCP Factory for self-production, screenshot-to-code, browser & desktop automation
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
@@ -71,7 +71,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Harness autonom
 - If a model only says it will inspect/edit/verify, SLATE nudges it to call tools; if it claims completion without tool evidence, SLATE asks it to verify or actually act
 - Tool results are fed back invisibly so the model can observe → act → verify → report in one run
 
-### Harness Autonomous Execution
+### Target Mode (Harness)
 
 - Six-phase loop: Goal → Plan → Execute → Verify → Report → Trace
 - Auto-generates TODOLIST for large tasks (live sidebar display), batch progress tracking, no sign-off until all items resolved
@@ -83,7 +83,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Harness autonom
 
 - Type `/grind <idea>` or click the 🖌 sidebar button to refine rough ideas into a structured task brief
 - Three-phase questioning: Receive → Grind → Collect (up to 10 rounds), sidebar ink panel marks ✔ resolved / ✘ unknown in real-time
-- Brief includes goals / audience / deliverables / acceptance criteria / boundaries / suggested path / open questions; three actions: send to Harness / push to whiteboard / save as template
+- Brief includes goals / audience / deliverables / acceptance criteria / boundaries / suggested path / open questions; three actions: send to Target Mode / push to whiteboard / save as template
 - Grind sessions persist and auto-restore on refresh or switch
 
 ### MCP Tools & Skill System

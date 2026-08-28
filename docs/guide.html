@@ -387,7 +387,7 @@
           <li><a href="#ch1"><span class="lang-zh">SLATE 是什么</span><span class="lang-en">What is SLATE?</span></a></li>
           <li><a href="#ch2"><span class="lang-zh">安装与启动</span><span class="lang-en">Installation</span></a></li>
           <li><a href="#ch3"><span class="lang-zh">多模型对话</span><span class="lang-en">Multi-Model Chat</span></a></li>
-          <li><a href="#ch4"><span class="lang-zh">Autopilot + Harness</span><span class="lang-en">Autopilot + Harness</span></a></li>
+          <li><a href="#ch4"><span class="lang-zh">Autopilot + 目标模式</span><span class="lang-en">Autopilot + Target Mode</span></a></li>
           <li><a href="#ch5"><span class="lang-zh">磨墨模式</span><span class="lang-en">Grind Mode</span></a></li>
           <li><a href="#ch6"><span class="lang-zh">团队模式</span><span class="lang-en">Team Mode</span></a></li>
           <li><a href="#ch7"><span class="lang-zh">白板逻辑链</span><span class="lang-en">Whiteboard</span></a></li>
@@ -497,14 +497,14 @@ python desktop.py</pre>
       <!-- Ch4 -->
       <div class="scroll-section" id="ch4">
         <div class="chapter-title"><span class="chapter-num">4</span>
-          <span class="lang-zh">Agent Autopilot + Harness 自主执行</span><span class="lang-en">Agent Autopilot + Harness</span>
+          <span class=”lang-zh”>Agent Autopilot + 目标模式自主执行</span><span class=”lang-en”>Agent Autopilot + Target Mode</span>
         </div>
-        <div class="chapter-body">
-          <div class="lang-zh">
-            <p><strong>Agent Autopilot</strong> 是默认的“少打继续”执行层。只要你要求 SLATE 查看项目、修改文件、运行命令、排查 bug、提交代码或生成文件，它会自动进入多轮 Agent Loop，不需要反复发送“继续”。</p>
+        <div class=”chapter-body”>
+          <div class=”lang-zh”>
+            <p><strong>Agent Autopilot</strong> 是默认的”少打继续”执行层。只要你要求 SLATE 查看项目、修改文件、运行命令、排查 bug、提交代码或生成文件，它会自动进入多轮 Agent Loop，不需要反复发送”继续”。</p>
             <p><strong>默认轮数：</strong>普通环境任务最多 18 轮；全面排查、项目级、多文件任务最多 28 轮。系统会把工具结果隐藏回灌给模型，让它继续观察 → 执行 → 验证 → 汇报。</p>
-            <p>如果模型只说“我将检查 / 接下来修改 / 是否继续”，系统会自动催它直接调工具；如果没有任何工具记录却口头说完成，系统会要求它先验证或真正动手。</p>
-            <p><strong>Harness</strong> 是更强的显式闭环模式。需要 50 轮长任务、明确 TODOLIST 和六阶段约束时，点击顶栏 ⚡ 按钮，或在消息中提及「用 Harness 执行」。</p>
+            <p>如果模型只说”我将检查 / 接下来修改 / 是否继续”，系统会自动催它直接调工具；如果没有任何工具记录却口头说完成，系统会要求它先验证或真正动手。</p>
+            <p><strong>目标模式</strong> 是更强的显式闭环模式。需要 50 轮长任务、明确 TODOLIST 和六阶段约束时，点击顶栏  按钮，或在消息中提及「用目标模式执行」。</p>
             <p><strong>六阶段流程：</strong></p>
             <ol>
               <li><strong>目标理解</strong> → 解析你的需求</li>
@@ -520,7 +520,7 @@ python desktop.py</pre>
             <p><strong>Agent Autopilot</strong> is the default "do not make me type continue" execution layer. When you ask SLATE to inspect a project, edit files, run commands, debug, commit, or generate files, it automatically enters a multi-round Agent Loop.</p>
             <p><strong>Default budgets:</strong> ordinary environment tasks can auto-advance up to 18 rounds; broad project-wide or multi-file tasks can auto-advance up to 28 rounds. Tool results are fed back invisibly so the model can continue Observe → Act → Verify → Report.</p>
             <p>If the model only says it will inspect/edit/continue, SLATE nudges it to call tools. If it claims completion without any tool evidence, SLATE asks it to verify or actually act first.</p>
-            <p><strong>Harness</strong> is the stronger explicit loop. Use the ⚡ button, or mention "use Harness", when you want 50 rounds, TODOLIST enforcement, and six-phase constraints.</p>
+            <p><strong>Target Mode</strong> is the stronger explicit loop. Use the ⚡ button, or mention "use Target Mode", when you want 50 rounds, TODOLIST enforcement, and six-phase constraints.</p>
             <p><strong>Six-Phase Flow:</strong></p>
             <ol>
               <li><strong>Goal Understanding</strong> → Parse requirements</li>
@@ -553,7 +553,7 @@ python desktop.py</pre>
               <tr><td>收墨</td><td>输出结构化 JSON 墨稿，含目标/交付物/验收标准</td></tr>
             </table>
             <p><strong>收墨触发：</strong>输入「收墨」「够了」「就这样」或达到轮数上限</p>
-            <p><strong>墨稿三键：</strong>送入 Harness 执行 / 投到白板推演 / 存为模板复用</p>
+            <p><strong>墨稿三键：</strong>送入目标模式执行 / 投到白板推演 / 存为模板复用</p>
           </div>
           <div class="lang-en">
             <p>Interactive refinement: turn rough ideas into structured task briefs.</p>
@@ -565,7 +565,7 @@ python desktop.py</pre>
               <tr><td>Collect</td><td>Outputs structured JSON brief with goals/deliverables/acceptance</td></tr>
             </table>
             <p><strong>Trigger Collect:</strong> Type "收墨" / "够了" / "就这样" or reach round limit</p>
-            <p><strong>Three Actions:</strong> Send to Harness / Push to Whiteboard / Save as Template</p>
+            <p><strong>Three Actions:</strong> Send to Target Mode / Push to Whiteboard / Save as Template</p>
           </div>
         </div>
       </div>

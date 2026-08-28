@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE（砚）· 本地 AI 协作调度台</title>
-  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Agent Autopilot、Harness 自主执行、磨墨模式、30 个 Unicode-safe 内置工具 + 外部 MCP Server 连接、专家包、AI 团队辩论与 DAG 工作流、带 Git 树的升级黑板、项目理解三档扫描，将灵感转化为结构化方案。开源免费，安装即用。">
+  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Agent Autopilot、目标模式自主执行、磨墨模式、30 个 Unicode-safe 内置工具 + 外部 MCP Server 连接、专家包、AI 团队辩论与 DAG 工作流、带 Git 树的升级黑板、项目理解三档扫描，将灵感转化为结构化方案。开源免费，安装即用。">
   <link rel="icon" type="image/png" href="../icon.png">
   <link rel="stylesheet" href="../style.css">
 </head>
@@ -189,7 +189,7 @@
           <div class="pane">
             <div class="pane-label">对话</div>
             <div class="chat-bubble me"><div class="skel w80"></div><div class="skel w60"></div></div>
-            <div class="tool-chip">⚡ Harness · 第 3/50 轮</div>
+            <div class="tool-chip">⚡ 目标 · 第 3/50 轮</div>
             <div class="chat-bubble ai"><div class="skel"></div><div class="skel w80"></div></div>
             <div class="chat-bubble me"><div class="skel w60"></div></div>
             <div class="chat-bubble ai"><div class="skel w80"></div><div class="skel w40"></div></div>
@@ -236,7 +236,7 @@
         <div class="reveal" data-stagger>
           <div class="stat-num" data-count="50">0</div>
           <div class="stat-label">轮自主执行上限</div>
-          <div class="stat-hint">Harness 模式长任务不断线</div>
+          <div class="stat-hint">目标模式长任务不断线</div>
         </div>
         <div class="reveal" data-stagger>
           <div class="stat-num"><span data-count="4">0</span> 层</div>
@@ -270,14 +270,14 @@
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">⚡</div>
-          <div class="feature-name">Agent Autopilot + Harness</div>
-          <div class="feature-desc">普通项目/操作类请求会自动进入 Agent 循环，不再需要反复发送“继续”。Autopilot 普通任务默认最多 18 轮，项目级大任务最多 28 轮；Harness 仍是显式 50 轮六阶段强闭环，带 TODOLIST 约束。</div>
+          <div class="feature-name">Agent Autopilot + 目标模式</div>
+          <div class="feature-desc">普通项目/操作类请求会自动进入 Agent 循环，不再需要反复发送"继续"。Autopilot 普通任务默认最多 18 轮，项目级大任务最多 28 轮；目标模式仍是显式 50 轮六阶段强闭环，带 TODOLIST 约束。</div>
           <div class="feature-plain">你只管说目标，SLATE 会持续观察、动手、验证、汇报，直到有真实结果或明确阻塞。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🖌️</div>
           <div class="feature-name">磨墨模式</div>
-          <div class="feature-desc">输入 /grind 加一句粗糙想法，AI 按"接墨→磨墨→收墨"三段式追问（上限 10 轮），把想法研磨成含目标、交付物、验收标准的结构化任务书；墨迹面板实时标记已定与未知，成稿一键送入 Harness 执行、投到白板推演或存为模板。</div>
+          <div class="feature-desc">输入 /grind 加一句粗糙想法，AI 按"接墨→磨墨→收墨"三段式追问（上限 10 轮），把想法研磨成含目标、交付物、验收标准的结构化任务书；墨迹面板实时标记已定与未知，成稿一键送入目标模式执行、投到白板推演或存为模板。</div>
           <div class="feature-plain">把"我有个模糊的想法"放进砚台里磨一磨，出来的就是一份清清楚楚的任务书。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -385,13 +385,13 @@
 
       <div class="highlight">
         <div class="highlight-text reveal from-left">
-          <h3>⚡ Autopilot + Harness：让模型自己干完</h3>
-          <p>普通项目任务默认由 Autopilot 自动续跑 Agent Loop，不需要你一步步喂“继续”。更大的任务再开启 Harness，按"目标 → 计划 → 执行 → 验证 → 汇报 → 追溯"六阶段推进，并用 TODOLIST 约束未完成项。</p>
-          <div class="highlight-plain">Autopilot 是默认的“继续干”层；Harness 是更强的 50 轮放手模式。</div>
+          <h3>⚡ Autopilot + 目标模式：让模型自己干完</h3>
+          <p>普通项目任务默认由 Autopilot 自动续跑 Agent Loop，不需要你一步步喂"继续"。更大的任务再开启目标模式，按"目标 → 计划 → 执行 → 验证 → 汇报 → 追溯"六阶段推进，并用 TODOLIST 约束未完成项。</p>
+          <div class="highlight-plain">Autopilot 是默认的"继续干"层；目标模式是更强的 50 轮放手模式。</div>
           <ul>
             <li>Autopilot 普通任务默认 18 轮，项目级大任务默认 28 轮</li>
             <li>工具调用轮数默认 50 轮，长任务不断线，模型每轮可见当前轮次与剩余预算</li>
-            <li>仅三种情况退出：手动停止 / 轮数用完 / TODOLIST 全部了结，停止不退出 Harness</li>
+            <li>仅三种情况退出：手动停止 / 轮数用完 / TODOLIST 全部了结，停止不退出目标模式</li>
             <li>模型侧失败、零输出、重复调用均自动拦截并恢复推进，循环不中断</li>
             <li>金色进度条实时显示执行轮次与清单进度，清单未了结自动催办</li>
             <li>输出截断四层防线：6 轮断点续写 + 截断守卫 + file_append 分段补齐，超长文件一定写完整</li>

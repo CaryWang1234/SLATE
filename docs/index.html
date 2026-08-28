@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE · Local AI Collaboration Studio</title>
-  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Agent Autopilot, Harness autonomous execution, Grind Mode, 30 Unicode-safe tools, external MCP Server support, Expert Packs, AI team debates & 8 DAG workflow templates, Code Review, voice input, upgraded whiteboard with Git tree, full sandbox security. Open source, install and use.">
+  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Agent Autopilot, Target Mode autonomous execution, Grind Mode, 30 Unicode-safe tools, external MCP Server support, Expert Packs, AI team debates & 8 DAG workflow templates, Code Review, voice input, upgraded whiteboard with Git tree, full sandbox security. Open source, install and use.">
   <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -189,7 +189,7 @@
           <div class="pane">
             <div class="pane-label">Chat</div>
             <div class="chat-bubble me"><div class="skel w80"></div><div class="skel w60"></div></div>
-            <div class="tool-chip">⚡ Harness · Round 3/50</div>
+            <div class="tool-chip">⚡ Target · Round 3/50</div>
             <div class="chat-bubble ai"><div class="skel"></div><div class="skel w80"></div></div>
             <div class="chat-bubble me"><div class="skel w60"></div></div>
             <div class="chat-bubble ai"><div class="skel w80"></div><div class="skel w40"></div></div>
@@ -236,7 +236,7 @@
         <div class="reveal" data-stagger>
           <div class="stat-num" data-count="50">0</div>
           <div class="stat-label">Max Autonomous Rounds</div>
-          <div class="stat-hint">Harness mode keeps long tasks running</div>
+          <div class="stat-hint">Target Mode keeps long tasks running</div>
         </div>
         <div class="reveal" data-stagger>
           <div class="stat-num"><span data-count="4">0</span> layers</div>
@@ -270,8 +270,8 @@
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">⚡</div>
-          <div class="feature-name">Agent Autopilot + Harness</div>
-          <div class="feature-desc">Ordinary project/action requests automatically enter an Agent loop, so you do not need to keep sending "continue". Autopilot can advance 18 rounds by default, 28 for broad project tasks; Harness remains the explicit 50-round six-phase loop with TODOLIST enforcement.</div>
+          <div class="feature-name">Agent Autopilot + Target Mode</div>
+          <div class="feature-desc">Ordinary project/action requests automatically enter an Agent loop, so you do not need to keep sending "continue". Autopilot can advance 18 rounds by default, 28 for broad project tasks; Target Mode remains the explicit 50-round six-phase loop with TODOLIST enforcement.</div>
           <div class="feature-plain">Say what you need once. SLATE keeps observing, acting, verifying, and reporting until there is a real result or a clear blocker.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -349,7 +349,7 @@
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🔔</div>
           <div class="feature-name">Task Completion Notifications</div>
-          <div class="feature-desc">When long tasks finish — Harness autonomous execution, team debates, or workflow pipelines — SLATE plays a chime sound and sends a system notification. Both can be toggled independently in Settings. Step away without fear of missing results.</div>
+          <div class="feature-desc">When long tasks finish — Target Mode autonomous execution, team debates, or workflow pipelines — SLATE plays a chime sound and sends a system notification. Both can be toggled independently in Settings. Step away without fear of missing results.</div>
           <div class="feature-plain">Like a timer for AI tasks — you get notified the moment the work is done.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -409,13 +409,13 @@
 
       <div class="highlight">
         <div class="highlight-text reveal from-left">
-          <h3>⚡ Autopilot + Harness: Let the Model Finish It</h3>
-          <p>For normal project tasks, Autopilot automatically keeps the Agent loop running so you do not need to feed "continue" step by step. For bigger tasks, Harness adds the six-phase loop: Goal → Plan → Execute → Verify → Report → Trace, with TODOLIST enforcement.</p>
-          <div class="highlight-plain">Autopilot is the default "keep going" layer. Harness is the stronger hands-free mode when you want a 50-round closed loop.</div>
+          <h3>⚡ Autopilot + Target Mode: Let the Model Finish It</h3>
+          <p>For normal project tasks, Autopilot automatically keeps the Agent loop running so you do not need to feed "continue" step by step. For bigger tasks, Target Mode adds the six-phase loop: Goal → Plan → Execute → Verify → Report → Trace, with TODOLIST enforcement.</p>
+          <div class="highlight-plain">Autopilot is the default "keep going" layer. Target Mode is the stronger hands-free mode when you want a 50-round closed loop.</div>
           <ul>
             <li>Autopilot: 18 rounds by default, 28 rounds for broad project-wide tasks</li>
             <li>50 tool-call rounds by default, long tasks stay connected, model sees current round and remaining budget each turn</li>
-            <li>Exits only on: manual stop / rounds exhausted / TODOLIST done — stop doesn't quit Harness</li>
+            <li>Exits only on: manual stop / rounds exhausted / TODOLIST done — stop doesn't quit Target Mode</li>
             <li>Model failures, zero output, repeated calls all auto-intercepted and recovered, loop never breaks</li>
             <li>Gold progress bar shows round count and checklist progress in real-time, auto-reminds until checklist done</li>
             <li>Four-layer truncation defense: 6-round anchor continuation + truncation guard + file_append segmented write, long files always complete</li>
