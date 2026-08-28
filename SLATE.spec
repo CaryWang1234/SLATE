@@ -107,6 +107,7 @@ hiddenimports = [
 ]
 
 excludes = [
+    'bambulabs_api',
     'kivy',
     'gi',
     'gtk',

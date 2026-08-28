@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260828-134";
+import { makeId } from "./services/utils.js?v=20260828-137";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
