@@ -18,10 +18,11 @@ PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.par
 
 app = FastAPI(title="SLATE", version="20260803-1")
 
-# CORS：桌面应用仅允许本地来源 + 局域网遥控
+# CORS：仅允许本机来源（桌面应用同源加载，不受影响）；跨源恶意网页一律拒绝
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["null"],  # file:// 直接打开时的 origin
+    allow_origin_regex=r"^https?://(127\.0\.0\.1|localhost)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -2,8 +2,8 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260828-125";
-import { t } from "./i18n.js?v=20260828-125";
+import { API_BASE } from "../store.js?v=20260828-129";
+import { t } from "./i18n.js?v=20260828-129";
 
 // 思考内容标记前缀（用于在流式输出中区分 reasoning 与 content）
 export const REASONING_PREFIX = "\x00\x01R\x01\x00";
@@ -272,15 +272,28 @@ async function* streamChat(payload) {
 
 /**
  * 上传文件（FormData）
+ * 与 request 相同：180s 超时防挂起；失败时解析后端中文 message（如 413 超大小提示）
  */
-async function upload(path, formData) {
+async function upload(path, formData, timeoutMs = REQUEST_TIMEOUT_MS) {
   const url = `${API_BASE}${path}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (controller.signal.aborted) throw new Error(t("上传超时（{s}s），可重试", { s: Math.round(timeoutMs / 1000) }));
+    throw new Error(formatFetchError(err, { timeoutMs }));
+  }
+  clearTimeout(timer);
   if (!resp.ok) {
-    throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+    const detail = await readErrorBody(resp);
+    throw new Error(formatHttpError(resp.status, resp.statusText, detail));
   }
   return resp.json();
 }

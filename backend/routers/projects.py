@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from backend.data_io import atomic_write_json
 from backend.subprocess_utils import hidden_subprocess_kwargs
 from backend.skills.text_io import read_text_file, write_text_file
 
@@ -205,10 +206,7 @@ async def update_project_config(req: UpdateConfigRequest):
     slate_dir.mkdir(exist_ok=True)
 
     config_path = slate_dir / "config.json"
-    config_path.write_text(
-        json.dumps(req.config, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    atomic_write_json(config_path, req.config)
 
     _current_project = _project_info(project_dir, req.config)
 
@@ -308,8 +306,11 @@ def _parse_unified_diff(diff_text: str) -> list[dict]:
             current_file = None
             current_chunk = None
             continue
-        if raw_line.startswith("--- a/"):
+        if raw_line.startswith("--- "):
+            # 新增文件的旧侧是 /dev/null，同样要创建条目（+++ 行会补上真实文件名）
             current_file = {"file": raw_line[6:], "changes": []}
+            if current_file["file"] == "dev/null":
+                current_file["file"] = ""
             files.append(current_file)
             continue
         if raw_line.startswith("+++ b/"):
@@ -382,7 +383,7 @@ async def review_diff(req: ReviewDiffRequest):
 
     try:
         result = subprocess.run(
-            cmd, cwd=project_dir, capture_output=True, text=True, timeout=30,
+            cmd, cwd=project_dir, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
             **hidden_subprocess_kwargs(),
         )
         diff_text = result.stdout

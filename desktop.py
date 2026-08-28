@@ -123,14 +123,24 @@ def stop_process(process):
     if not process:
         return
     log('stopping backend')
-    if hasattr(process, 'server') and process.server:
-        process.server.should_exit = True
+    if isinstance(process, threading.Thread):
+        # embedded 模式：线程可能在 server 赋值前异常退出（server 为 None），
+        # 此时对它调 poll() 会 AttributeError；这里统一走线程分支
+        server = getattr(process, 'server', None)
+        if server is not None:
+            try:
+                server.should_exit = True
+            except Exception:
+                pass
         process.join(timeout=5)
         log_file = getattr(process, '_slate_log_file', None)
         if log_file:
-            log_file.close()
+            try:
+                log_file.close()
+            except Exception:
+                pass
         return
-    if process and process.poll() is None:
+    if process.poll() is None:
         process.terminate()
         try:
             process.wait(timeout=5)

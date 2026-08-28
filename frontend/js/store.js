@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260828-125";
+import { makeId } from "./services/utils.js?v=20260828-129";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -663,11 +663,18 @@ function removePromptSnippet(id) {
 function setModelRegistry(registry) {
   state.modelRegistry = registry;
   if (state._pendingModelId) {
+    let found = null;
     for (const category of Object.values(registry)) {
-      const found = category.find(m => m.id === state._pendingModelId);
-      if (found) { setCurrentModel(found); break; }
+      found = category.find(m => m.id === state._pendingModelId);
+      if (found) break;
     }
-    delete state._pendingModelId;
+    if (!found) {
+      found = state.customModels.find(m => m.id === state._pendingModelId);
+    }
+    if (found) {
+      setCurrentModel(found);
+      delete state._pendingModelId;
+    }
   }
   notify("modelRegistry", registry);
 }

@@ -231,9 +231,23 @@ def _add_bullet(doc: Any, text: str) -> None:
 
 
 def _add_numbered(doc: Any, text: str) -> None:
-    p = doc.add_paragraph(style="List Number")
+    """添加有序列表项（每个列表独立编号）。"""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    
+    p = doc.add_paragraph()
     run = p.add_run(text)
     _set_run_font(run)
+    
+    # 手动设置 numbering 属性，确保每个列表从 1 开始
+    numPr = OxmlElement("w:numPr")
+    ilvl = OxmlElement("w:ilvl")
+    ilvl.set(qn("w:val"), "0")
+    numId = OxmlElement("w:numId")
+    numId.set(qn("w:val"), "0")  # 使用默认 numbering definition
+    numPr.append(ilvl)
+    numPr.append(numId)
+    p._element.get_or_add_pPr().append(numPr)
 
 
 def _set_run_font(run: Any) -> None:

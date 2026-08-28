@@ -46,47 +46,50 @@ def _scan_dir_fast(
                 # 过滤隐藏文件
                 if not include_hidden and name.startswith("."):
                     continue
-                
-                # 过滤模式
-                if pattern and not fnmatch.fnmatch(name, pattern):
-                    continue
-                
+
                 try:
                     is_dir = entry.is_dir(follow_symlinks=False)
                     is_file = entry.is_file(follow_symlinks=False)
-                    
-                    item: dict[str, Any] = {
-                        "name": name,
-                        "type": "dir" if is_dir else "file",
-                        "path": str(Path(directory) / name),
-                    }
-                    
-                    # 获取文件大小（仅文件）
-                    if is_file:
-                        try:
-                            stat = entry.stat(follow_symlinks=False)
-                            item["size"] = _format_size(stat.st_size)
-                            item["size_bytes"] = stat.st_size
-                        except OSError:
-                            item["size"] = "?"
-                    
-                    # 递归扫描子目录
-                    if is_dir and current_depth < max_depth:
-                        item["children"] = _scan_dir_fast(
-                            Path(directory) / name,
-                            max_depth=max_depth,
-                            pattern=pattern,
-                            include_hidden=include_hidden,
-                            current_depth=current_depth + 1,
-                        )
-                    
-                    items.append(item)
                 except PermissionError:
                     items.append({
                         "name": name,
                         "type": "dir" if entry.is_dir() else "file",
                         "error": "无权限访问",
                     })
+                    continue
+                
+                # 过滤模式：只对文件生效。目录必须始终进入递归，
+                # 否则 recursive=True + pattern="*.py" 时任何目录都不匹配而被跳过，
+                # 子目录内容会被静默丢弃
+                if pattern and is_file and not fnmatch.fnmatch(name, pattern):
+                    continue
+                
+                item: dict[str, Any] = {
+                    "name": name,
+                    "type": "dir" if is_dir else "file",
+                    "path": str(Path(directory) / name),
+                }
+                
+                # 获取文件大小（仅文件）
+                if is_file:
+                    try:
+                        stat = entry.stat(follow_symlinks=False)
+                        item["size"] = _format_size(stat.st_size)
+                        item["size_bytes"] = stat.st_size
+                    except OSError:
+                        item["size"] = "?"
+                
+                # 递归扫描子目录
+                if is_dir and current_depth < max_depth:
+                    item["children"] = _scan_dir_fast(
+                        Path(directory) / name,
+                        max_depth=max_depth,
+                        pattern=pattern,
+                        include_hidden=include_hidden,
+                        current_depth=current_depth + 1,
+                    )
+                
+                items.append(item)
     except PermissionError:
         raise PermissionError(f"无权限访问: {directory}")
     

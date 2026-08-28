@@ -2,12 +2,12 @@
  * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交付 Prompt
  */
 
-import { state, subscribe, addPromptSnippet } from "../store.js?v=20260828-125";
-import { get, post } from "../services/api.js?v=20260828-125";
-import { browseFiles } from "../services/project.js?v=20260828-125";
-import { t } from "../services/i18n.js?v=20260828-125";
-import { iconSvg } from "../services/icons.js?v=20260828-125";
-import { makeId } from "../services/utils.js?v=20260828-125";
+import { state, subscribe, addPromptSnippet } from "../store.js?v=20260828-129";
+import { get, post } from "../services/api.js?v=20260828-129";
+import { browseFiles } from "../services/project.js?v=20260828-129";
+import { t } from "../services/i18n.js?v=20260828-129";
+import { iconSvg } from "../services/icons.js?v=20260828-129";
+import { makeId } from "../services/utils.js?v=20260828-129";
 
 const FACTORY_PRESETS = {
   codex: {
@@ -435,7 +435,7 @@ function buildPrompt() {
   }
 
   if (context) {
-    sections.push("", "# 已知上下文, context");
+    sections.push("", "# 已知上下文", context);
   }
 
   if (constraints) {
@@ -534,7 +534,12 @@ function initPromptFactory() {
     renderConstitution();
     renderChecklist();
   });
-  subscribe("project", renderFilePicker);
+  subscribe("project", () => {
+    // 切换项目后清空旧项目的勾选路径，防止串项目
+    selectedFiles.clear();
+    renderFilePicker();
+    renderChecklist();
+  });
   subscribe("projectFileTree", renderFilePicker);
 }
 

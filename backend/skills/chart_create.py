@@ -219,14 +219,18 @@ def _render_pie(items: list[dict], colors: list[str], w: int, h: int) -> list[st
         else:
             parts.append(f'<path d="M {cx:.1f} {cy:.1f} L {x1:.1f} {y1:.1f} A {r:.1f} {r:.1f} 0 {large} 1 {x2:.1f} {y2:.1f} Z" fill="{colors[i]}"/>')
         angle = a2
-    # 图例（右侧）
+    # 图例（右侧），最多显示 15 项避免溢出
+    MAX_LEGEND = 15
     lx = w - 170
-    ly = max(60, cy - len(items) * 11)
-    for i, it in enumerate(items):
+    legend_items = items[:MAX_LEGEND]
+    ly = max(60, cy - len(legend_items) * 11)
+    for i, it in enumerate(legend_items):
         pct = max(it["value"], 0) / total * 100
         y = ly + i * 22
         parts.append(f'<rect x="{lx}" y="{y - 9}" width="12" height="12" rx="2" fill="{colors[i]}"/>')
         parts.append(f'<text x="{lx + 18}" y="{y + 1}" font-size="11" fill="{TEXT_COLOR}">{_esc(it["label"][:8])} {_fmt_num(it["value"])} ({pct:.1f}%)</text>')
+    if len(items) > MAX_LEGEND:
+        parts.append(f'<text x="{lx + 18}" y="{ly + len(legend_items) * 22 + 1}" font-size="10" fill="{TEXT_MUTED}">…还有 {len(items) - MAX_LEGEND} 项</text>')
     return parts
 
 

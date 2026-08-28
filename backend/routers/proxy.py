@@ -235,8 +235,8 @@ def _build_openai_request(body: dict[str, Any]) -> dict[str, Any]:
         "messages": body["messages"],
         "stream": body.get("stream", False),
     }
-    if temperature := body.get("temperature"):
-        payload["temperature"] = temperature
+    if "temperature" in body:
+        payload["temperature"] = body["temperature"]
     if max_tokens := body.get("max_tokens"):
         payload["max_tokens"] = max_tokens
     return payload
@@ -275,8 +275,8 @@ def _build_responses_request(body: dict[str, Any]) -> dict[str, Any]:
         payload["instructions"] = "\n\n".join(instructions_parts)
     if max_tokens := body.get("max_tokens"):
         payload["max_output_tokens"] = max_tokens
-    if temperature := body.get("temperature"):
-        payload["temperature"] = temperature
+    if "temperature" in body:
+        payload["temperature"] = body["temperature"]
     return payload
 
 
@@ -354,8 +354,8 @@ def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
     }
     if system_msg:
         payload["system"] = system_msg
-    if temperature := body.get("temperature"):
-        payload["temperature"] = temperature
+    if "temperature" in body:
+        payload["temperature"] = body["temperature"]
     return payload
 
 
@@ -567,6 +567,66 @@ async def _stream_anthropic(url: str, headers: dict[str, str], payload: dict[str
         yield "data: [DONE]\n\n"
 
 
+async def _stream_google(url: str, headers: dict[str, str], payload: dict[str, Any], trace_id: str = ""):
+    """流式转发 Google Gemini（streamGenerateContent + alt=sse），转换为 OpenAI 兼容 SSE 格式。"""
+    client = _get_stream_client(url.rsplit("/models/", 1)[0])
+    yielded = False
+    try:
+        async with client.stream("POST", url, json=payload, headers=headers) as resp:
+            if resp.status_code >= 400:
+                yield await _sse_error_from_response(resp, trace_id=trace_id, api_name="Google")
+                yield "data: [DONE]\n\n"
+                return
+            async for line in resp.aiter_lines():
+                trimmed = line.strip()
+                if not trimmed.startswith("data:"):
+                    continue
+                data_str = trimmed[5:].strip()
+                if not data_str or data_str == "[DONE]":
+                    continue
+                try:
+                    data = json.loads(data_str)
+                except json.JSONDecodeError:
+                    continue
+                if data.get("error"):
+                    yield _sse_error(_compact_error_text(json.dumps(data["error"], ensure_ascii=False)), trace_id=trace_id)
+                    yield "data: [DONE]\n\n"
+                    return
+                candidates = data.get("candidates") or []
+                if not candidates:
+                    continue
+                cand = candidates[0]
+                parts = (cand.get("content") or {}).get("parts") or []
+                for part in parts:
+                    text = part.get("text") or ""
+                    if text:
+                        yielded = True
+                        chunk = {"choices": [{"delta": {"content": text}, "index": 0}]}
+                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                finish = cand.get("finishReason") or ""
+                if finish == "STOP":
+                    chunk = {"choices": [{"delta": {}, "finish_reason": "stop", "index": 0}]}
+                    yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                if finish == "MAX_TOKENS":
+                    chunk = {"choices": [{"delta": {}, "finish_reason": "length", "index": 0}]}
+                    yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                if finish in ("SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY"):
+                    if not yielded:
+                        yield _sse_error(f"Gemini 内容被安全策略拦截（finishReason={finish}），未返回任何文本。请调整提问方式。", trace_id=trace_id, code="safety_filter")
+                        yield "data: [DONE]\n\n"
+                        return
+            if not yielded:
+                yield _sse_error("Google 连接正常结束，但没有返回任何文本增量。请检查模型 ID、API Key，或输出是否被安全策略拦截。", trace_id=trace_id, code="empty_stream")
+                yield "data: [DONE]\n\n"
+    except Exception as exc:
+        yield _sse_error_from_exception(exc, trace_id=trace_id, api_name="Google")
+        yield "data: [DONE]\n\n"
+
+
 @router.post("/chat")
 async def proxy_chat(request: Request) -> Any:
     """代理聊天请求到对应 LLM API。
@@ -635,16 +695,24 @@ async def proxy_chat(request: Request) -> Any:
     # ── Google ──
     if provider == "google":
         headers = {"content-type": "application/json"}
-        url = f"{base_url}/models/{model_id}:generateContent?key={api_key}"
         messages = body.get("messages", [])
         contents = []
         for msg in messages:
             role = "user" if msg["role"] == "user" else "model"
             contents.append({"role": role, "parts": _to_gemini_parts(msg["content"])})
         payload: dict[str, Any] = {"contents": contents}
-        if body.get("temperature"):
+        if "temperature" in body:
             payload["generationConfig"] = {"temperature": body["temperature"]}
 
+        if is_stream:
+            stream_url = f"{base_url}/models/{model_id}:streamGenerateContent?alt=sse&key={api_key}"
+            logger.info(f"[{trace_id}] Google 流式请求: {stream_url}")
+            return StreamingResponse(
+                _stream_google(stream_url, headers, payload, trace_id),
+                media_type="text/event-stream",
+            )
+
+        url = f"{base_url}/models/{model_id}:generateContent?key={api_key}"
         client = _get_client(base_url)
         try:
             resp = await client.post(url, json=payload, headers=headers)

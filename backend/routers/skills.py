@@ -132,8 +132,11 @@ async def execute_skill(body: dict[str, Any]) -> dict[str, Any]:
         except Exception as e:
             return {"code": -1, "data": None, "message": f"技能执行失败: {e}"}
 
-    # 查找自定义技能
-    custom_skill_dir = USER_SKILLS_DIR / skill_name
+    # 查找自定义技能（技能名先消毒，防止目录穿越读取任意 SKILL.md）
+    clean_skill = _sanitize_skill_name(skill_name)
+    if not clean_skill or clean_skill != skill_name:
+        return {"code": -1, "data": None, "message": f"无效的技能名称: {skill_name}"}
+    custom_skill_dir = USER_SKILLS_DIR / clean_skill
     if custom_skill_dir.is_dir():
         skill_md = custom_skill_dir / "SKILL.md"
         if skill_md.is_file():
@@ -166,8 +169,10 @@ async def upload_skill(
     skill_desc: str = "",
 ) -> dict[str, Any]:
     """上传自定义技能文件。"""
-    if not skill_name:
-        return {"code": -1, "data": None, "message": "技能名称不能为空"}
+    clean_name = _sanitize_skill_name(skill_name)
+    if not clean_name or clean_name != skill_name:
+        return {"code": -1, "data": None, "message": "技能名称包含非法字符"}
+    skill_name = clean_name
 
     skill_dir = USER_SKILLS_DIR / skill_name
     skill_dir.mkdir(parents=True, exist_ok=True)

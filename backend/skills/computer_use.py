@@ -406,7 +406,7 @@ def execute(
                 return {"error": f"参考图片不存在: {image_path}"}
             try:
                 location = pag.locateOnScreen(image_path, confidence=confidence)
-            except TypeError:
+            except (TypeError, NotImplementedError):
                 return {"error": "图像定位需要安装 opencv：pip install opencv-python"}
             if location is None:
                 return {"status": "not_found", "message": "未在屏幕上找到匹配的图片", "elapsed_ms": int((time.perf_counter() - started) * 1000)}

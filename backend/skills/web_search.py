@@ -123,13 +123,16 @@ def _merge_dedupe(*lists: list[dict[str, str]]) -> list[dict[str, str]]:
 
 
 def _normalize_url(url: str) -> str:
-    """URL 归一化：去除常见跟踪参数与锚点，仅比较主路径。"""
+    """URL 归一化：去除常见跟踪参数与锚点，仅比较主路径与剩余参数键值。"""
     try:
         parsed = urlparse(url)
-        clean_query = "&".join(
-            k for k, _ in parse_qs(parsed.query, keep_blank_values=True).items()
-            if not k.lower().startswith(("utm_", "fbclid", "gclid", "ref", "source"))
-        )
+        pairs = []
+        for k, vals in parse_qs(parsed.query, keep_blank_values=True).items():
+            if k.lower().startswith(("utm_", "fbclid", "gclid", "ref", "source")):
+                continue
+            for v in vals:
+                pairs.append(f"{k}={v}")
+        clean_query = "&".join(pairs)
         path = parsed.path.rstrip("/") or "/"
         return f"{parsed.netloc.lower()}{path}?{clean_query}".rstrip("?")
     except Exception:
@@ -178,6 +181,9 @@ def _clean_bing_url(href: str) -> str:
     parsed = urlparse(href)
     if "bing.com" in parsed.netloc and parsed.path.startswith("/ck/a"):
         encoded = parse_qs(parsed.query).get("u", [""])[0]
+        # Bing 的 u 参数是 "a1" + base64url，先剥前缀再解码，否则 12bit 错位解出乱码
+        if encoded.startswith("a1"):
+            encoded = encoded[2:]
         if encoded:
             try:
                 # base64url：补 padding 后解码

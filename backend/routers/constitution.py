@@ -9,6 +9,8 @@ from typing import Any
 
 from fastapi import APIRouter
 
+from backend.data_io import atomic_write_json
+
 router = APIRouter(prefix="/constitution", tags=["constitution"])
 
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
@@ -32,8 +34,5 @@ async def get_constitution() -> dict[str, Any]:
 async def update_constitution(body: dict[str, Any]) -> dict[str, Any]:
     """更新项目宪法。"""
     CONSTITUTION_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONSTITUTION_PATH.write_text(
-        json.dumps(body, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    atomic_write_json(CONSTITUTION_PATH, body)
     return {"code": 0, "data": body, "message": "ok"}

@@ -18,6 +18,8 @@ from typing import Any
 
 import httpx
 
+from backend.data_io import atomic_write_json, backup_corrupt
+
 logger = logging.getLogger("slate.mcp_client")
 
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
@@ -42,6 +44,8 @@ class McpServerConnection:
         self._sse_task: asyncio.Task | None = None
         self._client: httpx.AsyncClient | None = None
         self._connected_at: float = 0
+        self._endpoint_event = asyncio.Event()
+        self._listen_error = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -59,8 +63,31 @@ class McpServerConnection:
         self._request_id += 1
         return self._request_id
 
+    async def _fail_connect(self, error: str) -> bool:
+        """连接失败统一出口：记录错误并清理 SSE 监听任务与 HTTP 客户端。"""
+        self.status = "error"
+        self.error = error
+        if self._sse_task:
+            self._sse_task.cancel()
+            try:
+                await self._sse_task
+            except BaseException:
+                pass
+            self._sse_task = None
+        if self._client:
+            try:
+                await self._client.aclose()
+            except Exception:
+                pass
+            self._client = None
+        return False
+
     async def connect(self) -> bool:
-        """建立 SSE 连接，获取 message URL，拉取工具列表。"""
+        """建立 SSE 连接，获取 message URL，拉取工具列表。
+
+        MCP HTTP+SSE 传输：endpoint 事件绑定当前 SSE 会话（含 sessionId），
+        因此必须保持同一条 SSE 连接持续监听，POST 消息全部发往该连接解析出的 URL。
+        """
         self.status = "connecting"
         self.error = ""
         self.tools = []
@@ -68,54 +95,40 @@ class McpServerConnection:
         try:
             self._client = httpx.AsyncClient(timeout=30.0)
 
-            # 1. 连接 SSE 端点，获取 message URL
-            sse_url = f"{self.url}/sse"
-            async with self._client.stream("GET", sse_url, headers={"Accept": "text/event-stream"}) as resp:
-                if resp.status_code != 200:
-                    self.status = "error"
-                    self.error = f"SSE 连接失败: HTTP {resp.status_code}"
-                    return False
-
-                # 读取第一个 SSE 事件：endpoint
-                async for line in resp.aiter_lines():
-                    if line.startswith("data:"):
-                        data = line[5:].strip()
-                        if data.startswith("/message"):
-                            # message URL 可能是相对路径
-                            if data.startswith("http"):
-                                self._message_url = data
-                            else:
-                                self._message_url = f"{self.url}{data}"
-                            break
-                        elif data.startswith("http"):
-                            self._message_url = data
-                            break
-
-                if not self._message_url:
-                    self.status = "error"
-                    self.error = "未收到 message endpoint"
-                    return False
-
-            # SSE 流需要保持，重新建立长连接在后台监听
+            # 1. 建立持久 SSE 监听（后台任务）：endpoint 事件由该连接解析并保存 message URL
+            self._endpoint_event = asyncio.Event()
+            self._listen_error = ""
             self._sse_task = asyncio.create_task(self._listen_sse())
 
-            # 等一小段时间让 SSE 连接稳定
-            await asyncio.sleep(0.3)
+            # 2. 等待 message endpoint（含 sessionId 绑定），15 秒超时
+            try:
+                await asyncio.wait_for(self._endpoint_event.wait(), timeout=15.0)
+            except asyncio.TimeoutError:
+                return await self._fail_connect(self._listen_error or "未收到 message endpoint")
+            if not self._message_url:
+                return await self._fail_connect(self._listen_error or "未收到 message endpoint")
 
-            # 2. 发送 initialize 请求
+            # 3. 发送 initialize 请求
             init_result = await self._send_request("initialize", {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
                 "clientInfo": {"name": "SLATE", "version": "1.0.0"},
             })
+            if not init_result or "error" in init_result:
+                err = (init_result or {}).get("error")
+                err_text = err if isinstance(err, str) else (json.dumps(err, ensure_ascii=False)[:200] if err else "无响应")
+                return await self._fail_connect(f"initialize 失败: {err_text}")
 
-            # 3. 发送 initialized 通知
+            # 4. 发送 initialized 通知
             await self._send_notification("notifications/initialized")
 
-            # 4. 拉取工具列表
+            # 5. 拉取工具列表
             tools_result = await self._send_request("tools/list", {})
-            if tools_result and "tools" in tools_result:
-                self.tools = tools_result["tools"]
+            if not tools_result or "error" in tools_result:
+                err = (tools_result or {}).get("error")
+                err_text = err if isinstance(err, str) else (json.dumps(err, ensure_ascii=False)[:200] if err else "无响应")
+                return await self._fail_connect(f"tools/list 失败: {err_text}")
+            self.tools = tools_result.get("tools") or []
 
             self.status = "connected"
             self._connected_at = time.time()
@@ -123,31 +136,35 @@ class McpServerConnection:
             return True
 
         except httpx.ConnectError:
-            self.status = "error"
-            self.error = f"无法连接到 {self.url}"
-            return False
+            return await self._fail_connect(f"无法连接到 {self.url}")
         except httpx.TimeoutException:
-            self.status = "error"
-            self.error = "连接超时"
-            return False
+            return await self._fail_connect("连接超时")
         except Exception as e:
-            self.status = "error"
             self.error = str(e)[:200]
             logger.exception(f"MCP Server '{self.name}' 连接失败")
-            return False
+            return await self._fail_connect(str(e)[:200])
 
     async def _listen_sse(self):
-        """后台监听 SSE 流，处理响应和通知。"""
+        """后台监听 SSE 流：解析 endpoint 事件保存 message URL，持续接收响应与通知。"""
         try:
             async with httpx.AsyncClient(timeout=None) as client:
                 async with client.stream("GET", f"{self.url}/sse", headers={"Accept": "text/event-stream"}) as resp:
+                    if resp.status_code != 200:
+                        self._listen_error = f"SSE 连接失败: HTTP {resp.status_code}"
+                        self._endpoint_event.set()
+                        return
                     event_type = ""
                     async for line in resp.aiter_lines():
                         if line.startswith("event:"):
                             event_type = line[6:].strip()
                         elif line.startswith("data:"):
                             data = line[5:].strip()
-                            if event_type == "message" and data:
+                            # endpoint 事件（MCP 规范），兼容旧式 data 前缀判断
+                            if event_type == "endpoint" or data.startswith("/message") or data.startswith("http"):
+                                if not self._message_url:
+                                    self._message_url = data if data.startswith("http") else f"{self.url}{data}"
+                                    self._endpoint_event.set()
+                            elif event_type == "message" and data:
                                 try:
                                     msg = json.loads(data)
                                     req_id = msg.get("id")
@@ -164,9 +181,15 @@ class McpServerConnection:
             pass
         except Exception as e:
             logger.warning(f"MCP SSE 监听断开 ({self.name}): {e}")
+            self._listen_error = str(e)[:200]
+            self._endpoint_event.set()
             if self.status == "connected":
                 self.status = "error"
                 self.error = f"连接断开: {e}"
+            # 断线后让所有挂起的请求立即失败，避免 15 秒空等
+            for req_id, fut in list(self._pending.items()):
+                if not fut.done():
+                    fut.set_result({"error": "SSE 连接断开"})
 
     async def _send_request(self, method: str, params: dict) -> dict | None:
         """发送 JSON-RPC 请求并等待响应。"""
@@ -179,7 +202,7 @@ class McpServerConnection:
             "method": method,
             "params": params,
         }
-        future = asyncio.get_event_loop().create_future()
+        future = asyncio.get_running_loop().create_future()
         self._pending[req_id] = future
         try:
             resp = await self._client.post(self._message_url, json=payload, timeout=15.0)
@@ -227,6 +250,10 @@ class McpServerConnection:
         """断开连接。"""
         if self._sse_task:
             self._sse_task.cancel()
+            try:
+                await self._sse_task
+            except BaseException:
+                pass
             self._sse_task = None
         if self._client:
             await self._client.aclose()
@@ -240,23 +267,29 @@ class McpServerConnection:
 # ── 管理器（全局单例） ──────────────────────────────────
 
 _connections: dict[str, McpServerConnection] = {}
+_config_load_error = False  # 原文件损坏时置位，保存前备份防覆盖丢失
 
 
 def _load_config() -> list[dict[str, Any]]:
     """从磁盘加载 MCP Server 配置。"""
+    global _config_load_error
     if not CONFIG_PATH.exists():
+        _config_load_error = False
         return []
     try:
         data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        _config_load_error = False
         return data if isinstance(data, list) else []
     except Exception:
+        _config_load_error = True
         return []
 
 
 def _save_config(servers: list[dict[str, Any]]):
-    """保存 MCP Server 配置到磁盘。"""
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(json.dumps(servers, ensure_ascii=False, indent=2), encoding="utf-8")
+    """保存 MCP Server 配置到磁盘（原子写；原文件损坏时先备份再写）。"""
+    if _config_load_error:
+        backup_corrupt(CONFIG_PATH)
+    atomic_write_json(CONFIG_PATH, servers)
 
 
 def list_servers() -> list[dict[str, Any]]:

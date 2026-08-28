@@ -3,17 +3,17 @@
  * 轻量模型初步讨论，重型模型最终决策。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260828-125";
-import { notifyTaskComplete } from "../services/notify.js?v=20260828-125";
-import { streamChat } from "../services/api.js?v=20260828-125";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260828-125";
-import { renderMarkdown } from "../services/markdown.js?v=20260828-125";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260828-125";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260828-125";
-import { getExpertsCached } from "./experts.js?v=20260828-125";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260828-125";
-import { t } from "../services/i18n.js?v=20260828-125";
-import { makeId } from "../services/utils.js?v=20260828-125";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260828-129";
+import { notifyTaskComplete } from "../services/notify.js?v=20260828-129";
+import { streamChat } from "../services/api.js?v=20260828-129";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260828-129";
+import { renderMarkdown } from "../services/markdown.js?v=20260828-129";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260828-129";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260828-129";
+import { getExpertsCached } from "./experts.js?v=20260828-129";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260828-129";
+import { t } from "../services/i18n.js?v=20260828-129";
+import { makeId } from "../services/utils.js?v=20260828-129";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -661,6 +661,10 @@ async function startDiscussion() {
   discussAbortController = new AbortController();
   btnStartDiscuss.disabled = true;
   btnStartDiscuss.textContent = "辩论中…";
+  if (btnStopDiscuss) {
+    btnStopDiscuss.classList.remove("hidden");
+    btnStopDiscuss.disabled = false;
+  }
   teamOutput.innerHTML = "";
   resetTeamUsage();
 
@@ -696,12 +700,12 @@ async function startDiscussion() {
 
   // 多轮辩论：每轮每位成员可提案或回应他人，直到决策产生或轮次用尽
   for (let round = 1; round <= maxRounds && !verdict; round++) {
-
+    if (discussAbortController?.signal.aborted) break;
     addRoundHeader(round);
     const isLastRound = round === maxRounds;
 
     for (const member of teamMembers) {
-      if (verdict) break;
+      if (verdict || discussAbortController?.signal.aborted) break;
 
       const apiKey = getModelKey(member.modelId);
       if (!apiKey) {
@@ -733,6 +737,7 @@ async function startDiscussion() {
           teamOutput.scrollTop = teamOutput.scrollHeight;
         }
       } catch (e) {
+        if (discussAbortController?.signal.aborted) break;
         fullText = t("请求失败: {msg}", { msg: e.message });
       }
 
@@ -762,22 +767,29 @@ async function startDiscussion() {
 
     // 轮次用尽仍无决策：决策者强制拍板
     if (!verdict && isLastRound) {
-
+      if (discussAbortController?.signal.aborted) break;
       verdict = await forceVerdict(topic, boardContext, entries);
     }
   }
 
-  const summaryMarkdown = renderDebateSummary(topic, entries, verdict);
-  persistTeamSession({
-    id: makeSessionId(),
-    topic,
-    createdAt: Date.now(),
-    members: teamMembers.map(m => ({ ...m })),
-    entries,
-    verdictText: verdict?.text || "",
-    summaryMarkdown,
-    usage: { ...currentTeamUsage },
-  });
+  if (btnStopDiscuss) {
+    btnStopDiscuss.classList.add("hidden");
+    btnStopDiscuss.disabled = true;
+  }
+  const stoppedManually = !!discussAbortController?.signal.aborted;
+  if (!stoppedManually) {
+    const summaryMarkdown = renderDebateSummary(topic, entries, verdict);
+    persistTeamSession({
+      id: makeSessionId(),
+      topic,
+      createdAt: Date.now(),
+      members: teamMembers.map(m => ({ ...m })),
+      entries,
+      verdictText: verdict?.text || "",
+      summaryMarkdown,
+      usage: { ...currentTeamUsage },
+    });
+  }
 
   isDiscussing = false;
   discussAbortController = null;
@@ -790,16 +802,11 @@ async function startDiscussion() {
 /** 停止正在进行的讨论 */
 function stopDiscussion() {
   if (!isDiscussing || !discussAbortController) return;
+  if (discussAbortController.signal.aborted) return; // 已停止过，等待循环收尾
   discussAbortController.abort();
-  isDiscussing = false;
-  discussAbortController = null;
-  btnStartDiscuss.disabled = false;
-  btnStartDiscuss.textContent = t("开始讨论");
+  // 不在此重置状态：保持 controller 非空，后续成员请求拿到已中止的 signal 立即失败，
+  // 不会发出不受控请求；isDiscussing/按钮由循环结束后统一收尾，避免并发第二场辩论
   notifyTaskComplete(t("团队讨论完成"), t("辩论已结束"));
-  if (btnStopDiscuss) {
-    btnStopDiscuss.classList.add("hidden");
-    btnStopDiscuss.disabled = true;
-  }
   const stopEl = document.createElement("div");
   stopEl.className = "team-stopped-notice";
   stopEl.textContent = t("讨论已手动停止");
@@ -835,6 +842,7 @@ async function forceVerdict(topic, boardContext, entries) {
       teamOutput.scrollTop = teamOutput.scrollHeight;
     }
   } catch (e) {
+    if (discussAbortController?.signal.aborted) return null;
     fullText = t("请求失败: {msg}", { msg: e.message });
   }
 
@@ -1202,6 +1210,7 @@ async function runSelectedWorkflow() {
   } catch (e) {
     wfRunStatus.textContent = "";
     wfResultBar.textContent = "";
+    wfAbortBtn?.classList.add("hidden");
     const err = document.createElement("span");
     err.className = "wf-result-error";
     err.textContent = t("工作流执行失败: {msg}", { msg: e.message });

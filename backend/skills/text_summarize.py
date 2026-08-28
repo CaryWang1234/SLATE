@@ -8,7 +8,8 @@ from typing import Any
 
 
 def _sentences(text: str) -> list[str]:
-    parts = re.split(r"(?<=[。！？.!?])\s+|\n+", text)
+    # 中文分句：句号/感叹号/问号后不需要空格（直接切分）
+    parts = re.split(r"(?<=[。！？.!?])|\n+", text)
     return [part.strip() for part in parts if part.strip()]
 
 

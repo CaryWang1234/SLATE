@@ -22,8 +22,10 @@ def execute(text: str = "", size: int = 8, border: int = 2,
     content = str(text or "").strip()
     if not content:
         return {"message": "缺少 text 参数：二维码内容（文本或 URL）"}
-    if len(content) > 1800:
-        return {"message": "内容过长（>1800 字符），二维码将难以扫描，请精简"}
+    # QR Code v40-L 最大容量约 2953 字节（UTF-8），中文按 3 字节估算
+    byte_len = len(content.encode("utf-8"))
+    if byte_len > 2500:
+        return {"message": f"内容过长（{byte_len} 字节，上限 2500），二维码将难以扫描，请精简"}
 
     try:
         import qrcode

@@ -85,7 +85,9 @@ def execute(
 
     lines.append("---")
     lines.append("")
-    lines.append(f"*文档生成时间: SLATE 砚*")
+    from datetime import datetime
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines.append(f"*文档生成时间: {now}（SLATE 砚）*")
 
     markdown = "\n".join(lines)
 

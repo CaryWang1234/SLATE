@@ -36,18 +36,24 @@ CODEX_PLUGIN_MANIFEST = ".codex-plugin/plugin.json"
 
 
 def _parse_skill_md_frontmatter(content: str) -> dict[str, str]:
-    """解析 SKILL.md 的 YAML frontmatter，提取 name/description。"""
+    """解析 SKILL.md 开头的 YAML frontmatter，提取 name/description。
+
+    只在文件开头解析一次（首行 --- 到下一个 ---），正文中的 Markdown
+    水平线 --- 不得重新进入 frontmatter 模式，否则正文 `xxx: yyy` 行会
+    覆盖 name/description。
+    """
     meta: dict[str, str] = {}
+    if not content.startswith("---"):
+        return meta
     lines = content.split("\n")
-    in_frontmatter = False
-    for line in lines:
+    for i, line in enumerate(lines[1:], 1):
+        if line.strip() == "---":
+            break
         stripped = line.strip()
-        if stripped == "---":
-            in_frontmatter = not in_frontmatter
+        if not stripped or stripped.startswith("#") or ":" not in stripped:
             continue
-        if in_frontmatter and ":" in stripped:
-            key, _, value = stripped.partition(":")
-            meta[key.strip().lower()] = value.strip()
+        key, _, value = stripped.partition(":")
+        meta[key.strip().lower()] = value.strip()
     return meta
 
 

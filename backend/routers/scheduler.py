@@ -24,6 +24,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Request
 
+from backend.data_io import atomic_write_json, backup_corrupt
 from backend.routers.chat import _get_db, add_message, create_conversation
 from backend.routers.proxy import _find_model
 from backend.routers.settings import STATE_PATH
@@ -36,6 +37,7 @@ TASKS_PATH = DATA_DIR / "scheduled_tasks.json"
 
 _loop_started = False
 _running: set[str] = set()  # 正在执行中的任务 id，防止长任务被重复触发
+_tasks_load_error = False  # 上次加载损坏时置位，保存前备份原文件防覆盖丢失
 
 # ── 事件驱动状态 ────────────────────────────────
 
@@ -48,25 +50,40 @@ _event_loop_started = False
 # ── 持久化 ────────────────────────────────────
 
 def _load_tasks() -> list[dict[str, Any]]:
+    global _tasks_load_error
     if not TASKS_PATH.exists():
+        _tasks_load_error = False
         return []
     try:
         data = json.loads(TASKS_PATH.read_text(encoding="utf-8"))
+        _tasks_load_error = False
         return data if isinstance(data, list) else []
     except Exception:
+        _tasks_load_error = True
         return []
 
 
 def _save_tasks(tasks: list[dict[str, Any]]) -> None:
-    TASKS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    TASKS_PATH.write_text(json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8")
+    if _tasks_load_error:
+        backup_corrupt(TASKS_PATH)
+    atomic_write_json(TASKS_PATH, tasks)
 
 
 def _update_task(task: dict[str, Any]) -> None:
+    """后台完成时只回写运行状态字段，避免用触发时的旧快照覆盖用户并发修改。
+
+    模型调用可能持续数分钟，期间用户可能 PATCH 了 prompt/enabled，
+    整对象覆盖会把那些改动回滚掉。
+    """
     tasks = _load_tasks()
     for i, t in enumerate(tasks):
         if t.get("id") == task.get("id"):
-            tasks[i] = task
+            tasks[i]["last_run"] = task.get("last_run")
+            tasks[i]["last_status"] = task.get("last_status")
+            if "last_conversation_id" in task:
+                tasks[i]["last_conversation_id"] = task.get("last_conversation_id")
+            if task.get("mode") == "once" and "enabled" in task:
+                tasks[i]["enabled"] = task["enabled"]
             break
     _save_tasks(tasks)
 
@@ -123,13 +140,17 @@ def _check_file_changes(task: dict[str, Any]) -> bool:
         if not fp.exists():
             continue
         if fp.is_dir():
-            # 目录：取最新修改的文件
+            # 目录：逐一比对目录内所有文件 mtime。
+            # 初始快照由 _init_event_snapshots 预填，因此运行期出现的新 key 就是新建文件，应触发
             try:
-                newest = max(fp.rglob("*"), key=lambda f: f.stat().st_mtime, default=None)
-                if newest:
-                    mtime = newest.stat().st_mtime
-                    key = str(newest.resolve())
-                    if key in _file_mtimes and mtime > _file_mtimes[key]:
+                for f in fp.rglob("*"):
+                    if not f.is_file():
+                        continue
+                    key = str(f.resolve())
+                    mtime = f.stat().st_mtime
+                    if key not in _file_mtimes:
+                        changed = True
+                    elif mtime > _file_mtimes[key]:
                         changed = True
                     _file_mtimes[key] = mtime
             except (OSError, ValueError):
@@ -137,7 +158,9 @@ def _check_file_changes(task: dict[str, Any]) -> bool:
         elif fp.is_file():
             mtime = fp.stat().st_mtime
             key = str(fp.resolve())
-            if key in _file_mtimes and mtime > _file_mtimes[key]:
+            if key not in _file_mtimes:
+                changed = True
+            elif mtime > _file_mtimes[key]:
                 changed = True
             _file_mtimes[key] = mtime
     return changed
@@ -173,12 +196,9 @@ def _check_git_push(task: dict[str, Any]) -> bool:
 def _check_webhook(task: dict[str, Any]) -> bool:
     """检查是否有待处理的 webhook 触发。"""
     task_id = task.get("id", "")
-    pending = _pending_webhooks.get(task_id, [])
-    if pending:
-        # 取出并清空
-        _pending_webhooks[task_id] = []
-        return True
-    return False
+    # 只判断不消费：payload 由 _run_task 在真正注入提示词时取出，
+    # 避免这里清空后异步任务读到空列表
+    return bool(_pending_webhooks.get(task_id))
 
 
 def _should_run_event(task: dict[str, Any]) -> bool:
@@ -266,7 +286,8 @@ async def _run_task(task: dict[str, Any]) -> None:
             head = _git_heads.get(str(Path(repo).resolve()), "")
             context_parts.append(f"触发原因：Git push 检测\n仓库：{repo}\n最新 HEAD：{head[:12]}")
         elif event_type == "webhook":
-            payloads = _pending_webhooks.get(task.get("id", ""), [])
+            # 消费队列：取出后清空，payload 真正进入提示词
+            payloads = _pending_webhooks.pop(task.get("id", ""), [])
             context_parts.append(f"触发原因：Webhook 回调")
             if payloads:
                 try:

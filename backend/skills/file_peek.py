@@ -42,7 +42,12 @@ def _read_lines_fast(file_path: Path, encoding: str, errors: str = "replace") ->
 
 
 def _read_range(file_path: Path, encoding: str, start: int, end: int, errors: str = "replace") -> tuple[list[str], int]:
-    """读取指定行范围，返回 (lines, total_lines)。"""
+    """读取指定行范围，返回 (lines, total_lines)。
+
+    之前 `i > end` 时先 total += 1 再 break 导致 total 多计 1 行；
+    且 break 后总行数永远数不完。现在数完全部行，total 恒为文件总行数
+    （文件受 5MB 上限约束，全量计数开销可接受）。
+    """
     lines = []
     total = 0
     try:
@@ -51,8 +56,6 @@ def _read_range(file_path: Path, encoding: str, start: int, end: int, errors: st
                 total += 1
                 if start <= i <= end:
                     lines.append(line.rstrip("\n\r"))
-                elif i > end:
-                    break
     except PermissionError:
         raise PermissionError(f"无权限读取: {file_path}")
     return lines, total
@@ -60,19 +63,8 @@ def _read_range(file_path: Path, encoding: str, start: int, end: int, errors: st
 
 def _read_tail(file_path: Path, encoding: str, n: int, errors: str = "replace") -> tuple[list[str], int]:
     """读取最后 N 行，返回 (lines, total_lines)。"""
-    # 先统计总行数
-    total = 0
-    try:
-        with file_path.open("r", encoding=encoding, errors=errors) as f:
-            for _ in f:
-                total += 1
-    except PermissionError:
-        raise PermissionError(f"无权限读取: {file_path}")
-    
-    # 再读取最后 N 行
-    start = max(1, total - n + 1)
-    lines, _ = _read_range(file_path, encoding, start, total, errors)
-    return lines, total
+    all_lines, total = _read_range(file_path, encoding, 1, 1 << 31, errors)
+    return all_lines[-n:], total
 
 
 def execute(
@@ -147,14 +139,9 @@ def execute(
             content_lines = [l.rstrip("\n\r") for l in all_lines[:line_count]]
             total_lines = -1  # 未知
         
-        # 默认模式：读取前 N 行并统计总行数
+        # 默认模式：读取前 N 行（_read_range 已数完全部行，total 即文件总行数）
         else:
             content_lines, total_lines = _read_range(target, enc, 1, line_count)
-            # 如果文件更大，继续统计总行数
-            if total_lines == line_count:
-                with target.open("r", encoding=enc, errors="replace") as f:
-                    for _ in f:
-                        total_lines += 1
 
     except PermissionError as e:
         return {"error": str(e)}

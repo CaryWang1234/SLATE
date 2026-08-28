@@ -23,7 +23,9 @@ def _safe_path(rel: str) -> Path:
     """将相对路径解析为 VAULT_DIR 下的绝对路径，防止路径穿越。"""
     rel = rel.replace("\\", "/").strip("/")
     target = (VAULT_DIR / rel).resolve()
-    if not str(target).startswith(str(VAULT_DIR.resolve())):
+    vault_root = str(VAULT_DIR.resolve())
+    # 分隔符边界检查：`data/vault-x/...` 是 `data/vault` 的字符串前缀但不在 vault 内
+    if target != Path(vault_root) and not str(target).startswith(vault_root + os.sep):
         raise ValueError("路径不合法")
     return target
 

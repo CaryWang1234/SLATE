@@ -3,13 +3,13 @@
  * 对话模式通过 #expert-select 注入；团队模式通过成员 expertId 注入
  */
 
-import { state, setActiveExpertId } from "../store.js?v=20260828-125";
+import { state, setActiveExpertId } from "../store.js?v=20260828-129";
 import {
   loadExperts, getExpert, createExpert, saveExpert, deleteExpert,
   importExpertZip, expertExportUrl, uploadExpertFile, deleteExpertFile,
-} from "../services/experts.js?v=20260828-125";
-import { dlgConfirm } from "../services/dialog.js?v=20260828-125";
-import { t } from "../services/i18n.js?v=20260828-125";
+} from "../services/experts.js?v=20260828-129";
+import { dlgConfirm } from "../services/dialog.js?v=20260828-129";
+import { t } from "../services/i18n.js?v=20260828-129";
 
 let modal, expertListEl, detailEmpty, detailForm;
 let nameInput, descInput, personaInput, rulesInput;
@@ -26,7 +26,7 @@ function fmtSize(n) {
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260828-125");
+    const { toast: showToast } = await import("../app.js?v=20260828-129");
     showToast(msg);
   } catch {
     console.warn(msg);
@@ -102,9 +102,13 @@ function showEmpty() {
 
 // ── 详情加载 ────────────────────────────────
 
+let selectSeq = 0;
+
 async function selectExpert(id) {
+  const seq = ++selectSeq;
   try {
     const detail = await getExpert(id, { force: true });
+    if (seq !== selectSeq) return; // 用户已改选其他专家，丢弃过期响应
     currentId = id;
     currentDetail = detail;
     detailEmpty.classList.add("hidden");
@@ -118,6 +122,7 @@ async function selectExpert(id) {
     renderList();
     switchTab("persona");
   } catch (e) {
+    if (seq !== selectSeq) return;
     await toast(t("专家包打开失败: {msg}", { msg: e.message }));
   }
 }

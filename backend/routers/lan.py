@@ -73,38 +73,41 @@ def _remote_url(ip: str, port: int) -> str:
     return f"http://{ip}:{port}/?{TOKEN_QUERY}={_state['token']}"
 
 
-def _host_port(request: Request) -> int | None:
-    host = request.headers.get("host", "")
-    if host.startswith("["):
-        # IPv6 host like [::1]:8001
-        _, _, tail = host.rpartition("]:")
-        host = tail
-    elif ":" in host:
-        host = host.rsplit(":", 1)[1]
-    else:
-        return None
-    try:
-        return int(host)
-    except ValueError:
-        return None
-
-
 def is_lan_request(request: Request) -> bool:
-    """是否来自局域网副服务端口。主 127.0.0.1 端口不走此鉴权。"""
+    """是否来自局域网副服务端口。主 127.0.0.1 端口不走此鉴权。
+
+    基于 ASGI scope 中的实际监听端口（TCP 层，客户端不可伪造），
+    不能用 Host 头 —— Host 头可被任意伪造，用它判断必然可被绕过。
+    """
     port = _state.get("port")
-    return bool(port and _host_port(request) == port)
+    if not port:
+        return False
+    server = request.scope.get("server")
+    if not server or len(server) < 2:
+        return False
+    try:
+        return int(server[1]) == port
+    except (TypeError, ValueError):
+        return False
 
 
 def _authorized(request: Request) -> bool:
     expected = str(_state.get("token") or "")
     if not expected:
         return False
+    expected_b = expected.encode("utf-8")
     candidates = (
         request.query_params.get(TOKEN_QUERY, ""),
         request.cookies.get(TOKEN_COOKIE, ""),
         request.headers.get(TOKEN_HEADER, ""),
     )
-    return any(secrets.compare_digest(str(item), expected) for item in candidates if item)
+    try:
+        return any(
+            secrets.compare_digest(item.encode("utf-8"), expected_b)
+            for item in candidates if item
+        )
+    except (TypeError, ValueError, UnicodeEncodeError):
+        return False
 
 
 def _auth_page() -> HTMLResponse:

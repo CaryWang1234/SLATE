@@ -31,6 +31,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Optional
 
+from backend.skills.sandbox import is_path_safe
+
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
 
 # ---------------------------------------------------------------------------
@@ -178,6 +180,8 @@ def _walk_package(paths: list[str], prefix: str, max_depth: int, current_depth: 
         if is_pkg:
             try:
                 sub_mod = _safe_import(module_name)
+                if sub_mod:
+                    _track_module(module_name, sub_mod)
                 if sub_mod and hasattr(sub_mod, "__path__"):
                     _walk_package(list(sub_mod.__path__), module_name, max_depth, current_depth + 1, result)
             except Exception:
@@ -193,8 +197,29 @@ def _discover_submodules(package: ModuleType, max_depth: int) -> list[str]:
     return result
 
 
+# 本次提取期间注册进 sys.modules 的临时模块（名字 → 原值，None 表示原本不存在）
+_tmp_modules: dict[str, Any] = {}
+
+
+def _track_module(name: str, mod: Any) -> None:
+    """记录并注册临时模块，结束后由 _restore_tmp_modules 恢复。"""
+    if name not in _tmp_modules:
+        _tmp_modules[name] = sys.modules.get(name)
+    sys.modules[name] = mod
+
+
+def _restore_tmp_modules() -> None:
+    """恢复被临时注册的 sys.modules 条目（含 exec 失败留下的半初始化残留）。"""
+    while _tmp_modules:
+        name, orig = _tmp_modules.popitem()
+        if orig is None:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = orig
+
+
 def _register_package_in_sys_modules(package_path: Path, pkg_name: str) -> None:
-    """将文件系统上的包注册到 sys.modules。"""
+    """将文件系统上的包注册到 sys.modules（临时，结束后恢复）。"""
     init_file = package_path / "__init__.py"
     if not init_file.exists():
         return
@@ -203,14 +228,14 @@ def _register_package_in_sys_modules(package_path: Path, pkg_name: str) -> None:
         return
     mod = importlib.util.module_from_spec(spec)
     mod.__path__ = [str(package_path)]
-    sys.modules[pkg_name] = mod
+    _track_module(pkg_name, mod)
     try:
         spec.loader.exec_module(mod)  # type: ignore[union-attr]
     except Exception:
         pass
 
 
-def _discover_modules_from_path(target: str) -> tuple[str, list[str]]:
+def _discover_modules_from_path(target: str, max_depth: int = -1) -> tuple[str, list[str]]:
     """从文件系统路径发现模块，返回 (包名, 模块名列表)。"""
     target_path = Path(target).resolve()
     if not target_path.exists():
@@ -221,7 +246,7 @@ def _discover_modules_from_path(target: str) -> tuple[str, list[str]]:
         if spec is None:
             raise ImportError(f"无法从文件创建模块: {target}")
         mod = importlib.util.module_from_spec(spec)
-        sys.modules[target_path.stem] = mod
+        _track_module(target_path.stem, mod)
         try:
             spec.loader.exec_module(mod)  # type: ignore[union-attr]
         except Exception as e:
@@ -244,7 +269,7 @@ def _discover_modules_from_path(target: str) -> tuple[str, list[str]]:
                 sys.path.remove(parent)
         if mod is None:
             raise ImportError(f"包导入失败: {pkg_name}")
-        submodules = _discover_submodules(mod, -1)
+        submodules = _discover_submodules(mod, max_depth)
         return pkg_name, [pkg_name] + submodules
 
     # 普通目录：逐个加载其中的 .py 文件
@@ -257,7 +282,7 @@ def _discover_modules_from_path(target: str) -> tuple[str, list[str]]:
         if spec is None:
             continue
         mod = importlib.util.module_from_spec(spec)
-        sys.modules[name] = mod
+        _track_module(name, mod)
         try:
             spec.loader.exec_module(mod)  # type: ignore[union-attr]
         except Exception:
@@ -472,7 +497,7 @@ def execute(target: str = "", depth: int = 1, format: str = "json",
     is_path = os.path.exists(tgt) and (os.path.isdir(tgt) or tgt.endswith(".py"))
     try:
         if is_path:
-            lib_name, module_names = _discover_modules_from_path(tgt)
+            lib_name, module_names = _discover_modules_from_path(tgt, max_depth)
         else:
             lib_name = tgt
             top_mod = _safe_import(lib_name)
@@ -480,55 +505,67 @@ def execute(target: str = "", depth: int = 1, format: str = "json",
                 return {"error": f"导入失败: {lib_name}，请确认已安装或路径正确"}
             submodules = _discover_submodules(top_mod, max_depth)
             module_names = [lib_name] + submodules
+
+        module_names = sorted(set(module_names))
+        if not module_names:
+            return {"error": f"未发现任何模块: {tgt}"}
+
+        result: dict[str, Any] = {
+            "library_name": lib_name,
+            "version": _get_version(lib_name) if not is_path else "local",
+            "modules": {},
+        }
+        for mod_name in module_names:
+            mod = _safe_import(mod_name)
+            if mod is None:
+                continue
+            _track_module(mod_name, mod)
+            module_api = extract_module_api(mod, mod_name, is_top_level=(mod_name == lib_name))
+            if module_api["functions"] or module_api["classes"]:
+                result["modules"][mod_name] = module_api
+
+        if not result["modules"]:
+            return {"error": f"未提取到任何公共 API（目标可能全为私有成员或 C 扩展）: {tgt}"}
+
+        # 落盘（输出目录禁止指向系统敏感区域；文件名禁止路径穿越）
+        out_dir = Path(output_dir).expanduser() if output_dir else DATA_DIR / "outputs"
+        safe_dir, dir_reason = is_path_safe(str(out_dir.resolve()))
+        if not safe_dir:
+            return {"error": f"输出目录不合法: {dir_reason}"}
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_name = re.sub(r"[^\w.-]", "_", lib_name)[:48] or "api"
+        ext = ".md" if fmt == "markdown" else ".json"
+        out_name = (file_name.strip() if file_name else f"apidoc_{safe_name}_{stamp}")
+        out_name = re.sub(r"[\\/:*?\"<>|\s]", "_", out_name)
+        if not out_name.endswith(ext):
+            out_name += ext
+        out_path = (out_dir / out_name).resolve()
+        out_dir_resolved = out_dir.resolve()
+        # 双保险：解析后必须仍位于输出目录内
+        if out_path != out_dir_resolved and not str(out_path).startswith(str(out_dir_resolved) + os.sep):
+            return {"error": "输出文件名不合法"}
+        out_path = out_dir / out_name
+
+        if fmt == "markdown":
+            out_path.write_text(_format_as_markdown(result), encoding="utf-8")
+        else:
+            out_path.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+
+        func_count = sum(len(m["functions"]) for m in result["modules"].values())
+        class_count = sum(len(m["classes"]) for m in result["modules"].values())
+        return {
+            "message": "ok",
+            "library_name": lib_name,
+            "version": result["version"],
+            "format": fmt,
+            "module_count": len(result["modules"]),
+            "function_count": func_count,
+            "class_count": class_count,
+            "file_path": str(out_path),
+            "preview_url": f"/api/files/output?name={out_path.name}",
+        }
     except (FileNotFoundError, ImportError) as e:
         return {"error": str(e)}
-
-    module_names = sorted(set(module_names))
-    if not module_names:
-        return {"error": f"未发现任何模块: {tgt}"}
-
-    result: dict[str, Any] = {
-        "library_name": lib_name,
-        "version": _get_version(lib_name) if not is_path else "local",
-        "modules": {},
-    }
-    for mod_name in module_names:
-        mod = _safe_import(mod_name)
-        if mod is None:
-            continue
-        module_api = extract_module_api(mod, mod_name, is_top_level=(mod_name == lib_name))
-        if module_api["functions"] or module_api["classes"]:
-            result["modules"][mod_name] = module_api
-
-    if not result["modules"]:
-        return {"error": f"未提取到任何公共 API（目标可能全为私有成员或 C 扩展）: {tgt}"}
-
-    # 落盘
-    out_dir = Path(output_dir).expanduser() if output_dir else DATA_DIR / "outputs"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_name = re.sub(r"[^\w.-]", "_", lib_name)[:48] or "api"
-    ext = ".md" if fmt == "markdown" else ".json"
-    out_name = (file_name.strip() if file_name else f"apidoc_{safe_name}_{stamp}")
-    if not out_name.endswith(ext):
-        out_name += ext
-    out_path = out_dir / out_name
-
-    if fmt == "markdown":
-        out_path.write_text(_format_as_markdown(result), encoding="utf-8")
-    else:
-        out_path.write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
-
-    func_count = sum(len(m["functions"]) for m in result["modules"].values())
-    class_count = sum(len(m["classes"]) for m in result["modules"].values())
-    return {
-        "message": "ok",
-        "library_name": lib_name,
-        "version": result["version"],
-        "format": fmt,
-        "module_count": len(result["modules"]),
-        "function_count": func_count,
-        "class_count": class_count,
-        "file_path": str(out_path),
-        "preview_url": f"/api/files/output?name={out_path.name}",
-    }
+    finally:
+        _restore_tmp_modules()

@@ -217,7 +217,22 @@ def _extract_pdf(data: bytes, final_url: str, limit: int) -> dict[str, Any]:
 
 
 def _render_with_playwright(url: str) -> str | None:
-    """用无头浏览器渲染页面并返回渲染后的 HTML；不可用时返回 None。"""
+    """用无头浏览器渲染页面并返回渲染后的 HTML；不可用时返回 None。
+
+    同步 Playwright 禁止在运行中的 asyncio 事件循环线程内调用（MCP 主调用路径在循环内），
+    因此实际渲染提交到一次性工作线程执行。
+    """
+    import concurrent.futures
+    wait_s = (RENDER_TIMEOUT_MS + RENDER_WAIT_MS) / 1000 + 60
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="slate-render") as pool:
+            return pool.submit(_render_with_playwright_sync, url).result(timeout=wait_s)
+    except Exception:
+        return None
+
+
+def _render_with_playwright_sync(url: str) -> str | None:
+    """实际渲染（工作线程内执行）。"""
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:

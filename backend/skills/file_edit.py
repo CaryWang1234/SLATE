@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.skills.sandbox import is_path_safe, validate_file_size
-from backend.skills.text_io import read_text_file, write_text_file
+from backend.skills.text_io import read_text_file
 
 # 全局剪贴板存储（支持多个命名剪贴板）
 _clipboards: dict[str, str] = {}
@@ -77,23 +77,6 @@ def _read_with_lines(file_path: str, encoding: str = "") -> tuple[list[str], str
     lines = content.splitlines()
 
     return lines, content, line_ending, detected_encoding, None
-
-
-def _write_file(file_path: str, content: str, encoding: str = "") -> tuple[str | None, str, bool]:
-    """写入文件，返回 (error, encoding_used, encoding_changed)。"""
-    target = Path(file_path)
-    
-    safe, reason = is_path_safe(file_path)
-    if not safe:
-        return reason, "", False
-    
-    try:
-        info = write_text_file(target, content, encoding or "utf-8")
-        return None, info.encoding, info.encoding_changed
-    except PermissionError:
-        return f"无权限写入: {file_path}", "", False
-    except Exception as e:
-        return f"写入失败: {e}", "", False
 
 
 def _generate_diff(original: str, content: str, filename: str) -> str:
@@ -174,20 +157,24 @@ def _execute_replace(
     new_str: str,
     encoding: str = "",
 ) -> dict[str, Any]:
-    """replace 操作：精确字符串替换，唯一匹配 + 自动备份。
+    """replace 操作：精确字符串替换，只生成预览不写盘（落盘须经用户「接受」）。
 
     严格逻辑：
-    1. old_str == new_str → 不写入
+    1. old_str == new_str → 不变更
     2. count == 0 → 报错
     3. count > 1 → 报错
-    4. count == 1 → 创建 .bak 备份后写回
+    4. count == 1 → 生成 new_content/diff 预览
     """
     if old_str is None or old_str == "":
         return {"error": "old_str 不能为空"}
 
-    _lines, content, _line_ending, detected_encoding, error = _read_with_lines(file_path, encoding)
+    _lines, content, line_ending, detected_encoding, error = _read_with_lines(file_path, encoding)
     if error:
         return {"error": error}
+
+    # 换行归一化：view 输出的内容已被 splitlines 去掉 \r，CRLF 文件必须归一化才能匹配
+    old_str = _normalize_newlines(old_str, line_ending)
+    new_str = _normalize_newlines(new_str, line_ending)
 
     # 新旧相同
     if old_str == new_str:
@@ -210,37 +197,35 @@ def _execute_replace(
             "error": f"存在 {count} 处匹配，请在 old_str 前后增加 3 行唯一上下文以确保唯一匹配",
         }
 
-    # 创建备份
-    target = Path(file_path)
-    bak_path = target.with_suffix(target.suffix + ".bak")
-    try:
-        write_text_file(bak_path, content, detected_encoding or "utf-8")
-    except Exception as e:
-        return {"error": f"创建备份失败 ({bak_path}): {e}"}
-
-    # 执行替换
+    # 只生成预览，不写盘 —— 与 edit/replace_range 一致，落盘必须经用户点「接受」（/projects/apply-edit）
     new_content = content.replace(old_str, new_str, 1)
-
-    # 写回（保持原换行符）
-    write_error, written_encoding, encoding_changed = _write_file(file_path, new_content, detected_encoding)
-    if write_error:
-        return {"error": write_error}
-
-    # 计算替换位置信息
+    diff_text = _generate_diff(content, new_content, Path(file_path).name)
+    added, removed = _count_diff_lines(diff_text)
     pos = content.index(old_str)
     line_no = content[:pos].count("\n") + 1
 
     return {
-        "file": file_path,
+        "file": str(Path(file_path)),
+        "file_name": Path(file_path).name,
         "action": "replace",
-        "status": "ok",
-        "line": line_no,
-        "backup": str(bak_path),
-        "old_chars": len(old_str),
-        "new_chars": len(new_str),
-        "encoding": written_encoding,
-        "encoding_changed": encoding_changed,
-        "message": f"已替换第 {line_no} 行附近的唯一匹配，备份至 {bak_path.name}",
+        "status": "preview",
+        "diff": diff_text,
+        "applied": [{
+            "index": 1,
+            "line": line_no,
+            "old_lines": old_str.count("\n") + 1,
+            "new_lines": new_str.count("\n") + 1,
+        }],
+        "errors": [],
+        "stats": {
+            "edits_total": 1,
+            "edits_applied": 1,
+            "lines_added": added,
+            "lines_removed": removed,
+        },
+        "new_content": new_content,
+        "encoding": detected_encoding,
+        "note": "编辑已预览。用户可选择「接受」写入文件、「拒绝」放弃、「复制」拷贝 diff。",
     }
 
 
@@ -473,6 +458,10 @@ def _execute_delete(file_path: str, start_line: int, end_line: int, encoding: st
     
     lines = original.splitlines(keepends=True)
     total = len(lines)
+    
+    # 越界检查
+    if start_line > total:
+        return {"error": f"start_line ({start_line}) 超出文件总行数 ({total})"}
     
     start = max(1, start_line) - 1  # 0-based
     end = min(total, end_line)

@@ -2,12 +2,12 @@
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）。
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260828-125";
-import { get, post, del, upload } from "../services/api.js?v=20260828-125";
-import { guardSkillParams } from "../services/riskguard.js?v=20260828-125";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260828-125";
-import { t } from "../services/i18n.js?v=20260828-125";
-import { setIconText } from "../services/icons.js?v=20260828-125";
+import { state, subscribe, setSkills } from "../store.js?v=20260828-129";
+import { get, post, del, upload } from "../services/api.js?v=20260828-129";
+import { guardSkillParams } from "../services/riskguard.js?v=20260828-129";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260828-129";
+import { t } from "../services/i18n.js?v=20260828-129";
+import { setIconText } from "../services/icons.js?v=20260828-129";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -427,10 +427,10 @@ async function executeSkill() {
   } catch (e) {
     skillResult.classList.remove("hidden");
     skillResult.textContent = t("请求失败: {msg}", { msg: e.message });
+  } finally {
+    btnRunSkill.disabled = false;
+    btnRunSkill.textContent = "执行";
   }
-
-  btnRunSkill.disabled = false;
-  btnRunSkill.textContent = "执行";
 }
 
 // ── 上传自定义技术───────────────────────────

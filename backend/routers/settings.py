@@ -11,6 +11,8 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from backend.data_io import atomic_write_json
+
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
@@ -70,7 +72,7 @@ async def save_shared_state(req: SharedStateRequest):
             data[key] = req.data[key]
     try:
         STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        STATE_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(STATE_PATH, data)
         return {"code": 0, "data": data, "message": "ok"}
     except Exception as exc:
         return {"code": 1, "message": f"保存设置失败: {exc}"}

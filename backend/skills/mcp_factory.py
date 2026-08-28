@@ -16,8 +16,8 @@ from typing import Any
 # 工具模块存放目录
 SKILLS_DIR = Path(__file__).resolve().parent
 
-# 工具模板
-TOOL_TEMPLATE = '''"""{description}
+# 工具模板（占位符用 __XXX__ 包裹，避免与用户代码中的 {} 冲突）
+TOOL_TEMPLATE = '''"""__DESCRIPTION__
 
 由工具工厂自动生成。
 """
@@ -27,22 +27,27 @@ from __future__ import annotations
 from typing import Any
 
 
-def execute({params}) -> dict[str, Any]:
+def execute(__PARAMS__) -> dict[str, Any]:
     """执行工具逻辑。
 
     Args:
-{param_docs}
+__PARAM_DOCS__
     Returns:
         dict: 执行结果。
     """
     # ── 参数校验 ──
-{validations}
+__VALIDATIONS__
 
     # ── 核心逻辑 ──
-{body}
+__BODY__
 
-    return {{"status": "ok", "message": "工具执行成功"}}
+    return {"status": "ok", "message": "工具执行成功"}
 '''
+
+
+def _clean_text(text: Any) -> str:
+    """折叠空白为单行并去掉会破坏 docstring 的三连引号。"""
+    return " ".join(str(text or "").split()).replace('"""', "'''")
 
 
 def _sanitize_name(name: str) -> str:
@@ -70,21 +75,30 @@ def _generate_params(param_specs: list[dict]) -> tuple[str, str, str]:
         ptype = spec.get("type", "str")
         required = spec.get("required", True)
         default = spec.get("default", "")
-        desc = spec.get("description", "")
+        desc = _clean_text(spec.get("description", ""))
 
-        # 函数签名
+        # 函数签名：默认值必须生成合法的 Python 字面量，
+        # 否则 default 含引号/换行/非数值时会生成语法错误的文件
         if ptype == "int":
-            params.append(f"{name}: int = {default or 0}")
+            try:
+                dv = int(default)
+            except (TypeError, ValueError):
+                dv = 0
+            params.append(f"{name}: int = {dv}")
         elif ptype == "float":
-            params.append(f"{name}: float = {default or 0.0}")
+            try:
+                dv = float(default)
+            except (TypeError, ValueError):
+                dv = 0.0
+            params.append(f"{name}: float = {dv}")
         elif ptype == "bool":
-            params.append(f"{name}: bool = {str(default or False)}")
+            params.append(f"{name}: bool = {bool(default)}")
         elif ptype == "list":
             params.append(f"{name}: list = None")
         elif ptype == "dict":
             params.append(f"{name}: dict = None")
         else:
-            params.append(f'{name}: str = "{default}"' if default else f"{name}: str = ''")
+            params.append(f"{name}: str = {repr(str(default))}" if default else f"{name}: str = ''")
 
         # 文档
         type_desc = f"({ptype})" if ptype else ""
@@ -153,14 +167,13 @@ def execute(
         body_lines = body.strip().split("\n")
         body = "\n".join("    " + line if line.strip() else "" for line in body_lines)
 
-    # 生成代码
-    code = TOOL_TEMPLATE.format(
-        description=description,
-        params=params_str,
-        param_docs=param_docs or "        无参数",
-        validations=validations or "    # 无需校验",
-        body=body,
-    )
+    # 生成代码（占位符替换，避免 .format 与用户代码中的 {} 冲突）
+    code = (TOOL_TEMPLATE
+            .replace("__DESCRIPTION__", _clean_text(description))
+            .replace("__PARAMS__", params_str)
+            .replace("__PARAM_DOCS__", param_docs or "        无参数")
+            .replace("__VALIDATIONS__", validations or "    # 无需校验")
+            .replace("__BODY__", body))
 
     # 写入文件
     try:

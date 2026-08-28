@@ -643,10 +643,15 @@ async def create_snippet(body: dict[str, Any]) -> dict[str, Any]:
     source = body.get("source", "")
     now = time.time()
     conn = _get_db()
-    conn.execute("INSERT INTO prompt_snippets (id, text, source, created_at) VALUES (?, ?, ?, ?)",
-                 (snip_id, text, source, now))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("INSERT INTO prompt_snippets (id, text, source, created_at) VALUES (?, ?, ?, ?)",
+                     (snip_id, text, source, now))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        # ID 已存在时静默忽略（前端可能重发）
+        pass
+    finally:
+        conn.close()
     return {"code": 0, "data": {"id": snip_id}, "message": "ok"}
 
 

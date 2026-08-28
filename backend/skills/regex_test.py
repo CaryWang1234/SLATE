@@ -77,10 +77,14 @@ def execute(pattern: str = "", text: str = "", flags: str = "", limit: int = 20,
         # Windows: 使用线程 + 超时
         result_holder: dict[str, Any] = {"matches": [], "error": None}
 
+        stop_event = threading.Event()
+        
         def _run_matches():
             try:
                 results = []
                 for match in regex.finditer(str(text or "")):
+                    if stop_event.is_set():
+                        break
                     results.append({
                         "match": match.group(0),
                         "span": list(match.span()),
@@ -98,6 +102,7 @@ def execute(pattern: str = "", text: str = "", flags: str = "", limit: int = 20,
         t.join(timeout=REGEX_TIMEOUT)
         if t.is_alive():
             timed_out = True
+            stop_event.set()  # 通知线程尽快退出
         else:
             if result_holder["error"]:
                 return {"valid": False, "error": result_holder["error"]}

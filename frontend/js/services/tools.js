@@ -12,11 +12,11 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260828-125";
-import { post } from "../services/api.js?v=20260828-125";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260828-125";
-import { t } from "./i18n.js?v=20260828-125";
-import { makeId } from "./utils.js?v=20260828-125";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260828-129";
+import { post } from "../services/api.js?v=20260828-129";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260828-129";
+import { t } from "./i18n.js?v=20260828-129";
+import { makeId } from "./utils.js?v=20260828-129";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -895,13 +895,21 @@ function parseFileWriteParams(body) {
   const lines = text.split(/\r?\n/);
   while (lines.length && !lines[0].trim()) lines.shift(); // 跳过前导空行
   const filePath = (lines.shift() || "").trim();
-  // 容忍模型在路径与内容之间加一行分隔符（◈── / --- / === 之类），跳过
-  if (lines.length && /^[◈─—\-=:*]{2,}\s*$/.test(lines[0].trim())) lines.shift();
+  // 容忍模型在路径与内容之间加一行分隔符（◈── / === 之类），跳过。
+  // `---` 可能是 Markdown 的 YAML frontmatter 首行（合法内容）：后续行形如 `key: value` 时按内容保留。
+  if (lines.length && /^[◈─—\-=:*]{2,}\s*$/.test(lines[0].trim())) {
+    const sep = lines[0].trim();
+    const nextLine = (lines[1] || "").trim();
+    const yamlFrontmatter = sep === "---" && /^[A-Za-z0-9_."'\-]+\s*:/.test(nextLine);
+    if (!yamlFrontmatter) lines.shift();
+  }
   // 防御：模型偶尔无视规则把内容包进 ``` 代码围栏，剥掉外层围栏还原真实内容。
+  // 仅对非 Markdown 文件剥离——.md 内容以 ``` 开头结尾是合法的（如单个代码块的笔记）。
   // 末尾可能带协议性空行，需在最后一个非空行上判断闭合围栏。
   let lastIdx = lines.length - 1;
   while (lastIdx >= 0 && !lines[lastIdx].trim()) lastIdx--;
-  if (lastIdx >= 1 && /^``/.test(lines[0].trim()) && /^```\s*$/.test(lines[lastIdx].trim())) {
+  const isMarkdownFile = /\.(md|markdown|mdown|mkd)$/i.test(filePath);
+  if (lastIdx >= 1 && /^```/.test(lines[0].trim()) && /^```\s*$/.test(lines[lastIdx].trim()) && !isMarkdownFile) {
     lines.shift();
     lines.splice(lastIdx - 1, 1);
   }

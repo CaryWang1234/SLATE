@@ -64,16 +64,16 @@ PRESETS: dict[str, dict[str, str]] = {
     },
 }
 
-# 关键词到配色的映射
+# 关键词到配色的映射（长关键词优先，避免短词提前匹配导致死映射）
 KEYWORD_MAP = {
-    "暖": "warm", "温暖": "warm", "warm": "warm", "橙色": "warm", "橘": "warm",
-    "冷": "cool", "冷静": "cool", "cool": "cool", "蓝色": "cool", "蓝": "cool",
+    "海洋": "ocean", "海": "ocean", "ocean": "ocean", "天蓝": "ocean", "水": "ocean",
+    "玫瑰": "rose", "红": "rose", "粉": "rose", "rose": "rose", "热情": "rose",
+    "日落": "sunset", "夕阳": "sunset", "sunset": "sunset", "橙": "sunset",
     "自然": "nature", "绿色": "nature", "绿": "nature", "清新": "nature", "nature": "nature",
     "黑白": "mono", "灰": "mono", "单色": "mono", "极简": "mono", "mono": "mono", "素": "mono",
     "暗": "dark", "深色": "dark", "黑夜": "dark", "dark": "dark", "night": "dark",
-    "日落": "sunset", "夕阳": "sunset", "sunset": "sunset", "橙": "sunset",
-    "海洋": "ocean", "海": "ocean", "ocean": "ocean", "天蓝": "ocean", "水": "ocean",
-    "玫瑰": "rose", "红": "rose", "粉": "rose", "rose": "rose", "热情": "rose",
+    "暖": "warm", "温暖": "warm", "warm": "warm", "橙色": "warm", "橘": "warm",
+    "冷": "cool", "冷静": "cool", "cool": "cool", "蓝色": "cool", "蓝": "cool",
 }
 
 

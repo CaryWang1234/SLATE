@@ -3,11 +3,11 @@
  * 文件夹/笔记树形浏览、编辑器+实时预览、[[wiki-link]] 双向链接、搜索与标签
  */
 
-import { get, post, put, del } from "../services/api.js?v=20260828-125";
-import { renderMarkdown } from "../services/markdown.js?v=20260828-125";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260828-125";
-import { t } from "../services/i18n.js?v=20260828-125";
-import { iconSvgEl } from "../services/icons.js?v=20260828-125";
+import { get, post, put, del } from "../services/api.js?v=20260828-129";
+import { renderMarkdown } from "../services/markdown.js?v=20260828-129";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260828-129";
+import { t } from "../services/i18n.js?v=20260828-129";
+import { iconSvgEl } from "../services/icons.js?v=20260828-129";
 
 let vaultSidebar, vaultEditorEmpty, vaultEditorActive;
 let vaultSearchInput, vaultTagsBar;
@@ -25,7 +25,7 @@ let previewTimer = null;
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260828-125");
+    const { toast: showToast } = await import("../app.js?v=20260828-129");
     showToast(msg);
   } catch { console.warn(msg); }
 }
@@ -34,6 +34,11 @@ async function toast(msg) {
 function noteNameFromPath(path) {
   const name = path.split("/").pop() || path;
   return name.replace(/\.md$/, "");
+}
+
+/** 按路径段编码，避免 # ? 等字符截断 URL */
+function encodeVaultPath(path) {
+  return path.split("/").map(encodeURIComponent).join("/");
 }
 
 /** 渲染 wiki-link 为可点击 HTML */
@@ -156,7 +161,16 @@ function renderTreeItems(items, container, depth) {
       delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         if (!await dlgConfirm(t("删除笔记「{name}」？", { name: item.name }), { danger: true, okText: "删除" })) return;
-        await del(`/vault/note/${item.path}`);
+        try {
+          const res = await del(`/vault/note/${encodeVaultPath(item.path)}`);
+          if (res.code !== 0) {
+            await toast(t("删除失败: {msg}", { msg: res.message }));
+            return;
+          }
+        } catch (err) {
+          await toast(t("删除失败: {msg}", { msg: err.message }));
+          return;
+        }
         if (currentNotePath === item.path) {
           currentNotePath = "";
           showEditorEmpty();
@@ -180,7 +194,7 @@ async function openNote(path) {
   }
 
   try {
-    const res = await get(`/vault/note/${path}`);
+    const res = await get(`/vault/note/${encodeVaultPath(path)}`);
     if (res.code !== 0) {
       await toast(t("加载失败: {msg}", { msg: res.message }));
       return;
@@ -246,7 +260,7 @@ async function saveCurrentNote() {
   const title = vaultNoteTitle.value.trim();
 
   try {
-    const res = await put(`/vault/note/${currentNotePath}`, { content, tags, title });
+    const res = await put(`/vault/note/${encodeVaultPath(currentNotePath)}`, { content, tags, title });
     if (res.code === 0) {
       currentNoteDirty = false;
       await toast(t("笔记已保存"));
@@ -264,7 +278,7 @@ async function deleteCurrentNote() {
   if (!currentNotePath) return;
   if (!await dlgConfirm(t("删除当前笔记？"), { danger: true, okText: "删除" })) return;
   try {
-    await del(`/vault/note/${currentNotePath}`);
+    await del(`/vault/note/${encodeVaultPath(currentNotePath)}`);
     currentNotePath = "";
     currentNoteDirty = false;
     showEditorEmpty();

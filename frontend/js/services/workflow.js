@@ -6,11 +6,11 @@
  * - 支持 AbortController 中断
  */
 
-import { get, post } from "./api.js?v=20260828-125";
-import { state, getModelKey } from "../store.js?v=20260828-125";
-import { guardSkillParams } from "./riskguard.js?v=20260828-125";
-import { t } from "./i18n.js?v=20260828-125";
-import { makeId } from "./utils.js?v=20260828-125";
+import { get, post } from "./api.js?v=20260828-129";
+import { state, getModelKey } from "../store.js?v=20260828-129";
+import { guardSkillParams } from "./riskguard.js?v=20260828-129";
+import { t } from "./i18n.js?v=20260828-129";
+import { makeId } from "./utils.js?v=20260828-129";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 
@@ -149,7 +149,7 @@ function resolveBinding(node, members) {
   if (node.role) {
     member = (members || []).find(m => m.role === node.role || m.name === node.role) || null;
   }
-  const modelId = member?.modelId || node.model || state.currentModelId || "";
+  const modelId = member?.modelId || node.model || state.currentModel?.id || "";
   return { member, modelId, modelLabel: findModelName(modelId), persona: member?.persona || "" };
 }
 

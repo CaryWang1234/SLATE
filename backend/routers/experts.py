@@ -115,9 +115,11 @@ def _write_data_json(d: Path, data: dict[str, Any]) -> None:
 
 
 def _safe_rel_name(name: str) -> str | None:
-    """清洗子目录内文件名：禁止路径穿越，仅保留相对路径。"""
+    """清洗子目录内文件名：禁止路径穿越与绝对路径（含盘符），仅保留相对路径。"""
     name = str(name or "").replace("\\", "/").strip()
     if not name or name.startswith("/"):
+        return None
+    if re.match(r"^[A-Za-z]:", name):
         return None
     parts = [p for p in name.split("/") if p and p not in (".", "..")]
     if not parts or ".." in name.split("/"):

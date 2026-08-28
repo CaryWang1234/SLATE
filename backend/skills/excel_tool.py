@@ -101,8 +101,22 @@ def _create(title: str, sheet: str, headers: Any, rows: Any, data: str, file_nam
         for cell in ws[1]:
             cell.font = header_font
             cell.fill = header_fill
+    
+    def _to_cell_value(v):
+        """保留数字/布尔等原始类型，仅截断超长字符串。"""
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return v
+        s = str(v)[:32000]
+        # 尝试还原数字类型
+        try:
+            if "." in s:
+                return float(s)
+            return int(s)
+        except (ValueError, TypeError):
+            return s
+    
     for row in body:
-        ws.append([str(c)[:32000] for c in row])
+        ws.append([_to_cell_value(c) for c in row])
 
     # 简单列宽自适应（按表头/前若干行估算）
     for idx, col in enumerate(ws.iter_cols(max_row=min(ws.max_row, 20)), start=1):
@@ -146,7 +160,9 @@ def _read(file_path: str, sheet: str, limit: int) -> dict[str, Any]:
         wb = load_workbook(str(p), read_only=True, data_only=True)
         sheet_name = (sheet or "").strip()
         if sheet_name and sheet_name not in wb.sheetnames:
-            return {"error": f"工作表不存在: {sheet_name}，可用: {wb.sheetnames}"}
+            err_msg = f"工作表不存在: {sheet_name}，可用: {wb.sheetnames}"
+            wb.close()
+            return {"error": err_msg}
         ws = wb[sheet_name] if sheet_name else wb.active
         sheet_name = ws.title
         rows = [[("" if c is None else c) for c in row] for row in ws.iter_rows(values_only=True)]
@@ -193,7 +209,7 @@ def _convert(file_path: str, out: str) -> dict[str, Any]:
         ws = wb.active
         ws.title = p.stem[:31] or "Sheet1"
         for row in rows:
-            ws.append([str(c)[:32000] for c in row])
+            ws.append([_to_cell_value(c) for c in row])
         out_path = Path(out).expanduser() if (out or "").strip() else p.with_suffix(".xlsx")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         wb.save(str(out_path))

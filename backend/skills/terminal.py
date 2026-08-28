@@ -41,7 +41,7 @@ MAX_OUTPUT = MAX_OUTPUT_CHARS
 # Terminal pipes use UTF-8 regardless of the Windows ANSI/OEM code page.
 TERMINAL_ENCODING = "utf-8"
 # 禁止的命令前缀（无条件拦截）
-BLOCKED_PREFIXES = ("rm -rf /", "format", "mkfs", "dd if=")
+BLOCKED_PREFIXES = ("rm -rf /", "format c:", "format d:", "mkfs", "dd if=")
 
 # 高危命令规则（写死）
 HIGH_RISK_PATTERNS: list[tuple[re.Pattern, str]] = [
@@ -49,6 +49,7 @@ HIGH_RISK_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\b(rmdir|shred|unlink)\b", re.I), "删除文件/目录"),
     (re.compile(r"\b(del|erase)\b\s", re.I), "删除文件（del/erase）"),
     (re.compile(r"\brd\b\s", re.I), "删除目录（rd）"),
+    (re.compile(r"\bri\b\s", re.I), "删除文件/目录（PowerShell ri 别名）"),
     (re.compile(r"Remove-Item", re.I), "删除文件（Remove-Item）"),
     (re.compile(r"\bdd\b(?=.*\bof=)", re.I), "磁盘写入（dd）"),
     (re.compile(r"\b(fdisk|diskpart|parted)\b", re.I), "磁盘分区操作"),
@@ -165,6 +166,10 @@ def _looks_like_windows_native_command(command: str) -> bool:
     return base in WINDOWS_NATIVE_PREFIXES
 
 
+# cd / Set-Location / chdir / sl（PowerShell 中 rd 也是 Remove-Item，不在此列）
+_CD_RE = re.compile(r"^\s*(?:cd|chdir|sl|Set-Location)\s*(.*?)\s*$", re.I)
+
+
 class TerminalSession:
     """持久化终端会话。"""
 
@@ -187,6 +192,7 @@ class TerminalSession:
         self.current_command = ""
         self._reader_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
+        self._lock = threading.Lock()  # 保护并发 run_command
         
     def start(self) -> None:
         """启动 shell 进程。"""
@@ -216,9 +222,11 @@ class TerminalSession:
         self._reader_thread.start()
     
     def _read_output(self) -> None:
-        """异步读取 stdout/stderr。"""
+        """异步读取 stdout/stderr（缓冲区有上限，防止内存爆炸）。"""
         if not self.process:
             return
+        
+        MAX_BUFFER_LINES = 10_000  # 每缓冲区最多保留 10k 行
         
         def read_stream(stream, buffer):
             try:
@@ -226,6 +234,9 @@ class TerminalSession:
                     if self._stop_event.is_set():
                         break
                     buffer.append(line)
+                    # 超过上限时丢弃最旧的行（保留最近 N 行）
+                    if len(buffer) > MAX_BUFFER_LINES * 1.2:
+                        del buffer[:len(buffer) - MAX_BUFFER_LINES]
             except Exception:
                 pass
         
@@ -283,8 +294,41 @@ class TerminalSession:
             self.running = False
             self.current_command = ""
     
+    def _apply_cd(self, command: str) -> bool:
+        """识别 cd 类命令并同步 self.cwd，保证后续原生命令在新目录执行。
+
+        原生命令（git/python/pytest…）绕开 shell 直接以 self.cwd 作为
+        工作目录启动；若 shell 内 cd 后 Python 侧不更新，原生命令会在旧目录跑。
+        目标目录不存在时不更新（与 shell 行为一致，cd 失败 cwd 不变）。
+        """
+        m = _CD_RE.match(command)
+        if not m:
+            return False
+        target = m.group(1).strip().strip("\"'")
+        try:
+            if not target:
+                self.cwd = Path.home()
+            else:
+                new_path = Path(target)
+                if not new_path.is_absolute():
+                    new_path = self.cwd / new_path
+                resolved = new_path.resolve()
+                if resolved.is_dir():
+                    self.cwd = resolved
+        except OSError:
+            pass
+        return True
+
     def run_command(self, command: str, timeout: float = TIMEOUT) -> dict[str, Any]:
         """在会话中执行命令。"""
+        with self._lock:  # 防止并发串扰
+            return self._run_command_locked(command, timeout)
+
+    def _run_command_locked(self, command: str, timeout: float = TIMEOUT) -> dict[str, Any]:
+        """在持有锁的情况下执行命令（内部方法）。"""
+        # 先同步 cwd（cd 命令本身仍交给 shell 执行）
+        self._apply_cd(command)
+
         if _looks_like_windows_native_command(command):
             return self._run_command_direct(command, timeout)
 
@@ -357,18 +401,30 @@ class TerminalSession:
             self.current_command = ""
     
     def kill_process(self) -> None:
-        """终止 shell 进程。"""
+        """终止 shell 进程及其所有子进程（进程树）。"""
         self._stop_event.set()
         if self.process:
             try:
-                self.process.terminate()
-                self.process.wait(timeout=2)
+                pid = self.process.pid
+                if sys.platform == "win32":
+                    # Windows: 用 taskkill /T 杀整个进程树
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(pid)],
+                        timeout=5,
+                        **hidden_subprocess_kwargs(),
+                    )
+                else:
+                    # Unix: terminate + wait，失败时 kill -9
+                    self.process.terminate()
+                    self.process.wait(timeout=2)
             except Exception:
                 try:
-                    self.process.kill()
+                    if sys.platform != "win32":
+                        self.process.kill()
                 except Exception:
                     pass
-            self.process = None
+            finally:
+                self.process = None
     
     def close(self) -> None:
         """关闭会话。"""

@@ -36,9 +36,9 @@ def execute(directory: str = ".", max_files: int = 5000, **_kw: Any) -> dict[str
             continue
         if not path.is_file():
             continue
-        file_count += 1
-        if file_count > file_limit:
+        if file_count >= file_limit:
             break
+        file_count += 1
         try:
             size = path.stat().st_size
         except OSError:
@@ -55,5 +55,5 @@ def execute(directory: str = ".", max_files: int = 5000, **_kw: Any) -> dict[str
         "total_bytes": total_bytes,
         "extensions": dict(ext_counts.most_common(30)),
         "largest_files": largest,
-        "truncated": file_count > file_limit,
+        "truncated": file_count >= file_limit,
     }

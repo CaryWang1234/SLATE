@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
+
+from backend.data_io import atomic_write_json
 
 router = APIRouter(prefix="/grind", tags=["grind"])
 
@@ -29,6 +32,17 @@ SESSIONS_DIR = DATA_DIR / "grind_sessions"
 _sessions: dict[str, dict[str, Any]] = {}
 
 MAX_ROUNDS = 10
+
+# 会话 ID 只允许字母/数字/下划线/连字符，防止 `../`、`%5C` 等路径穿越写/删任意 .json
+_CONV_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+
+
+def _sanitize_conv_id(conv_id: str | None) -> str | None:
+    """校验并规范化会话 ID；非法时返回 None。"""
+    conv_id = (conv_id or "").strip()
+    if not _CONV_ID_RE.match(conv_id):
+        return None
+    return conv_id
 
 
 def _load_all() -> None:
@@ -48,7 +62,7 @@ def _persist(session: dict[str, Any]) -> None:
     try:
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         path = SESSIONS_DIR / f"{session['conversation_id']}.json"
-        path.write_text(json.dumps(session, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(path, session)
     except OSError:
         pass
 
@@ -66,9 +80,9 @@ def _archive(conv_id: str) -> None:
 @router.post("/sessions")
 async def start_session(body: dict[str, Any]) -> dict[str, Any]:
     """开启磨墨会话；同一对话已有进行中会话时直接复用。"""
-    conv_id = str(body.get("conversation_id") or "").strip()
+    conv_id = _sanitize_conv_id(body.get("conversation_id"))
     if not conv_id:
-        return {"code": -1, "data": None, "message": "conversation_id 不能为空"}
+        return {"code": -1, "data": None, "message": "conversation_id 不能为空或包含非法字符"}
 
     _load_all()
     existing = _sessions.get(conv_id)
@@ -94,18 +108,24 @@ async def start_session(body: dict[str, Any]) -> dict[str, Any]:
 @router.get("/sessions/{conv_id}")
 async def get_session(conv_id: str) -> dict[str, Any]:
     """查询会话状态；不存在时返回 idle 占位。"""
+    safe_id = _sanitize_conv_id(conv_id)
+    if not safe_id:
+        return {"code": -1, "data": None, "message": "会话 ID 不合法"}
     _load_all()
-    session = _sessions.get(conv_id)
+    session = _sessions.get(safe_id)
     if not session:
-        return {"code": 0, "data": {"conversation_id": conv_id, "state": "idle"}, "message": "ok"}
+        return {"code": 0, "data": {"conversation_id": safe_id, "state": "idle"}, "message": "ok"}
     return {"code": 0, "data": session, "message": "ok"}
 
 
 @router.patch("/sessions/{conv_id}")
 async def update_session(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
     """更新会话的轮数、已定项与墨稿。"""
+    safe_id = _sanitize_conv_id(conv_id)
+    if not safe_id:
+        return {"code": -1, "data": None, "message": "会话 ID 不合法"}
     _load_all()
-    session = _sessions.get(conv_id)
+    session = _sessions.get(safe_id)
     if not session:
         return {"code": -1, "data": None, "message": "磨墨会话不存在"}
 
@@ -127,8 +147,11 @@ async def update_session(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
 @router.post("/sessions/{conv_id}/collect")
 async def collect_session(conv_id: str) -> dict[str, Any]:
     """转入收墨状态：下一轮助手回复直接输出墨稿。"""
+    safe_id = _sanitize_conv_id(conv_id)
+    if not safe_id:
+        return {"code": -1, "data": None, "message": "会话 ID 不合法"}
     _load_all()
-    session = _sessions.get(conv_id)
+    session = _sessions.get(safe_id)
     if not session:
         return {"code": -1, "data": None, "message": "磨墨会话不存在"}
     if session["state"] != "done":
@@ -141,6 +164,9 @@ async def collect_session(conv_id: str) -> dict[str, Any]:
 @router.delete("/sessions/{conv_id}")
 async def end_session(conv_id: str) -> dict[str, Any]:
     """结束并归档会话（清除状态文件）。"""
+    safe_id = _sanitize_conv_id(conv_id)
+    if not safe_id:
+        return {"code": -1, "data": None, "message": "会话 ID 不合法"}
     _load_all()
-    _archive(conv_id)
+    _archive(safe_id)
     return {"code": 0, "data": None, "message": "ok"}

@@ -152,9 +152,13 @@ ALL_RULES = (
 
 
 def _should_skip_dir(dirpath: str) -> bool:
-    """判断是否应跳过该目录。"""
-    parts = Path(dirpath).parts
-    return any(excluded in parts for excluded in EXCLUDE_DIRS)
+    """判断是否应跳过该目录。
+
+    只比较当前目录名，避免祖先目录名（如 D:\\dev\\build\\SLATE 的 build）
+    误伤整个扫描——os.walk 的 dirpath 含全部祖先，之前用 parts 比对
+    会在首个 root 就命中排除表导致 0 文件假阴性。
+    """
+    return Path(dirpath).name in EXCLUDE_DIRS
 
 
 def _scan_file(filepath: Path, rules: list[SecurityRule]) -> list[dict[str, Any]]:

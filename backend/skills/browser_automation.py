@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import os
 import tempfile
 import time
@@ -31,6 +32,10 @@ _context = None       # BrowserContext
 _page = None          # 当前 Page
 _playwright = None    # Playwright 实例
 _headless = True
+
+# Playwright 同步 API 禁止在运行中的 asyncio 事件循环线程内调用（MCP/技能主路径都在循环内），
+# 所有浏览器操作统一提交到该独立工作线程执行，跨调用状态由该线程保持
+_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="slate-browser")
 
 
 def _ensure_browser() -> Any:
@@ -63,7 +68,7 @@ def _screenshot_path(name: str = "") -> str:
     return str(tmp / fname)
 
 
-def execute(
+def _execute_sync(
     action: str = "",
     url: str = "",
     selector: str = "",
@@ -75,7 +80,7 @@ def execute(
     timeout: int = 30000,
     **_kw: Any,
 ) -> dict[str, Any]:
-    """浏览器自动化工具。通过 Playwright 控制 Chromium 浏览器。
+    """浏览器自动化实际实现（在独立工作线程内执行，规避同步 Playwright 与 asyncio 冲突）。
 
     Args:
         action: 操作类型 - launch/navigate/screenshot/click/type/get_text/get_html/evaluate/scroll/wait/close
@@ -227,3 +232,47 @@ def execute(
 
     except Exception as e:
         return {"error": f"浏览器操作失败 ({action}): {e}"}
+
+
+def execute(
+    action: str = "",
+    url: str = "",
+    selector: str = "",
+    text: str = "",
+    expression: str = "",
+    headless: bool = True,
+    screenshot_name: str = "",
+    full_page: bool = False,
+    timeout: int = 30000,
+    **_kw: Any,
+) -> dict[str, Any]:
+    """浏览器自动化工具（入口）。通过 Playwright 控制 Chromium 浏览器。
+
+    实际操作提交到独立工作线程执行：同步 Playwright 在运行中的 asyncio 事件循环
+    线程内直接调用会抛异常，而 MCP/技能主调用路径均在循环内。
+
+    Args:
+        action: 操作类型 - launch/navigate/screenshot/click/type/get_text/get_html/evaluate/scroll/wait/close
+        url: 导航目标 URL（action=navigate 时必填）
+        selector: CSS 选择器（click/type/get_text/wait 时使用）
+        text: 输入文字（action=type 时必填）
+        expression: JavaScript 表达式（action=evaluate 时必填）
+        headless: 是否无头模式（action=launch 时生效，默认 True）
+        screenshot_name: 截图文件名前缀（可选）
+        full_page: 是否全页截图（默认 False，只截可视区域）
+        timeout: 操作超时毫秒数（默认 30000）
+
+    Returns:
+        dict: 操作结果。
+    """
+    wait_s = max(90, timeout / 1000 + 60)
+    try:
+        return _executor.submit(
+            _execute_sync, action=action, url=url, selector=selector, text=text,
+            expression=expression, headless=headless, screenshot_name=screenshot_name,
+            full_page=full_page, timeout=timeout, **_kw,
+        ).result(timeout=wait_s)
+    except concurrent.futures.TimeoutError:
+        return {"error": "浏览器操作超时（执行线程仍在后台运行，请稍后重试）"}
+    except Exception as e:
+        return {"error": f"浏览器操作失败: {e}"}

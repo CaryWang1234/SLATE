@@ -2,12 +2,12 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260828-125";
-import { get, streamChat } from "../services/api.js?v=20260828-125";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260828-125";
-import { t } from "../services/i18n.js?v=20260828-125";
-import { iconSvgEl } from "../services/icons.js?v=20260828-125";
-import { makeId } from "../services/utils.js?v=20260828-125";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260828-129";
+import { get, streamChat } from "../services/api.js?v=20260828-129";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260828-129";
+import { t } from "../services/i18n.js?v=20260828-129";
+import { iconSvgEl } from "../services/icons.js?v=20260828-129";
+import { makeId } from "../services/utils.js?v=20260828-129";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -163,6 +163,9 @@ function normalizeBoardCardsLayout(cards = state.boardCards) {
     const hasY = Number.isFinite(Number(card.y));
     if (hasX && hasY) return card;
     changed = true;
+    // 只补缺失的坐标，保留已有的有效坐标
+    if (hasX) return { ...card, y: getNextCardPosition(index).y };
+    if (hasY) return { ...card, x: getNextCardPosition(index).x };
     return { ...card, ...getNextCardPosition(index) };
   });
   if (changed) setBoardCards(normalized);
@@ -1165,11 +1168,10 @@ function setBoardView(view, options = {}) {
 
 function refreshWhiteboard() {
   if (!boardCanvas) return;
-  boardViewCollapsed = false;
   resizeDrawCanvas();
   updateBoardLayerSize();
-  if (!currentBoardView) currentBoardView = DEFAULT_BOARD_VIEW;
-  setBoardView(currentBoardView);
+  // 切标签页等触发场景不强制重置：保留当前视图与折叠状态
+  setBoardView(currentBoardView, { preserveCollapse: true });
 }
 
 function renderCard(card) {
@@ -1213,7 +1215,9 @@ function renderCard(card) {
   deleteBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
     if (await dlgConfirm(t('删除卡片 "{title}"？', { title: card.title }), { danger: true, okText: "删除" })) {
-      const cards = state.boardCards.filter(c => c.id !== card.id);
+      const cards = state.boardCards
+        .filter(c => c.id !== card.id)
+        .map(c => ({ ...c, arrows: (c.arrows || []).filter(id => id !== card.id) }));
       setBoardCards(cards);
     }
   });
@@ -1744,7 +1748,9 @@ async function deleteCard() {
   if (!editingCardId) return;
   if (!await dlgConfirm(t("确认删除此卡片？"), { danger: true, okText: t("删除") })) return;
 
-  const cards = state.boardCards.filter(c => c.id !== editingCardId);
+  const cards = state.boardCards
+    .filter(c => c.id !== editingCardId)
+    .map(c => ({ ...c, arrows: (c.arrows || []).filter(id => id !== editingCardId) }));
   setBoardCards(cards);
   closeCardModal();
 }

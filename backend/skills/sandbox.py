@@ -40,11 +40,12 @@ _UNIX_SENSITIVE = (
 )
 
 # 敏感文件名模式（密钥 / 凭据文件）
+# 意图：拦截 .env 系列、SSH 私钥、credentials/secrets 系列，以及任意 *.pem/*.key/*.p12 等后缀
 _SENSITIVE_FILENAMES = re.compile(
-    r"^(\.env\.local|\.env\.production|"
+    r"^(\.env(\..*)?|"
     r"id_rsa|id_dsa|id_ecdsa|id_ed25519|"
-    r"\.pem|\.key|\.p12|\.pfx|\.keystore|"
-    r"credentials|secrets|\.htpasswd)$",
+    r"credentials(\.\w+)?|secrets(\.\w+)?|\.htpasswd|"
+    r".+\.(pem|key|p12|pfx|keystore|jks|p8|cer|crt))$",
     re.I,
 )
 
@@ -80,12 +81,15 @@ def is_path_safe(file_path: str) -> tuple[bool, str]:
     resolved_str = str(resolved)
 
     # 检查是否指向敏感系统目录
-    # Windows
+    # Windows（路径大小写不敏感，统一小写比较防止 `c:\windows` 绕过）
     for sensitive in _WIN_SENSITIVE:
         try:
             sens_resolved = Path(sensitive).resolve()
             sens_str = str(sens_resolved)
-            if resolved_str == sens_str or resolved_str.startswith(sens_str + os.sep):
+            if os.name == "nt":
+                if resolved_str.lower() == sens_str.lower() or resolved_str.lower().startswith(sens_str.lower() + os.sep):
+                    return False, f"禁止访问系统目录: {sensitive}"
+            elif resolved_str == sens_str or resolved_str.startswith(sens_str + os.sep):
                 return False, f"禁止访问系统目录: {sensitive}"
         except OSError:
             # 该路径在当前系统不存在，跳过
@@ -142,8 +146,12 @@ def sanitize_param(value: Any, max_length: int = MAX_PARAM_LENGTH, name: str = "
     return s, True
 
 
-def validate_skill_params(params: dict[str, Any]) -> str | None:
+def validate_skill_params(params: Any) -> str | None:
     """统一验证技能参数大小。返回错误信息或 None。"""
+    if params is None:
+        return None
+    if not isinstance(params, dict):
+        return "参数必须是键值对对象"
     for key, value in params.items():
         if isinstance(value, str) and len(value) > MAX_PARAM_LENGTH:
             return f"参数 {key} 过长（{len(value)} 字符 > {MAX_PARAM_LENGTH} 限制）"
