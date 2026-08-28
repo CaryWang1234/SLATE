@@ -276,7 +276,7 @@ export const EN_DICT = {
   // ── app.js ───────────────────────────────────────────
   "{name} 初始化失败，请查看控制台": "Failed to initialize {name}, see the console",
   "国外": "Overseas",
-  "国内": "Domestic",
+  "国内": "Chinese",
   "本地": "Local",
   "自定义": "Custom",
   "+ 自定义模型…": "+ Custom model…",
@@ -741,7 +741,7 @@ export const EN_DICT = {
   "每 {n} 分钟": "Every {n} min",
   "单次 · {time}": "Once · {time}",
   "每天 · {time}": "Daily · {time}",
-  "国产模型": "Domestic models",
+  "国产模型": "Chinese Models",
   "国际模型": "International models",
   "本地模型": "Local models",
   "暂无定时任务，先在上方添加一个": "No scheduled tasks yet — add one above",

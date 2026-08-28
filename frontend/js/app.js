@@ -2,26 +2,26 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260827-119";
-import { initI18n, t } from "./services/i18n.js?v=20260827-119";
-import { iconSvgEl } from "./services/icons.js?v=20260827-119";
-import { get, post, put } from "./services/api.js?v=20260827-119";
-import { dlgConfirm } from "./services/dialog.js?v=20260827-119";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260827-119";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260827-119";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260828-120";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260827-119";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260827-119";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260827-119";
-import { initTeamPanel } from "./components/team.js?v=20260827-119";
-import { initProjectBar } from "./components/project_bar.js?v=20260827-119";
-import { initMemoryPanel } from "./components/memory.js?v=20260827-119";
-import { initExpertsPanel } from "./components/experts.js?v=20260827-119";
-import { initSchedule } from "./components/schedule.js?v=20260827-119";
-import { initRiskGuard } from "./services/riskguard.js?v=20260827-119";
-import { initUnderstandPanel } from "./components/understand.js?v=20260827-119";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260827-119";
-import { setProject, setProjectFileTree } from "./store.js?v=20260827-119";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260828-125";
+import { initI18n, t } from "./services/i18n.js?v=20260828-125";
+import { iconSvgEl } from "./services/icons.js?v=20260828-125";
+import { get, post, put } from "./services/api.js?v=20260828-125";
+import { dlgConfirm } from "./services/dialog.js?v=20260828-125";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260828-125";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260828-125";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260828-125";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260828-125";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260828-125";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260828-125";
+import { initTeamPanel } from "./components/team.js?v=20260828-125";
+import { initProjectBar } from "./components/project_bar.js?v=20260828-125";
+import { initMemoryPanel } from "./components/memory.js?v=20260828-125";
+import { initExpertsPanel } from "./components/experts.js?v=20260828-125";
+import { initSchedule } from "./components/schedule.js?v=20260828-125";
+import { initRiskGuard } from "./services/riskguard.js?v=20260828-125";
+import { initUnderstandPanel } from "./components/understand.js?v=20260828-125";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260828-125";
+import { setProject, setProjectFileTree } from "./store.js?v=20260828-125";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -90,7 +90,7 @@ function populateModelSelect() {
     const models = state.modelRegistry[cat];
     if (!models || models.length === 0) continue;
     const optgroup = document.createElement("optgroup");
-    optgroup.label = `${label} (${models.length})`;
+    optgroup.label = `${t(label)} (${models.length})`;
     for (const m of models) {
       const opt = document.createElement("option");
       opt.value = m.id;
@@ -111,7 +111,7 @@ function populateModelSelect() {
   if (state.customModels.length > 0) {
 
     const optgroup = document.createElement("optgroup");
-    optgroup.label = "自定义";
+    optgroup.label = t("自定义");
     for (const m of state.customModels) {
       const opt = document.createElement("option");
       opt.value = m.id;
@@ -967,7 +967,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260827-119").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260828-125").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1082,7 +1082,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260827-119");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260828-125");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1307,7 +1307,7 @@ async function init() {
     if (res.code === 0 && res.data) {
       setProject(res.data);
     } else {
-      const { openProject } = await import("./services/project.js?v=20260827-119");
+      const { openProject } = await import("./services/project.js?v=20260828-125");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) setProject(openRes.data);
     }

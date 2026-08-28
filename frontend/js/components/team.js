@@ -3,17 +3,17 @@
  * 轻量模型初步讨论，重型模型最终决策。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260827-119";
-import { notifyTaskComplete } from "../services/notify.js?v=20260827-119";
-import { streamChat } from "../services/api.js?v=20260827-119";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260827-119";
-import { renderMarkdown } from "../services/markdown.js?v=20260827-119";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260827-119";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260827-119";
-import { getExpertsCached } from "./experts.js?v=20260827-119";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260828-120";
-import { t } from "../services/i18n.js?v=20260827-119";
-import { makeId } from "../services/utils.js?v=20260827-119";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260828-125";
+import { notifyTaskComplete } from "../services/notify.js?v=20260828-125";
+import { streamChat } from "../services/api.js?v=20260828-125";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260828-125";
+import { renderMarkdown } from "../services/markdown.js?v=20260828-125";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260828-125";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260828-125";
+import { getExpertsCached } from "./experts.js?v=20260828-125";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260828-125";
+import { t } from "../services/i18n.js?v=20260828-125";
+import { makeId } from "../services/utils.js?v=20260828-125";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -516,7 +516,7 @@ function populateModelOptions(select, selectedId) {
     const models = state.modelRegistry[cat];
     if (!models) continue;
     const optgroup = document.createElement("optgroup");
-    optgroup.label = label;
+    optgroup.label = t(label);
     for (const m of models) {
       const opt = document.createElement("option");
       opt.value = m.id;
@@ -531,7 +531,7 @@ function populateModelOptions(select, selectedId) {
   if (state.customModels.length > 0) {
 
     const optgroup = document.createElement("optgroup");
-    optgroup.label = "自定义";
+    optgroup.label = t("自定义");
     for (const m of state.customModels) {
       const opt = document.createElement("option");
       opt.value = m.id;

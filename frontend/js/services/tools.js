@@ -12,11 +12,11 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260827-119";
-import { post } from "../services/api.js?v=20260827-119";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260827-119";
-import { t } from "./i18n.js?v=20260827-119";
-import { makeId } from "./utils.js?v=20260827-119";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260828-125";
+import { post } from "../services/api.js?v=20260828-125";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260828-125";
+import { t } from "./i18n.js?v=20260828-125";
+import { makeId } from "./utils.js?v=20260828-125";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
