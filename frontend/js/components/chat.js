@@ -8,7 +8,7 @@ import { TOOLS, detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedT
 import { renderMarkdown } from "../services/markdown.js?v=20260827-119";
 import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260827-119";
 import { getExpertsCached } from "./experts.js?v=20260827-119";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260827-119";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260828-120";
 import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260827-119";
 import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260827-119";
 import { fileTypeIcon } from "../services/file_icons.js?v=20260827-119";

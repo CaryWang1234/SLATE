@@ -1150,9 +1150,6 @@ function setBoardView(view, options = {}) {
   document.querySelectorAll(".board-view-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === currentBoardView);
   });
-  document.querySelectorAll(".board-tool-btn, #btn-undo-stroke, #btn-clear-strokes").forEach(el => {
-    el.disabled = !showCanvas;
-  });
   if (showCanvas) {
     renderAllCards();
     renderNotes();
@@ -1386,7 +1383,15 @@ function drawArrows() {
 
 // ── 工具模式 ───────────────────────────────────
 
+// 视图栏（看板/流程等）展开时选择工具：自动收起视图栏，回到画布操作
+function ensureCanvasVisible() {
+  if (!boardViewPanel || boardViewPanel.classList.contains("hidden") || boardViewPanel.classList.contains("collapsed")) return;
+  boardViewCollapsed = true;
+  setBoardView(currentBoardView, { preserveCollapse: true });
+}
+
 function setToolMode(mode) {
+  ensureCanvasVisible();
   currentToolMode = mode || "select";
   connectSourceId = null;
   document.querySelectorAll(".board-tool-btn").forEach(btn => {
@@ -1414,8 +1419,8 @@ function setupBoardTools() {
   document.querySelectorAll(".board-tool-btn").forEach(btn => {
     btn.addEventListener("click", () => setToolMode(btn.dataset.mode || "select"));
   });
-  document.getElementById("btn-undo-stroke")?.addEventListener("click", undoStroke);
-  document.getElementById("btn-clear-strokes")?.addEventListener("click", clearStrokesAndNotes);
+  document.getElementById("btn-undo-stroke")?.addEventListener("click", () => { ensureCanvasVisible(); undoStroke(); });
+  document.getElementById("btn-clear-strokes")?.addEventListener("click", () => { ensureCanvasVisible(); clearStrokesAndNotes(); });
   setToolMode(currentToolMode);
 }
 

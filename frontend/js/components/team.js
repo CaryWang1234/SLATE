@@ -11,7 +11,7 @@ import { renderMarkdown } from "../services/markdown.js?v=20260827-119";
 import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260827-119";
 import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260827-119";
 import { getExpertsCached } from "./experts.js?v=20260827-119";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260827-119";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260828-120";
 import { t } from "../services/i18n.js?v=20260827-119";
 import { makeId } from "../services/utils.js?v=20260827-119";
 

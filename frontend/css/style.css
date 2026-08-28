@@ -861,13 +861,28 @@ textarea::-webkit-scrollbar-thumb {
 #chat-input-area {
   position: relative;
   display: flex;
-  align-items: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
   background: var(--bg);
   transition: border-color var(--transition), background-color var(--transition);
+}
+
+/* 输入框独占第一行，辅助控件换行到第二行 */
+#chat-input-area .chat-input-wrap {
+  order: -1;
+  flex: 1 1 100%;
+}
+
+/* 语音与发送按钮分组，整体靠右（语音隐藏时发送仍在最右） */
+#chat-input-area .input-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .chat-input-wrap {
@@ -1724,6 +1739,7 @@ textarea::-webkit-scrollbar-thumb {
   -ms-overflow-style: none;
   padding: 16px;
   min-height: 0;
+  border-top: 1px solid var(--border);
   background:
     repeating-linear-gradient(
       0deg,
@@ -6078,6 +6094,7 @@ img.file-type-icon {
   padding: 4px 6px;
   font-size: 11px;
   font-family: var(--font-main);
+  height: 26px;
   outline: none;
   background: var(--bg-input);
   color: var(--text-secondary);

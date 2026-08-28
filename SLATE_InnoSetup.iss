@@ -1,6 +1,8 @@
 ; ─────────────────────────────────────────────────────────────
 ; SLATE（砚）Windows 安装程序
 ; 编译：ISCC SLATE_InnoSetup.iss（或运行 build_installer.bat）
+; 语言：向导第一步选择安装包语言（简体中文 / English），
+;       应用界面语言在后续步骤另选（见 [Code] LangPage）
 ; ─────────────────────────────────────────────────────────────
 
 #define MyAppName "SLATE 砚"
@@ -56,26 +58,69 @@ VersionInfoDescription={#MyAppName} 安装程序 Installer (Build {#MyAppBuild})
 VersionInfoProductName={#MyAppName}
 VersionInfoCopyright=Copyright (c) {#MyAppPublisher}
 
+; 安装包语言：向导第一步弹出语言选择对话框（2 种语言以上时自动出现）。
+; 简体中文使用随仓库分发的官方翻译 installer\ChineseSimplified.isl；
+; 列表第一项为默认预选语言。
 [Languages]
+Name: "chinesesimp"; MessagesFile: "installer\ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
-; 向导页默认文案（英文 Default.isl）覆盖为中英双语显示
+; 向导文案按语言提供：无前缀为英文（也是缺省回退），chinesesimp. 前缀为简体中文。
+; 注意：覆盖内置消息名时（如 WelcomeLabel1），每种语言都要有定义，
+; 否则该语言会回退使用第一种语言的定义。
 [CustomMessages]
-SetupWindowTitle={#MyAppName} 安装程序 / SLATE Setup
-WelcomeLabel1=欢迎使用 {#MyAppName} 安装向导%nWelcome to the {#MyAppName} Setup Wizard
-WelcomeLabel2=安装程序将把 {#MyAppName} 安装到您的计算机。建议在继续前关闭所有其他应用程序。%n%nThis will install {#MyAppName} on your computer. It is recommended that you close all other applications before continuing.
-SelectTasksLabel1=请选择安装过程中要执行的其他任务，然后点击“下一步”。%nSelect the additional tasks you would like Setup to perform while installing {#MyAppName}, then click Next.
-SelectTasksLabel2=需要执行哪些附加任务？%nWhich additional tasks should be performed?
-ReadyLabel1=准备安装 / Start Installation
-ReadyLabel2=点击“安装”开始安装；如需检查或修改设置，请点击“上一步”。%n%nClick Install to continue with the installation, or click Back if you want to review or change any settings.
-FinishedLabel=安装程序已成功将 {#MyAppName} 安装到您的计算机，可通过选择安装的图标启动应用程序。%n%nSetup has finished installing {#MyAppName} on your computer. The application may be launched by selecting the installed icons.
-FinishedLabelNoIcons=安装程序已成功将 {#MyAppName} 安装到您的计算机。%nSetup has finished installing {#MyAppName} on your computer.
-ClickFinish=点击“完成”按钮退出安装程序。%nClick the Finish button to exit Setup.
+SetupWindowTitle=SLATE Setup
+WelcomeLabel1=Welcome to the {#MyAppName} Setup Wizard
+WelcomeLabel2=This will install {#MyAppName} on your computer. It is recommended that you close all other applications before continuing.
+SelectTasksLabel1=Select the additional tasks you would like Setup to perform while installing {#MyAppName}, then click Next.
+SelectTasksLabel2=Which additional tasks should be performed?
+ReadyLabel1=Ready to Install
+ReadyLabel2=Click Install to continue with the installation, or click Back if you want to review or change any settings.
+FinishedLabel=Setup has finished installing {#MyAppName} on your computer. The application may be launched by selecting the installed icons.
+FinishedLabelNoIcons=Setup has finished installing {#MyAppName} on your computer.
+ClickFinish=Click the Finish button to exit Setup.
+TaskDesktop=Create a desktop shortcut
+TaskAutostart=Auto start SLATE while setup
+TaskKeepData=Keep data when uninstall
+GroupShortcuts=Additional shortcuts:
+GroupOptions=Additional options:
+GroupUninstall=Uninstall behavior:
+UninstallApp=Uninstall {#MyAppName}
+LaunchApp=Launch {#MyAppName}
+AppLangTitle=Application Language
+AppLangSub=Choose the interface language of SLATE
+AppLangFooter=This can be changed by reinstalling.
+WebView2Msg=Microsoft Edge WebView2 runtime was not detected.%n%nThe SLATE desktop window depends on it; the UI may fail to display without it.%n%nOpen the official Microsoft download page? (You can also install it later.)
+UninstallDataMsg=Delete user data (chat history, custom skills, settings) as well?%n%nChoose ""No"" to keep the data and continue after reinstalling.
+
+chinesesimp.SetupWindowTitle=SLATE 砚 安装程序
+chinesesimp.WelcomeLabel1=欢迎使用 {#MyAppName} 安装向导
+chinesesimp.WelcomeLabel2=安装程序将把 {#MyAppName} 安装到您的计算机。建议在继续前关闭所有其他应用程序。
+chinesesimp.SelectTasksLabel1=请选择安装过程中要执行的其他任务，然后点击“下一步”。
+chinesesimp.SelectTasksLabel2=需要执行哪些附加任务？
+chinesesimp.ReadyLabel1=准备安装
+chinesesimp.ReadyLabel2=点击“安装”开始安装；如需检查或修改设置，请点击“上一步”。
+chinesesimp.FinishedLabel=安装程序已成功将 {#MyAppName} 安装到您的计算机，可通过选择安装的图标启动应用程序。
+chinesesimp.FinishedLabelNoIcons=安装程序已成功将 {#MyAppName} 安装到您的计算机。
+chinesesimp.ClickFinish=点击“完成”按钮退出安装程序。
+chinesesimp.TaskDesktop=创建桌面快捷方式
+chinesesimp.TaskAutostart=开机自动启动 {#MyAppName}
+chinesesimp.TaskKeepData=卸载时保留用户数据（聊天记录 / 技能 / 设置）
+chinesesimp.GroupShortcuts=附加快捷方式：
+chinesesimp.GroupOptions=附加选项：
+chinesesimp.GroupUninstall=卸载行为：
+chinesesimp.UninstallApp=卸载 {#MyAppName}
+chinesesimp.LaunchApp=启动 {#MyAppName}
+chinesesimp.AppLangTitle=应用语言
+chinesesimp.AppLangSub=选择 SLATE 的界面语言
+chinesesimp.AppLangFooter=安装完成后可通过重装更改。
+chinesesimp.WebView2Msg=未检测到 Microsoft Edge WebView2 运行时。%n%nSLATE 桌面窗口依赖该组件，缺少时可能无法显示界面。%n%n是否打开微软官方下载页面？（也可稍后自行安装）
+chinesesimp.UninstallDataMsg=是否同时删除用户数据（聊天记录、自定义技能、设置）？%n%n选择“否”将保留数据，重新安装后可继续使用。
 
 [Tasks]
-Name: "desktopicon"; Description: "创建桌面快捷方式 Add Desktop Shortcut"; GroupDescription: "附加快捷方式：Additional shortcuts:"; Flags: checkedonce
-Name: "autostart"; Description: "开机自动启动 {#MyAppName} Auto start SLATE while setup"; GroupDescription: "附加选项：Additional options:"; Flags: unchecked
-Name: "userdata"; Description: "卸载时保留用户数据（聊天记录 / 技能 / 设置）Keep data when uninstall"; GroupDescription: "卸载行为：Uninstall behavior:"; Flags: checkedonce
+Name: "desktopicon"; Description: "{cm:TaskDesktop}"; GroupDescription: "{cm:GroupShortcuts}"; Flags: checkedonce
+Name: "autostart"; Description: "{cm:TaskAutostart}"; GroupDescription: "{cm:GroupOptions}"; Flags: unchecked
+Name: "userdata"; Description: "{cm:TaskKeepData}"; GroupDescription: "{cm:GroupUninstall}"; Flags: checkedonce
 
 [Registry]
 ; 开机自启（随 autostart 任务创建，卸载时自动移除）
@@ -98,11 +143,11 @@ Source: "{#MyAppSourceDir}\data\constitution.json"; DestDir: "{app}\data"; Flags
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"
-Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{group}\{cm:UninstallApp}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName} Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent shellexec
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent shellexec
 
 [InstallDelete]
 ; 清理旧版本 PyInstaller 产物，避免残留
@@ -113,7 +158,7 @@ Type: files; Name: "{app}\desktop_backend.log"
 Type: files; Name: "{app}\*.log"
 
 [Code]
-// ── 应用界面语言选择（安装时选择，写入 data/language.txt，应用运行时只读） ──
+// ── 应用界面语言选择（与安装包语言相互独立，写入 data/language.txt） ──
 var
   LangPage: TInputOptionWizardPage;
   LangZhIndex: Integer;
@@ -122,15 +167,14 @@ var
 procedure InitializeWizard;
 begin
   LangPage := CreateInputOptionPage(wpSelectTasks,
-    '应用语言 / Application Language',
-    '选择 SLATE 的界面语言 / Choose the interface language of SLATE',
-    '安装完成后可通过重装更改。' + #13#10 +
-    'This can be changed by reinstalling.',
+    ExpandConstant('{cm:AppLangTitle}'),
+    ExpandConstant('{cm:AppLangSub}'),
+    ExpandConstant('{cm:AppLangFooter}'),
     True, False);
   LangZhIndex := LangPage.Add('简体中文 (Chinese)');
   LangEnIndex := LangPage.Add('English (英文)');
-  // 默认跟随系统语言：非简体中文环境默认英文
-  if GetUILanguage and $3FF = $04 then
+  // 默认跟随第一步所选的安装包语言，仍可在此页另选
+  if ActiveLanguage() = 'chinesesimp' then
     LangPage.Values[LangZhIndex] := True
   else
     LangPage.Values[LangEnIndex] := True;
@@ -179,13 +223,7 @@ begin
   Result := True;
   if not IsWebView2Installed then
   begin
-    if MsgBox(
-      '未检测到 Microsoft Edge WebView2 运行时。' + #13#10 +
-      'WebView2 runtime not detected.' + #13#10#13#10 +
-      'SLATE 桌面窗口依赖该组件，缺少时可能无法显示界面。' + #13#10 +
-      'The SLATE desktop window depends on it; the UI may fail to display without it.' + #13#10#13#10 +
-      '是否打开微软官方下载页面？（也可稍后自行安装）' + #13#10 +
-      'Open the official Microsoft download page? (You can also install it later.)',
+    if MsgBox(ExpandConstant('{cm:WebView2Msg}'),
       mbConfirmation, MB_YESNO) = IDYES then
     begin
       ShellExec('open', 'https://developer.microsoft.com/microsoft-edge/webview2/',
@@ -214,11 +252,7 @@ begin
   begin
     if not KeepUserData then
     begin
-      if MsgBox(
-        '是否同时删除用户数据（聊天记录、自定义技能、设置）？' + #13#10 +
-        'Delete user data (chat history, custom skills, settings) as well?' + #13#10#13#10 +
-        '选择“否”将保留数据，重新安装后可继续使用。' + #13#10 +
-        'Choose "No" to keep the data and continue after reinstalling.',
+      if MsgBox(ExpandConstant('{cm:UninstallDataMsg}'),
         mbConfirmation, MB_YESNO) = IDYES then
       begin
         DelTree(ExpandConstant('{app}\data'), True, True, True);
