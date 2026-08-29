@@ -12,11 +12,12 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260828-138";
-import { post } from "../services/api.js?v=20260828-138";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260828-138";
-import { t } from "./i18n.js?v=20260828-138";
-import { makeId } from "./utils.js?v=20260828-138";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260829-141";
+import { post } from "../services/api.js?v=20260829-141";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260829-141";
+import { t } from "./i18n.js?v=20260829-141";
+import { makeId } from "./utils.js?v=20260829-141";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260829-141";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -275,6 +276,41 @@ const TOOLS = {
         return `工具执行失败: ${res.message}`;
       } catch (e) {
         return `工具调用出错: ${e.message}`;
+      }
+    },
+  },
+
+  subagent_run: {
+    name: "并行子代理",
+    description: "一次性派出多个子代理并行执行相互独立的子任务，全部完成后汇总各子代理结论返回。适用场景：互不依赖的多路调研/扫描/分析（如同时调研多个目录、多个技术方案并行试错、多文件独立审查）。每个子代理拥有与你相同的工具（读文件/执行命令/联网搜索等）与独立的运行上下文——子代理看不到主对话历史，因此每个 task 必须自包含（写清背景、目标、路径、期望产出）。agents 为对象数组，每项 {name: 简短中文名, task: 完整任务描述}；单次最多 5 个并行，多给的会被忽略。有依赖关系或需要共享上下文的任务不要用本工具，应分多轮串行处理。",
+    params: {
+      agents: { type: "array", description: "子代理定义数组 [{name: 名称, task: 自包含任务描述}]，required: true" },
+    },
+    async execute({ agents }) {
+      if (!Array.isArray(agents) || agents.length === 0 || !agents.some(a => a && String(a.task || "").trim())) {
+        return "参数错误：agents 必须是非空数组，每项包含 {name, task}，且至少一项 task 非空。请修正后重发调用。";
+      }
+      try {
+        const { results, skipped } = await runSubAgents(agents, {
+          detect: detectToolCalls,
+          strip: stripToolCalls,
+          exec: executeTool,
+          toolsPrompt: getToolsSystemPrompt({ compact: true }),
+        }, getSubAgentSignal());
+
+        const statusText = { done: "完成", failed: "失败", stopped: "已停止", max_rounds: "轮次用尽" };
+        const ok = results.filter(r => r.status === "done").length;
+        const failed = results.filter(r => r.status === "failed").length;
+        const parts = results.map(r => {
+          const body = (r.output || "").trim() || "（无文本输出）";
+          const clipped = body.length > SUBAGENT_OUTPUT_LIMIT ? body.slice(0, SUBAGENT_OUTPUT_LIMIT) + "…（超出长度上限已截断）" : body;
+          return `## 子代理「${r.name}」（${statusText[r.status] || r.status}，${r.rounds} 轮，${r.toolCalls} 次工具调用）\n${clipped}`;
+        });
+        let head = `[子代理执行完成] 共 ${results.length} 个（完成 ${ok} / 失败 ${failed}${results.some(r => r.status === "stopped") ? " / 部分被用户停止" : ""}）。请基于以下各子代理结论汇总回答用户。`;
+        if (skipped > 0) head += `\n注意：另有 ${skipped} 个子代理因超出单次 ${SUBAGENT_MAX_PARALLEL} 个并行上限被忽略，如需执行请再次调用。`;
+        return `${head}\n\n${parts.join("\n\n")}`;
+      } catch (e) {
+        return `子代理执行出错: ${e.message}`;
       }
     },
   },
@@ -784,6 +820,7 @@ const TOOL_USE_RECIPES = [
   ["代码/文档安全扫描", "skill_run code_scan / doc_scan"],
   ["桌面操作", "skill_run computer_use，截图默认 jpeg/fast"],
   ["生成图表/二维码/文档", "skill_run chart_create/qrcode_create/doc_write/ppt_create/word_create/excel_tool"],
+  ["多个互不依赖的子任务并行", "subagent_run agents=[{name,task}] 一次并行派出，task 写清背景与期望产出"],
 ];
 
 const SKILL_RUN_QUICK_LIST = [

@@ -2,26 +2,26 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260828-138";
-import { initI18n, t } from "./services/i18n.js?v=20260828-138";
-import { iconSvgEl } from "./services/icons.js?v=20260828-138";
-import { get, post, put } from "./services/api.js?v=20260828-138";
-import { dlgConfirm } from "./services/dialog.js?v=20260828-138";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260828-138";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260828-138";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260828-138";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260828-138";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260828-138";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260828-138";
-import { initTeamPanel } from "./components/team.js?v=20260828-138";
-import { initProjectBar } from "./components/project_bar.js?v=20260828-138";
-import { initMemoryPanel } from "./components/memory.js?v=20260828-138";
-import { initExpertsPanel } from "./components/experts.js?v=20260828-138";
-import { initSchedule } from "./components/schedule.js?v=20260828-138";
-import { initRiskGuard } from "./services/riskguard.js?v=20260828-138";
-import { initUnderstandPanel } from "./components/understand.js?v=20260829-139";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260828-138";
-import { setProject, setProjectFileTree } from "./store.js?v=20260828-138";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260829-141";
+import { initI18n, t } from "./services/i18n.js?v=20260829-141";
+import { iconSvgEl } from "./services/icons.js?v=20260829-141";
+import { get, post, put } from "./services/api.js?v=20260829-141";
+import { dlgConfirm } from "./services/dialog.js?v=20260829-141";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260829-141";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260829-141";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260829-141";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260829-141";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260829-141";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260829-141";
+import { initTeamPanel } from "./components/team.js?v=20260829-141";
+import { initProjectBar } from "./components/project_bar.js?v=20260829-141";
+import { initMemoryPanel } from "./components/memory.js?v=20260829-141";
+import { initExpertsPanel } from "./components/experts.js?v=20260829-141";
+import { initSchedule } from "./components/schedule.js?v=20260829-141";
+import { initRiskGuard } from "./services/riskguard.js?v=20260829-141";
+import { initUnderstandPanel } from "./components/understand.js?v=20260829-141";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260829-141";
+import { setProject, setProjectFileTree } from "./store.js?v=20260829-141";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -967,7 +967,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260828-138").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260829-141").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1082,7 +1082,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260828-138");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260829-141");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1311,7 +1311,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260828-138");
+        const { openProject } = await import("./services/project.js?v=20260829-141");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }

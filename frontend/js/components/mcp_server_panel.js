@@ -3,9 +3,9 @@
  * 在设置页中展示已配置的外部 MCP Server，支持添加/删除/连接/断开。
  */
 
-import { get, post, del } from "../services/api.js?v=20260828-138";
-import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260828-138";
-import { refreshSkills } from "./skill_panel.js?v=20260828-138";
+import { get, post, del } from "../services/api.js?v=20260829-141";
+import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260829-141";
+import { refreshSkills } from "./skill_panel.js?v=20260829-141";
 
 let serverListEl, btnAdd, btnRefresh;
 

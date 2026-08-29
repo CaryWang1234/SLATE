@@ -242,11 +242,6 @@ select:focus {
   border-color: var(--border-hover);
 }
 
-#model-select {
-  width: clamp(180px, 24vw, 320px);
-  max-width: 320px;
-  font-variant-numeric: tabular-nums;
-}
 #conversation-select { max-width: 140px; }
 
 /* ── 通用按钮 ─────────────────────────── */
@@ -901,6 +896,56 @@ textarea::-webkit-scrollbar-thumb {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* ── 模型选择与快捷操作栏 ─────────────── */
+
+.model-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+}
+
+#model-select {
+  flex-shrink: 0;
+  width: clamp(160px, 24vw, 320px);
+  max-width: 320px;
+  font-variant-numeric: tabular-nums;
+}
+
+.model-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.model-bar-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: var(--font-main);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color var(--transition), border-color var(--transition), background-color var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.model-bar-btn:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.model-bar-btn.theme-btn {
+  /* 明暗按钮特殊样式 */
 }
 
 .chat-input-wrap {
@@ -3130,6 +3175,9 @@ textarea::-webkit-scrollbar-thumb {
     width: clamp(112px, 30vw, 170px);
     max-width: 170px;
   }
+  .model-bar { flex-wrap: wrap; gap: 6px; }
+  .model-bar-actions { flex-wrap: wrap; }
+  .model-bar-btn { padding: 3px 6px; font-size: 11px; }
   .modal-content { width: 95vw; }
   #topbar { padding: 0 8px; gap: 6px; }
   .topbar-left { min-width: auto; }
@@ -4665,6 +4713,159 @@ textarea::-webkit-scrollbar-thumb {
   color: var(--text-secondary);
   border-radius: 6px;
   max-height: none;
+}
+
+/* ── SubAgent 并行执行面板 ─────────────────── */
+
+.subagent-panel {
+  margin: 6px 0;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--accent-bg) 62%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 86%, var(--bg-alt));
+  overflow: hidden;
+  font-size: 12px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.subagent-panel:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.subagent-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 9px;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.subagent-panel-header .subagent-panel-icon {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  color: var(--accent-bg);
+  flex-shrink: 0;
+}
+
+.subagent-panel-header .subagent-panel-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.subagent-panel-count {
+  margin-left: auto;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: color-mix(in srgb, var(--bg-alt) 70%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.subagent-item {
+  display: grid;
+  grid-template-columns: 10px minmax(0, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.subagent-item:hover {
+  background: color-mix(in srgb, var(--bg-alt) 60%, transparent);
+}
+
+.subagent-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.subagent-dot.running {
+  background: var(--accent-bg);
+  animation: subagent-pulse 1.2s ease-in-out infinite;
+}
+
+.subagent-dot.done {
+  background: #4a9d5b;
+}
+
+.subagent-dot.failed {
+  background: #c44;
+}
+
+.subagent-dot.stopped {
+  background: var(--text-muted);
+}
+
+@keyframes subagent-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.subagent-name {
+  min-width: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.subagent-task {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.subagent-round {
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: color-mix(in srgb, var(--bg-alt) 70%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.subagent-item-body {
+  display: none;
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg-alt) 74%, transparent);
+  color: var(--text-secondary);
+  font-family: var(--font-main);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.subagent-item.expanded .subagent-item-body {
+  display: block;
 }
 
 /* ── 文件编辑 diff 查看器 ─────────────────── */

@@ -895,6 +895,14 @@ export const EN_DICT = {
   "运行中": "Running",
   "成功": "Success",
   "跳过": "Skipped",
+
+  // ── SubAgent 并行面板（chat 组件 UI） ────────────────
+  "子代理": "SubAgents",
+  "并行执行中": "running in parallel",
+  "轮 {n}": "Round {n}",
+  "已完成": "Done",
+  "执行失败": "Failed",
+  "轮次用尽": "Max rounds",
   "暂无工作流，请在 backend/workflows/ 目录放置 JSON 定义文件": "No workflows — place JSON definition files in backend/workflows/",
   "（{n} 节点）": "({n} nodes)",
   "（定义非法）": "(invalid definition)",
