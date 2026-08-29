@@ -215,7 +215,6 @@ const SKILL_PARAM_DEFS = {
     { key: "image_path", label: "图片路径", type: "text", placeholder: "C:/path/to/screenshot.png" },
     { key: "style", label: "风格偏好（可选）", type: "text", placeholder: "tailwind / plain css / responsive" },
   ],
-  system_info: [],
 };
 
 // ── 列表渲染：工具 + SKILL.md 技能区 ───────────

@@ -59,7 +59,6 @@ BUILTIN_SKILLS: dict[str, str] = {
     "pdf_tool": "PDF 办公文档：获取元信息、提取文本内容与表格数据",
     "git_tool": "Git 仓库只读信息：分支状态/提交日志/diff 统计/分支与远程列表",
     "screenshot_to_code": "截图转代码：读取图片编码为 base64，AI 视觉分析生成 HTML/CSS 还原截图内容",
-    "system_info": "系统元认知：获取本机日期时间、CPU/内存/GPU（独显+集显）/存储/电池电量/网络连接状态",
 }
 
 
