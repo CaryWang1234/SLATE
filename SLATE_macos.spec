@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 # ── 基础路径 ────────────────────────────────────────────────
-BASE_DIR = Path(__file__).parent.resolve()
+BASE_DIR = Path(SPECPATH).resolve()
 FRONTEND_DIR = BASE_DIR / "frontend"
 BACKEND_DIR = BASE_DIR / "backend"
 
