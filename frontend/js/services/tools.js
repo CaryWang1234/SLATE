@@ -12,12 +12,12 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260829-141";
-import { post } from "../services/api.js?v=20260829-141";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260829-141";
-import { t } from "./i18n.js?v=20260829-141";
-import { makeId } from "./utils.js?v=20260829-141";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260829-141";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260829-142";
+import { post } from "../services/api.js?v=20260829-142";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260829-142";
+import { t } from "./i18n.js?v=20260829-142";
+import { makeId } from "./utils.js?v=20260829-142";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260829-142";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");

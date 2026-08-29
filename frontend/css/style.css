@@ -898,54 +898,28 @@ textarea::-webkit-scrollbar-thumb {
   gap: 6px;
 }
 
-/* ── 模型选择与快捷操作栏 ─────────────── */
+/* ── 模型选择（带图标）────────────── */
 
-.model-bar {
-  display: flex;
+.model-select-wrap {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  border-top: 1px solid var(--border);
+}
+
+.model-icon {
+  position: absolute;
+  left: 8px;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  z-index: 1;
 }
 
 #model-select {
-  flex-shrink: 0;
+  padding-left: 28px;
   width: clamp(160px, 24vw, 320px);
   max-width: 320px;
   font-variant-numeric: tabular-nums;
-}
-
-.model-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-}
-
-.model-bar-btn {
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 4px 8px;
-  font-size: 12px;
-  font-family: var(--font-main);
-  cursor: pointer;
-  color: var(--text-secondary);
-  transition: color var(--transition), border-color var(--transition), background-color var(--transition);
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.model-bar-btn:hover {
-  color: var(--gold);
-  border-color: var(--gold);
-}
-
-.model-bar-btn.theme-btn {
-  /* 明暗按钮特殊样式 */
 }
 
 .chat-input-wrap {
@@ -3174,10 +3148,9 @@ textarea::-webkit-scrollbar-thumb {
   #model-select {
     width: clamp(112px, 30vw, 170px);
     max-width: 170px;
+    padding-left: 24px;
   }
-  .model-bar { flex-wrap: wrap; gap: 6px; }
-  .model-bar-actions { flex-wrap: wrap; }
-  .model-bar-btn { padding: 3px 6px; font-size: 11px; }
+  .model-icon { width: 14px; height: 14px; left: 6px; }
   .modal-content { width: 95vw; }
   #topbar { padding: 0 8px; gap: 6px; }
   .topbar-left { min-width: auto; }
