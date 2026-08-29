@@ -53,8 +53,8 @@ check_command create-dmg "create-dmg" || log_warn "create-dmg 未安装，将使
 
 # ── 清理旧构建 ──────────────────────────────────────────────
 log_info "清理旧构建..."
-rm -rf dist/macos build/macos
-mkdir -p dist/macos
+rm -rf dist build
+mkdir -p dist
 
 # ── 安装依赖 ───────────────────────────────────────────────
 log_info "安装 Python 依赖..."
@@ -64,15 +64,15 @@ pip3 install -r requirements.txt --quiet
 log_info "PyInstaller 构建中..."
 pyinstaller SLATE_macos.spec --clean --noconfirm
 
-if [ ! -f "dist/macos/${BUNDLE_NAME}/Contents/MacOS/SLATE" ]; then
-    log_error "PyInstaller 构建失败，未找到可执行文件"
+if [ ! -d "dist/${BUNDLE_NAME}" ]; then
+    log_error "PyInstaller 构建失败，未找到 .app 包"
 fi
 
 log_info "PyInstaller 构建完成"
 
 # ─ 复制前端资源到 .app 内部 ────────────────────────────────
 log_info "复制前端资源..."
-RESOURCES_DIR="dist/macos/${BUNDLE_NAME}/Contents/Resources"
+RESOURCES_DIR="dist/${BUNDLE_NAME}/Contents/Resources"
 mkdir -p "${RESOURCES_DIR}/frontend"
 cp -r frontend/* "${RESOURCES_DIR}/frontend/" 2>/dev/null || true
 
@@ -90,7 +90,7 @@ fi
 
 # ── 验证 .app 结构 ──────────────────────────────────────────
 log_info "验证 .app 包结构..."
-if [ ! -d "dist/macos/${BUNDLE_NAME}/Contents/MacOS" ]; then
+if [ ! -d "dist/${BUNDLE_NAME}/Contents/MacOS" ]; then
     log_error ".app 包结构不完整"
 fi
 
@@ -98,17 +98,17 @@ fi
 # 如果有 Apple Developer ID，取消下面注释并替换证书名称
 # log_info "代码签名..."
 # codesign --force --deep --sign "Developer ID Application: Your Name (TEAM_ID)" \
-#     "dist/macos/${BUNDLE_NAME}"
+#     "dist/${BUNDLE_NAME}"
 
 # ── 创建 DMG 安装包 ─────────────────────────────────────────
 log_info "创建 DMG 安装包..."
 
-DMG_TEMP="dist/macos/slate-dmg-temp"
+DMG_TEMP="dist/slate-dmg-temp"
 rm -rf "${DMG_TEMP}"
 mkdir -p "${DMG_TEMP}"
 
 # 复制 .app 到临时目录
-cp -R "dist/macos/${BUNDLE_NAME}" "${DMG_TEMP}/"
+cp -R "dist/${BUNDLE_NAME}" "${DMG_TEMP}/"
 
 # 创建 Applications 文件夹快捷方式（符号链接）
 ln -s /Applications "${DMG_TEMP}/Applications"
@@ -118,15 +118,15 @@ if command -v create-dmg &> /dev/null; then
     log_info "使用 create-dmg 创建安装包..."
     create-dmg \
         --volname "SLATE 砚 ${VERSION}" \
-        --volicon "dist/macos/${BUNDLE_NAME}/Contents/Resources/app.icns" \
+        --volicon "dist/${BUNDLE_NAME}/Contents/Resources/app.icns" \
         --window-pos 200 120 \
         --window-size 600 400 \
         --icon-size 100 \
         --icon "SLATE.app" 175 190 \
         --hide-extension "SLATE.app" \
         --app-drop-link 425 190 \
-        --background "dist/macos/dmg-background.png" \
-        "dist/macos/${DMG_FILENAME}" \
+        --background "dist/dmg-background.png" \
+        "dist/${DMG_FILENAME}" \
         "${DMG_TEMP}"
 else
     # 基础 DMG 创建方式
@@ -136,7 +136,7 @@ else
         -srcfolder "${DMG_TEMP}" \
         -ov \
         -format UDZO \
-        "dist/macos/${DMG_FILENAME}"
+        "dist/${DMG_FILENAME}"
 fi
 
 # 清理临时目录
@@ -144,7 +144,7 @@ rm -rf "${DMG_TEMP}"
 
 # ── 生成校验和 ──────────────────────────────────────────────
 log_info "生成 SHA256 校验和..."
-cd dist/macos
+cd dist
 shasum -a 256 "${DMG_FILENAME}" > "${DMG_FILENAME}.sha256"
 cd ../..
 
@@ -152,8 +152,8 @@ cd ../..
 log_info "=========================================="
 log_info "macOS 安装包构建完成！"
 log_info "=========================================="
-log_info "位置: dist/macos/${DMG_FILENAME}"
-log_info "校验和: dist/macos/${DMG_FILENAME}.sha256"
+log_info "位置: dist/${DMG_FILENAME}"
+log_info "校验和: dist/${DMG_FILENAME}.sha256"
 log_info ""
 log_info "安装说明："
 log_info "1. 双击打开 ${DMG_FILENAME}"
