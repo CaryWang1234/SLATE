@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (如 0.3.6)'
+        description: '版本号 (如 0.3.7)'
         required: true
-        default: '0.3.6'
+        default: '0.3.7'
 
 jobs:
   build-macos:
@@ -45,20 +45,20 @@ jobs:
 
       - name: Verify outputs
         run: |
-          ls -lh dist/macos/*.dmg
-          cat dist/macos/*.sha256
+          ls -lh dist/*.dmg
+          cat dist/*.sha256
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: SLATE-macOS-${{ steps.version.outputs.version }}
-          path: dist/macos/SLATE-Setup-*.dmg
+          path: dist/SLATE-Setup-*.dmg
           retention-days: 90
 
       - name: Upload checksum
         uses: actions/upload-artifact@v4
         with:
           name: SLATE-macOS-${{ steps.version.outputs.version }}-checksum
-          path: dist/macos/SLATE-Setup-*.dmg.sha256
+          path: dist/SLATE-Setup-*.dmg.sha256
           retention-days: 90
 
