@@ -59,7 +59,7 @@ function renderProjectBar() {
     understandBtn.appendChild(iconSvgEl("book-open"));
     understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册";
     understandBtn.addEventListener("click", () => {
-      import("./understand.js?v=20260828-138")
+      import("./understand.js?v=20260829-139")
         .then(({ openUnderstandModal }) => openUnderstandModal())
         .catch(() => {});
     });

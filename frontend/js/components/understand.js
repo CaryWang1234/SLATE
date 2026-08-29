@@ -5,7 +5,7 @@
  */
 
 import { state, setProject, getModelKey } from "../store.js?v=20260828-138";
-import { post, streamChat } from "../services/api.js?v=20260828-138";
+import { post, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260828-138";
 import { updateProjectConfig } from "../services/project.js?v=20260828-138";
 import { renderMarkdown } from "../services/markdown.js?v=20260828-138";
 import { t } from "../services/i18n.js?v=20260828-138";
@@ -209,6 +209,11 @@ async function generateDoc(modelId, apiKey, systemPrompt, scanContext) {
     signal: abortController?.signal,
   })) {
     throwIfAborted();
+    // 过滤掉 reasoning/thinking 内容，只保留正文
+    const s = String(chunk || "");
+    if (s.startsWith(REASONING_PREFIX) || s.startsWith(REASONING_INLINE_PREFIX)) {
+      continue;
+    }
     fullText += chunk;
   }
   if (!fullText.trim()) throw new Error(t("模型未返回内容"));

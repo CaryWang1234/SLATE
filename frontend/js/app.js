@@ -19,7 +19,7 @@ import { initMemoryPanel } from "./components/memory.js?v=20260828-138";
 import { initExpertsPanel } from "./components/experts.js?v=20260828-138";
 import { initSchedule } from "./components/schedule.js?v=20260828-138";
 import { initRiskGuard } from "./services/riskguard.js?v=20260828-138";
-import { initUnderstandPanel } from "./components/understand.js?v=20260828-138";
+import { initUnderstandPanel } from "./components/understand.js?v=20260829-139";
 import { getCurrentProject, browseFiles } from "./services/project.js?v=20260828-138";
 import { setProject, setProjectFileTree } from "./store.js?v=20260828-138";
 
