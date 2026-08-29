@@ -40,6 +40,7 @@ hiddenimports = [
     'backend.routers.proxy',
     'backend.routers.settings',
     'backend.routers.skills',
+    'backend.routers.system_info',
     'backend.routers.update',
     'backend.routers.vault',
     'backend.routers.workflows',
@@ -77,6 +78,8 @@ hiddenimports = [
     'backend.skills.plugin_adapter',
     'backend.skills.text_io',
     'backend.mcp_client',
+    # 系统元认知（system_info.py 延迟导入 psutil）
+    'psutil',
     # 多模态文件解析依赖（files.py 内函数级延迟导入，需显式声明）
     'openpyxl',
     'pdfplumber',
