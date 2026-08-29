@@ -116,6 +116,13 @@ ln -s /Applications "${DMG_TEMP}/Applications"
 if command -v create-dmg &> /dev/null; then
     # 使用 create-dmg 创建美观的 DMG
     log_info "使用 create-dmg 创建安装包..."
+    
+    # 检查背景图是否存在
+    BACKGROUND_ARG=""
+    if [ -f "dist/dmg-background.png" ]; then
+        BACKGROUND_ARG="--background dist/dmg-background.png"
+    fi
+    
     create-dmg \
         --volname "SLATE 砚 ${VERSION}" \
         --volicon "dist/${BUNDLE_NAME}/Contents/Resources/app.icns" \
@@ -125,7 +132,7 @@ if command -v create-dmg &> /dev/null; then
         --icon "SLATE.app" 175 190 \
         --hide-extension "SLATE.app" \
         --app-drop-link 425 190 \
-        --background "dist/dmg-background.png" \
+        ${BACKGROUND_ARG} \
         "dist/${DMG_FILENAME}" \
         "${DMG_TEMP}"
 else
