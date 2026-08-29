@@ -1,12 +1,6 @@
 name: Build macOS Installer
 
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
-    paths-ignore:
-      - "docs/**"
-      - "**.md"
   workflow_dispatch:
     inputs:
       version:
@@ -42,11 +36,6 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-          else
-            VERSION=$(grep '#define MyAppVersion' SLATE_InnoSetup.iss | sed 's/.*"\(.*\)".*/\1/')
-            echo "version=${VERSION}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build macOS installer
@@ -73,13 +62,3 @@ jobs:
           path: dist/macos/SLATE-Setup-*.dmg.sha256
           retention-days: 90
 
-      - name: Create Release (on tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/macos/SLATE-Setup-*.dmg
-            dist/macos/SLATE-Setup-*.dmg.sha256
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
