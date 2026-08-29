@@ -2,7 +2,7 @@
 # ─────────────────────────────────────────────────────────────
 # SLATE macOS 构建与打包脚本
 # 用法：bash build_macos.sh [version]
-#   version: 可选，如 "0.3.6"，默认从 desktop.py 读取
+#   version: 可选，如 "0.3.7"，默认从 InnoSetup 读取
 # ─────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -26,7 +26,7 @@ if [ -z "$VERSION" ]; then
     fi
 fi
 if [ -z "$VERSION" ]; then
-    log_error "无法确定版本号，请手动传入: bash build_macos.sh 0.3.6"
+    log_error "无法确定版本号，请手动传入: bash build_macos.sh 0.3.7"
 fi
 
 BUILD_TIMESTAMP=$(date +"%Y%m%d%H%M")
