@@ -15,7 +15,7 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/update", tags=["update"])
 
 # 与 SLATE_InnoSetup.iss 的 MyAppVersion 保持同步
-APP_VERSION = "0.3.5"
+APP_VERSION = "0.3.6"
 
 REPO = "CaryWang1234/SLATE"
 API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
