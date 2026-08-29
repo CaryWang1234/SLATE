@@ -129,8 +129,8 @@ if command -v create-dmg &> /dev/null; then
         --window-pos 200 120 \
         --window-size 600 400 \
         --icon-size 100 \
-        --icon "SLATE.app" 175 190 \
-        --hide-extension "SLATE.app" \
+        --icon "${BUNDLE_NAME}" 175 190 \
+        --hide-extension "${BUNDLE_NAME}" \
         --app-drop-link 425 190 \
         ${BACKGROUND_ARG} \
         "dist/${DMG_FILENAME}" \
