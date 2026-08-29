@@ -158,21 +158,9 @@ exe = EXE(
     icon="app.icns" if Path("app.icns").exists() else None,
 )
 
-# macOS .app Bundle 配置
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name="SLATE",
-)
-
-# 生成 .app Bundle
+# macOS .app Bundle 配置（直接 BUNDLE，无需 COLLECT）
 app = BUNDLE(
-    coll,
+    exe,
     name=f"{app_name}.app",
     icon="app.icns" if Path("app.icns").exists() else None,
     bundle_identifier="com.slate.desktop",
@@ -184,7 +172,7 @@ app = BUNDLE(
         "CFBundleShortVersionString": app_version,
         "CFBundleIdentifier": "com.slate.desktop",
         "NSHighResolutionCapable": True,
-        "LSMinimumSystemVersion": "10.15.0",  # macOS Catalina+
-        "NSRequiresAquaSystemAppearance": False,  # 支持深色模式
+        "LSMinimumSystemVersion": "10.15.0",
+        "NSRequiresAquaSystemAppearance": False,
     },
 )
