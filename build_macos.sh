@@ -31,7 +31,7 @@ fi
 
 BUILD_TIMESTAMP=$(date +"%Y%m%d%H%M")
 APP_NAME="SLATE 砚"
-BUNDLE_NAME="SLATE.app"
+BUNDLE_NAME="${APP_NAME}.app"
 DMG_FILENAME="SLATE-Setup-${VERSION}.dmg"
 
 log_info "版本: ${VERSION}"
