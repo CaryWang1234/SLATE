@@ -11,8 +11,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import chat, constitution, experts, files, grind, i18n, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, system_info, update, vault, workflows
+from backend.routers import chat, constitution, experts, files, grind, i18n, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, update, vault, workflows
 from backend import mcp_client
+
+# system_info 需要 psutil，可能不在所有环境中可用
+try:
+    from backend.routers import system_info
+    HAS_SYSTEM_INFO = True
+except ImportError:
+    HAS_SYSTEM_INFO = False
 
 PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 
@@ -83,7 +90,10 @@ app.include_router(i18n.router, prefix="/api")
 app.include_router(vault.router, prefix="/api")
 app.include_router(mcp.router, prefix="/api")
 app.include_router(mcp_servers.router, prefix="/api")
-app.include_router(system_info.router, prefix="/api")
+
+# system_info 路由（需要 psutil，可能不可用）
+if HAS_SYSTEM_INFO:
+    app.include_router(system_info.router, prefix="/api")
 
 
 @app.on_event("startup")
