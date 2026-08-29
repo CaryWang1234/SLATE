@@ -2,26 +2,26 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260829-142";
-import { initI18n, t } from "./services/i18n.js?v=20260829-142";
-import { iconSvgEl } from "./services/icons.js?v=20260829-142";
-import { get, post, put } from "./services/api.js?v=20260829-142";
-import { dlgConfirm } from "./services/dialog.js?v=20260829-142";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260829-142";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260829-142";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260829-142";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260829-142";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260829-142";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260829-142";
-import { initTeamPanel } from "./components/team.js?v=20260829-142";
-import { initProjectBar } from "./components/project_bar.js?v=20260829-142";
-import { initMemoryPanel } from "./components/memory.js?v=20260829-142";
-import { initExpertsPanel } from "./components/experts.js?v=20260829-142";
-import { initSchedule } from "./components/schedule.js?v=20260829-142";
-import { initRiskGuard } from "./services/riskguard.js?v=20260829-142";
-import { initUnderstandPanel } from "./components/understand.js?v=20260829-142";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260829-142";
-import { setProject, setProjectFileTree } from "./store.js?v=20260829-142";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260829-143";
+import { initI18n, t } from "./services/i18n.js?v=20260829-143";
+import { iconSvgEl } from "./services/icons.js?v=20260829-143";
+import { get, post, put } from "./services/api.js?v=20260829-143";
+import { dlgConfirm } from "./services/dialog.js?v=20260829-143";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260829-143";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260829-143";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260829-143";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260829-143";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260829-143";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260829-143";
+import { initTeamPanel } from "./components/team.js?v=20260829-143";
+import { initProjectBar } from "./components/project_bar.js?v=20260829-143";
+import { initMemoryPanel } from "./components/memory.js?v=20260829-143";
+import { initExpertsPanel } from "./components/experts.js?v=20260829-143";
+import { initSchedule } from "./components/schedule.js?v=20260829-143";
+import { initRiskGuard } from "./services/riskguard.js?v=20260829-143";
+import { initUnderstandPanel } from "./components/understand.js?v=20260829-143";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260829-143";
+import { setProject, setProjectFileTree } from "./store.js?v=20260829-143";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -82,24 +82,24 @@ const MODEL_ICON_MAP = {
   zhipu: "./images/glm.svg",
   doubao: "./images/doubao.svg",
   ernie: "./images/ernie.svg",
+  minimax: "./images/minimax.svg",
 };
 
 function getModelIconUrl(model) {
   if (!model) return "";
   const id = (model.id || "").toLowerCase();
-  const provider = (model.provider || "").toLowerCase();
   const baseUrl = (model.base_url || "").toLowerCase();
 
-  if (id.includes("gpt") || provider === "openai" && baseUrl.includes("openai")) return MODEL_ICON_MAP.openai;
-  if (id.includes("claude") || provider === "anthropic") return MODEL_ICON_MAP.anthropic;
-  if (id.includes("gemini") || provider === "google") return MODEL_ICON_MAP.google;
+  if (id.includes("gpt") || baseUrl.includes("openai.com")) return MODEL_ICON_MAP.openai;
+  if (id.includes("claude") || baseUrl.includes("anthropic")) return MODEL_ICON_MAP.anthropic;
+  if (id.includes("gemini") || baseUrl.includes("googleapis")) return MODEL_ICON_MAP.google;
   if (id.includes("deepseek") || baseUrl.includes("deepseek")) return MODEL_ICON_MAP.deepseek;
   if (id.includes("kimi") || baseUrl.includes("moonshot")) return MODEL_ICON_MAP.moonshot;
   if (id.includes("qwen") || baseUrl.includes("dashscope")) return MODEL_ICON_MAP.qwen;
   if (id.includes("glm") || baseUrl.includes("bigmodel")) return MODEL_ICON_MAP.zhipu;
   if (id.includes("doubao") || baseUrl.includes("volces")) return MODEL_ICON_MAP.doubao;
   if (id.includes("ernie") || baseUrl.includes("baidubce")) return MODEL_ICON_MAP.ernie;
-  if (provider === "openai") return MODEL_ICON_MAP.openai;
+  if (id.includes("minimax") || baseUrl.includes("minimax")) return MODEL_ICON_MAP.minimax;
   return "";
 }
 
@@ -1013,7 +1013,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260829-142").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260829-143").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1128,7 +1128,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260829-142");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260829-143");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1357,7 +1357,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260829-142");
+        const { openProject } = await import("./services/project.js?v=20260829-143");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }
