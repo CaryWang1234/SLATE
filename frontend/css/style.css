@@ -1089,6 +1089,7 @@ textarea::-webkit-scrollbar-thumb {
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-secondary);
+  font-family: var(--font-main);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 300px;

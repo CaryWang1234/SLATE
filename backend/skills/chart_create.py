@@ -40,6 +40,7 @@ THEMES: dict[str, list[str]] = {
 
 AXIS_COLOR = "#8a8f98"
 TEXT_COLOR = "#3a3f47"
+TEXT_MUTED = "#8a8f98"
 GRID_COLOR = "#e3e6ea"
 
 

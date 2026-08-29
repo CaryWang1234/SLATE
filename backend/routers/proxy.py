@@ -388,7 +388,11 @@ async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, A
                         yield _sse_error(_compact_error_text(json.dumps(parsed["error"], ensure_ascii=False)), trace_id=trace_id)
                         yield "data: [DONE]\n\n"
                         return
-                    delta = parsed.get("choices", [{}])[0].get("delta", {})
+                    choices = parsed.get("choices")
+                    if not choices or len(choices) == 0:
+                        # Some providers (e.g. Qwen) send metadata-only chunks with empty choices; skip safely
+                        continue
+                    delta = choices[0].get("delta", {})
                     # 标准化 reasoning 字段
                     reasoning = delta.get("reasoning_content") or delta.get("reasoning") or delta.get("thinking")
                     if reasoning:
@@ -801,7 +805,10 @@ async def proxy_chat(request: Request) -> Any:
     except httpx.HTTPError as exc:
         msg = _sse_error_from_exception(exc, trace_id=trace_id, api_name="Chat Completions")
         return {"code": -1, "data": None, "message": json.loads(msg[6:].strip()).get("error", {}).get("message", str(exc))}
-    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    choices = data.get("choices")
+    if not choices or len(choices) == 0:
+        return {"code": -1, "data": None, "message": "Chat Completions 返回成功，但 choices 为空。可能是模型只返回了工具调用、内容过滤，或服务商返回格式变化。"}
+    content = choices[0].get("message", {}).get("content", "")
     if not str(content or "").strip():
         return {"code": -1, "data": None, "message": "Chat Completions 返回成功，但没有可显示文本。可能是模型只返回了工具调用、内容过滤，或服务商返回格式变化。"}
     logger.info(f"[{trace_id}] OpenAI 兼容完成")

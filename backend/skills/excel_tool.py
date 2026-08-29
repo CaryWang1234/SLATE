@@ -52,6 +52,20 @@ def _parse_matrix(value: Any) -> list[list[Any]] | None:
     return None
 
 
+def _to_cell_value(v):
+    """保留数字/布尔等原始类型，仅截断超长字符串。"""
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return v
+    s = str(v)[:32000]
+    # 尝试还原数字类型
+    try:
+        if "." in s:
+            return float(s)
+        return int(s)
+    except (ValueError, TypeError):
+        return s
+
+
 def _parse_text_rows(text: str) -> list[list[str]]:
     """解析 CSV/TSV 风格文本为二维数组（自动识别分隔符）。"""
     sample = text[:4096]
@@ -101,19 +115,6 @@ def _create(title: str, sheet: str, headers: Any, rows: Any, data: str, file_nam
         for cell in ws[1]:
             cell.font = header_font
             cell.fill = header_fill
-    
-    def _to_cell_value(v):
-        """保留数字/布尔等原始类型，仅截断超长字符串。"""
-        if isinstance(v, (int, float)) and not isinstance(v, bool):
-            return v
-        s = str(v)[:32000]
-        # 尝试还原数字类型
-        try:
-            if "." in s:
-                return float(s)
-            return int(s)
-        except (ValueError, TypeError):
-            return s
     
     for row in body:
         ws.append([_to_cell_value(c) for c in row])
