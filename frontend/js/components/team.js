@@ -6,7 +6,7 @@
 import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260829-143";
 import { notifyTaskComplete } from "../services/notify.js?v=20260829-143";
 import { streamChat } from "../services/api.js?v=20260829-143";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260829-143";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260829-144";
 import { renderMarkdown } from "../services/markdown.js?v=20260829-143";
 import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260829-143";
 import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260829-143";

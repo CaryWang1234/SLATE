@@ -315,6 +315,93 @@ const TOOLS = {
     },
   },
 
+  system_info: {
+    name: "系统元认知",
+    description: "获取本机系统信息：当前日期时间、CPU/内存/存储配置、GPU（独显+集显）、电池电量、网络连接状态。让模型了解运行环境。",
+    params: {},
+    async execute() {
+      try {
+        const res = await post("/system/info");
+        if (res.code !== 0) return res.message || "获取系统信息失败";
+        
+        const info = res.data;
+        const lines = [];
+        
+        // 日期时间
+        lines.push(`## 📅 日期时间`);
+        lines.push(`- **当前时间**: ${info.datetime}`);
+        lines.push(`- **时区**: ${info.timezone}`);
+        
+        // CPU
+        lines.push(`\n## 💻 CPU`);
+        lines.push(`- **物理核心**: ${info.cpu.cores_physical} 核`);
+        lines.push(`- **逻辑线程**: ${info.cpu.cores_logical} 线程`);
+        if (info.cpu.frequency_mhz) {
+          lines.push(`- **主频**: ${info.cpu.frequency_mhz} MHz`);
+        }
+        lines.push(`- **使用率**: ${info.cpu.percent}%`);
+        
+        // 内存
+        lines.push(`\n## 🧠 内存`);
+        lines.push(`- **总容量**: ${info.memory.total_gb} GB`);
+        lines.push(`- **可用**: ${info.memory.available_gb} GB (${100 - info.memory.percent}%)`);
+        if (info.memory.swap_total_gb > 0) {
+          lines.push(`- **交换空间**: ${info.memory.swap_total_gb} GB`);
+        }
+        
+        // GPU
+        if (info.gpus && info.gpus.length > 0) {
+          lines.push(`\n## 🎮 GPU`);
+          info.gpus.forEach((gpu, i) => {
+            const typeLabel = gpu.type === "integrated" ? "集成显卡" : "独立显卡";
+            lines.push(`- **${typeLabel}**: ${gpu.name}${gpu.vram_gb ? ` (${gpu.vram_gb} GB)` : ""}`);
+          });
+        }
+        
+        // 存储
+        if (info.storage && info.storage.length > 0) {
+          lines.push(`\n## 💾 存储`);
+          info.storage.forEach(disk => {
+            lines.push(`- **${disk.mountpoint}** (${disk.fstype}): 共 ${disk.total_gb} GB，已用 ${disk.used_gb} GB (${disk.percent}%)`);
+          });
+        }
+        
+        // 电池
+        if (info.battery) {
+          lines.push(`\n## 🔋 电池`);
+          lines.push(`- **电量**: ${info.battery.percent}%`);
+          lines.push(`- **电源**: ${info.battery.power_plugged ? "已连接" : "未连接"}`);
+          if (typeof info.battery.secsleft === "number") {
+            const mins = Math.round(info.battery.secsleft / 60);
+            lines.push(`- **剩余续航**: 约 ${mins} 分钟`);
+          } else if (info.battery.secsleft === "unlimited") {
+            lines.push(`- **剩余续航**: 无限制（充电中）`);
+          }
+        }
+        
+        // 网络
+        lines.push(`\n## 🌐 网络`);
+        lines.push(`- **活跃连接数**: ${info.network.connections_count}`);
+        if (info.network.interfaces && Object.keys(info.network.interfaces).length > 0) {
+          Object.entries(info.network.interfaces).forEach(([name, iface]) => {
+            if (iface.isup) {
+              const ipv4 = iface.addresses.find(a => a.type === "ipv4");
+              if (ipv4) {
+                lines.push(`- **${name}**: ${ipv4.address} (${iface.speed_mbps} Mbps)`);
+              }
+            }
+          });
+        } else {
+          lines.push(`- **接口**: 未检测到活跃网络接口`);
+        }
+        
+        return lines.join("\n");
+      } catch (e) {
+        return `获取系统信息失败: ${e.message}`;
+      }
+    },
+  },
+
   knowledge_search: {
     name: "检索知识库",
     description: "从本地轻量向量知识库中检索长期记忆、资料摘录和知识中心内容",

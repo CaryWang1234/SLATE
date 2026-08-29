@@ -4,7 +4,7 @@
  */
 
 import { state } from "../store.js?v=20260829-143";
-import { getToolsSystemPrompt } from "./tools.js?v=20260829-143";
+import { getToolsSystemPrompt } from "./tools.js?v=20260829-144";
 
 // ── System Prompt 模板 ──────────────────────
 

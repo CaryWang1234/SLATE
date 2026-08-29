@@ -4,7 +4,7 @@
 import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260829-143";
 import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260829-143";
 import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260829-143";
-import { TOOLS, detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt } from "../services/tools.js?v=20260829-143";
+import { TOOLS, detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt } from "../services/tools.js?v=20260829-144";
 import { renderMarkdown } from "../services/markdown.js?v=20260829-143";
 import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260829-143";
 import { getExpertsCached } from "./experts.js?v=20260829-143";
