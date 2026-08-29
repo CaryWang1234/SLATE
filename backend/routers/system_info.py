@@ -6,9 +6,15 @@ import platform
 import subprocess
 from datetime import datetime
 
-import psutil
 from fastapi import APIRouter
 from pydantic import BaseModel
+
+# psutil 可能未安装，延迟导入
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -189,18 +195,29 @@ def _get_network_info() -> dict:
 
 
 @router.get("/info")
-async def get_system_info() -> SystemInfoResponse:
+async def get_system_info():
     """获取系统元认知信息"""
+    if not HAS_PSUTIL:
+        return {
+            "code": 1,
+            "message": "psutil 未安装，无法获取系统信息。请运行: pip install psutil",
+            "data": None
+        }
+    
     now = datetime.now()
     tz = datetime.now().astimezone().tzinfo
 
-    return SystemInfoResponse(
-        datetime=now.strftime("%Y-%m-%d %H:%M:%S"),
-        timezone=str(tz),
-        cpu=_get_cpu_info(),
-        memory=_get_memory_info(),
-        storage=_get_storage_info(),
-        gpus=_get_gpu_info(),
-        battery=_get_battery_info(),
-        network=_get_network_info(),
-    )
+    return {
+        "code": 0,
+        "data": {
+            "datetime": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "timezone": str(tz),
+            "cpu": _get_cpu_info(),
+            "memory": _get_memory_info(),
+            "storage": _get_storage_info(),
+            "gpus": _get_gpu_info(),
+            "battery": _get_battery_info(),
+            "network": _get_network_info(),
+        },
+        "message": "ok"
+    }
