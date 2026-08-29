@@ -915,6 +915,24 @@ textarea::-webkit-scrollbar-thumb {
   z-index: 1;
 }
 
+/* GPT 图标：深色模式白色，浅色模式原色 */
+.model-icon[src*="gpt.svg"] {
+  filter: brightness(0) invert(0); /* 浅色模式保持原色（黑色） */
+}
+
+[data-theme="dark"] .model-icon[src*="gpt.svg"] {
+  filter: brightness(0) invert(1); /* 深色模式变白 */
+}
+
+/* Kimi 图标：浅色模式变黑，深色模式原色 */
+.model-icon[src*="kimi.svg"] {
+  filter: brightness(0) invert(1); /* 浅色模式变白再反转为黑 */
+}
+
+[data-theme="dark"] .model-icon[src*="kimi.svg"] {
+  filter: none; /* 深色模式保持原色 */
+}
+
 #model-select {
   padding-left: 28px;
   width: clamp(160px, 24vw, 320px);
