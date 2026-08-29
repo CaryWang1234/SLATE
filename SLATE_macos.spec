@@ -43,11 +43,12 @@ def collect_skills():
 # ─ 数据文件列表 ────────────────────────────────────────────
 datas = collect_frontend() + collect_skills()
 
-# 添加其他必要的数据文件
-extra_datas = [
-    ("LICENSE", "."),
-    ("README.md", "."),
-]
+# 添加其他必要的数据文件（可选）
+extra_datas = []
+if Path("LICENSE").exists():
+    extra_datas.append(("LICENSE", "."))
+if Path("README.md").exists():
+    extra_datas.append(("README.md", "."))
 datas.extend(extra_datas)
 
 # ── 隐藏导入（PyInstaller 自动检测可能遗漏的模块）────────────
@@ -77,6 +78,7 @@ hiddenimports = [
     "pdfplumber",
     # Web scraping
     "ddgs",
+    "trafilatura",
     "playwright",
     "playwright.sync_api",
     # Desktop
