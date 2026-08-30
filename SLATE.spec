@@ -18,6 +18,7 @@ except Exception:
 
 datas = [
     ('frontend', 'frontend'),
+    ('backend/routers', 'backend/routers'),
     ('backend/skills', 'backend/skills'),
     ('backend/workflows', 'backend/workflows'),
 ] + _clr_data + _cffi_data

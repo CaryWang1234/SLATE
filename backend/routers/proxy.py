@@ -182,6 +182,8 @@ MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
          "base_url": "https://api.moonshot.cn/v1", "context_window": 262144},
         {"id": "qwen3.8-max", "name": "Qwen3.8-Max", "provider": "openai",
          "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
+        {"id": "qwen3.8-flash", "name": "Qwen3.8-Flash", "provider": "openai",
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
         {"id": "qwen3.7-max", "name": "Qwen3.7-Max", "provider": "openai",
          "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
         {"id": "qwen3.7-plus", "name": "Qwen3.7-Plus", "provider": "openai",

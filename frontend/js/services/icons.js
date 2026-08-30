@@ -8,6 +8,8 @@
  *   iconText(name, text) → 返回 <span class="icon-text">图标+文本</span>（文本走 textNode，无 XSS）
  */
 
+import { CUSTOM_ICONS, CUSTOM_VIEWBOXES } from "./icons_custom.js?v=20260830-001";
+
 const ICONS = {
   key: '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
   wifi: '<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
@@ -167,9 +169,11 @@ const ICON_ALIASES = {
 };
 
 export function iconSvg(name, cls = "") {
-  const inner = ICONS[name] || ICONS[ICON_ALIASES[name]] || "";
+  const inner = ICONS[name] || CUSTOM_ICONS[name] || ICONS[ICON_ALIASES[name]] || "";
   if (!inner) return "";
-  return `<svg class="svg-icon${cls ? " " + cls : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+  const vb = CUSTOM_VIEWBOXES[name] || "0 0 24 24";
+  const fill = CUSTOM_VIEWBOXES[name] ? "fill=\"currentColor\"" : "fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"";
+  return `<svg class="svg-icon${cls ? " " + cls : ""}" viewBox="${vb}" ${fill} aria-hidden="true">${inner}</svg>`;
 }
 
 export function iconSvgEl(name, cls = "") {

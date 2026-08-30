@@ -284,6 +284,22 @@ select:focus {
   height: 1.05em;
 }
 
+/* 右上角四个按钮：图标在左、文字在右（横向） */
+.topbar-right .icon-btn {
+  flex-direction: row;
+  gap: 4px;
+  width: auto;
+  height: auto;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+.icon-label {
+  font-size: 11px;
+  line-height: 1;
+  color: inherit;
+}
+
 .icon-text {
   display: inline-flex;
   align-items: center;
@@ -924,13 +940,9 @@ textarea::-webkit-scrollbar-thumb {
   filter: brightness(0) invert(1); /* 深色模式变白 */
 }
 
-/* Kimi 图标：浅色模式变黑，深色模式原色 */
-.model-icon[src*="kimi.svg"] {
-  filter: brightness(0) invert(1); /* 浅色模式变白再反转为黑 */
-}
-
+/* Kimi 图标：源文件为纯黑（浅色模式直接显示黑色），深色模式反转为白 */
 [data-theme="dark"] .model-icon[src*="kimi.svg"] {
-  filter: none; /* 深色模式保持原色 */
+  filter: brightness(0) invert(1); /* 深色模式变白 */
 }
 
 #model-select {

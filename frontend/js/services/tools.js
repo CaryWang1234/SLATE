@@ -12,12 +12,12 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260829-143";
-import { post } from "../services/api.js?v=20260829-143";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260829-143";
-import { t } from "./i18n.js?v=20260829-143";
-import { makeId } from "./utils.js?v=20260829-143";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260829-143";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260830-001";
+import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260830-001";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260830-001";
+import { t } from "./i18n.js?v=20260830-001";
+import { makeId } from "./utils.js?v=20260830-001";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260830-001";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -321,7 +321,7 @@ const TOOLS = {
     params: {},
     async execute() {
       try {
-        const res = await post("/system/info");
+        const res = await get("/api/system/info");
         if (res.code !== 0) return res.message || "获取系统信息失败";
         
         const info = res.data;
@@ -1199,10 +1199,13 @@ function hasTruncatedTail(text) {
 }
 
 function stripToolCalls(text) {
-  const stripped = text.replace(TOOL_RE, "");
+  let stripped = text.replace(TOOL_RE, "");
+  // 移除 reasoning 标记前缀（子代理输出中不应包含）
+  stripped = stripped
+    .replace(new RegExp(REASONING_PREFIX, "g"), "")
+    .replace(new RegExp(REASONING_INLINE_PREFIX, "g"), "");
   // 同时移除末尾未闭合的截断工具块，避免残缺 JSON 残留在消息正则
   return stripped
-
     .replace(/◈◈◈[ \t]*\w+[ \t]*\r?\n[\s\S]*$/, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

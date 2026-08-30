@@ -18,7 +18,9 @@ from backend import mcp_client
 try:
     from backend.routers import system_info
     HAS_SYSTEM_INFO = True
-except ImportError:
+except ImportError as e:
+    import logging
+    logging.warning(f"[system_info] 路由导入失败: {e}")
     HAS_SYSTEM_INFO = False
 
 PROJECT_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
