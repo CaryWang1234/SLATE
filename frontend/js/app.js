@@ -2,26 +2,26 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260901-001";
-import { initI18n, t } from "./services/i18n.js?v=20260901-001";
-import { iconSvgEl } from "./services/icons.js?v=20260901-001";
-import { get, post, put } from "./services/api.js?v=20260901-001";
-import { dlgConfirm } from "./services/dialog.js?v=20260901-001";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260901-001";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260901-001";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260901-001";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260901-001";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260901-001";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260901-001";
-import { initTeamPanel } from "./components/team.js?v=20260901-001";
-import { initProjectBar } from "./components/project_bar.js?v=20260901-001";
-import { initMemoryPanel } from "./components/memory.js?v=20260901-001";
-import { initExpertsPanel } from "./components/experts.js?v=20260901-001";
-import { initSchedule } from "./components/schedule.js?v=20260901-001";
-import { initRiskGuard } from "./services/riskguard.js?v=20260901-001";
-import { initUnderstandPanel } from "./components/understand.js?v=20260901-001";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260901-001";
-import { setProject, setProjectFileTree } from "./store.js?v=20260901-001";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260904-001";
+import { initI18n, t } from "./services/i18n.js?v=20260904-001";
+import { iconSvgEl } from "./services/icons.js?v=20260904-001";
+import { get, post, put } from "./services/api.js?v=20260904-001";
+import { dlgConfirm } from "./services/dialog.js?v=20260904-001";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260904-001";
+import { initChat, refreshConversationList } from "./components/chat.js?v=20260904-001";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260904-001";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260904-001";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260904-001";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260904-001";
+import { initTeamPanel } from "./components/team.js?v=20260904-001";
+import { initProjectBar } from "./components/project_bar.js?v=20260904-001";
+import { initMemoryPanel } from "./components/memory.js?v=20260904-001";
+import { initExpertsPanel } from "./components/experts.js?v=20260904-001";
+import { initSchedule } from "./components/schedule.js?v=20260904-001";
+import { initRiskGuard } from "./services/riskguard.js?v=20260904-001";
+import { initUnderstandPanel } from "./components/understand.js?v=20260904-001";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260904-001";
+import { setProject, setProjectFileTree } from "./store.js?v=20260904-001";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -478,6 +478,8 @@ function openSettings(options = {}) {
   updateNotifPermissionHint();
   renderPermissionModeSettings();
   renderWebSearchSettings();
+  renderImageGenSettings();
+  renderVideoGenSettings();
   if (state.constitution) {
     document.getElementById("setting-constitution").value = JSON.stringify(state.constitution, null, 2);
   }
@@ -1021,7 +1023,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260901-001").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260904-001").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1110,6 +1112,67 @@ function initWebSearchPersistence() {
   });
 }
 
+// ── 媒体生成配置（图片/视频）──────────────────
+
+const GEN_CONFIGS = {
+  image: {
+    stateKey: "imageGen",
+    label: "图片生成",
+    modelInput: "image-gen-model",
+    urlInput: "image-gen-url",
+    keyInput: "image-gen-key",
+    statusEl: "image-gen-status",
+  },
+  video: {
+    stateKey: "videoGen",
+    label: "视频生成",
+    modelInput: "video-gen-model",
+    urlInput: "video-gen-url",
+    keyInput: "video-gen-key",
+    statusEl: "video-gen-status",
+  },
+};
+
+function renderGenSettings(kind) {
+  const c = GEN_CONFIGS[kind];
+  if (!c) return;
+  const cfg = state[c.stateKey] || {};
+  const modelEl = document.getElementById(c.modelInput);
+  const urlEl = document.getElementById(c.urlInput);
+  const keyEl = document.getElementById(c.keyInput);
+  const statusEl = document.getElementById(c.statusEl);
+  if (modelEl) modelEl.value = cfg.model || "";
+  if (urlEl) urlEl.value = cfg.base_url || "https://api.openai.com/v1";
+  if (keyEl) keyEl.value = cfg.api_key || "";
+  if (statusEl) {
+    statusEl.textContent = (cfg.model && cfg.api_key)
+      ? `已配置 — 当前模型：${cfg.model}（${cfg.base_url || "https://api.openai.com/v1"}）`
+      : `未配置 — 调用 ${kind === "image" ? "image_gen" : "video_gen"} 工具会返回错误`;
+  }
+}
+
+function renderImageGenSettings() { renderGenSettings("image"); }
+function renderVideoGenSettings() { renderGenSettings("video"); }
+
+function applyGenSetting(kind, key, value) {
+  const c = GEN_CONFIGS[kind];
+  if (!c) return;
+  state[c.stateKey] = { ...(state[c.stateKey] || {}), [key]: value };
+  savePersistent();
+  renderGenSettings(kind);
+}
+
+function initGenSettingsPersistence() {
+  Object.entries(GEN_CONFIGS).forEach(([kind, c]) => {
+    const modelEl = document.getElementById(c.modelInput);
+    const urlEl = document.getElementById(c.urlInput);
+    const keyEl = document.getElementById(c.keyInput);
+    if (modelEl) modelEl.addEventListener("change", () => applyGenSetting(kind, "model", modelEl.value.trim()));
+    if (urlEl) urlEl.addEventListener("change", () => applyGenSetting(kind, "base_url", urlEl.value.trim()));
+    if (keyEl) keyEl.addEventListener("change", () => applyGenSetting(kind, "api_key", keyEl.value));
+  });
+}
+
 async function saveSettings() {
   const maxTokens = parseInt(document.getElementById("setting-max-tokens").value) || 64000;
   state.maxTokens = maxTokens;
@@ -1136,7 +1199,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260901-001");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260904-001");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1345,6 +1408,7 @@ async function init() {
   initNotificationPersistence();
   initPermissionModePersistence();
   initWebSearchPersistence();
+  initGenSettingsPersistence();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
   // 设置页导航与关于
@@ -1365,7 +1429,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260901-001");
+        const { openProject } = await import("./services/project.js?v=20260904-001");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }

@@ -2,12 +2,12 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260901-001";
-import { get, streamChat } from "../services/api.js?v=20260901-001";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260901-001";
-import { t } from "../services/i18n.js?v=20260901-001";
-import { iconSvgEl } from "../services/icons.js?v=20260901-001";
-import { makeId } from "../services/utils.js?v=20260901-001";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260904-001";
+import { get, streamChat } from "../services/api.js?v=20260904-001";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260904-001";
+import { t } from "../services/i18n.js?v=20260904-001";
+import { iconSvgEl } from "../services/icons.js?v=20260904-001";
+import { makeId } from "../services/utils.js?v=20260904-001";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -33,6 +33,10 @@ let gitGraphState = { loading: false, data: null, error: "", repo: "" };
 let gitNodePositions = {};
 let gitGraphPan = { x: 0, y: 0 };
 let boardOutlineCollapsed = new Set();
+// 看板列是否显示工具步骤卡（默认隐藏，与用户卡片分离）；localStorage 记忆开关
+let showToolSteps = (() => {
+  try { return localStorage.getItem("slate_board_show_steps") === "1"; } catch { return false; }
+})();
 
 const CARD_LAYOUT = {
   width: 220,
@@ -457,7 +461,9 @@ function renderBoardView() {
     boardViewPanel.appendChild(strip);
     return;
   }
-  const cards = state.boardCards || [];
+  const allCards = state.boardCards || [];
+  // 默认隐藏工具步骤卡：看板/流程/纲要列只呈现用户卡片，开关可恢复显示
+  const cards = showToolSteps ? allCards : allCards.filter(c => !c._isToolStep);
   boardViewPanel.innerHTML = "";
   const header = document.createElement("div");
   header.className = "board-view-header";
@@ -468,8 +474,19 @@ function renderBoardView() {
   titleGroup.append(title);
   const actions = document.createElement("div");
   actions.className = "board-view-header-actions";
+  const hiddenSteps = allCards.length - cards.length;
   const meta = document.createElement("span");
-  meta.textContent = t("{n} 张卡片", { n: cards.length });
+  meta.textContent = t("{n} 张卡片", { n: cards.length }) + (hiddenSteps > 0 ? ` · ${t("已隐藏 {m} 张步骤卡", { m: hiddenSteps })}` : "");
+  const stepToggle = document.createElement("button");
+  stepToggle.type = "button";
+  stepToggle.className = "board-view-collapse-btn" + (showToolSteps ? " active" : "");
+  stepToggle.textContent = t("显示工具步骤");
+  stepToggle.title = showToolSteps ? t("隐藏工具步骤") : t("显示工具步骤");
+  stepToggle.addEventListener("click", () => {
+    showToolSteps = !showToolSteps;
+    try { localStorage.setItem("slate_board_show_steps", showToolSteps ? "1" : "0"); } catch {}
+    renderBoardView();
+  });
   const collapse = document.createElement("button");
   collapse.type = "button";
   collapse.className = "board-view-collapse-btn";
@@ -479,7 +496,7 @@ function renderBoardView() {
     boardViewCollapsed = true;
     setBoardView(currentBoardView, { preserveCollapse: true });
   });
-  actions.append(meta, collapse);
+  actions.append(meta, stepToggle, collapse);
   header.append(titleGroup, actions);
   boardViewPanel.appendChild(header);
   if (currentBoardView === "git") {
@@ -489,7 +506,9 @@ function renderBoardView() {
   if (!cards.length) {
     const empty = document.createElement("div");
     empty.className = "board-view-empty";
-    empty.textContent = t("黑板是空的，请先添加卡片");
+    empty.textContent = allCards.length > 0
+      ? t("当前仅有工具步骤卡，点击右上「显示工具步骤」查看")
+      : t("黑板是空的，请先添加卡片");
     boardViewPanel.appendChild(empty);
     return;
   }

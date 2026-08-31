@@ -25,6 +25,7 @@ OUTPUT_SERVE_TYPES = {
     ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
     ".md": "text/markdown; charset=utf-8", ".json": "application/json; charset=utf-8",
+    ".mp4": "video/mp4", ".webm": "video/webm",
 }
 
 # 支持的文本文件扩展名

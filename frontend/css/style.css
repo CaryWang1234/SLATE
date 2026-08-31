@@ -1262,6 +1262,19 @@ textarea::-webkit-scrollbar-thumb {
   background: #fff;
 }
 
+.tool-call-video {
+  margin-top: 6px;
+}
+
+.tool-call-video video {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #000;
+}
+
 /* 技能手动执行结果中的输出图片 */
 .skill-result-image {
   display: block;
@@ -1802,24 +1815,9 @@ textarea::-webkit-scrollbar-thumb {
   -ms-overflow-style: none;
   padding: 16px;
   min-height: 0;
-  border-top: 1px solid var(--border);
-  background:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 31px,
-      var(--board-grid) 31px,
-      var(--board-grid) 32px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 31px,
-      var(--board-grid) 31px,
-      var(--board-grid) 32px
-    ),
-    var(--bg);
-  background-size: 32px 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
 }
 
 .board-view-panel.git-mode {
@@ -1834,7 +1832,6 @@ textarea::-webkit-scrollbar-thumb {
   min-height: 34px;
   padding: 0;
   overflow: hidden;
-  border-top: 1px solid var(--border);
   background: var(--bg-alt);
 }
 
@@ -1885,6 +1882,12 @@ textarea::-webkit-scrollbar-thumb {
 .board-view-collapse-btn:hover {
   border-color: var(--border-hover);
   color: var(--text);
+}
+
+.board-view-collapse-btn.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-bg);
+  color: var(--accent-fg);
 }
 
 .board-view-header strong {

@@ -60,6 +60,8 @@ BUILTIN_SKILLS: dict[str, str] = {
     "pdf_tool": "PDF 办公文档：获取元信息、提取文本内容与表格数据",
     "git_tool": "Git 仓库只读信息：分支状态/提交日志/diff 统计/分支与远程列表",
     "screenshot_to_code": "截图转代码：读取图片编码为 base64，AI 视觉分析生成 HTML/CSS 还原截图内容",
+    "image_gen": "AI 图片生成：基于描述生成图片（OpenAI 兼容 images/generations，需在设置中配置模型与 API Key），返回本地文件与预览链接",
+    "video_gen": "AI 视频生成：基于描述生成短视频（OpenAI 兼容 /videos/generations，支持同步返回或异步任务轮询，需在设置中配置模型与 API Key），返回本地文件与预览链接",
 }
 
 

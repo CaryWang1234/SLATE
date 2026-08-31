@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260901-001";
+import { makeId } from "./services/utils.js?v=20260904-001";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -123,6 +123,10 @@ const state = {
 
   // 联网搜索配置：engine=auto（Bing+DDG 合并）/ bing / ddg；renderJs=auto（正文过短自动渲染）/ on / off
   webSearch: { engine: "auto", renderJs: "auto" },
+
+  // 媒体生成配置：未配置 model / api_key 时对应工具（image_gen / video_gen）不可用
+  imageGen: { model: "", base_url: "https://api.openai.com/v1", api_key: "" },
+  videoGen: { model: "", base_url: "https://api.openai.com/v1", api_key: "" },
 };
 
 // ── 订阅者 ──────────────────────────────────
@@ -167,6 +171,8 @@ function buildPersistentData() {
     onboardingSeen: state.onboardingSeen === true,
     permissionMode: state.permissionMode,
     webSearch: normalizeWebSearch(state.webSearch),
+    imageGen: normalizeGenConfig(state.imageGen),
+    videoGen: normalizeGenConfig(state.videoGen),
   };
 }
 
@@ -183,6 +189,15 @@ function normalizeWebSearch(value) {
   return {
     engine: ["auto", "bing", "ddg"].includes(v.engine) ? v.engine : "auto",
     renderJs: ["auto", "on", "off"].includes(v.renderJs) ? v.renderJs : "auto",
+  };
+}
+
+function normalizeGenConfig(value) {
+  const v = value && typeof value === "object" ? value : {};
+  return {
+    model: typeof v.model === "string" ? v.model : "",
+    base_url: typeof v.base_url === "string" && v.base_url.trim() ? v.base_url.trim() : "https://api.openai.com/v1",
+    api_key: typeof v.api_key === "string" ? v.api_key : "",
   };
 }
 
@@ -214,6 +229,8 @@ function getSharedPersistentData(data = buildPersistentData()) {
     onboardingSeen: data.onboardingSeen === true,
     permissionMode: normalizePermissionMode(data.permissionMode),
     webSearch: normalizeWebSearch(data.webSearch),
+    imageGen: normalizeGenConfig(data.imageGen),
+    videoGen: normalizeGenConfig(data.videoGen),
   };
 }
 
@@ -277,6 +294,8 @@ function loadPersistent() {
     state.onboardingSeen = data.onboardingSeen === true;
     state.permissionMode = normalizePermissionMode(data.permissionMode);
     state.webSearch = normalizeWebSearch(data.webSearch);
+    state.imageGen = normalizeGenConfig(data.imageGen);
+    state.videoGen = normalizeGenConfig(data.videoGen);
   } catch (e) {}
 }
 
@@ -342,6 +361,12 @@ async function loadSharedPersistent() {
     }
     if (Object.prototype.hasOwnProperty.call(data, "webSearch")) {
       state.webSearch = normalizeWebSearch(data.webSearch);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "imageGen")) {
+      state.imageGen = normalizeGenConfig(data.imageGen);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "videoGen")) {
+      state.videoGen = normalizeGenConfig(data.videoGen);
     }
     saveLocalPersistent();
   } catch (e) {}
