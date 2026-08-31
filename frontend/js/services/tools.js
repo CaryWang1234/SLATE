@@ -12,12 +12,13 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260904-001";
-import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260904-001";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260904-001";
-import { t } from "./i18n.js?v=20260904-001";
-import { makeId } from "./utils.js?v=20260904-001";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260904-001";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260907-001";
+import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-001";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260907-001";
+import { dlgUserAsk } from "./dialog.js?v=20260907-001";
+import { t } from "./i18n.js?v=20260907-001";
+import { makeId } from "./utils.js?v=20260907-001";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260907-001";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -262,6 +263,20 @@ const TOOLS = {
       const d = res.data || {};
       if (d.message && d.message !== "ok") return `视频生成失败：${d.message}`;
       return JSON.stringify(d);
+    },
+  },
+
+  user_ask: {
+    name: "询问用户",
+    description: "任务需要额外条件输入时调用：向用户提出一个选择题并等待回答。question 必填（向用户提出的问题，如“希望用什么风格生成？”），options 可选（2-6 个选项的数组；用户也可自由输入自定义答案）。调用后返回用户的选择，请基于答案继续任务。仅在任务关键条件缺失且无法基于上下文合理假设时使用，不要过度打扰用户。",
+    params: {
+      question: { type: "string", description: "向用户提出的问题", required: true },
+      options: { type: "array", description: "选择题选项（2-6 个字符串），用户也可自由输入" },
+    },
+    async execute({ question, options }) {
+      const answer = await dlgUserAsk(String(question || "").trim(), options);
+      if (answer === null) return "用户未提供条件，请基于现有信息继续，或向用户说明还缺少什么。";
+      return `用户回答: ${answer}`;
     },
   },
 
@@ -986,6 +1001,8 @@ const TOOL_USE_RECIPES = [
   ["生成图片/视频", "image_gen / video_gen（需先在设置中配置模型与 Key）"],
   ["多个互不依赖的子任务并行", "subagent_run agents=[{name,task}] 一次并行派出，task 写清背景与期望产出"],
   ["需要技能但不知名字", "skill_search 搜索 -> skill_run 调用"],
+  ["任务缺少关键条件（风格/受众/格式/语言等）", "user_ask question=问题 options=[选项]"],
+  ["事实性问答（可查证）", "先 project_files/project_read_file 或 web_search 佐证，再基于事实回答"],
 ];
 
 const SKILL_RUN_QUICK_LIST = [
@@ -1368,12 +1385,13 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   let s = "\n\n[可用工具]\n";
   s += "你拥有工具，可以直接操作用户的工作环境。\n\n";
   s += "**Agent 调用纪律**\n";
+  s += "工具优先：能查证就不猜，能执行就不描述——凡涉及项目现状、实时信息、生成/计算/验证的内容，默认先调用对应工具获取事实再回答，不要凭记忆或推测作答。\n";
   s += "1. 必须使用下方格式实际发出调用，不要只描述意图；禁止说“我先看看”“我需要查看”后停住。\n";
-  s += "2. 任务需要查看文件、目录、项目结构、执行命令或写文件时，当前回复必须包含工具调用块。\n";
+  s += "2. 任务需要查看文件、目录、项目结构、执行命令、联网搜索、生成文档/图表/图片/视频或写文件时，当前回复必须包含工具调用块。\n";
   s += "3. 同一回复可批量调用互不依赖的读取/扫描工具；有依赖的等工具结果后再继续。\n";
   s += "4. 工具失败后换参数、换工具或读取更多上下文；不要重复完全相同的失败调用。\n";
-  s += "5. 等待用户选择、确认、补充隐私信息或许可时，不调用工具。\n";
-  s += "6. 工具/技能纪律：仅任务确实需要时才调用——纯问答、闲聊、解释概念时绝不调用任何工具；不确定技能是否存在时，先 skill_search 搜索确认，再决定是否 skill_run；搜索到的技能与任务无关时，绝不强行使用。\n\n";
+  s += "5. 等待用户选择、确认、补充隐私信息或许可时，不调用工具；但任务缺少用户必须提供的关键条件（如生成风格、目标受众、输出格式、尺寸、语言）且无法合理假设时，调用 user_ask 以选择题形式询问，拿到回答后继续。\n";
+  s += "6. 工具/技能纪律：优先用工具佐证再回答——事实性、现状性问题默认查项目文件或联网搜索；仅当回答不依赖外部事实（纯闲聊、纯观点、无需佐证的概念解释）时才直接回答。不确定技能是否存在时，先 skill_search 搜索确认，再决定是否 skill_run；搜索到的技能与任务无关时，绝不强行使用。\n\n";
   s += "**工具选择速查**\n";
   for (const [scene, route] of TOOL_USE_RECIPES) s += `- ${scene}: ${route}\n`;
   for (const rule of AGENT_TOOL_DECISION_RULES) s += `- ${rule}\n`;
@@ -1482,7 +1500,7 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   s += "- 只包含你要修改的部分，不要包含整个文件内容；replace_range 的 content 只写目标行范围的新内容\n";
   s += "- 可以包含多组 edits 一次性完成所有修改；跨远距离的大修改优先分多次 replace_range\n";
   s += "- 用户会看到 diff 预览，并可以选择「接受」「拒绝」或「复制」\n";
-  s += "- 编辑完成后，等待用户确认，不要自动继续修改\n";
+  s += "- 编辑完成后，简要汇报改动与验证结果；没有新指令时不要自动继续无关修改\n";
 
   // file_create 专项指导
   s += "\n[文件创建规则 / file_create 工具]\n";
@@ -1497,7 +1515,7 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   s += "- 如果收到“输出被截断”相关的工具结果反馈，不要重复已写入的内容，立即用 file_append 从断点接续补齐\n";
   s += "- 如果文件已存在，应使用 file_edit 工具而非 file_create\n";
   s += "- 用户会看到内容预览，并可以选择「接受」「拒绝」或「复制」\n";
-  s += "- 创建完成后，等待用户确认\n";
+  s += "- 创建完成后，简要汇报文件路径与内容概览\n";
 
   // file_append 专项指导
   s += "\n[文件追加规则 / file_append 工具]\n";

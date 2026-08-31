@@ -1286,6 +1286,16 @@ textarea::-webkit-scrollbar-thumb {
   background: #fff;
 }
 
+.skill-result-video {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #000;
+}
+
 /* 工具输出的文档预览链接（apidoc 等） */
 .tool-call-doc {
   margin-top: 6px;
@@ -7072,6 +7082,25 @@ img.file-type-icon {
 
 .dlg-btn-danger:hover {
   filter: brightness(1.1);
+}
+
+/* 需求输入框（user_ask）：选项 chips + 自由输入 */
+.dlg-options-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.dlg-option-btn {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+}
+
+.dlg-options-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0 8px;
 }
 
 /* ── 设置页：左侧锚点导航 + 单列内容 ─────────────── */

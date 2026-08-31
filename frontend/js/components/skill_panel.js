@@ -2,12 +2,12 @@
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）。
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260904-001";
-import { get, post, del, upload } from "../services/api.js?v=20260904-001";
-import { guardSkillParams } from "../services/riskguard.js?v=20260904-001";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260904-001";
-import { t } from "../services/i18n.js?v=20260904-001";
-import { setIconText } from "../services/icons.js?v=20260904-001";
+import { state, subscribe, setSkills } from "../store.js?v=20260907-001";
+import { get, post, del, upload } from "../services/api.js?v=20260907-001";
+import { guardSkillParams } from "../services/riskguard.js?v=20260907-001";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260907-001";
+import { t } from "../services/i18n.js?v=20260907-001";
+import { setIconText } from "../services/icons.js?v=20260907-001";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -215,6 +215,15 @@ const SKILL_PARAM_DEFS = {
     { key: "image_path", label: "图片路径", type: "text", placeholder: "C:/path/to/screenshot.png" },
     { key: "style", label: "风格偏好（可选）", type: "text", placeholder: "tailwind / plain css / responsive" },
   ],
+  image_gen: [
+    { key: "prompt", label: "图片内容描述", type: "textarea", placeholder: "一只戴礼帽的橘猫，水彩风格，浅色背景" },
+    { key: "size", label: "尺寸", type: "text", placeholder: "1024x1024" },
+    { key: "n", label: "数量（1-4）", type: "number", placeholder: "1" },
+  ],
+  video_gen: [
+    { key: "prompt", label: "视频内容描述", type: "textarea", placeholder: "一只橘猫在草地上奔跑，镜头跟随" },
+    { key: "duration", label: "时长秒数（1-30）", type: "number", placeholder: "5" },
+  ],
 };
 
 // ── 列表渲染：工具 + SKILL.md 技能区 ───────────
@@ -401,16 +410,24 @@ async function executeSkill() {
     skillResult.classList.remove("hidden");
     if (res.code === 0) {
       skillResult.textContent = JSON.stringify(res.data, null, 2);
-      // 多模态输出：图片内联预览，文档附查看链接
+      // 多模态输出：图片/视频内联预览，文档附查看链接
       if (res.data?.preview_url) {
         const url = res.data.preview_url;
         const name = (res.data.file_path || url).split(/[\\/]/).pop();
         const isImage = /\.(svg|png|jpe?g|webp|gif)$/i.test(name);
+        const isVideo = /\.(mp4|webm)$/i.test(name);
         if (isImage) {
           const img = document.createElement("img");
           img.src = url;
           img.className = "skill-result-image";
           skillResult.appendChild(img);
+        } else if (isVideo) {
+          const video = document.createElement("video");
+          video.src = url;
+          video.controls = true;
+          video.preload = "metadata";
+          video.className = "skill-result-video";
+          skillResult.appendChild(video);
         } else {
           const link = document.createElement("a");
           link.href = url;

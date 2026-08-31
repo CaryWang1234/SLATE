@@ -6,10 +6,13 @@
  * - dlgConfirm(message, opts) -> Promise<boolean>  确认框（danger 时确认按钮为红色）
  * - dlgPrompt(message, opts)  -> Promise<string|null>  输入框（取消返回 null，确认返回字符串）
  * - dlgToast(message, duration) 轻量通知，复用页面 #toast-container
+ * - dlgUserAsk(question, options) -> Promise<string|null>  模型主动弹窗询问（选择题 chips + 自由输入）
  *
  * opts: { title, okText, cancelText, danger, value, placeholder, textarea, rows, options }
  *       options: [{value,label}] 传入时渲染下拉选择（替代手敲枚举值）
  */
+
+import { t } from "./i18n.js?v=20260907-001";
 
 // 对话框需要盖在已有模态（卡片编辑、技能执行等，z-index:1000）之上
 let zTop = 2000;
@@ -170,6 +173,96 @@ export function dlgPrompt(message, opts = {}) {
       body.appendChild(input);
       return input;
     },
+  });
+}
+
+/** 需求输入框（user_ask 工具）：模型主动弹窗询问关键条件。
+ * question 为问题文本；options 为选择题选项数组（可选），
+ * 点选选项（单选）自动填入输入框，也可直接输入自定义答案。
+ * 确定返回输入框文本，取消/ESC/×/背景点击返回 null。 */
+export function dlgUserAsk(question, options) {
+  return new Promise((resolve) => {
+    const { root, backdrop, closeBtn, body, footer } = buildShell(t("模型需要补充条件"));
+    let done = false;
+
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      root.remove();
+      resolve(value);
+    };
+
+    const msg = document.createElement("div");
+    msg.className = "dlg-message";
+    msg.textContent = String(question || "").trim() || "请补充所需条件";
+    body.appendChild(msg);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "dlg-input";
+    input.placeholder = t("或自定义输入");
+
+    const optList = Array.isArray(options)
+      ? options.map(o => String(o || "").trim()).filter(Boolean).slice(0, 6)
+      : [];
+
+    if (optList.length > 0) {
+      const row = document.createElement("div");
+      row.className = "dlg-options-row";
+      const pick = (value) => {
+        for (const b of row.querySelectorAll(".dlg-option-btn")) {
+          b.classList.toggle("active", b.dataset.value === value);
+        }
+        input.value = value;
+        input.focus();
+      };
+      for (const opt of optList) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "review-mode-btn dlg-option-btn";
+        btn.textContent = opt;
+        btn.dataset.value = opt;
+        btn.addEventListener("click", () => pick(opt));
+        row.appendChild(btn);
+      }
+      body.appendChild(row);
+      const hint = document.createElement("div");
+      hint.className = "dlg-options-hint";
+      hint.textContent = t("或自定义输入");
+      body.appendChild(hint);
+    }
+
+    // 手动输入时清除选中态（自定义输入优先）
+    input.addEventListener("input", () => {
+      for (const b of body.querySelectorAll(".dlg-option-btn.active")) b.classList.remove("active");
+    });
+
+    body.appendChild(input);
+
+    const cancelBtn = makeBtn(t("取消"), "dlg-btn");
+    cancelBtn.addEventListener("click", () => finish(null));
+    footer.appendChild(cancelBtn);
+
+    const okBtn = makeBtn(t("确定"), "dlg-btn dlg-btn-primary");
+    okBtn.addEventListener("click", () => finish(input.value.trim()));
+    footer.appendChild(okBtn);
+
+    backdrop.addEventListener("click", () => finish(null));
+    closeBtn.addEventListener("click", () => finish(null));
+
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        finish(null);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        finish(input.value.trim());
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+
+    input.focus();
   });
 }
 

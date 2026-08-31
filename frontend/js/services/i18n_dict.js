@@ -380,6 +380,8 @@ export const EN_DICT = {
   "知道了": "Got it",
   "请确认": "Please confirm",
   "请输入": "Please enter",
+  "模型需要补充条件": "The model needs additional input",
+  "或自定义输入": "Or type a custom answer",
   // ── chat.js（UI 部分；模型提示词不收录） ─────────────
   "目标模式已开启 · 待命自主执行（点右上「目标模式」手动退出）": "Target Mode enabled · standing by for autonomous runs (click Target Mode top-right to exit)",
   "展开任务清单": "Expand task list",
