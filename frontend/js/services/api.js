@@ -2,8 +2,8 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260831-001";
-import { t } from "./i18n.js?v=20260831-001";
+import { API_BASE } from "../store.js?v=20260901-001";
+import { t } from "./i18n.js?v=20260901-001";
 
 // 思考内容标记前缀（用于在流式输出中区分 reasoning 与 content）
 export const REASONING_PREFIX = "\x00\x01R\x01\x00";
@@ -167,8 +167,9 @@ function patch(path, body) {
  * - 零内容自动重试：连接失败/挂死且未产出任何内容时，退避重试
  * - payload.meta：可选对象，回写 finish_reason 到 meta.finishReason
  */
-async function* streamChat(payload) {
+async function* streamChat(payload, opts = {}) {
   const { signal, meta, ...body } = payload || {};
+  const { onToolCall } = opts || {};
   let attempt = 0;
 
   while (true) {
@@ -187,6 +188,10 @@ async function* streamChat(payload) {
 
     let receivedAny = false;
     let yieldedAny = false;
+    // 原生工具调用累积（每次 attempt 重置，重试不串数据）
+    const toolCallsAcc = [];
+    let toolDirty = false;
+    let toolYielded = false;
     try {
       resetIdle();
       const resp = await fetch(`${API_BASE}/proxy/chat`, {
@@ -233,6 +238,22 @@ async function* streamChat(payload) {
           // 提取 reasoning 字段（DeepSeek/OpenAI o-series/Anthropic thinking）
           const reasoning = normalizeReasoningChunk(delta.reasoning ?? delta.reasoning_content ?? delta.thinking ?? delta.reasoning_details);
           if (reasoning) chunks.push(REASONING_PREFIX + reasoning);
+          // 原生工具调用增量：按 index 累积（id/name 首包出现，arguments 追加拼接）
+          if (Array.isArray(delta.tool_calls)) {
+            for (const tc of delta.tool_calls) {
+              if (typeof tc?.index !== "number") continue;
+              const acc = (toolCallsAcc[tc.index] ??= { index: tc.index, id: "", name: "", arguments: "" });
+              if (tc.id) acc.id = tc.id;
+              if (tc.function?.name) acc.name = tc.function.name;
+              if (typeof tc.function?.arguments === "string" && tc.function.arguments) acc.arguments += tc.function.arguments;
+              toolYielded = true;
+              toolDirty = true;
+            }
+          }
+        }
+        if (toolDirty && typeof onToolCall === "function") {
+          toolDirty = false;
+          onToolCall(toolCallsAcc.filter(Boolean).map(c => ({ index: c.index, id: c.id, name: c.name, arguments: c.arguments })));
         }
         return chunks;
       };
@@ -261,7 +282,7 @@ async function* streamChat(payload) {
           yield chunk;
         }
       }
-      if (!yieldedAny) {
+      if (!yieldedAny && !toolYielded) {
         throw new Error("模型连接已结束，但没有返回任何可显示内容。\n诊断：可能是上游返回空 SSE、只返回了错误但被代理吞掉、Responses API 与当前模型不兼容，或模型输出被服务商过滤。");
       }
       return;

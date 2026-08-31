@@ -1328,10 +1328,17 @@ export const EN_DICT = {
   "系统通知权限已被拒绝，请在浏览器设置中手动开启": "Notification permission denied, enable it manually in browser settings",
   "开启系统通知后将请求浏览器授权": "Enabling will request browser permission",
   "目标模式任务完成": "Target Mode task complete",
+  "目标模式已停止": "Target Mode stopped",
+  "Autopilot 已停止": "Autopilot stopped",
+  "目标模式 · 连续 {n} 轮未调用工具，强警告（第 {k} 次）": "Target Mode · {n} consecutive rounds without tool calls, hard warning (#{k})",
+  "Autopilot · 连续 {n} 轮未调用工具，强警告（第 {k} 次）": "Autopilot · {n} consecutive rounds without tool calls, hard warning (#{k})",
   "团队讨论完成": "Team discussion complete",
   "辩论已结束": "Debate finished",
   "工作流完成": "Workflow complete",
   "{ok}/{n} 节点成功": "{ok}/{n} nodes succeeded",
+
+  // ── 原生工具调用 ─────────────────────────────
+  "该模型不支持原生工具调用，已自动切换为文本格式": "This model doesn't support native tool calling; switched to text format automatically",
 
   // ── 命令权限设置 ─────────────────────────────
   "命令权限": "Command Permissions",

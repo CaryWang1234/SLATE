@@ -245,6 +245,11 @@ def _build_openai_request(body: dict[str, Any]) -> dict[str, Any]:
         payload["temperature"] = body["temperature"]
     if max_tokens := body.get("max_tokens"):
         payload["max_tokens"] = max_tokens
+    # 原生工具调用：前端在支持时传入 tools 数组（OpenAI 格式），透传给上游
+    if body.get("tools"):
+        payload["tools"] = body["tools"]
+    if body.get("tool_choice"):
+        payload["tool_choice"] = body["tool_choice"]
     return payload
 
 
@@ -283,6 +288,21 @@ def _build_responses_request(body: dict[str, Any]) -> dict[str, Any]:
         payload["max_output_tokens"] = max_tokens
     if "temperature" in body:
         payload["temperature"] = body["temperature"]
+    # 原生工具调用：Chat Completions 格式转 Responses 格式
+    # {type:"function", function:{name,description,parameters}} → {type:"function", name, description, parameters}
+    if body.get("tools"):
+        converted = []
+        for tool in body["tools"]:
+            fn = tool.get("function", {}) if tool.get("type") == "function" else tool
+            converted.append({
+                "type": "function",
+                "name": fn.get("name", ""),
+                "description": fn.get("description", ""),
+                "parameters": fn.get("parameters") or {"type": "object", "properties": {}},
+            })
+        payload["tools"] = converted
+    if body.get("tool_choice"):
+        payload["tool_choice"] = body["tool_choice"]
     return payload
 
 
@@ -350,7 +370,9 @@ def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
         if msg["role"] == "system":
             system_msg = msg["content"] if isinstance(msg["content"], str) else _to_anthropic_content(msg["content"])
         else:
-            chat_messages.append({"role": msg["role"], "content": _to_anthropic_content(msg["content"])})
+            # 防御：原生工具协议消息（role="tool"）在 Anthropic 无对应概念，转成 user 保留结果文本
+            role = "user" if msg["role"] == "tool" else msg["role"]
+            chat_messages.append({"role": role, "content": _to_anthropic_content(msg["content"])})
 
     payload: dict[str, Any] = {
         "model": body["model"],
@@ -408,7 +430,7 @@ async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, A
                             if k in delta and k != "reasoning":
                                 del delta[k]
                         parsed["choices"][0]["delta"] = delta
-                    if delta.get("content") or delta.get("reasoning"):
+                    if delta.get("content") or delta.get("reasoning") or delta.get("tool_calls"):
                         yielded = True
                     yield f"data: {json.dumps(parsed, ensure_ascii=False)}\n\n"
                 except json.JSONDecodeError:
@@ -432,6 +454,9 @@ async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str
                 return
             sent_text_delta = False
             saw_completed = False
+            # 原生工具调用累积：按出现顺序保存 {id, name, arguments}
+            tool_calls_meta: list[dict[str, Any]] = []
+            saw_tool_delta = False
             async for line in resp.aiter_lines():
                 if not line.startswith("data:"):
                     continue
@@ -467,10 +492,52 @@ async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str
                         chunk = {"choices": [{"delta": {"reasoning": delta}, "index": 0}]}
                         yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
+                # 原生工具调用：function_call 创建（携带 id 与函数名），转为 Chat Completions 流式格式
+                elif obj_type == "response.output_item.added":
+                    item = data.get("item") or {}
+                    if item.get("type") == "function_call":
+                        idx = len(tool_calls_meta)
+                        call_id = item.get("id") or item.get("call_id") or f"fc_{idx}"
+                        tool_calls_meta.append({"id": call_id, "name": item.get("name", ""), "arguments": ""})
+                        saw_tool_delta = True
+                        chunk = {"choices": [{"delta": {"tool_calls": [{"index": idx, "id": call_id, "type": "function", "function": {"name": item.get("name", ""), "arguments": ""}}]}, "index": 0}]}
+                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+
+                # 原生工具调用：arguments 增量
+                elif obj_type == "response.function_call_arguments.delta":
+                    item_id = data.get("item_id")
+                    delta_args = data.get("delta", "")
+                    if delta_args:
+                        for idx, call in enumerate(tool_calls_meta):
+                            if call["id"] == item_id:
+                                call["arguments"] += delta_args
+                                saw_tool_delta = True
+                                chunk = {"choices": [{"delta": {"tool_calls": [{"index": idx, "function": {"arguments": delta_args}}]}, "index": 0}]}
+                                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                                break
+
                 elif obj_type in ("response.output_item.done", "response.content_part.done"):
+                    item = data.get("item") or data.get("part") or {}
+                    # 兼容只发 done 不发 delta 的实现：补齐缺失的调用创建/完整参数
+                    if item.get("type") == "function_call":
+                        call_id = item.get("id") or item.get("call_id") or ""
+                        meta = next((c for c in tool_calls_meta if c["id"] == call_id), None)
+                        if meta is None:
+                            idx = len(tool_calls_meta)
+                            meta = {"id": call_id or f"fc_{idx}", "name": item.get("name", ""), "arguments": ""}
+                            tool_calls_meta.append(meta)
+                            saw_tool_delta = True
+                            chunk = {"choices": [{"delta": {"tool_calls": [{"index": idx, "id": meta["id"], "type": "function", "function": {"name": meta["name"], "arguments": ""}}]}, "index": 0}]}
+                            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                        if item.get("arguments") and not meta["arguments"]:
+                            meta["arguments"] = item["arguments"]
+                            saw_tool_delta = True
+                            idx = tool_calls_meta.index(meta)
+                            chunk = {"choices": [{"delta": {"tool_calls": [{"index": idx, "function": {"arguments": item["arguments"]}}]}, "index": 0}]}
+                            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                        continue
                     if sent_text_delta:
                         continue
-                    item = data.get("item") or data.get("part") or {}
                     text = ""
                     if item.get("type") in ("message", "output_text"):
                         for content in item.get("content", []) or []:
@@ -503,8 +570,8 @@ async def _stream_responses(url: str, headers: dict[str, str], payload: dict[str
                 elif "delta" in data and isinstance(data["delta"], str):
                     chunk = {"choices": [{"delta": {"content": data["delta"]}, "index": 0}]}
                     yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
-            if not sent_text_delta and not saw_completed:
-                yield _sse_error("Responses API 连接正常结束，但没有收到文本增量或 completed 事件。请确认该模型/服务商是否真正支持 Responses API 流式输出，必要时关闭 Responses API 选项。", trace_id=trace_id, code="empty_stream")
+            if not sent_text_delta and not saw_tool_delta and not saw_completed:
+                yield _sse_error("Responses API 连接正常结束，但没有收到文本增量、工具调用或 completed 事件。请确认该模型/服务商是否真正支持 Responses API 流式输出，必要时关闭 Responses API 选项。", trace_id=trace_id, code="empty_stream")
                 yield "data: [DONE]\n\n"
     except Exception as exc:
         yield _sse_error_from_exception(exc, trace_id=trace_id, api_name="Responses API")
@@ -709,7 +776,8 @@ async def proxy_chat(request: Request) -> Any:
         messages = body.get("messages", [])
         contents = []
         for msg in messages:
-            role = "user" if msg["role"] == "user" else "model"
+            # 防御：原生工具协议消息（role="tool"）转成 user，避免被误映射为 model
+            role = "user" if msg["role"] in ("user", "tool") else "model"
             contents.append({"role": role, "parts": _to_gemini_parts(msg["content"])})
         payload: dict[str, Any] = {"contents": contents}
         if "temperature" in body:

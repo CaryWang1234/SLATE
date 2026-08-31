@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20260831-001";
-import { getToolsSystemPrompt } from "./tools.js?v=20260831-001";
+import { state } from "../store.js?v=20260901-001";
+import { getToolsSystemPrompt } from "./tools.js?v=20260901-001";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -123,8 +123,10 @@ function getExpertSystemPrompt() {
 /**
  * 构建完整的消息列表（注入系统提示 + 宪法 + 专家/记忆/知识 + 工具）。
  * 顺序：角色定义、项目宪法、专家/记忆/知识上下文、工具说明（贴近对话，降低遗忘）。
+ * toolMode：native=序列化原生工具协议（assistant.tool_calls + role:"tool"）；
+ *           text=剥离协议（tool 消息降为 user，便于不支持 tools 的端点消费）。
  */
-function buildMessages(userMessages, constitution) {
+function buildMessages(userMessages, constitution, toolMode = "text") {
   const messages = [];
 
   // 系统提示
@@ -148,6 +150,13 @@ function buildMessages(userMessages, constitution) {
 
   messages.push({ role: "system", content: systemContent });
 
+  const native = toolMode === "native";
+  // 历史中已存在的 tool 结果 id（原生协议要求 assistant tool_calls 后必须有匹配的 tool 消息）
+  const existingToolIds = new Set();
+  for (const m of userMessages) {
+    if (m.role === "tool" && m.tool_call_id) existingToolIds.add(m.tool_call_id);
+  }
+
   // 用户消息（带图片附件时装配为多模态内容，让模型真正“看见”图片）
   for (const msg of userMessages) {
     const images = (Array.isArray(msg.images) ? msg.images : []).filter(src => typeof src === "string" && src.startsWith("data:image"));
@@ -159,9 +168,48 @@ function buildMessages(userMessages, constitution) {
           ...images.map(src => ({ type: "image_url", image_url: { url: src } })),
         ],
       });
-    } else {
-      messages.push({ role: msg.role, content: msg.content });
+      continue;
     }
+    if (msg.role === "tool") {
+      // 原生工具结果消息；文本模式无 tool 角色，降为 user 保留结果内容
+      messages.push(native
+        ? { role: "tool", tool_call_id: msg.tool_call_id || "", content: String(msg.content ?? "") }
+        : { role: "user", content: String(msg.content ?? "") });
+      continue;
+    }
+    if (msg.role === "assistant" && native) {
+      const tc = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
+      const kept = [];
+      for (const c of tc) {
+        if (!c?.id || !c?.name) continue;
+        if (existingToolIds.has(c.id)) {
+          kept.push(c);
+        } else {
+          // 刷新/切会话后结果消息不在内存历史中：从 metadata.toolResults 合成；
+          // 无结果可合成的调用直接丢弃，避免上游 400
+          const resEntry = (Array.isArray(msg.toolResults) ? msg.toolResults : []).find(r => r?.call?.id === c.id);
+          if (resEntry) {
+            kept.push(c);
+            messages.push({ role: "tool", tool_call_id: c.id, content: String(resEntry.result?.output ?? "") });
+          }
+        }
+      }
+      if (kept.length) {
+        messages.push({
+          role: "assistant",
+          content: msg.content ?? "",
+          tool_calls: kept.map(c => ({
+            id: c.id,
+            type: "function",
+            function: { name: c.name, arguments: typeof c.arguments === "string" ? c.arguments : "{}" },
+          })),
+        });
+      } else {
+        messages.push({ role: "assistant", content: msg.content ?? "" });
+      }
+      continue;
+    }
+    messages.push({ role: msg.role, content: msg.content });
   }
 
   return messages;

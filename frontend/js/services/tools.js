@@ -12,12 +12,12 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260831-001";
-import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260831-001";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260831-001";
-import { t } from "./i18n.js?v=20260831-001";
-import { makeId } from "./utils.js?v=20260831-001";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260831-001";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260901-001";
+import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260901-001";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260901-001";
+import { t } from "./i18n.js?v=20260901-001";
+import { makeId } from "./utils.js?v=20260901-001";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260901-001";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -1475,6 +1475,73 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   return s;
 }
 
+// ── 原生工具调用（OpenAI function calling）────────────────────
+// OpenAI 工具名约束 ^[a-zA-Z0-9_-]+$：直接使用 TOOLS 对象键（ASCII），
+// 中文 name 拼进 description 首行，模型仍能理解工具语义。
+
+function buildOpenAITools() {
+  const tools = [];
+  for (const [key, tool] of Object.entries(TOOLS)) {
+    const properties = {};
+    const required = [];
+    for (const [pkey, pval] of Object.entries(tool.params || {})) {
+      properties[pkey] = { type: pval.type, description: pval.description || "" };
+      if (pval.required) required.push(pkey);
+    }
+    tools.push({
+      type: "function",
+      function: {
+        name: key,
+        description: tool.name ? `${tool.name} - ${tool.description}` : tool.description,
+        parameters: { type: "object", properties, required },
+      },
+    });
+  }
+  return tools;
+}
+
+// 流式累积的 {index, id, name, arguments} → 执行器统一形态 {name, params, id}
+function openAICallsToCalls(toolCalls) {
+  const calls = [];
+  for (const tc of toolCalls || []) {
+    if (!tc?.name) continue;
+    let params;
+    if (!tc.arguments) {
+      params = {};
+    } else {
+      try {
+        params = JSON.parse(stripJsonFence(tc.arguments));
+      } catch {
+        params = salvageTruncatedParams(tc.arguments);
+        params._truncated = true;
+      }
+    }
+    if (!params || typeof params !== "object" || Array.isArray(params)) params = {};
+    params = normalizeToolParams(tc.name, params);
+    calls.push({ name: tc.name, params, id: tc.id || undefined });
+  }
+  return calls;
+}
+
+function _toolCapKey(modelId) {
+  return `slate_tool_cap_${modelId}`;
+}
+
+// 模型工具能力判定：localStorage 记忆（失败自动降级后写入）优先，其次 provider==="openai" 默认原生
+function getModelToolCapability(modelId, provider) {
+  try {
+    const saved = localStorage.getItem(_toolCapKey(modelId));
+    if (saved === "native" || saved === "text") return saved;
+  } catch {}
+  return provider === "openai" ? "native" : "text";
+}
+
+function setModelToolCapability(modelId, mode) {
+  try {
+    if (mode === "native" || mode === "text") localStorage.setItem(_toolCapKey(modelId), mode);
+  } catch {}
+}
+
 function _example(params) {
   const obj = {};
   for (const [k, v] of Object.entries(params || {})) {
@@ -1490,4 +1557,6 @@ export {
   TOOLS, detectToolCalls, stripToolCalls, hasTruncatedTail,
   executeTool, executeToolCalls,
   getToolsSystemPrompt,
+  buildOpenAITools, openAICallsToCalls,
+  getModelToolCapability, setModelToolCapability,
 };
