@@ -39,6 +39,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "word_create": "生成 .docx Word 文档（标题层级、段落、列表排版）",
     "file_edit": "文件编辑（view 带行号查看 / replace 精确唯一替换 / edit diff / read / insert / delete / copy / paste / cut）",
     "file_create": "创建新文件（预览后确认写入）",
+    "code_search": "全局代码搜索：在当前项目中按文本/正则搜索（类似 Ctrl+Shift+F，默认全局=项目根，scope 可缩小到子目录）",
     "text_summarize": "文本摘要与关键词提取",
     "json_tool": "JSON 校验、格式化、压缩与路径读取",
     "regex_test": "正则表达式测试与匹配结果预览",

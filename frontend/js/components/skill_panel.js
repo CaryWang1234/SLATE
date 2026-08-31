@@ -2,12 +2,12 @@
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）。
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260907-001";
-import { get, post, del, upload } from "../services/api.js?v=20260907-001";
-import { guardSkillParams } from "../services/riskguard.js?v=20260907-001";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260907-001";
-import { t } from "../services/i18n.js?v=20260907-001";
-import { setIconText } from "../services/icons.js?v=20260907-001";
+import { state, subscribe, setSkills } from "../store.js?v=20260907-002";
+import { get, post, del, upload } from "../services/api.js?v=20260907-002";
+import { guardSkillParams } from "../services/riskguard.js?v=20260907-002";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260907-002";
+import { t } from "../services/i18n.js?v=20260907-002";
+import { setIconText } from "../services/icons.js?v=20260907-002";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -87,6 +87,13 @@ const SKILL_PARAM_DEFS = {
   file_create: [
     { key: "file_path", label: "文件路径", type: "text", placeholder: "frontend/js/new_file.js" },
     { key: "content", label: "文件内容", type: "textarea", placeholder: "文件内容..." },
+  ],
+  code_search: [
+    { key: "query", label: "搜索关键词/正则", type: "text", placeholder: "async function|TODO|function main" },
+    { key: "scope", label: "搜索范围子目录", type: "text", placeholder: "空=全局（项目根）；如 backend/routers" },
+    { key: "case_sensitive", label: "区分大小写", type: "text", placeholder: "true / false" },
+    { key: "glob", label: "文件名过滤", type: "text", placeholder: "*.py" },
+    { key: "limit", label: "结果上限", type: "number", placeholder: "50" },
   ],
   text_summarize: [
     { key: "text", label: "文本", type: "textarea", placeholder: "粘贴要总结的文本 "},

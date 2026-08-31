@@ -12,13 +12,13 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260907-001";
-import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-001";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260907-001";
-import { dlgUserAsk } from "./dialog.js?v=20260907-001";
-import { t } from "./i18n.js?v=20260907-001";
-import { makeId } from "./utils.js?v=20260907-001";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260907-001";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260907-002";
+import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-002";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260907-002";
+import { dlgUserAsk } from "./dialog.js?v=20260907-002";
+import { t } from "./i18n.js?v=20260907-002";
+import { makeId } from "./utils.js?v=20260907-002";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260907-002";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -104,6 +104,30 @@ const TOOLS = {
       const matches = res.data?.matches || [];
       if (!matches.length) return `未找到 ${query}`;
       return matches.map(item => `${item.type === "dir" ? "[目录]" : "[文件]"} ${item.path}${item.size ? ` (${item.size}B)` : ""}`).join("\n");
+    },
+  },
+
+  code_search: {
+    name: "全局代码搜索",
+    description: "在当前项目中搜索文本或正则（类似 Ctrl+Shift+F 全局搜索）。query 必填，支持正则；默认搜索整个项目（全局），可用 scope 缩小到项目内子目录（相对路径或项目内绝对路径）；case_sensitive 控制大小写，glob 过滤文件名，limit 控制结果上限。",
+    params: {
+      query: { type: "string", description: "要搜索的文本或正则表达式", required: true },
+      scope: { type: "string", description: "搜索范围：项目内相对路径或绝对路径，空=全局（项目根）" },
+      case_sensitive: { type: "boolean", description: "是否区分大小写（默认 false）" },
+      glob: { type: "string", description: "文件名过滤，如 *.py / **/*.ts" },
+      limit: { type: "integer", description: "结果上限（默认 50）" },
+    },
+    async execute(params) {
+      if (!state.project) return "未打开项目";
+      const res = await post("/skills/execute", { skill: "code_search", params: params || {} });
+      if (res.code !== 0) return res.message || "搜索失败";
+      const d = res.data || {};
+      if (d.error) return `搜索失败：${d.error}`;
+      const matches = d.matches || [];
+      if (!matches.length) return `未找到匹配「${(params && params.query) || ""}」`;
+      const lines = matches.map(m => `${m.file}:${m.line}:${m.column}  ${m.text}`);
+      const tail = d.truncated ? `\n…（已截断，仅显示前 ${matches.length} 条）` : `\n（共 ${d.count} 条，扫描 ${d.scanned_files} 个文件）`;
+      return lines.join("\n") + tail;
     },
   },
 
@@ -1003,11 +1027,13 @@ const TOOL_USE_RECIPES = [
   ["需要技能但不知名字", "skill_search 搜索 -> skill_run 调用"],
   ["任务缺少关键条件（风格/受众/格式/语言等）", "user_ask question=问题 options=[选项]"],
   ["事实性问答（可查证）", "先 project_files/project_read_file 或 web_search 佐证，再基于事实回答"],
+  ["在海量代码中定位关键字/函数/符号", "code_search query=关键词（可 scope 缩小范围）-> project_read_file 精读"],
 ];
 
 const SKILL_RUN_QUICK_LIST = [
   "file_tree", "file_peek", "file_edit", "file_create", "terminal",
   "repo_stats", "todo_scan", "git_tool", "code_scan", "doc_scan",
+  "code_search",
   "web_search", "web_fetch", "browser_automation", "computer_use",
   "html_render", "css_color", "doc_write", "text_summarize", "json_tool",
   "regex_test", "chart_create", "qrcode_create", "python_api_extract",
@@ -1017,12 +1043,13 @@ const SKILL_RUN_QUICK_LIST = [
 
 const CORE_AGENT_TOOLS = [
   "project_info", "project_files", "project_find_file", "project_read_file",
-  "skill_search", "skill_run", "file_edit", "file_create", "file_append",
+  "code_search", "skill_search", "skill_run", "file_edit", "file_create", "file_append",
   "todo_manage", "board_read", "board_batch",
 ];
 
 const AGENT_TOOL_DECISION_RULES = [
   "需要仓库事实：先 project_files / project_find_file / project_read_file，再回答或修改。",
+  "定位代码位置：code_search 搜内容/符号（可限定 scope），再 project_read_file 精读。",
   "修改已有文件：先读现状与行号，再 file_edit；改完后读取或运行检查验证。",
   "创建新文件：file_create 用原样格式；长文件分段 file_append，不要省略内容。",
   "运行命令/测试/构建/Git：skill_run terminal 或 git_tool，默认会注入项目目录。",

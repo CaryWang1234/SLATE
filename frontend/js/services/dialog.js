@@ -12,7 +12,7 @@
  *       options: [{value,label}] 传入时渲染下拉选择（替代手敲枚举值）
  */
 
-import { t } from "./i18n.js?v=20260907-001";
+import { t } from "./i18n.js?v=20260907-002";
 
 // 对话框需要盖在已有模态（卡片编辑、技能执行等，z-index:1000）之上
 let zTop = 2000;
