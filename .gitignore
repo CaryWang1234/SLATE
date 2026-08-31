@@ -19,3 +19,4 @@ repo-doctor.py
 /outputs
 /.qoder
 /.diag
+/installer/SLATE-Setup-*.exe
