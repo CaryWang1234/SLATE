@@ -41,7 +41,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
 - 🔍 **Code Review** — Read git diff (staged/unstaged/commit range), AI reviews across code quality, security, performance, and maintainability with structured report and line-level comments
 - 🔔 **Task Completion Notifications** — Chime sound + system notification when Harness/team/workflow finishes; both toggleable in settings
-- 📡 **LAN Remote Control with Auth** — Opens port 8001 on launch; scan QR from phone/tablet browser for the full interface; optional LAN password prevents other devices on the network from operating SLATE
+- 📡 **LAN Remote Control with Auth** — Opens port 8001 on launch; phone/tablet browsers auto-switch to the dedicated **SLATE Mobile UI** — bottom-tab navigation across Chat / Conversations / Memory / Tasks / Settings, full chat & tool-loop capability, bottom-sheet confirmations for high-risk commands and file diffs, desktop zero-regression; optional LAN password prevents other devices on the network from operating SLATE
 - 🛡️ **High-Risk Command Approval** — Dual-layer frontend+backend interception with hardcoded rules; AI explains command purpose before approval; catastrophic commands unconditionally blocked
 - 👥 **AI Team Multi-Round Debate** — Multi-role propose/oppose/decide with light/heavy model division; plus DAG workflow pipeline with **8 built-in templates** (Dev Flow, Code Review, Doc Generation, Data Analysis, Research Report, Product Requirements, Bug Investigation, Parallel Research); stop button for mid-debate interruption; **9 built-in team presets** (Code Review, Product Brainstorm, Red-Blue Debate, etc.) + custom configuration; workflow import/export/delete
 - ⏰ **Scheduled Chat Tasks** — Auto-execute preset prompts on schedule, results archived as separate sessions
@@ -101,6 +101,7 @@ Built-in tools (`backend/skills/`):
 | `ppt_create` / `word_create` | .pptx presentations / .docx Word documents |
 | `json_tool` / `regex_test` | JSON processing / Regex testing |
 | `repo_stats` / `todo_scan` | Repository stats / TODO scanning |
+| `system_info` | System metacognition: date/time, hardware specs, battery, network status |
 | `web_search` / `web_fetch` | Web search (no key needed) / Page content retrieval |
 | `chart_create` / `qrcode_create` | SVG charts (bar/line/pie) / QR codes, inline preview |
 | `python_api_extract` / `html_bundle` | Python library API extraction / Web page bundling |
@@ -146,6 +147,13 @@ Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention i
 - LAN access settings: QR/code URL display, optional remote password, and clear warnings when LAN auth is not configured
 - First-launch onboarding guide
 - Auto-check for updates on startup, prompts upgrade when new GitHub Release found
+
+### SLATE Mobile (Remote UI)
+
+- Phone/tablet browsers visiting the LAN address automatically get the dedicated mobile UI (desktop UAs keep the full desktop interface — zero regression)
+- Bottom-tab navigation with five panels: Chat / Conversations / Memory / Schedule / Settings
+- Full chat capability: streaming output, tool loop with bottom-sheet risk approval and diff previews, @-mentions, voice input
+- Session history management, long-term memory CRUD, scheduled tasks, and streamlined settings (model switching, API keys, theme, LAN info)
 
 ### AI Team Collaboration
 
@@ -265,12 +273,15 @@ SLATE/
 │   └── skills/                 # 30 built-in MCP tool implementations (incl. Unicode-safe file/terminal tools and high-risk command dual interception)
 ├── frontend/
 │   ├── index.html              # Three-column layout entry (Chat / Whiteboard / Factory+Capabilities)
+│   ├── m.html                  # Mobile remote UI entry (SLATE Mobile)
 │   ├── css/style.css           # Global styles (dual theme)
+│   ├── css/mobile.css          # Mobile styles
 │   └── js/
 │       ├── app.js              # Main controller initialization
 │       ├── store.js            # Global state management
 │       ├── components/         # Chat / Whiteboard / Team / Skills / Memory / Schedule etc.
-│       └── services/           # api / adapter / tools / markdown / i18n / grind
+│       ├── services/           # api / adapter / tools / markdown / i18n / grind
+│       └── mobile/             # Mobile modules (init / app / ui / chat / conversations / memory / schedule / settings)
 ├── docs/                       # Website Landing Page (GitHub Pages)
 │   ├── index.html              # English version
 │   ├── zh/index.html           # Chinese version
