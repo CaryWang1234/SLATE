@@ -15,7 +15,7 @@ BACKEND_DIR = BASE_DIR / "backend"
 
 # ── 应用信息 ────────────────────────────────────────────────
 app_name = "SLATE 砚"
-app_version = "0.3.7"  # 从 SLATE_InnoSetup.iss 同步
+app_version = "0.3.8"  # 从 SLATE_InnoSetup.iss 同步
 
 # ── 收集前端文件 ────────────────────────────────────────────
 def collect_frontend():

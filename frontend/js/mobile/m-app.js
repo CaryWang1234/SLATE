@@ -3,9 +3,9 @@
  * 底部 tab 切换 / 顶部状态条 / 键盘适配 / 空状态
  */
 
-import { state, subscribe, toggleTheme } from "../store.js?v=20260830-003";
-import { t } from "../services/i18n.js?v=20260830-003";
-import { mToast } from "./m-ui.js?v=20260830-003";
+import { state, subscribe, toggleTheme } from "../store.js?v=20260831-001";
+import { t } from "../services/i18n.js?v=20260831-001";
+import { mToast } from "./m-ui.js?v=20260831-001";
 
 const $ = (id) => document.getElementById(id);
 
