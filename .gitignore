@@ -2,7 +2,6 @@
 /.tmp-chrome-codex-*
 /dist
 /build
-/installer
 */__pycache__
 **/__pycache__/
 *.pyc
