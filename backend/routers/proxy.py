@@ -190,6 +190,10 @@ MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
          "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
         {"id": "glm-5.2", "name": "GLM-5.2", "provider": "openai",
          "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 131072},
+        {"id": "glm-5.3", "name": "GLM-5.3", "provider": "openai",
+         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576},
+        {"id": "glm-5.3-flash", "name": "GLM-5.3-Flash", "provider": "openai",
+         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576},
         {"id": "doubao-seed-2-1-pro-260628", "name": "Doubao-Seed-2.1-Pro-260628", "provider": "openai",
          "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144},
         {"id": "doubao-seed-2-1-turbo-260628", "name": "Doubao-Seed-2.1-Turbo-260628", "provider": "openai",
@@ -212,7 +216,7 @@ async def list_models() -> dict[str, Any]:
     return {"code": 0, "data": MODEL_REGISTRY, "message": "ok"}
 
 
-def _find_model(model_id: str, base_url: str | None = None) -> dict[str, Any] | None:
+def _find_model(model_id: str, base_url: str | None = None, provider: str | None = None) -> dict[str, Any] | None:
     """在注册表中查找模型配置，未找到时构建自定义配置。"""
     for category_models in MODEL_REGISTRY.values():
         for m in category_models:
@@ -223,7 +227,7 @@ def _find_model(model_id: str, base_url: str | None = None) -> dict[str, Any] | 
         return {
             "id": model_id,
             "name": model_id,
-            "provider": "openai",
+            "provider": provider or "openai",
             "base_url": base_url,
             "context_window": 32768,
         }
@@ -643,13 +647,14 @@ async def proxy_chat(request: Request) -> Any:
     model_id = body.get("model", "")
     api_key = body.get("api_key", "")
     custom_base_url = body.get("base_url")
+    custom_provider = body.get("provider")
     is_stream = body.get("stream", False)
     
     # 生成请求追踪 ID（Loop Engineering: 可观测性）
     trace_id = str(uuid.uuid4())[:8]
     logger.info(f"[{trace_id}] 请求开始: model={model_id}, stream={is_stream}")
 
-    model_cfg = _find_model(model_id, custom_base_url)
+    model_cfg = _find_model(model_id, custom_base_url, custom_provider)
     if not model_cfg:
         logger.warning(f"[{trace_id}] 未知模型: {model_id}")
         return {"code": -1, "data": None, "message": f"未知模型: {model_id}"}
@@ -787,8 +792,8 @@ async def proxy_chat(request: Request) -> Any:
             "message": "ok",
         }
 
-    # 默认：Chat Completions API
-    url = f"{base_url}/chat/completions"
+    # 默认：Chat Completions API（curl 直连模式：base_url 即完整端点 URL，不拼接路径）
+    url = base_url if provider == "curl" else f"{base_url}/chat/completions"
     payload = _build_openai_request(body)
 
     if is_stream:

@@ -12,12 +12,12 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260830-002";
-import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260830-002";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260830-002";
-import { t } from "./i18n.js?v=20260830-002";
-import { makeId } from "./utils.js?v=20260830-002";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260830-002";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260830-003";
+import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260830-003";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260830-003";
+import { t } from "./i18n.js?v=20260830-003";
+import { makeId } from "./utils.js?v=20260830-003";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260830-003";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -232,6 +232,46 @@ const TOOLS = {
     },
   },
 
+  skill_search: {
+    name: "技能搜索",
+    description: "搜索可用技能/工具：按关键词查找内置工具、SKILL.md 自定义技能与远程 MCP 工具，关键词匹配技能名或描述。keyword 留空则列出全部。命中结果中的技能名可直接通过 skill_run 调用（skill 参数传技能名）读取其定义。",
+    params: {
+      keyword: { type: "string", description: "搜索关键词（匹配技能名或描述），留空列出全部技能", required: false },
+    },
+    async execute({ keyword }) {
+      try {
+        let mcp = {}, skills = {}, remoteTools = [];
+        if (state.skills) {
+          mcp = state.skills.mcp || {};
+          skills = state.skills.skills || {};
+          remoteTools = state.skills.remoteTools || [];
+        }
+        if (!Object.keys(mcp).length && !Object.keys(skills).length && !remoteTools.length) {
+          const res = await get("/skills");
+          if (res.code === 0) {
+            mcp = res.data.mcp || {};
+            skills = res.data.skills || {};
+            remoteTools = res.data.remoteTools || [];
+          }
+        }
+        const kw = String(keyword || "").trim().toLowerCase();
+        const all = [
+          ...Object.entries(mcp).map(([name, desc]) => ({ name, desc: String(desc), type: "内置工具" })),
+          ...Object.entries(skills).map(([name, desc]) => ({ name, desc: String(desc), type: "SKILL.md 技能" })),
+          ...(remoteTools || []).map(t => ({ name: `mcp__${t.serverId}__${t.name}`, desc: `[MCP:${t.server}] ${t.description || ""}`, type: "远程 MCP" })),
+        ];
+        const hits = kw
+          ? all.filter(x => x.name.toLowerCase().includes(kw) || x.desc.toLowerCase().includes(kw))
+          : all;
+        if (!hits.length) return `未找到与「${keyword}」相关的技能。可尝试其他关键词，或留空 keyword 列出全部技能。`;
+        const lines = hits.map((x, i) => `${i + 1}. ${x.name}（${x.type}）：${compactDescription(x.desc, 120)}`);
+        return `共找到 ${hits.length} 个相关技能：\n${lines.join("\n")}\n\n需要使用时通过 skill_run 调用，skill 参数传技能名（自定义技能会返回 SKILL.md 定义内容）。`;
+      } catch (e) {
+        return `技能搜索失败: ${e.message}`;
+      }
+    },
+  },
+
   skill_run: {
     name: "执行工具",
     description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/replace_range按行号范围替换（start_line/end_line/content，推荐先view确认行号）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(持久化终端会话：支持多会话管理、状态保持（cd/export跨命令保持）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，高危命令双层拦截), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，engine可选auto（Bing+DuckDuckGo并发合并去重，推荐）/bing/ddg，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文Markdown，支持JS渲染页面与PDF，mode=html时返回原始HTML，render_js可选auto（正文过短自动渲染）/on/off，max_chars截断长度默认20000上限60000), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果)。也可传入 SKILL.md 技能名读取其定义内容",
@@ -257,10 +297,12 @@ const TOOLS = {
           }
         }
         // 高危命令审批：写死规则判定，命中后弹框并用模型解释目的
+        // 移动端通过 window.__slateGuardOverride 接管审批 UI（底部 sheet），桌面不受影响
         if (skill === "terminal" && p.command) {
 
           const risk = isHighRiskCommand(p.command);
-          if (risk.risk && !(await guardSkillParams(skill, p))) {
+          const guard = window.__slateGuardOverride || guardSkillParams;
+          if (risk.risk && !(await guard(skill, p))) {
             return `高危命令被用户拒绝执行（${risk.reason}）：${p.command}`;
           }
         }
@@ -270,6 +312,7 @@ const TOOLS = {
         const res = await post("/skills/execute", { skill, params: p });
         if (res.code === 0) {
           const data = res.data;
+          if (data && data.type === "custom_skill" && data.content) return data.content;
           if (typeof data === "string") return data.length > 2000 ? data.slice(0, 2000) + "…" : data;
           return JSON.stringify(data, null, 2);
         }
@@ -908,6 +951,7 @@ const TOOL_USE_RECIPES = [
   ["桌面操作", "skill_run computer_use，截图默认 jpeg/fast"],
   ["生成图表/二维码/文档", "skill_run chart_create/qrcode_create/doc_write/ppt_create/word_create/excel_tool"],
   ["多个互不依赖的子任务并行", "subagent_run agents=[{name,task}] 一次并行派出，task 写清背景与期望产出"],
+  ["需要技能但不知名字", "skill_search 搜索 -> skill_run 调用"],
 ];
 
 const SKILL_RUN_QUICK_LIST = [
@@ -922,7 +966,7 @@ const SKILL_RUN_QUICK_LIST = [
 
 const CORE_AGENT_TOOLS = [
   "project_info", "project_files", "project_find_file", "project_read_file",
-  "skill_run", "file_edit", "file_create", "file_append",
+  "skill_search", "skill_run", "file_edit", "file_create", "file_append",
   "todo_manage", "board_read", "board_batch",
 ];
 
@@ -1294,7 +1338,8 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   s += "2. 任务需要查看文件、目录、项目结构、执行命令或写文件时，当前回复必须包含工具调用块。\n";
   s += "3. 同一回复可批量调用互不依赖的读取/扫描工具；有依赖的等工具结果后再继续。\n";
   s += "4. 工具失败后换参数、换工具或读取更多上下文；不要重复完全相同的失败调用。\n";
-  s += "5. 等待用户选择、确认、补充隐私信息或许可时，不调用工具。\n\n";
+  s += "5. 等待用户选择、确认、补充隐私信息或许可时，不调用工具。\n";
+  s += "6. 工具/技能纪律：仅任务确实需要时才调用——纯问答、闲聊、解释概念时绝不调用任何工具；不确定技能是否存在时，先 skill_search 搜索确认，再决定是否 skill_run；搜索到的技能与任务无关时，绝不强行使用。\n\n";
   s += "**工具选择速查**\n";
   for (const [scene, route] of TOOL_USE_RECIPES) s += `- ${scene}: ${route}\n`;
   for (const rule of AGENT_TOOL_DECISION_RULES) s += `- ${rule}\n`;
@@ -1325,7 +1370,7 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   s += compact || minimal ? "**核心 Agent 工具**\n" : "**工具目录**\n";
   for (const [key, tool] of toolEntries) {
     const desc = key === "skill_run"
-      ? `调用内置工具/远程 MCP/自定义技能。常用内置工具：${SKILL_RUN_QUICK_LIST.join(", ")}。复杂参数按工具名传入 params。`
+      ? `调用内置工具/远程 MCP/自定义技能。不确定技能名时先调用 skill_search 搜索。常用内置工具：${SKILL_RUN_QUICK_LIST.join(", ")}。复杂参数按工具名传入 params。`
       : compactDescription(tool.description);
     s += `### ${key} ${desc}\n`;
     if (tool.rawContent) {

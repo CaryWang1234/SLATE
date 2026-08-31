@@ -2,12 +2,12 @@
  * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）。
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260830-002";
-import { get, post, del, upload } from "../services/api.js?v=20260830-002";
-import { guardSkillParams } from "../services/riskguard.js?v=20260830-002";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260830-002";
-import { t } from "../services/i18n.js?v=20260830-002";
-import { setIconText } from "../services/icons.js?v=20260830-002";
+import { state, subscribe, setSkills } from "../store.js?v=20260830-003";
+import { get, post, del, upload } from "../services/api.js?v=20260830-003";
+import { guardSkillParams } from "../services/riskguard.js?v=20260830-003";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260830-003";
+import { t } from "../services/i18n.js?v=20260830-003";
+import { setIconText } from "../services/icons.js?v=20260830-003";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 

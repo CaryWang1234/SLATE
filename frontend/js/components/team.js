@@ -3,17 +3,17 @@
  * 轻量模型初步讨论，重型模型最终决策。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260830-002";
-import { notifyTaskComplete } from "../services/notify.js?v=20260830-002";
-import { streamChat } from "../services/api.js?v=20260830-002";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260830-002";
-import { renderMarkdown } from "../services/markdown.js?v=20260830-002";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260830-002";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260830-002";
-import { getExpertsCached } from "./experts.js?v=20260830-002";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260830-002";
-import { t } from "../services/i18n.js?v=20260830-002";
-import { makeId } from "../services/utils.js?v=20260830-002";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260830-003";
+import { notifyTaskComplete } from "../services/notify.js?v=20260830-003";
+import { streamChat } from "../services/api.js?v=20260830-003";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260830-003";
+import { renderMarkdown } from "../services/markdown.js?v=20260830-003";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260830-003";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260830-003";
+import { getExpertsCached } from "./experts.js?v=20260830-003";
+import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260830-003";
+import { t } from "../services/i18n.js?v=20260830-003";
+import { makeId } from "../services/utils.js?v=20260830-003";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -722,6 +722,7 @@ async function startDiscussion() {
       try {
         for await (const chunk of streamChat({
           model: member.modelId,
+          provider: findModel(member.modelId)?.provider,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -827,6 +828,7 @@ async function forceVerdict(topic, boardContext, entries) {
   try {
     for await (const chunk of streamChat({
       model: decider.modelId,
+      provider: findModel(decider.modelId)?.provider,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

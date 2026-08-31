@@ -8,11 +8,24 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260830-002">
+  <link rel="stylesheet" href="./css/style.css?v=20260830-003">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
     setTimeout(function () { document.documentElement.classList.remove("i18n-pending"); }, 2500);
+  </script>
+  <script>
+    // 手机遥控专属 UI 分流：移动 UA 进入 m.html，保留 query（含 slate_lan_token）
+    (function () {
+      if (window.location.pathname.endsWith("m.html")) return;
+      var isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+      if (!isMobile) return;
+      if (new URLSearchParams(window.location.search).get("slate_mobile") === "0") return;
+      var parts = window.location.pathname.split("/").filter(Boolean);
+      parts.pop();
+      var base = parts.length ? "/" + parts.join("/") : "";
+      window.location.replace(base + "/m.html" + window.location.search + window.location.hash);
+    })();
   </script>
 </head>
 <body>
@@ -364,6 +377,14 @@
               <div class="setting-group">
                 <label class="setting-label">模型名称 / ID</label>
                 <input id="custom-model-name" type="text" class="setting-input" placeholder="my-model">
+              </div>
+              <div class="setting-group">
+                <label class="setting-label">请求模式</label>
+                <select id="custom-model-mode" class="setting-input">
+                  <option value="openai">OpenAI 兼容（自动拼接 /chat/completions）</option>
+                  <option value="anthropic">Anthropic（/v1/messages + x-api-key）</option>
+                  <option value="curl">curl 直连（Base URL 填完整端点 URL）</option>
+                </select>
               </div>
               <div class="setting-group">
                 <label class="setting-label">Base URL</label>
@@ -1153,7 +1174,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260830-002"></script>
+  <script type="module" src="./js/app.js?v=20260830-003"></script>
 
 </body>
 </html>

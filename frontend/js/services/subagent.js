@@ -6,8 +6,8 @@
  * tools 相关函数经 deps 注入，避免与 tools.js 循环导入。
  */
 
-import { state, getModelKey } from "../store.js?v=20260830-002";
-import { streamChat } from "./api.js?v=20260830-002";
+import { state, getModelKey } from "../store.js?v=20260830-003";
+import { streamChat } from "./api.js?v=20260830-003";
 
 export const SUBAGENT_MAX_PARALLEL = 5;     // 单次派出的并行上限
 export const SUBAGENT_MAX_ROUNDS = 8;       // 每个子代理的工具轮次预算
@@ -98,6 +98,7 @@ async function runOneSubAgent(spec, index, deps, signal) {
       let lastEmit = 0;
       for await (const chunk of streamChat({
         model: modelId,
+        provider: state.currentModel?.provider,
         messages,
         api_key: apiKey,
         base_url: baseUrl,

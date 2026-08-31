@@ -2,12 +2,23 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260830-002";
-import { t } from "./i18n.js?v=20260830-002";
+import { API_BASE } from "../store.js?v=20260830-003";
+import { t } from "./i18n.js?v=20260830-003";
 
 // 思考内容标记前缀（用于在流式输出中区分 reasoning 与 content）
 export const REASONING_PREFIX = "\x00\x01R\x01\x00";
 export const REASONING_INLINE_PREFIX = "\x01R\x01";
+
+// 局域网遥控鉴权 token（lan 副端口要求，桌面主端口无需设置）
+let _lanToken = "";
+
+export function setLanToken(token) {
+  _lanToken = String(token || "").trim();
+}
+
+function authHeaders() {
+  return _lanToken ? { "x-slate-lan-token": _lanToken } : {};
+}
 
 function normalizeReasoningChunk(value) {
   if (value === undefined || value === null) return "";
@@ -99,7 +110,7 @@ function formatFetchError(err, { idleAborted = false, timeoutMs = 0 } = {}) {
 async function request(path, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   const url = `${API_BASE}${path}`;
   const defaults = {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
   };
   const config = { ...defaults, ...options };
   if (config.body && typeof config.body === "object") {
@@ -180,7 +191,7 @@ async function* streamChat(payload) {
       resetIdle();
       const resp = await fetch(`${API_BASE}/proxy/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ ...body, stream: true }),
         signal: controller.signal,
       });

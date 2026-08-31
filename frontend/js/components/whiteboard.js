@@ -2,12 +2,12 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260830-002";
-import { get, streamChat } from "../services/api.js?v=20260830-002";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260830-002";
-import { t } from "../services/i18n.js?v=20260830-002";
-import { iconSvgEl } from "../services/icons.js?v=20260830-002";
-import { makeId } from "../services/utils.js?v=20260830-002";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260830-003";
+import { get, streamChat } from "../services/api.js?v=20260830-003";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260830-003";
+import { t } from "../services/i18n.js?v=20260830-003";
+import { iconSvgEl } from "../services/icons.js?v=20260830-003";
+import { makeId } from "../services/utils.js?v=20260830-003";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -2075,6 +2075,7 @@ async function aiOrganize() {
   try {
     for await (const chunk of streamChat({
       model: modelId,
+      provider: state.currentModel?.provider,
       messages,
       api_key: apiKey,
       temperature: 0.3,

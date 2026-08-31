@@ -4,12 +4,12 @@
  * 三档深度：简略/ 平衡 / 详细（扫描预算与输出长度随档位变化）
  */
 
-import { state, setProject, getModelKey } from "../store.js?v=20260830-002";
-import { post, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260830-002";
-import { updateProjectConfig } from "../services/project.js?v=20260830-002";
-import { renderMarkdown } from "../services/markdown.js?v=20260830-002";
-import { t } from "../services/i18n.js?v=20260830-002";
-import { iconSvgEl } from "../services/icons.js?v=20260830-002";
+import { state, setProject, getModelKey } from "../store.js?v=20260830-003";
+import { post, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260830-003";
+import { updateProjectConfig } from "../services/project.js?v=20260830-003";
+import { renderMarkdown } from "../services/markdown.js?v=20260830-003";
+import { t } from "../services/i18n.js?v=20260830-003";
+import { iconSvgEl } from "../services/icons.js?v=20260830-003";
 
 const LEVELS = {
   brief: { label: "简略", tree: "目录深度 2 层", files: "精读 6 个关键文件", out: "输出约 900 字" },
@@ -37,7 +37,7 @@ function showView(name) {
 function openUnderstandModal() {
   bindUnderstandModal();
   if (!state.project) {
-    import("../app.js?v=20260830-002").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
+    import("../app.js?v=20260830-003").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
     return;
   }
   currentResult = state.project.config?.understanding || null;
@@ -109,7 +109,7 @@ async function startUnderstanding() {
   const model = state.currentModel;
   const apiKey = model?.id ? getModelKey(model.id) : "";
   if (!model?.id || !apiKey) {
-    import("../app.js?v=20260830-002").then(({ toast }) => toast(t("请先选择模型并配置 API Key"))).catch(() => {});
+    import("../app.js?v=20260830-003").then(({ toast }) => toast(t("请先选择模型并配置 API Key"))).catch(() => {});
     return;
   }
 
@@ -136,7 +136,7 @@ async function startUnderstanding() {
     // 生成导览·百科
     setStepStatus(1, "running");
     appendLog(t("正在生成导览·百科…"));
-    const tour = await generateDoc(model.id, apiKey, buildTourPrompt(scan.project, currentLevel), scanContext);
+    const tour = await generateDoc(model.id, apiKey, model.provider, buildTourPrompt(scan.project, currentLevel), scanContext);
     throwIfAborted();
     appendLog(t("导览·百科完成（{n} 字符）", { n: tour.length }));
     setStepStatus(1, "done");
@@ -144,7 +144,7 @@ async function startUnderstanding() {
     // 生成规则手册
     setStepStatus(2, "running");
     appendLog(t("正在生成规则手册…"));
-    const rules = await generateDoc(model.id, apiKey, buildRulesPrompt(scan.project, currentLevel), scanContext);
+    const rules = await generateDoc(model.id, apiKey, model.provider, buildRulesPrompt(scan.project, currentLevel), scanContext);
     throwIfAborted();
     appendLog(t("规则手册完成（{n} 字符）", { n: rules.length }));
     setStepStatus(2, "done");
@@ -169,7 +169,7 @@ async function startUnderstanding() {
 
     renderResult();
     showView("result");
-    import("../app.js?v=20260830-002").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
+    import("../app.js?v=20260830-003").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
   } catch (e) {
     if (e.name === "AbortError") {
       appendLog(t("已取消"));
@@ -180,7 +180,7 @@ async function startUnderstanding() {
         if (steps[i].classList.contains("running")) setStepStatus(i, "error");
       }
       appendLog(t("失败: {msg}", { msg: e.message }));
-      import("../app.js?v=20260830-002").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
+      import("../app.js?v=20260830-003").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
     }
   } finally {
     running = false;
@@ -194,10 +194,11 @@ function throwIfAborted() {
   }
 }
 
-async function generateDoc(modelId, apiKey, systemPrompt, scanContext) {
+async function generateDoc(modelId, apiKey, provider, systemPrompt, scanContext) {
   let fullText = "";
   for await (const chunk of streamChat({
     model: modelId,
+    provider,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: scanContext },
@@ -314,9 +315,9 @@ async function copyCurrentResult() {
   const text = activeTab === "tour" ? currentResult.tour : currentResult.rules;
   try {
     await navigator.clipboard.writeText(text || "");
-    import("../app.js?v=20260830-002").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
+    import("../app.js?v=20260830-003").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
   } catch {
-    import("../app.js?v=20260830-002").then(({ toast }) => toast("复制失败")).catch(() => {});
+    import("../app.js?v=20260830-003").then(({ toast }) => toast("复制失败")).catch(() => {});
   }
 }
 
