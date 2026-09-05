@@ -4634,16 +4634,19 @@ textarea::-webkit-scrollbar-thumb {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tool-call-title {
   min-width: 0;
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tool-call-card-meta {
   min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -8437,11 +8440,9 @@ html[data-ui="codex"] #conv-sidebar {
   display: none !important;
 }
 
-/* 有消息态：消息条限宽 720 居中 */
+/* 有消息态：仅限制消息最宽，左右分组交给基础 .msg-user(flex-end)/.msg-assistant(flex-start) */
 html[data-ui="codex"] #chat-messages .msg {
-  width: min(720px, 100%);
-  margin-left: auto;
-  margin-right: auto;
+  max-width: min(720px, calc(100% - 24px));
 }
 
 /* 输入区限宽 720 居中 + 大圆角胶囊（输入区始终留在 #chat-area，避免被消息渲染器整体重写摧毁） */
@@ -8637,5 +8638,6 @@ html[data-ui="codex"] .msg-user {
 }
 
 html[data-ui="codex"] .msg-assistant {
+  border: none;
   border-radius: 12px 12px 12px 4px;
 }

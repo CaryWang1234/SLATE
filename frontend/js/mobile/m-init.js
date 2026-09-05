@@ -5,18 +5,18 @@
  * 3. 装配外壳与各面板
  */
 
-import { state, loadPersistent, loadSharedPersistent, setModelRegistry } from "../store.js?v=20260907-014";
-import { setLanToken, get } from "../services/api.js?v=20260907-014";
-import { initI18n } from "../services/i18n.js?v=20260907-014";
-import { initMApp } from "./m-app.js?v=20260907-014";
-import { mToast } from "./m-ui.js?v=20260907-014";
-import { initMChat } from "./m-chat.js?v=20260907-014";
-import { initMChatInput } from "./m-chat-input.js?v=20260907-014";
-import { initMConversations } from "./m-conversations.js?v=20260907-014";
-import { initMMemory } from "./m-memory.js?v=20260907-014";
-import { initMSchedule } from "./m-schedule.js?v=20260907-014";
-import { initMSettings } from "./m-settings.js?v=20260907-014";
-import { mGuardTerminal } from "./m-auth.js?v=20260907-014";
+import { state, loadPersistent, loadSharedPersistent, setModelRegistry } from "../store.js?v=20260907-016";
+import { setLanToken, get } from "../services/api.js?v=20260907-016";
+import { initI18n } from "../services/i18n.js?v=20260907-016";
+import { initMApp } from "./m-app.js?v=20260907-016";
+import { mToast } from "./m-ui.js?v=20260907-016";
+import { initMChat } from "./m-chat.js?v=20260907-016";
+import { initMChatInput } from "./m-chat-input.js?v=20260907-016";
+import { initMConversations } from "./m-conversations.js?v=20260907-016";
+import { initMMemory } from "./m-memory.js?v=20260907-016";
+import { initMSchedule } from "./m-schedule.js?v=20260907-016";
+import { initMSettings } from "./m-settings.js?v=20260907-016";
+import { mGuardTerminal } from "./m-auth.js?v=20260907-016";
 
 // 移动端接管高危命令审批 UI（底部 sheet），桌面不受影响
 window.__slateGuardOverride = mGuardTerminal;

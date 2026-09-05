@@ -6,14 +6,14 @@
 
 import {
   state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe,
-} from "../store.js?v=20260907-014";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-014";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260907-014";
-import { detectToolCalls, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260907-014";
-import { renderMarkdown } from "../services/markdown.js?v=20260907-014";
-import { mToast, t } from "./m-ui.js?v=20260907-014";
-import { mHandleStructured } from "./m-auth.js?v=20260907-014";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260907-014";
+} from "../store.js?v=20260907-016";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-016";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260907-016";
+import { detectToolCalls, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260907-016";
+import { renderMarkdown } from "../services/markdown.js?v=20260907-016";
+import { mToast, t } from "./m-ui.js?v=20260907-016";
+import { mHandleStructured } from "./m-auth.js?v=20260907-016";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260907-016";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
