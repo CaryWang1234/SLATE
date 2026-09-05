@@ -3,11 +3,11 @@
  * 文件夹/笔记树形浏览、编辑器+实时预览、[[wiki-link]] 双向链接、搜索与标签
  */
 
-import { get, post, put, del } from "../services/api.js?v=20260907-003";
-import { renderMarkdown } from "../services/markdown.js?v=20260907-003";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260907-003";
-import { t } from "../services/i18n.js?v=20260907-003";
-import { iconSvgEl } from "../services/icons.js?v=20260907-003";
+import { get, post, put, del } from "../services/api.js?v=20260907-012";
+import { renderMarkdown } from "../services/markdown.js?v=20260907-012";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260907-012";
+import { t } from "../services/i18n.js?v=20260907-012";
+import { iconSvgEl } from "../services/icons.js?v=20260907-012";
 
 let vaultSidebar, vaultEditorEmpty, vaultEditorActive;
 let vaultSearchInput, vaultTagsBar;
@@ -25,7 +25,7 @@ let previewTimer = null;
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260907-003");
+    const { toast: showToast } = await import("../app.js?v=20260907-012");
     showToast(msg);
   } catch { console.warn(msg); }
 }

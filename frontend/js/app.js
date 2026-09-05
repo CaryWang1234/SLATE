@@ -2,30 +2,32 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260907-003";
-import { initI18n, t } from "./services/i18n.js?v=20260907-003";
-import { iconSvgEl } from "./services/icons.js?v=20260907-003";
-import { get, post, put } from "./services/api.js?v=20260907-003";
-import { dlgConfirm } from "./services/dialog.js?v=20260907-003";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260907-003";
-import { initChat, refreshConversationList } from "./components/chat.js?v=20260907-003";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260907-003";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260907-003";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260907-003";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260907-003";
-import { initTeamPanel } from "./components/team.js?v=20260907-003";
-import { initProjectBar } from "./components/project_bar.js?v=20260907-003";
-import { initMemoryPanel } from "./components/memory.js?v=20260907-003";
-import { initExpertsPanel } from "./components/experts.js?v=20260907-003";
-import { initSchedule } from "./components/schedule.js?v=20260907-003";
-import { initRiskGuard } from "./services/riskguard.js?v=20260907-003";
-import { initUnderstandPanel } from "./components/understand.js?v=20260907-003";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260907-003";
-import { setProject, setProjectFileTree } from "./store.js?v=20260907-003";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260907-012";
+import { initI18n, t } from "./services/i18n.js?v=20260907-012";
+import { iconSvgEl } from "./services/icons.js?v=20260907-012";
+import { get, post, put } from "./services/api.js?v=20260907-012";
+import { dlgConfirm } from "./services/dialog.js?v=20260907-012";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260907-012";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260907-012";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260907-012";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260907-012";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260907-012";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260907-012";
+import { initTeamPanel } from "./components/team.js?v=20260907-012";
+import { initProjectBar } from "./components/project_bar.js?v=20260907-012";
+import { initMemoryPanel } from "./components/memory.js?v=20260907-012";
+import { initExpertsPanel } from "./components/experts.js?v=20260907-012";
+import { initSchedule } from "./components/schedule.js?v=20260907-012";
+import { initRiskGuard } from "./services/riskguard.js?v=20260907-012";
+import { initUnderstandPanel } from "./components/understand.js?v=20260907-012";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260907-012";
+import { setProject, setProjectFileTree } from "./store.js?v=20260907-012";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260907-012";
 
 // ── Toast 通知 ──────────────────────────────
 
 let activePanelName = "chat";
+let prevUiMode = null;
 
 function toast(msg, duration = 2200) {
   const container = document.getElementById("toast-container");
@@ -41,6 +43,7 @@ function toast(msg, duration = 2200) {
 }
 
 function switchPanel(panelName) {
+  const prevName = document.querySelector(".panel.active")?.id.replace("panel-", "") || null;
   activePanelName = panelName || "chat";
   document.querySelectorAll(".tab-btn").forEach(t => {
     t.classList.toggle("active", t.dataset.panel === activePanelName);
@@ -51,6 +54,11 @@ function switchPanel(panelName) {
   if (activePanelName === "whiteboard") {
     requestAnimationFrame(() => refreshWhiteboard());
   }
+  if (prevName && prevName !== activePanelName) {
+    const panelEl = document.getElementById("panel-" + activePanelName);
+    if (panelEl) cxPanelIn(panelEl, activePanelName === "whiteboard" ? 0 : 6);
+  }
+  updateDockActive();
 }
 
 function safeInit(name, fn) {
@@ -477,6 +485,7 @@ function openSettings(options = {}) {
   document.getElementById("setting-notif-system").checked = state.notifications?.systemNotifEnabled === true;
   updateNotifPermissionHint();
   renderPermissionModeSettings();
+  document.getElementById("setting-ui-mode").checked = state.uiMode === "codex";
   renderWebSearchSettings();
   renderImageGenSettings();
   renderVideoGenSettings();
@@ -1023,7 +1032,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260907-003").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260907-012").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1110,6 +1119,347 @@ function initWebSearchPersistence() {
   document.querySelectorAll("#web-search-render-row .review-mode-btn").forEach(btn => {
     btn.addEventListener("click", () => applyWebSearchSetting("renderJs", btn.dataset.value));
   });
+}
+
+// ── 通用 UI（Codex 风格极简布局）────────────────
+
+// 面板类条目没有现成 svg，内置 4 个简短描边图标
+const CX_ICON_CHAT = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+const CX_ICON_TEAM = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+const CX_ICON_BOARD = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="7" y1="10" x2="17" y2="10"/></svg>';
+const CX_ICON_FACTORY = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20h20"/><path d="M4 20V8l6 4V8l6 4V4h4v16"/></svg>';
+
+const CODEX_DOCK_GROUPS = [
+  {
+    items: [
+      { key: "chat", label: "对话", text: "对话", customIcon: CX_ICON_CHAT },
+      { key: "team", label: "团队", text: "团队", customIcon: CX_ICON_TEAM },
+      { key: "whiteboard", label: "黑板", text: "黑板", customIcon: CX_ICON_BOARD },
+      { key: "factory", label: "工厂", text: "工厂", customIcon: CX_ICON_FACTORY },
+    ],
+  },
+  {
+    items: [
+      { key: "newchat", label: "新建会话", text: "新建会话", source: "btn-new-chat" },
+    ],
+  },
+];
+
+// 输入框上方工具行：收纳其余功能入口（原 dock 里的对话类与系统类按钮）
+const CODEX_QUICK_ACTIONS = [
+  { key: "brainstorm", label: "头脑风暴", source: "btn-brainstorm" },
+  { key: "grind", label: "磨墨", source: "btn-grind" },
+  { key: "harness", label: "目标模式", source: "btn-harness" },
+  { key: "schedule", label: "定时任务", source: "btn-schedule" },
+  { key: "compress", label: "压缩上下文", source: "btn-compress" },
+  { key: "memory", label: "记忆与画像", source: "btn-memory" },
+  { key: "experts", label: "专家包", source: "btn-experts" },
+  { key: "snippets", label: "提示词素材", source: "btn-snippets" },
+  { key: "theme", label: "明暗主题", source: "btn-theme" },
+];
+
+function ensureChatMode() {
+  const teamBtn = document.getElementById("btn-team-mode");
+  if (teamBtn && teamBtn.classList.contains("active")) {
+    document.getElementById("btn-chat-mode")?.click();
+    afterModeToggle();
+  }
+}
+
+function ensureTeamMode() {
+  const teamBtn = document.getElementById("btn-team-mode");
+  if (teamBtn && !teamBtn.classList.contains("active")) {
+    teamBtn.click();
+    afterModeToggle();
+  }
+}
+
+function afterModeToggle() {
+  updateDockActive();
+}
+
+function cxChatAction(sourceId) {
+  ensureChatMode();
+  document.getElementById(sourceId)?.click();
+}
+
+function handleCodexDock(key) {
+  switch (key) {
+    case "chat":
+      switchPanel("chat");
+      ensureChatMode();
+      break;
+    case "team":
+      switchPanel("chat");
+      ensureTeamMode();
+      break;
+    case "whiteboard":
+      switchPanel("whiteboard");
+      break;
+    case "factory":
+      switchPanel("factory");
+      break;
+    case "newchat":
+      cxChatAction("btn-new-chat");
+      setTimeout(refreshCodexHistory, 500);
+      break;
+    case "settings":
+      openSettings();
+      break;
+  }
+  updateDockActive();
+}
+
+function buildCodexDockItem(item) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "codex-dock-item";
+  btn.dataset.cxKey = item.key;
+  btn.title = item.label;
+  const iconSpan = document.createElement("span");
+  iconSpan.className = "codex-dock-icon";
+  if (item.source) {
+    const src = document.getElementById(item.source);
+    if (src) {
+      if (src.title) btn.title = src.title;
+      const icon = src.querySelector("svg");
+      if (icon) iconSpan.appendChild(icon.cloneNode(true));
+      else if (src.firstChild && src.firstChild.nodeType === Node.TEXT_NODE && src.firstChild.textContent.trim()) {
+        iconSpan.textContent = src.firstChild.textContent.trim().slice(0, 1);
+      }
+    }
+  }
+  if (!iconSpan.firstChild && item.customIcon) {
+    const holder = document.createElement("span");
+    holder.innerHTML = item.customIcon;
+    const svg = holder.firstElementChild;
+    if (svg) iconSpan.appendChild(svg);
+  }
+  if (!iconSpan.firstChild) iconSpan.textContent = (item.text || item.label).slice(0, 1);
+  btn.appendChild(iconSpan);
+  const label = document.createElement("span");
+  label.className = "codex-dock-label";
+  label.textContent = item.text || item.label;
+  btn.appendChild(label);
+  btn.addEventListener("click", () => handleCodexDock(item.key));
+  return btn;
+}
+
+function buildCodexDock() {
+  const dock = document.getElementById("codex-dock");
+  if (!dock || dock.dataset.built) return;
+  dock.dataset.built = "1";
+  // 结构：#codex-dock > .codex-dock-nav(固定导航) + #codex-dock-history(历史，可滚动)
+  //                + .codex-dock-bottom(底部设置)
+  const nav = document.createElement("div");
+  nav.className = "codex-dock-nav";
+  for (const group of CODEX_DOCK_GROUPS) {
+    const g = document.createElement("div");
+    g.className = "codex-dock-group";
+    for (const item of group.items) g.appendChild(buildCodexDockItem(item));
+    nav.appendChild(g);
+  }
+  const history = document.createElement("div");
+  history.id = "codex-dock-history";
+  history.className = "codex-dock-history";
+  history.innerHTML = '<div class="codex-hist-empty">暂无历史会话</div>';
+  const bottom = document.createElement("div");
+  bottom.className = "codex-dock-bottom";
+  bottom.appendChild(buildCodexDockItem({ key: "settings", label: "设置", text: "设置", source: "btn-settings" }));
+  dock.append(nav, history, bottom);
+}
+
+function updateDockActive() {
+  const dock = document.getElementById("codex-dock");
+  if (!dock) return;
+  const panelId = document.querySelector(".panel.active")?.id || "";
+  const teamActive = !!document.getElementById("btn-team-mode")?.classList.contains("active");
+  let activeKey = "";
+  if (panelId === "panel-chat") activeKey = teamActive ? "team" : "chat";
+  else if (panelId === "panel-whiteboard") activeKey = "whiteboard";
+  else if (panelId === "panel-factory") activeKey = "factory";
+  else if (panelId === "panel-settings") activeKey = "settings";
+  dock.querySelectorAll(".codex-dock-item").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.cxKey === activeKey);
+  });
+}
+
+// ── 输入框上方工具行（收纳其余功能入口）──────
+// 该行插在 #chat-input-area 之前、始终留在 #chat-area 内，
+// #chat-messages 会被消息渲染器整体 innerHTML="" 重写，不能放入其中。
+
+function buildCodexQuickActions() {
+  const inputArea = document.getElementById("chat-input-area");
+  if (!inputArea || document.getElementById("cx-quick-actions")) return;
+  const bar = document.createElement("div");
+  bar.id = "cx-quick-actions";
+  bar.className = "cx-quick-actions";
+  for (const item of CODEX_QUICK_ACTIONS) bar.appendChild(buildCodexQuickItem(item));
+  inputArea.parentNode.insertBefore(bar, inputArea);
+}
+
+function buildCodexQuickItem(item) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "cx-quick-item";
+  btn.dataset.cxKey = item.key;
+  btn.title = item.label;
+  const icon = document.createElement("span");
+  icon.className = "cx-quick-icon";
+  const src = document.getElementById(item.source);
+  if (src) {
+    if (src.title) btn.title = src.title;
+    const svg = src.querySelector("svg");
+    if (svg) icon.appendChild(svg.cloneNode(true));
+    else if (src.firstChild && src.firstChild.nodeType === Node.TEXT_NODE && src.firstChild.textContent.trim()) {
+      icon.textContent = src.firstChild.textContent.trim().slice(0, 1);
+    }
+  }
+  if (!icon.firstChild) icon.textContent = item.label.slice(0, 1);
+  btn.appendChild(icon);
+  const label = document.createElement("span");
+  label.className = "cx-quick-label";
+  label.textContent = item.label;
+  btn.appendChild(label);
+  btn.addEventListener("click", () => handleCodexQuick(item.key));
+  return btn;
+}
+
+function handleCodexQuick(key) {
+  const item = CODEX_QUICK_ACTIONS.find(a => a.key === key);
+  if (item) cxChatAction(item.source);
+}
+
+// ── 左侧历史会话：按项目分组陈列 ────────────
+
+let cxConvsCache = [];
+const cxHistoryCollapsed = new Set();
+
+function cxProjectLabel(conv) {
+  return (conv.project && conv.project.trim()) ? conv.project.trim() : "未分类";
+}
+
+async function refreshCodexHistory() {
+  if (state.uiMode !== "codex") return;
+  try {
+    const res = await get("/chat/conversations");
+    if (res.code === 0) {
+      cxConvsCache = Array.isArray(res.data) ? res.data : [];
+      renderCodexHistory();
+    }
+  } catch (e) { /* 列表刷新失败静默 */ }
+}
+
+function renderCodexHistory() {
+  const box = document.getElementById("codex-dock-history");
+  if (!box) return;
+  if (document.documentElement.getAttribute("data-ui") !== "codex") return;
+  box.innerHTML = "";
+  if (!cxConvsCache.length) {
+    box.innerHTML = '<div class="codex-hist-empty">暂无历史会话</div>';
+    cxHistReveal(box);
+    return;
+  }
+  const groups = new Map();
+  for (const conv of cxConvsCache) {
+    const name = cxProjectLabel(conv);
+    if (!groups.has(name)) groups.set(name, []);
+    groups.get(name).push(conv);
+  }
+  for (const [name, convs] of groups) {
+    box.appendChild(buildCodexHistGroup(name, convs.length));
+    if (cxHistoryCollapsed.has(name)) continue;
+    const list = document.createElement("div");
+    list.className = "codex-hist-list";
+    for (const conv of convs) list.appendChild(buildCodexHistItem(conv));
+    box.appendChild(list);
+  }
+  cxHistReveal(box);
+}
+
+function buildCodexHistGroup(name, count) {
+  const head = document.createElement("button");
+  head.type = "button";
+  head.className = "codex-hist-group";
+  const collapsed = cxHistoryCollapsed.has(name);
+  const caret = document.createElement("span");
+  caret.className = "codex-hist-caret" + (collapsed ? "" : " open");
+  caret.textContent = "▸";
+  head.appendChild(caret);
+  const title = document.createElement("span");
+  title.className = "codex-hist-group-name";
+  title.textContent = name;
+  head.appendChild(title);
+  const num = document.createElement("span");
+  num.className = "codex-hist-group-count";
+  num.textContent = String(count);
+  head.appendChild(num);
+  head.addEventListener("click", () => {
+    if (collapsed) cxHistoryCollapsed.delete(name);
+    else cxHistoryCollapsed.add(name);
+    renderCodexHistory();
+  });
+  return head;
+}
+
+function buildCodexHistItem(conv) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "codex-hist-item" + (conv.id === state.currentConversationId ? " active" : "");
+  btn.dataset.convId = conv.id;
+  const dot = document.createElement("span");
+  dot.className = "codex-hist-dot";
+  btn.appendChild(dot);
+  const title = document.createElement("span");
+  title.className = "codex-hist-item-title";
+  title.textContent = conv.title || conv.id;
+  btn.appendChild(title);
+  btn.addEventListener("click", () => cxOpenConv(conv.id));
+  return btn;
+}
+
+async function cxOpenConv(convId) {
+  switchPanel("chat");
+  ensureChatMode();
+  await openConversation(convId);
+  updateDockActive();
+}
+
+function applyUiMode() {
+  const codexOn = state.uiMode === "codex";
+  const enteringCodex = codexOn && prevUiMode !== "codex";
+  prevUiMode = state.uiMode;
+  const html = document.documentElement;
+  if (codexOn) html.setAttribute("data-ui", "codex");
+  else html.removeAttribute("data-ui");
+  buildCodexQuickActions();
+  if (codexOn) refreshCodexHistory();
+  updateDockActive();
+  if (enteringCodex) {
+    requestAnimationFrame(() => {
+      cxDockIn();
+      const panelEl = document.getElementById("panel-" + activePanelName);
+      if (panelEl) cxPanelIn(panelEl, activePanelName === "whiteboard" ? 0 : 6);
+      cxHistReveal(document.getElementById("codex-dock-history"), true);
+    });
+  }
+}
+
+function initUiMode() {
+  buildCodexDock();
+  buildCodexQuickActions();
+  const setting = document.getElementById("setting-ui-mode");
+  setting?.addEventListener("change", () => {
+    state.uiMode = setting.checked ? "codex" : "classic";
+    savePersistent();
+    applyUiMode();
+    toast(state.uiMode === "codex" ? "已切换到通用 UI（Codex 风格）" : "已恢复经典布局");
+  });
+  window.addEventListener("slate:convs-updated", () => {
+    if (state.uiMode === "codex") refreshCodexHistory();
+  });
+  window.addEventListener("slate:conv-active-changed", () => renderCodexHistory());
+  applyUiMode();
 }
 
 // ── 媒体生成配置（图片/视频）──────────────────
@@ -1199,7 +1549,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260907-003");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260907-012");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1362,6 +1712,7 @@ async function init() {
 
   // 应用保存的主题
   document.documentElement.setAttribute("data-theme", state.theme);
+  applyUiMode();
 
 
   safeInit("标签页", initTabs);
@@ -1409,6 +1760,7 @@ async function init() {
   initPermissionModePersistence();
   initWebSearchPersistence();
   initGenSettingsPersistence();
+  initUiMode();
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
   // 设置页导航与关于
@@ -1429,7 +1781,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260907-003");
+        const { openProject } = await import("./services/project.js?v=20260907-012");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }

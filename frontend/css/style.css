@@ -8191,3 +8191,434 @@ html.i18n-pending body {
   opacity: 0.8;
   border-bottom-style: solid;
 }
+
+/* ══ 通用 UI（Codex 风格极简布局）══
+   总开关：html[data-ui="codex"]；classic 模式无该属性，以下覆盖全部失效 */
+
+html[data-ui="codex"] #topbar {
+  display: none;
+}
+
+html[data-ui="codex"] #workspace {
+  height: 100vh;
+  display: flex;
+}
+
+html[data-ui="codex"] .panel {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 左侧 Codex 侧栏：classic 不占位，codex 显示为窄“图标+文字”列表栏 */
+.codex-dock {
+  display: none;
+}
+
+html[data-ui="codex"] #codex-dock {
+  display: flex;
+  flex-direction: column;
+  width: 208px;
+  flex-shrink: 0;
+  background: var(--bg-alt);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* 结构：.codex-dock-nav(固定导航) + #codex-dock-history(历史可滚动) + .codex-dock-bottom(设置) */
+html[data-ui="codex"] .codex-dock-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 8px 8px 6px;
+}
+
+.codex-dock-nav .codex-dock-group + .codex-dock-group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.codex-dock-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  width: 100%;
+}
+
+html[data-ui="codex"] #codex-dock-history {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 6px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.codex-hist-empty {
+  padding: 16px 8px;
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.codex-hist-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px 6px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.codex-hist-group:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.codex-hist-caret {
+  display: inline-block;
+  width: 10px;
+  flex-shrink: 0;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--text-faint);
+  transition: transform var(--transition);
+}
+
+.codex-hist-caret.open {
+  transform: rotate(90deg);
+}
+
+.codex-hist-group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.codex-hist-group-count {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.codex-hist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 4px 8px;
+}
+
+.codex-hist-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 26px;
+  padding: 3px 6px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: color var(--transition), background-color var(--transition);
+}
+
+.codex-hist-item:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.codex-hist-item.active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  font-weight: 500;
+}
+
+.codex-hist-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+.codex-hist-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codex-dock-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  flex-shrink: 0;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--border);
+}
+
+.codex-dock-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  flex-shrink: 0;
+  transition: color var(--transition), background-color var(--transition);
+}
+
+.codex-dock-item:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.codex-dock-item.active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  font-weight: 600;
+}
+
+.codex-dock-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.codex-dock-icon .svg-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.codex-dock-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 对话面板：收起项目树/历史/头部，内容铺满 */
+html[data-ui="codex"] #project-sidebar,
+html[data-ui="codex"] .resize-handle,
+html[data-ui="codex"] #panel-chat .panel-header,
+html[data-ui="codex"] #usage-bar,
+html[data-ui="codex"] #conv-sidebar {
+  display: none !important;
+}
+
+/* 有消息态：消息条限宽 720 居中 */
+html[data-ui="codex"] #chat-messages .msg {
+  width: min(720px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* 输入区限宽 720 居中 + 大圆角胶囊（输入区始终留在 #chat-area，避免被消息渲染器整体重写摧毁） */
+html[data-ui="codex"] #chat-input-area {
+  width: min(720px, calc(100% - 24px));
+  margin-left: auto;
+  margin-right: auto;
+  padding: 8px 10px 4px;
+  border-radius: 26px;
+}
+
+html[data-ui="codex"] #chat-input-area:focus-within {
+  border-color: var(--border-hover);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--text) 8%, transparent),
+    0 6px 28px rgba(0, 0, 0, 0.07);
+}
+
+/* 胶囊内不再画工具栏分隔线，图标直接落在圆角底边内 */
+html[data-ui="codex"] #chat-input-area .input-toolbar {
+  border-top-color: transparent;
+  padding: 2px 4px 4px;
+}
+
+/* Codex 下发送按钮白色：文字用深色，保持停止/禁用态可辨识 */
+html[data-ui="codex"] #btn-send {
+  background: #fff;
+  color: #161616;
+}
+
+html[data-ui="codex"] #btn-send:hover {
+  opacity: 0.88;
+}
+
+/* 输入框上方功能工具行：极简小胶囊，横向全宽均分排布 */
+html[data-ui="codex"] .cx-quick-actions {
+  display: flex;
+  align-items: stretch;
+  width: min(720px, calc(100% - 24px));
+  margin: 0 auto 8px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+html[data-ui="codex"] .cx-quick-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 99px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition), background-color var(--transition);
+}
+
+html[data-ui="codex"] .cx-quick-item:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+html[data-ui="codex"] .cx-quick-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+html[data-ui="codex"] .cx-quick-icon .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+
+html[data-ui="codex"] .cx-quick-icon:empty {
+  display: none;
+}
+
+html[data-ui="codex"] .cx-quick-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+
+/* 目标模式状态条：与输入框同宽居中 */
+html[data-ui="codex"] .harness-status {
+  width: min(720px, calc(100% - 24px));
+  box-sizing: border-box;
+  margin: 0 auto 8px;
+}
+
+/* 欢迎页（codex 仅空对话出现）：去掉 logo/分隔线/副标语/虚线提示框，
+   只保留 Slogan 大字 */
+html[data-ui="codex"] .chat-welcome {
+  gap: 0;
+  padding: 24px 16px 28px;
+}
+
+html[data-ui="codex"] .chat-welcome-logo,
+html[data-ui="codex"] .chat-welcome-sep,
+html[data-ui="codex"] .chat-welcome-sub,
+html[data-ui="codex"] .chat-welcome-hint {
+  display: none;
+}
+
+html[data-ui="codex"] .chat-welcome-title {
+  font-size: 32px;
+  font-weight: 650;
+  letter-spacing: 0.5px;
+  text-indent: 0.5px;
+}
+
+/* 消息容器为空 DOM（未渲染欢迎页/无消息）时，用 ::before 呈现 Slogan 大字，
+   替代默认“开始一段对话…”小字占位；与 welcome 路径在视觉上保持一致 */
+html[data-ui="codex"] .chat-scroll:empty::before {
+  content: "研磨灵感，落笔成章";
+  font-size: 32px;
+  font-weight: 650;
+  letter-spacing: 0.5px;
+  color: var(--text);
+}
+
+/* 空对话欢迎态：Slogan + 工具行 + 状态条 + 输入框作为整组垂直居中
+   注意：不能写 :not(:has(...)) —— :has 嵌套在 :not 里 Chromium 解析会整条丢弃；
+   因此用两条并列 :has 覆盖两条空态路径（.chat-scroll 空 DOM 的 ::before 路径、
+   以及已渲染 .chat-welcome 的路径） */
+html[data-ui="codex"] #chat-area:has(.chat-scroll:empty),
+html[data-ui="codex"] #chat-area:has(.chat-welcome) {
+  justify-content: center;
+}
+
+html[data-ui="codex"] #chat-area:has(.chat-scroll:empty) .chat-area-row,
+html[data-ui="codex"] #chat-area:has(.chat-welcome) .chat-area-row {
+  flex: 0 0 auto;
+}
+
+html[data-ui="codex"] #chat-area:has(.chat-welcome) .chat-welcome {
+  margin: 0 auto;
+}
+
+/* 其余面板（黑板/工厂/设置等）头部与左侧栏同底色，极简扁平 */
+html[data-ui="codex"] .panel-header {
+  background: var(--bg-alt);
+}
+
+html[data-ui="codex"] .panel-title {
+  color: var(--text-secondary);
+  font-size: 12px;
+  letter-spacing: 3px;
+}
+
+/* Codex 主色调：深色下改纯黑白灰（黑底白字），保留金色等彩色点缀不变 */
+html[data-ui="codex"][data-theme="dark"] {
+  --bg: #141414;
+  --bg-alt: #1c1c1c;
+  --bg-input: #232323;
+  --text: #ECECEC;
+  --text-secondary: #a8a8a8;
+  --text-muted: #767676;
+  --text-faint: #4a4a4a;
+  --border: #2c2c2c;
+  --border-hover: #c0c0c0;
+  --code-bg: #0e0e0e;
+  --code-fg: #e6e6e6;
+  --inline-code-bg: rgba(255, 255, 255, 0.07);
+  --msg-user-bg: #2a2a2a;
+  --msg-user-fg: #ECECEC;
+  --msg-asst-bg: #1a1a1a;
+  --selection-bg: #ECECEC;
+  --selection-fg: #141414;
+  --scrollbar-thumb: #333333;
+  --board-grid: #262626;
+}

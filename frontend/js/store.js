@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260907-003";
+import { makeId } from "./services/utils.js?v=20260907-012";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -13,6 +13,9 @@ const API_BASE = `${API_ORIGIN}/api`;
 const state = {
   // 主题
   theme: "light",
+
+  // 通用 UI 模式：classic（默认，完整布局）| codex（极简 Codex 风格）
+  uiMode: "classic",
 
   // 当前选中的模型
   currentModel: null,
@@ -147,6 +150,7 @@ function notify(key, data) {
 function buildPersistentData() {
   return {
     theme: normalizeTheme(state.theme),
+    uiMode: state.uiMode === "codex" ? "codex" : "classic",
     modelKeys: state.modelKeys,
     customModels: state.customModels,
     currentModelId: state.currentModel?.id || state._pendingModelId || null,
@@ -250,6 +254,7 @@ function loadPersistent() {
     if (!raw) return;
     const data = JSON.parse(raw);
     state.theme = normalizeTheme(data.theme);
+    state.uiMode = data.uiMode === "codex" ? "codex" : "classic";
     state.modelKeys = data.modelKeys || {};
     state.customModels = data.customModels || [];
     state.boardCards = data.boardCards || [];
