@@ -8273,7 +8273,7 @@ html[data-ui="codex"] #codex-dock-history {
   padding: 4px 6px;
   background: none;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
   color: var(--text-secondary);
   font-size: 11px;
   cursor: pointer;
@@ -8330,7 +8330,7 @@ html[data-ui="codex"] #codex-dock-history {
   padding: 3px 6px;
   background: none;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
   color: var(--text-secondary);
   font-size: 12px;
   cursor: pointer;
@@ -8385,7 +8385,7 @@ html[data-ui="codex"] #codex-dock-history {
   padding: 0 10px;
   background: none;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
@@ -8450,7 +8450,7 @@ html[data-ui="codex"] #chat-input-area {
   margin-left: auto;
   margin-right: auto;
   padding: 8px 10px 4px;
-  border-radius: 26px;
+  border-radius: 30px;
 }
 
 html[data-ui="codex"] #chat-input-area:focus-within {
@@ -8476,7 +8476,11 @@ html[data-ui="codex"] #btn-send:hover {
   opacity: 0.88;
 }
 
-/* 输入框上方功能工具行：极简小胶囊，横向全宽均分排布 */
+/* 输入框上方功能工具行：仅 codex 展示；经典布局默认隐藏 */
+.cx-quick-actions {
+  display: none;
+}
+
 html[data-ui="codex"] .cx-quick-actions {
   display: flex;
   align-items: stretch;
@@ -8621,4 +8625,17 @@ html[data-ui="codex"][data-theme="dark"] {
   --selection-fg: #141414;
   --scrollbar-thumb: #333333;
   --board-grid: #262626;
+}
+
+/* Codex 圆角：全局圆角变量小升（克制，不追求过圆），消息气泡单独加圆 */
+html[data-ui="codex"] {
+  --radius: 8px;
+}
+
+html[data-ui="codex"] .msg-user {
+  border-radius: 12px 12px 4px 12px;
+}
+
+html[data-ui="codex"] .msg-assistant {
+  border-radius: 12px 12px 12px 4px;
 }

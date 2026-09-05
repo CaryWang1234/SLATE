@@ -2,27 +2,27 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260907-012";
-import { initI18n, t } from "./services/i18n.js?v=20260907-012";
-import { iconSvgEl } from "./services/icons.js?v=20260907-012";
-import { get, post, put } from "./services/api.js?v=20260907-012";
-import { dlgConfirm } from "./services/dialog.js?v=20260907-012";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260907-012";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260907-012";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260907-012";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260907-012";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260907-012";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260907-012";
-import { initTeamPanel } from "./components/team.js?v=20260907-012";
-import { initProjectBar } from "./components/project_bar.js?v=20260907-012";
-import { initMemoryPanel } from "./components/memory.js?v=20260907-012";
-import { initExpertsPanel } from "./components/experts.js?v=20260907-012";
-import { initSchedule } from "./components/schedule.js?v=20260907-012";
-import { initRiskGuard } from "./services/riskguard.js?v=20260907-012";
-import { initUnderstandPanel } from "./components/understand.js?v=20260907-012";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260907-012";
-import { setProject, setProjectFileTree } from "./store.js?v=20260907-012";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260907-012";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260907-014";
+import { initI18n, t } from "./services/i18n.js?v=20260907-014";
+import { iconSvgEl } from "./services/icons.js?v=20260907-014";
+import { get, post, put } from "./services/api.js?v=20260907-014";
+import { dlgConfirm } from "./services/dialog.js?v=20260907-014";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260907-014";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260907-014";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260907-014";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260907-014";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260907-014";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260907-014";
+import { initTeamPanel } from "./components/team.js?v=20260907-014";
+import { initProjectBar } from "./components/project_bar.js?v=20260907-014";
+import { initMemoryPanel } from "./components/memory.js?v=20260907-014";
+import { initExpertsPanel } from "./components/experts.js?v=20260907-014";
+import { initSchedule } from "./components/schedule.js?v=20260907-014";
+import { initRiskGuard } from "./services/riskguard.js?v=20260907-014";
+import { initUnderstandPanel } from "./components/understand.js?v=20260907-014";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260907-014";
+import { setProject, setProjectFileTree } from "./store.js?v=20260907-014";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260907-014";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -1032,7 +1032,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260907-012").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260907-014").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1432,7 +1432,8 @@ function applyUiMode() {
   const html = document.documentElement;
   if (codexOn) html.setAttribute("data-ui", "codex");
   else html.removeAttribute("data-ui");
-  buildCodexQuickActions();
+  if (codexOn) buildCodexQuickActions();
+  else document.getElementById("cx-quick-actions")?.remove();
   if (codexOn) refreshCodexHistory();
   updateDockActive();
   if (enteringCodex) {
@@ -1447,7 +1448,6 @@ function applyUiMode() {
 
 function initUiMode() {
   buildCodexDock();
-  buildCodexQuickActions();
   const setting = document.getElementById("setting-ui-mode");
   setting?.addEventListener("change", () => {
     state.uiMode = setting.checked ? "codex" : "classic";
@@ -1549,7 +1549,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260907-012");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260907-014");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1781,7 +1781,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260907-012");
+        const { openProject } = await import("./services/project.js?v=20260907-014");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }
