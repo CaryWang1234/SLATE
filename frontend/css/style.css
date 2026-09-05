@@ -8445,13 +8445,14 @@ html[data-ui="codex"] #chat-messages .msg {
   max-width: min(720px, calc(100% - 24px));
 }
 
-/* 输入区限宽 720 居中 + 大圆角胶囊（输入区始终留在 #chat-area，避免被消息渲染器整体重写摧毁） */
+/* 输入区铺满底栏（仅保留左右 12px 呼吸，margin auto 与宽 100% - 24px 组合即左右各 12px）。
+   输入区始终留在 #chat-area，避免被消息渲染器整体重写摧毁 */
 html[data-ui="codex"] #chat-input-area {
-  width: min(720px, calc(100% - 24px));
+  width: calc(100% - 24px);
   margin-left: auto;
   margin-right: auto;
   padding: 8px 10px 4px;
-  border-radius: 30px;
+  border-radius: 18px;
 }
 
 html[data-ui="codex"] #chat-input-area:focus-within {
@@ -8477,7 +8478,8 @@ html[data-ui="codex"] #btn-send:hover {
   opacity: 0.88;
 }
 
-/* 输入框上方功能工具行：仅 codex 展示；经典布局默认隐藏 */
+/* 输入框上方功能工具行：仅 codex 展示；经典布局默认隐藏；
+   与输入框同宽铺满底栏（宽 100% - 24px + margin auto → 左右各 12px） */
 .cx-quick-actions {
   display: none;
 }
@@ -8485,7 +8487,7 @@ html[data-ui="codex"] #btn-send:hover {
 html[data-ui="codex"] .cx-quick-actions {
   display: flex;
   align-items: stretch;
-  width: min(720px, calc(100% - 24px));
+  width: calc(100% - 24px);
   margin: 0 auto 8px;
   padding: 0 2px;
   flex-shrink: 0;
@@ -8538,9 +8540,9 @@ html[data-ui="codex"] .cx-quick-label {
   font-size: 12px;
 }
 
-/* 目标模式状态条：与输入框同宽居中 */
+/* 目标模式状态条：与输入框同宽铺满底栏 */
 html[data-ui="codex"] .harness-status {
-  width: min(720px, calc(100% - 24px));
+  width: calc(100% - 24px);
   box-sizing: border-box;
   margin: 0 auto 8px;
 }
