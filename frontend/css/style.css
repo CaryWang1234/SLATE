@@ -4538,6 +4538,67 @@ textarea::-webkit-scrollbar-thumb {
   color: var(--text);
 }
 
+/* ── 砚流 · 落笔即所见（参数成形预览）──── */
+
+.inkstream {
+  margin: 6px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.inkstream-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  color: var(--text-secondary);
+}
+
+.inkstream-name {
+  flex-shrink: 0;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.inkstream-state {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.inkstream-row.is-ready .inkstream-state,
+.inkstream-row.is-running .inkstream-state {
+  color: var(--gold);
+}
+
+.inkstream-fields {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-family: var(--font-code);
+  font-size: 11px;
+}
+
+.inkstream-caret {
+  display: none;
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+  animation: blink 1s steps(1) infinite;
+}
+
+.inkstream-row:not(.is-ready) .inkstream-caret {
+  display: inline-block;
+}
+
 /* ── 工具调用卡片 ─────────────────────── */
 
 .tool-call-card {

@@ -3,17 +3,16 @@
  * 轻量模型初步讨论，重型模型最终决策。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260907-018";
-import { notifyTaskComplete } from "../services/notify.js?v=20260907-018";
-import { streamChat } from "../services/api.js?v=20260907-018";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260907-018";
-import { renderMarkdown } from "../services/markdown.js?v=20260907-018";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260907-018";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260907-018";
-import { getExpertsCached } from "./experts.js?v=20260907-018";
-import { addToolStepCard, updateToolStepCard } from "./whiteboard.js?v=20260907-018";
-import { t } from "../services/i18n.js?v=20260907-018";
-import { makeId } from "../services/utils.js?v=20260907-018";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260907-022";
+import { notifyTaskComplete } from "../services/notify.js?v=20260907-022";
+import { streamChat } from "../services/api.js?v=20260907-022";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260907-022";
+import { renderMarkdown } from "../services/markdown.js?v=20260907-022";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260907-022";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260907-022";
+import { getExpertsCached } from "./experts.js?v=20260907-022";
+import { t } from "../services/i18n.js?v=20260907-022";
+import { makeId } from "../services/utils.js?v=20260907-022";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -746,7 +745,7 @@ async function startDiscussion() {
       const toolCalls = detectToolCalls(fullText);
       if (toolCalls.length > 0) {
         fullText = stripToolCalls(fullText);
-        const results = await executeToolCalls(toolCalls);
+        const results = await executeToolCalls(toolCalls, { signal: discussAbortController?.signal });
         for (const r of results) {
           const toolEl = document.createElement("div");
           toolEl.className = "team-tool-result";

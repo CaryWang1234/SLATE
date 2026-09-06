@@ -1,19 +1,24 @@
 /**
  * SLATE Mobile — 聊天核心
  * 复用桌面纯逻辑（adapter/buildMessages、api/streamChat、tools 解析与执行、markdown 渲染），
- * 自写移动渲染：消息气泡 / 思考折叠卡 / 工具卡片 / 流式续写 / 工具循环（简化版，保留去重与轮数上限）
+ * 自写移动渲染：消息气泡 / 思考折叠卡 / 工具卡片 / 流式续写
+ * 工具循环与桌面共用 agent_loop kernel，只注入移动端 policy/view/io（无目标模式，保留去重与轮数上限）
  */
 
 import {
   state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe,
-} from "../store.js?v=20260907-018";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-018";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260907-018";
-import { detectToolCalls, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260907-018";
-import { renderMarkdown } from "../services/markdown.js?v=20260907-018";
-import { mToast, t } from "./m-ui.js?v=20260907-018";
-import { mHandleStructured } from "./m-auth.js?v=20260907-018";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260907-018";
+} from "../store.js?v=20260907-022";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-022";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260907-022";
+import { detectToolCalls, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260907-022";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction } from "../services/agent_common.js?v=20260907-022";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260907-022";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260907-022";
+import { toolLabel } from "../services/tool_meta.js?v=20260907-022";
+import { renderMarkdown } from "../services/markdown.js?v=20260907-022";
+import { mToast, t } from "./m-ui.js?v=20260907-022";
+import { mHandleStructured } from "./m-auth.js?v=20260907-022";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260907-022";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -189,7 +194,7 @@ function addToolCard(wrap, call, status, summary) {
       <span class="m-tool-summary"></span>
     </div>
     <div class="m-tool-body"><pre></pre></div>`;
-  card.querySelector(".m-tool-name").textContent = call.name;
+  card.querySelector(".m-tool-name").textContent = toolLabel(call.name, call.params);
   card.querySelector(".m-tool-summary").textContent = summary || "";
   card.querySelector("pre").textContent = JSON.stringify(call.params ?? {}, null, 2);
   card.querySelector(".m-tool-head").addEventListener("click", () => card.classList.toggle("open"));
@@ -324,167 +329,108 @@ async function mContinueTruncated(wrap, content, modelId, apiKey, baseUrl, param
   return { content, reasoning };
 }
 
-// ── 工具执行循环（移动简化版：去重 + 轮数上限） ─
+// ── Agent 循环：kernel + 移动装配 ─────────────────────────
 
-function dedupeCalls(calls) {
-  const seen = new Set();
-  const unique = [];
-  for (const call of calls || []) {
-    const sig = `${call?.name || ""}:${JSON.stringify(call?.params || {})}`;
-    if (seen.has(sig)) continue;
-    seen.add(sig);
-    unique.push(call);
-  }
-  return unique;
-}
-
-function buildToolFollowupInstruction({ round, maxRounds, results }) {
-  const failed = (results || []).filter(r => r.success === false);
-  const lines = [
-    "",
-    "[Agent Loop 指令]",
-    `当前工具轮次：${round + 1}/${maxRounds}。`,
-    "- 先吸收工具结果，再决定下一步；不要复述工具原文。",
-    "- 若目标仍未完成，继续调用最小必要工具推进。",
-    "- 若刚完成文件修改/生成，优先验证：读取文件、运行检查/测试/构建或说明无法验证原因。",
-    "- 若已完成并验证，输出简短最终汇报，不再调用工具。",
-  ];
-  if (failed.length) lines.push(`- 本轮有 ${failed.length} 个工具失败：换参数、换工具或先读取更多上下文，不要重复完全相同的失败调用。`);
-  return "\n" + lines.join("\n");
-}
-
-function formatToolResultForModel(call, result) {
-  const ok = result?.success !== false;
-  const nextHint = ok
-    ? "Next: use this result to continue the task. Do not repeat the same tool call unless new parameters are needed."
-    : "Next: fix the parameters or choose a different tool. Do not repeat the identical failing call.";
-  const structured = result?._structured;
-  if (structured && ["file_edit", "file_create", "file_append"].includes(structured._type)) {
-    const path = structured.file_path_rel || structured.file_name || structured.file || call?.params?.file_path || "";
-    const errors = structured.errors?.length ? `\nWarnings: ${structured.errors.join("; ")}` : "";
-    const truncNote = structured._type === "file_append" && structured.truncated
-      ? "\nNote: this append was itself truncated; continue with another file_append from the new breakpoint."
-      : "";
-    const status = structured.applied === "auto" || structured.applied === true
-      ? "Status: written to disk."
-      : "Status: preview shown to user; not written to disk until accepted.";
-    return `[工具 ${structured._type} 结果]: ${result.output}\nTarget path: ${path}\n${status}${errors}${truncNote}\n${nextHint}`;
-  }
-  return `[工具 ${call.name} ${ok ? "成功" : "失败"}]: ${result.output}\n${nextHint}`;
-}
-
-/**
- * 工具循环：解析最后一条 assistant 的工具调用 → 执行 → 结果回灌 →
- * 新建气泡流式续写，直到模型收尾 / 轮数上限 / 手动停止 / 会话切换
- * wrap 为当前含工具调用的助手气泡元素；每轮续写后更新为新气泡
- */
-async function mRunToolLoop(wrap, modelId, apiKey, baseUrl, params, signal) {
-  const genConvId = state.currentConversationId;
-  let prevCallsSig = "";
-  let dupRounds = 0;
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    if (signal?.aborted) break;
-    if (genConvId !== null && state.currentConversationId !== genConvId) break;
-    const lastMsg = state.messages[state.messages.length - 1];
-    if (!lastMsg || lastMsg.role !== "assistant") break;
-
-    const calls = dedupeCalls(detectToolCalls(lastMsg.content));
-    let nudged = false;
-
-    // 相同调用去重（防原地空转）
-    if (calls.length > 0) {
-      const sig = JSON.stringify(calls.map(c => [c.name, c.params]));
-      if (sig === prevCallsSig) {
-        dupRounds++;
-        addMessage({
-          role: "user",
-          content: `[系统] ${round + 1}/${MAX_TOOL_ROUNDS} 轮：你本轮发出的工具调用与上一轮完全相同，已拦截未重复执行。${dupRounds >= 2 ? "已连续多轮相同调用，必须换思路。" : ""}若上轮结果不符合预期，请换思路（拆分任务、改用其他工具、或先读取文件查看现状）；若任务已推进，直接继续剩余工作或输出结论。`,
-          model: "[dedup]",
-          hidden: true,
-        });
-        nudged = true;
+// 移动侧策略：只保留去重催办与结果回灌，无目标模式/自主推进的空轮决策
+const mobilePolicy = {
+  openRun(run) {
+    return openLedgerRun({ conversationId: run.genConvId || "", mode: "mobile", budget: run.maxRounds });
+  },
+  dedupRound(run) {
+    const { round, maxRounds, dupRounds } = run;
+    return {
+      action: "nudge",
+      hiddenMsg: {
+        role: "user",
+        content: `[系统] ${round + 1}/${maxRounds} 轮：你本轮发出的工具调用与上一轮完全相同，已拦截未重复执行。${dupRounds >= 2 ? "已连续多轮相同调用，必须换思路。" : ""}若上轮结果不符合预期，请换思路（拆分任务、改用其他工具、或先读取文件查看现状）；若任务已推进，直接继续剩余工作或输出结论。`,
+        model: "[dedup]",
+        hidden: true,
+      },
+    };
+  },
+  emptyRound() {
+    return { action: "break" }; // 模型收尾，无工具调用
+  },
+  async postExec(run) {
+    // 结构化结果（file_edit/file_create 未自动落盘）→ 底部 diff sheet 确认
+    for (let i = 0; i < run.results.length; i++) {
+      const result = run.results[i];
+      const card = run.cards?.[i];
+      const structured = result?._structured;
+      if (structured && ["file_edit", "file_create"].includes(structured._type) && structured.applied !== "auto" && structured.applied !== true) {
+        updateToolCard(card, "running", t("等待确认…"));
+        const decision = await mHandleStructured(structured);
+        if (decision === "accepted" || decision === "applied") updateToolCard(card, "done", t("已写入磁盘"));
+        else if (decision === "rejected") updateToolCard(card, "error", t("已拒绝写入"));
+        else updateToolCard(card, "error", t("未确认"));
       } else {
-        dupRounds = 0;
-      }
-      prevCallsSig = sig;
-    }
-
-    if (calls.length === 0) {
-      if (nudged) {
-        // 去重催办后仍需一轮续写让模型换思路
-      } else {
-        break; // 模型收尾，无工具调用
+        updateToolCard(card, result.success ? "done" : "error", toolSummary(result));
       }
     }
+  },
+  buildFeeds(run) {
+    const { calls, results, round, maxRounds } = run;
+    // 工具结果回灌模型（hidden user 消息，不渲染）
+    const toolResultText = `[${round + 1}/${maxRounds} 轮]\n`
+      + results.map((r, i) => formatToolResultForModel(calls[i], r, MOBILE_TOOL_RESULT_STATUS)).join("\n\n")
+      + "\n\n" + buildToolFollowupInstruction({ round, maxRounds, results, failedLine: MOBILE_FAILED_LINE, prefix: "\n" });
+    return [{ role: "user", content: toolResultText, model: "[tool_results]", hidden: true }];
+  },
+};
 
-    if (!nudged) {
-      // 执行工具（卡片挂在当前含工具调用的气泡上）
-      const cardMap = [];
-      for (const call of calls) {
-        const card = addToolCard(wrap, call, "running", "");
-        cardMap.push({ call, card });
-      }
-      const results = await executeToolCalls(calls);
-      if (signal?.aborted) break;
-      if (genConvId !== null && state.currentConversationId !== genConvId) break;
+// 移动侧视图：正文回显 + 工具卡片挂在当前气泡上（无进度条、无白板步骤卡）
+const mobileView = {
+  renderBubble(el, content) {
+    const contentEl = el?.querySelector(".m-msg-content");
+    if (contentEl) contentEl.innerHTML = renderAssistantHtml(content);
+  },
+  toolCards: {
+    // 移动侧工具卡是人工确认门的载体，按 index 供 postExec 回写，不走账本投影
+    begin(run) {
+      return run.calls.map(call => addToolCard(run.bubble, call, "running", ""));
+    },
+  },
+};
 
-      // 结构化结果（file_edit/file_create 未自动落盘）→ 底部 diff sheet 确认
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        const { card } = cardMap[i];
-        const structured = result?._structured;
-        if (structured && ["file_edit", "file_create"].includes(structured._type) && structured.applied !== "auto" && structured.applied !== true) {
-          updateToolCard(card, "running", t("等待确认…"));
-          const decision = await mHandleStructured(structured);
-          if (decision === "accepted" || decision === "applied") updateToolCard(card, "done", t("已写入磁盘"));
-          else if (decision === "rejected") updateToolCard(card, "error", t("已拒绝写入"));
-          else updateToolCard(card, "error", t("未确认"));
-        } else {
-          updateToolCard(card, result.success ? "done" : "error", toolSummary(result));
-        }
-      }
-
-      // 清理内容中的工具标记并落库
-      const clean = stripToolCalls(lastMsg.content);
-      lastMsg.content = clean;
-      lastMsg.toolResults = [
-        ...(lastMsg.toolResults || []),
-        ...results.map((r, i) => ({ call: calls[i], result: r })),
-      ];
-      if (lastMsg.id) {
-        try {
-          await patch(`/chat/messages/${lastMsg.id}`, { content: clean, metadata: { toolResults: lastMsg.toolResults } });
-        } catch (e) { console.warn("[SLATE-Mobile] 工具结果保存失败:", e); }
-      }
-      const contentEl = wrap.querySelector(".m-msg-content");
-      if (contentEl) contentEl.innerHTML = renderAssistantHtml(clean);
-
-      // 工具结果回灌模型（hidden user 消息，不渲染）
-      const toolResultText = `[${round + 1}/${MAX_TOOL_ROUNDS} 轮]\n`
-        + results.map((r, i) => formatToolResultForModel(calls[i], r)).join("\n\n")
-        + "\n\n" + buildToolFollowupInstruction({ round, maxRounds: MAX_TOOL_ROUNDS, results });
-      addMessage({ role: "user", content: toolResultText, model: "[tool_results]", hidden: true });
+// 移动侧 IO：调用探测、工具执行、结果落库、新建气泡流式续写
+const mobileIo = {
+  detectCalls(lastMsg) {
+    return dedupeToolCalls(detectToolCalls(lastMsg.content));
+  },
+  execute(calls, opts) {
+    return executeToolCalls(calls, opts);
+  },
+  async commitResults(run) {
+    const { lastMsg } = run;
+    lastMsg.toolResults = [
+      ...(lastMsg.toolResults || []),
+      ...projectChat(run.ledger, run.round),
+    ];
+    if (lastMsg.id) {
+      try {
+        await patch(`/chat/messages/${lastMsg.id}`, { content: lastMsg.content, metadata: { toolResults: lastMsg.toolResults, ledgerRunId: run.ledger?.runId || "" } });
+      } catch (e) { console.warn("[SLATE-Mobile] 工具结果保存失败:", e); }
     }
-
-    // 新建 follow-up 气泡并流式续写
+  },
+  async streamTurn(run) {
+    const { signal, genConvId } = run;
+    const { modelId, apiKey, baseUrl, params } = run.opts;
     const followUp = { role: "assistant", content: "", model: modelId };
     addMessage(followUp);
-    wrap = appendAssistantBubble();
+    const wrap = appendAssistantBubble();
     const history = state.messages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
     history._modelId = modelId;
     const { content: followContent, finishReason } = await mStreamAssistant({ wrap, modelId, apiKey, baseUrl, params, signal, history });
-    if (signal?.aborted) break;
-    if (genConvId !== null && state.currentConversationId !== genConvId) break;
 
     let finalContent = followContent;
     if (hasTruncatedTail(finalContent) || finishReason === "length") {
-      finalContent = await mContinueTruncated(wrap, finalContent, modelId, apiKey, baseUrl, params, signal, finishReason);
-      if (signal?.aborted) break;
+      const cont = await mContinueTruncated(wrap, finalContent, modelId, apiKey, baseUrl, params, signal, finishReason);
+      finalContent = cont.content;
     }
 
-    // 持久化并更新本地状态
+    // 持久化并更新本地状态（会话已切换时跳过本地列表更新，内容仍写回归属会话）
     followUp.content = finalContent;
-    updateLastAssistantMessage(finalContent);
+    if (state.currentConversationId === genConvId) updateLastAssistantMessage(finalContent);
     if (genConvId) {
       try {
         const saved = await post(`/chat/conversations/${genConvId}/messages`, { role: "assistant", content: finalContent, model: modelId });
@@ -494,7 +440,29 @@ async function mRunToolLoop(wrap, modelId, apiKey, baseUrl, params, signal) {
     const contentEl = wrap.querySelector(".m-msg-content");
     if (contentEl) contentEl.innerHTML = renderAssistantHtml(finalContent);
     keepScrolled();
-  }
+    return { bubble: wrap, message: followUp, content: finalContent };
+  },
+};
+
+const mobileAgentLoop = createAgentLoop({ policy: mobilePolicy, view: mobileView, io: mobileIo });
+
+/**
+ * 工具循环：解析最后一条 assistant 的工具调用 → 执行 → 结果回灌 →
+ * 新建气泡流式续写，直到模型收尾 / 轮数上限 / 手动停止 / 会话切换
+ * wrap 为当前含工具调用的助手气泡元素；每轮续写后更新为新气泡
+ */
+async function mRunToolLoop(wrap, modelId, apiKey, baseUrl, params, signal) {
+  // 本循环归属会话：之后即使切换到新会话，旧循环也只读写自己的会话
+  await mobileAgentLoop({
+    bubble: wrap,
+    modelId,
+    apiKey,
+    baseUrl,
+    params,
+    signal,
+    maxRounds: MAX_TOOL_ROUNDS,
+    genConvId: state.currentConversationId,
+  });
 }
 
 // ── 压缩检查（与桌面同逻辑，静默执行） ─────────

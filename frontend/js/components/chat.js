@@ -1,24 +1,29 @@
 /**
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输入 */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260907-018";
-import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-018";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260907-018";
-import { TOOLS, detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt, buildOpenAITools, openAICallsToCalls, getModelToolCapability, setModelToolCapability } from "../services/tools.js?v=20260907-018";
-import { renderMarkdown } from "../services/markdown.js?v=20260907-018";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260907-018";
-import { getExpertsCached } from "./experts.js?v=20260907-018";
-import { addToolStepCard, updateToolStepCard, clearToolStepCards } from "./whiteboard.js?v=20260907-018";
-import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260907-018";
-import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260907-018";
-import { fileTypeIcon } from "../services/file_icons.js?v=20260907-018";
-import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260907-018";
-import * as grindSvc from "../services/grind.js?v=20260907-018";
-import { t } from "../services/i18n.js?v=20260907-018";
-import { iconSvg, iconSvgEl, iconText, setIconText } from "../services/icons.js?v=20260907-018";
-import { notifyTaskComplete } from "../services/notify.js?v=20260907-018";
-import { subagentEvents, setSubAgentSignal } from "../services/subagent.js?v=20260907-018";
-import { cxEmptyIn } from "../services/cx_motion.js?v=20260907-018";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, estimateContextTokens, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, addBoardCard } from "../store.js?v=20260907-022";
+import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-022";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260907-022";
+import { TOOLS, detectToolCalls, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt, buildOpenAITools, openAICallsToCalls, getModelToolCapability, setModelToolCapability } from "../services/tools.js?v=20260907-022";
+import { renderMarkdown } from "../services/markdown.js?v=20260907-022";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260907-022";
+import { getExpertsCached } from "./experts.js?v=20260907-022";
+import { syncToolStepCards, clearToolStepCards } from "./whiteboard.js?v=20260907-022";
+import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260907-022";
+import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260907-022";
+import { fileTypeIcon } from "../services/file_icons.js?v=20260907-022";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260907-022";
+import * as grindSvc from "../services/grind.js?v=20260907-022";
+import { t } from "../services/i18n.js?v=20260907-022";
+import { iconSvg, iconSvgEl, iconText, setIconText } from "../services/icons.js?v=20260907-022";
+import { notifyTaskComplete } from "../services/notify.js?v=20260907-022";
+import { subagentEvents, setSubAgentSignal } from "../services/subagent.js?v=20260907-022";
+import { cxEmptyIn } from "../services/cx_motion.js?v=20260907-022";
+import { createInkstream } from "../services/inkstream.js?v=20260907-022";
+import { _pendingToolMsgs, dedupeToolCalls, formatToolResultForModel, buildToolFollowupInstruction } from "../services/agent_common.js?v=20260907-022";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260907-022";
+import { openRun as openLedgerRun, projectChat, projectSteps } from "../services/agent_ledger.js?v=20260907-022";
+import { toolLabel } from "../services/tool_meta.js?v=20260907-022";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar, convSidebar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -45,10 +50,6 @@ const CHAT_DRAFT_KEY = "slate_chat_draft";
 // ── 智能滚动跟随 ──────────────────────────────
 // 用户向上滚动浏览历史时不强制拉到底部，仅在处于底部时跟随
 let stickToBottom = true;
-
-// 正在工具执行循环中（尚未执行或正在执行）的 assistant 消息。
-// 渲染时对这些消息不合成"历史恢复"卡片，避免把未执行的调用伪装成成功执行。
-const _pendingToolMsgs = new Set();
 
 function cleanupStaleToolMarkers() {
   const lastMsg = state.messages[state.messages.length - 1];
@@ -1340,26 +1341,6 @@ function shouldHideToolOutput(call) {
   return ["skill_run", "project_files", "project_read_file", "project_find_file", "board_read", "chat_context", "knowledge_search"].includes(call?.name);
 }
 
-function formatToolResultForModel(call, result) {
-  const ok = result?.success !== false;
-  const nextHint = ok
-    ? "Next: use this result to continue the task. Do not repeat the same tool call unless new parameters are needed."
-    : "Next: fix the parameters or choose a different tool. Do not repeat the identical failing call.";
-  const structured = result?._structured;
-  if (structured && ["file_edit", "file_create", "file_append"].includes(structured._type)) {
-    const path = structured.file_path_rel || structured.file_name || structured.file || call?.params?.file_path || "";
-    const errors = structured.errors?.length ? `\nWarnings: ${structured.errors.join("; ")}` : "";
-    const truncNote = structured._type === "file_append" && structured.truncated
-      ? "\nNote: this append was itself truncated; continue with another file_append from the new breakpoint."
-      : "";
-    const status = structured.applied === "auto"
-      ? "Status: written to disk (auto-confirmed by user setting; no manual acceptance needed; verify via project_read_file if necessary)."
-      : "Status: preview only; not written to disk until the user accepts.";
-    return `[工具 ${structured._type} 结果]: ${result.output}\nTarget path: ${path}\n${status}${errors}${truncNote}\n${nextHint}`;
-  }
-  return `[工具 ${call.name} ${ok ? "成功" : "失败"}]: ${result.output}\n${nextHint}`;
-}
-
 function looksLikeInspectionStall(content) {
   if (!content || detectToolCalls(content).length > 0) return false;
   const text = content.replace(/```[\s\S]*?```/g, " ");
@@ -1790,45 +1771,6 @@ function formatSuggestedCalls(calls) {
   return calls.map(call => `- ${call.name}: ${JSON.stringify(call.params || {})}`).join("\n");
 }
 
-function toolCallSignature(call) {
-  return `${call?.name || ""}:${JSON.stringify(call?.params || {})}`;
-}
-
-function dedupeToolCalls(calls) {
-  const seen = new Set();
-  const unique = [];
-  for (const call of calls || []) {
-    const sig = toolCallSignature(call);
-    if (seen.has(sig)) continue;
-    seen.add(sig);
-    unique.push(call);
-  }
-  return unique;
-}
-
-function buildToolFollowupInstruction({ harnessOn, autopilotOn = false, round, maxRounds, results }) {
-  const failed = (results || []).filter(r => r.success === false);
-  const lines = [
-    "",
-    "[Agent Loop 指令]",
-    `当前工具轮次：${round + 1}/${maxRounds}。`,
-    "- 先吸收工具结果，再决定下一步；不要复述工具原文。",
-    "- 若目标仍未完成，继续调用最小必要工具推进。",
-    "- 若刚完成文件修改/生成，优先验证：读取文件、运行检查/测试/构建或说明无法验证原因。",
-    "- 若已完成并验证，输出简短最终汇报，不再调用工具。",
-  ];
-  if (autopilotOn && !harnessOn) {
-    lines.push("- Autopilot 模式下：不要等用户说“继续”；任务未完成就继续观察、修改或验证。");
-  }
-  if (harnessOn) {
-    lines.push("- 目标模式下：如有 TODOLIST，完成一批就 todo_manage(action=update)，全部 done/blocked 后再收尾。");
-  }
-  if (failed.length) {
-    lines.push(`- 有 ${failed.length} 个工具失败：请换参数、换工具或先读取更多上下文，不要重复完全相同的失败调用。`);
-  }
-  return lines.join("\n");
-}
-
 function scheduleAutoAdvanceNudge(msgEl, calls, reason = "stalled") {
   const lastMsg = state.messages[state.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return false;
@@ -1894,61 +1836,7 @@ async function autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal = nul
 
 // ── 工具调用渲染 ─────────────────────────────
 
-// 工具卡片的标签与图标（图标用 SVG；标签走 i18n）
-const TOOL_LABELS = {
-  file_create: "创建文件",
-  file_edit: "编辑文件",
-  file_append: "追加文件",
-  file_tree: "查看目录",
-  file_peek: "查看文件",
-  terminal: "执行命令",
-  skill_run: "技能",
-  project_info: "项目信息",
-  project_files: "文件列表",
-  project_read_file: "读取文件",
-  project_find_file: "查找文件",
-  code_search: "代码搜索",
-  web_search: "联网搜索",
-  web_fetch: "抓取网页",
-  image_gen: "生成图片",
-  video_gen: "生成视频",
-  chart_create: "生成图表",
-  qrcode_create: "生成二维码",
-  html_render: "渲染 HTML",
-  css_color: "CSS 配色",
-  doc_write: "生成文档",
-  ppt_create: "生成演示文稿",
-  word_create: "生成 Word",
-  text_summarize: "文本摘要",
-  json_tool: "JSON 处理",
-  regex_test: "正则测试",
-  repo_stats: "项目统计",
-  todo_scan: "待办扫描",
-  todo_manage: "任务清单",
-  git_tool: "Git 操作",
-  code_scan: "代码扫描",
-  doc_scan: "文档扫描",
-  excel_tool: "表格处理",
-  pdf_tool: "PDF 处理",
-  browser_automation: "浏览器自动化",
-  computer_use: "桌面自动化",
-  mcp_factory: "工具工厂",
-  screenshot_to_code: "截图转码",
-  user_ask: "询问用户",
-  skill_search: "技能搜索",
-  subagent_run: "并行子代理",
-  system_info: "系统信息",
-  board_add: "添加卡片",
-  board_read: "读取黑板",
-  board_update: "更新卡片",
-  board_batch: "批量操作",
-  board_clear: "清空黑板",
-  knowledge_search: "知识检索",
-  knowledge_add: "知识添加",
-  prompt_gen: "提示词生成",
-  chat_context: "对话上下文",
-};
-
+// 工具卡片的图标（SVG）；标签已并入 services/tool_meta.js，与白板步骤卡同源
 const TOOL_ICONS = {
   file_create: "file",
   file_edit: "edit-2",
@@ -2005,12 +1893,8 @@ const TOOL_ICONS = {
 
 function getToolCallLabel(call) {
   const name = call?.name;
-  if (name === "skill_run") {
-    const skillName = call.params?.skill;
-    if (skillName && TOOL_LABELS[skillName]) return TOOL_LABELS[skillName];
-    return skillName ? t("技能 · {name}", { name: skillName }) : "技能";
-  }
-  if (name && TOOL_LABELS[name]) return TOOL_LABELS[name];
+  const label = toolLabel(name, call?.params);
+  if (label && label !== name) return label;
   if (name?.startsWith?.("mcp__")) {
     const short = String(name).split("__").pop();
     return t("工具 · {name}", { name: short || name });
@@ -2022,6 +1906,36 @@ function getToolCallIcon(call) {
   const name = call?.name;
   if (name === "skill_run") return TOOL_ICONS[call.params?.skill] || "zap";
   return TOOL_ICONS[name] || "tool";
+}
+
+/** 砚流·落笔即所见：为正在生成的气泡挂上参数成形预览（只读预览，不参与执行判定） */
+const _inkstreams = new WeakMap();
+
+function attachInkstream(hostEl) {
+  if (!hostEl) return null;
+  const alive = _inkstreams.get(hostEl);
+  if (alive && !alive.destroyed) return alive;
+  const ink = createInkstream({
+    host: hostEl,
+    labelFor: (name) => getToolCallLabel({ name }),
+    iconFor: (name) => getToolCallIcon({ name }),
+  });
+  _inkstreams.set(hostEl, ink);
+  const destroy = ink.destroy.bind(ink);
+  ink.destroy = () => {
+    if (_inkstreams.get(hostEl) === ink) _inkstreams.delete(hostEl);
+    destroy();
+  };
+  return ink;
+}
+
+/** 气泡节点被整表重渲染替换：砚流条改挂到新节点，已落成的行状态不重建 */
+function rehostInkstream(staleEl, liveEl) {
+  const ink = _inkstreams.get(staleEl);
+  if (!ink || ink.destroyed) return;
+  _inkstreams.delete(staleEl);
+  _inkstreams.set(liveEl, ink);
+  ink.rehost(liveEl);
 }
 
 function getToolCallStatus(result) {
@@ -2657,6 +2571,7 @@ function stripOverlap(oldContent, newPart) {
 
 async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl, params, signal, finishReason = "", out = {}) {
   const contentEl = msgEl?.querySelector(".msg-content");
+  const ink = msgEl ? attachInkstream(msgEl) : null;
   let fr = finishReason;
   for (let round = 1; round <= MAX_CONTINUE_ROUNDS; round++) {
     // 工具块未闭合或模型自报 finish_reason=length 都视为被截断
@@ -2664,7 +2579,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     if (signal?.aborted || !stuck) break;
     const contPrompt = buildContinuePrompt(content);
     try {
-      const { toast } = await import("../app.js?v=20260907-018");
+      const { toast } = await import("../app.js?v=20260907-022");
       toast(t("输出达到长度上限，自动续写中（{x}/{n}）…", { x: round, n: MAX_CONTINUE_ROUNDS }));
     } catch {}
 
@@ -2680,7 +2595,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     const contMeta = {};
     let part = "";
     try {
-      for await (const chunk of streamChat({ model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, messages, api_key: apiKey, base_url: baseUrl, temperature: params?.temperature ?? 0.7, max_tokens: params?.max_tokens ?? getOutputMaxTokens(), stream: true, signal, meta: contMeta, ...(toolMode === "native" ? { tools: buildOpenAITools() } : {}) }, { onToolCall: (calls) => { out.toolCalls = calls; } })) {
+      for await (const chunk of streamChat({ model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, messages, api_key: apiKey, base_url: baseUrl, temperature: params?.temperature ?? 0.7, max_tokens: params?.max_tokens ?? getOutputMaxTokens(), stream: true, signal, meta: contMeta, ...(toolMode === "native" ? { tools: buildOpenAITools() } : {}) }, { onToolCall: (calls) => { out.toolCalls = calls; ink?.onCalls(calls); } })) {
         appendStreamChunk(chunk, {
           reasoning() {
             markActivity();
@@ -2689,6 +2604,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
             part += text;
             markActivity();
             if (contentEl) renderAssistantContent(contentEl, content + part, cursor);
+            ink?.onTextContent(content + part);
             autoScroll();
           },
         });
@@ -2706,10 +2622,11 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
   // 轮数耗尽仍未闭合：提示用户，后续由工具循环的截断守卫接管（拒执行并要求拆分重试）
   if (!signal?.aborted && hasTruncatedTail(content)) {
     try {
-      const { toast } = await import("../app.js?v=20260907-018");
+      const { toast } = await import("../app.js?v=20260907-022");
       toast("输出仍不完整，已要求模型拆分重试", 3200);
     } catch {}
   }
+  ink?.destroy();
   if (contentEl) renderAssistantContent(contentEl, content);
   return content;
 }
@@ -2759,7 +2676,7 @@ async function streamWithNativeFallback({ history, model, provider, api_key, bas
         toolMode = "text";
         setModelToolCapability(model, "text");
         try {
-          const { toast } = await import("../app.js?v=20260907-018");
+          const { toast } = await import("../app.js?v=20260907-022");
           toast(t("该模型不支持原生工具调用，已自动切换为文本格式"), 3200);
         } catch {}
         continue;
@@ -2769,265 +2686,317 @@ async function streamWithNativeFallback({ history, model, provider, api_key, bas
   }
 }
 
-async function runToolLoop(
-  msgEl,
-  modelId,
-  apiKey,
-  baseUrl,
-  params = { temperature: 0.7, max_tokens: getOutputMaxTokens() },
-  signal = null,
-  maxRounds = 5,
-  options = {},
-) {
-  // 本循环归属会话：之后即使切换到新会话并开始新生成，旧循环也只读写自己的会话
-  const genConvId = activeGenerationConvId;
-  const harnessOn = state.harness?.enabled === true;
-  const autopilotOn = harnessOn || options.autopilot === true;
-  // 目标循环仅三种退出：手动停止 / 轮数用完 / TODO 全部了结；模型侧异常不再中断循环
-  let todoNudges = 0;
-  let autopilotNudges = 0;
-  let prevCallsSig = ""; // 上一轮工具调用指纹，用于拦截原地打转的相同调用
-  let dupRounds = 0;
-  // 连续"只描述计划、未发起工具调用"的轮数：先强警告，再强制停止，避免 50 轮空转烧额度
-  const STALL_WARN_ROUNDS = 2;
-  const STALL_EXIT_ROUNDS = 4;
-  let stallStreak = 0;
-  let exitReason = "";
-  let successfulToolInThisLoop = false;
-  // 新任务开始：清掉上一任务残留的工具步骤卡，画布只保留当前任务的步骤链
-  clearToolStepCards();
-  for (let round = 0; round < maxRounds; round++) {
-    if (signal?.aborted) {
-      exitReason = "已手动停止";
-      break;
-    }
-    // 生成期间切换/新建会话：立即中止循环，防止旧回复注入新会话
-    if (genConvId !== null && state.currentConversationId !== genConvId) {
-      exitReason = "会话已切换";
-      break;
-    }
-    const lastMsg = state.messages[state.messages.length - 1];
-    if (!lastMsg || lastMsg.role !== "assistant") break;
-    _pendingToolMsgs.add(lastMsg);
+// ── Agent 循环：kernel + 桌面装配 ─────────────────────────
 
-    // 原生 ∪ 文本双协议并集消费：原生 tool_calls 与 ◈ 文本块都执行
-    let calls = dedupeToolCalls([
-      ...detectToolCalls(lastMsg.content),
-      ...openAICallsToCalls(lastMsg.toolCalls || []),
-    ]);
-    let nudged = false;
+const DESKTOP_EXIT_REASONS = { aborted: "已手动停止", switched: "会话已切换" };
+
+// 桌面侧策略：轮次推进决策与模型可见提示词（这些字符串不经 t()，只为用户可见文本包 t()）
+const desktopPolicy = {
+  exitReasons: DESKTOP_EXIT_REASONS,
+  beginRun(opts) {
+    // 目标循环仅三种退出：手动停止 / 轮数用完 / TODO 全部了结；模型侧异常不再中断循环
+    const harnessOn = state.harness?.enabled === true;
+    return {
+      harnessOn,
+      autopilotOn: harnessOn || opts.options?.autopilot === true,
+      todoNudges: 0,
+      autopilotNudges: 0,
+      // 连续"只描述计划、未发起工具调用"的轮数：先强警告，再强制停止，避免 50 轮空转烧额度
+      STALL_WARN_ROUNDS: 2,
+      STALL_EXIT_ROUNDS: 4,
+    };
+  },
+  openRun(run) {
+    const { harnessOn, autopilotOn } = run.extra;
+    return openLedgerRun({
+      conversationId: run.genConvId || "",
+      mode: harnessOn ? "target" : autopilotOn ? "autopilot" : "chat",
+      budget: run.maxRounds,
+    });
+  },
+  onStart(run) {
+    // 新任务开始：清掉上一任务残留的工具步骤卡，画布只保留当前任务的步骤链
+    clearToolStepCards(run.ledger?.runId || "");
+  },
+  markActivity() { markActivity(); },
+  dedupRound(run) {
+    const { round, maxRounds, dupRounds, extra } = run;
+    // 目标模式下仅拦截重复调用并催其换思路，不直接退出。
+    if (dupRounds >= 2 && !extra.autopilotOn) return { action: "break" };
+    return {
+      action: "nudge",
+      hiddenMsg: {
+        role: "user",
+        content: `[系统] ${round + 1}/${maxRounds} 轮：你本轮发出的工具调用与上一轮完全相同，已拦截未重复执行。${dupRounds >= 2 ? "已连续多轮相同调用，必须换思路。" : ""}若上轮结果不符合预期，请换思路（拆分任务、改用其他工具、或先用 project_read_file 查看现状）；若任务已推进，直接继续剩余工作或输出结论。`,
+        model: "[dedup]",
+        hidden: true,
+      },
+    };
+  },
+  emptyRound(run) {
+    const { round, maxRounds, lastMsg, stallStreak, successfulTool, extra } = run;
+    const { harnessOn, autopilotOn, STALL_WARN_ROUNDS, STALL_EXIT_ROUNDS } = extra;
+    const todoState = getTodoLoopState();
+    const pending = todoState.pending;
+    const completedReply = looksLikeCompletedReply(lastMsg.content);
     // 上一轮生成异常：失败报错或零输出（目标模式下不退出，催其重新生成继续推进）
     const replyFailed = !(lastMsg.content || "").trim() || /^(续写失败|请求失败)/.test(lastMsg.content);
 
-
-    // 相同调用去重：本轮调用与上一轮完全一致时不重复执行（避免无效副作用与空转耗尽轮数）
-    if (calls.length > 0) {
-      stallStreak = 0;
-
-      const sig = JSON.stringify(calls.map(c => [c.name, c.params]));
-      if (sig === prevCallsSig) {
-        dupRounds++;
-        if (dupRounds >= 2 && !autopilotOn) break;
-        // 目标模式下仅拦截重复调用并催其换思路，不直接退出。
-        addMessage({
-          role: "user",
-          content: `[系统] ${round + 1}/${maxRounds} 轮：你本轮发出的工具调用与上一轮完全相同，已拦截未重复执行。${dupRounds >= 2 ? "已连续多轮相同调用，必须换思路。" : ""}若上轮结果不符合预期，请换思路（拆分任务、改用其他工具、或先用 project_read_file 查看现状）；若任务已推进，直接继续剩余工作或输出结论。`,
-          model: "[dedup]",
-          hidden: true,
-        });
-        nudged = true;
-      } else {
-        dupRounds = 0;
-      }
-      prevCallsSig = sig;
+    if (harnessOn && todoState.closed && !replyFailed) {
+      clearAutoAdvanceHints(lastMsg);
+      return { action: "break", exitReason: "TODOLIST 已全部了结，模型已收尾" };
     }
-
-    if (calls.length === 0) {
-      const todoState = getTodoLoopState();
-      const pending = todoState.pending;
-      const completedReply = looksLikeCompletedReply(lastMsg.content);
-      if (harnessOn && todoState.closed && !replyFailed) {
-        clearAutoAdvanceHints(lastMsg);
-        exitReason = "TODOLIST 已全部了结，模型已收尾";
-        break;
-      }
-      if (!harnessOn && autopilotOn && completedReply && successfulToolInThisLoop) {
-        const settled = settleAutopilotTodosOnCompletion();
-        exitReason = settled
+    if (!harnessOn && autopilotOn && completedReply && successfulTool) {
+      const settled = settleAutopilotTodosOnCompletion();
+      return {
+        action: "break",
+        exitReason: settled
           ? t("任务完成或模型已收尾 · 已同步清单 {n} 项", { n: settled })
-          : "任务完成或模型已收尾";
-        break;
-      }
-      // 连续空转止损：模型多轮只描述计划、从未发起工具调用（通常是不支持/不遵守工具调用格式），
-      // 达到阈值即强制退出，避免一路空转到轮数上限烧光额度
-      if (autopilotOn && stallStreak >= STALL_EXIT_ROUNDS && round < maxRounds - 1) {
-        exitReason = `模型连续 ${stallStreak} 轮未发起任何工具调用，已停止空转。可能原因：当前模型端点不支持工具调用，或模型未遵守指令。建议停止后更换支持工具调用的模型（如官方 DeepSeek / Claude / GPT 端点）重试。`;
-        break;
-      }
-      if (lastMsg.autoAdvanceNudge && round < maxRounds - 1) {
-        addMessage({
-          role: "user",
-          content: lastMsg.autoAdvanceNudge,
-          model: "[auto_advance]",
-          hidden: true,
-        });
-        delete lastMsg.autoAdvanceNudge;
-        delete lastMsg.autoAdvanceSuggestedCalls;
-        nudged = true;
-      } else if (autopilotOn && round < maxRounds - 1) {
-        if (stallStreak >= STALL_WARN_ROUNDS && !replyFailed && !completedReply) {
-          // 已连续多轮无工具调用：升级强警告，明确要求输出工具调用块，或声明端点不支持
-          addMessage({
+          : "任务完成或模型已收尾",
+      };
+    }
+    // 连续空转止损：模型多轮只描述计划、从未发起工具调用（通常是不支持/不遵守工具调用格式），
+    // 达到阈值即强制退出，避免一路空转到轮数上限烧光额度
+    if (autopilotOn && stallStreak >= STALL_EXIT_ROUNDS && round < maxRounds - 1) {
+      return {
+        action: "break",
+        exitReason: `模型连续 ${stallStreak} 轮未发起任何工具调用，已停止空转。可能原因：当前模型端点不支持工具调用，或模型未遵守指令。建议停止后更换支持工具调用的模型（如官方 DeepSeek / Claude / GPT 端点）重试。`,
+      };
+    }
+    if (lastMsg.autoAdvanceNudge && round < maxRounds - 1) {
+      const nudge = lastMsg.autoAdvanceNudge;
+      delete lastMsg.autoAdvanceNudge;
+      delete lastMsg.autoAdvanceSuggestedCalls;
+      return {
+        action: "nudge",
+        hiddenMsg: { role: "user", content: nudge, model: "[auto_advance]", hidden: true },
+      };
+    }
+    if (autopilotOn && round < maxRounds - 1) {
+      if (stallStreak >= STALL_WARN_ROUNDS && !replyFailed && !completedReply) {
+        // 已连续多轮无工具调用：升级强警告，明确要求输出工具调用块，或声明端点不支持
+        return {
+          action: "nudge",
+          progressText: (harnessOn ? t("目标模式 · 连续 {n} 轮未调用工具，强警告（第 {k} 次）", { n: stallStreak, k: stallStreak - STALL_WARN_ROUNDS + 1 }) : t("Autopilot · 连续 {n} 轮未调用工具，强警告（第 {k} 次）", { n: stallStreak, k: stallStreak - STALL_WARN_ROUNDS + 1 })),
+          hiddenMsg: {
             role: "user",
             content: `[系统警告] ${round + 1}/${maxRounds} 轮：你已连续 ${stallStreak} 轮只描述计划，从未发起任何工具调用。SLATE 的 Agent 必须通过工具调用执行任务：请以 ◈◈◈ 工具名\n{JSON 参数}\n◈◆◆ 的格式输出工具调用（可用 file_tree / project_find_file / project_read_file / terminal 等）。若你的模型端点确实无法输出工具调用格式，请直接回复【不支持工具调用】，系统将停止本次执行以免浪费额度。`,
             model: "[stall_warn]",
             hidden: true,
-          });
-          setHarnessProgress((harnessOn ? t("目标模式 · 连续 {n} 轮未调用工具，强警告（第 {k} 次）", { n: stallStreak, k: stallStreak - STALL_WARN_ROUNDS + 1 }) : t("Autopilot · 连续 {n} 轮未调用工具，强警告（第 {k} 次）", { n: stallStreak, k: stallStreak - STALL_WARN_ROUNDS + 1 })));
-          nudged = true;
-        } else if (replyFailed) {
-          // 模型侧失败零输出：不退出循环，注入提示让其忽略异常继续推进
-          addMessage({
+          },
+        };
+      }
+      if (replyFailed) {
+        // 模型侧失败零输出：不退出循环，注入提示让其忽略异常继续推进
+        return {
+          action: "nudge",
+          hiddenMsg: {
             role: "user",
             content: `[系统] ${round + 1}/${maxRounds} 轮：上一轮生成异常（失败或无输出），自主推进仍在执行，请忽略异常内容，直接继续推进任务。`,
             model: "[retry]",
             hidden: true,
-          });
-          nudged = true;
-        } else if (pending.length > 0) {
-          // 闭环强制：模型想收尾但 TODOLIST 仍有未完成项，注入系统催办继续推进。
-          todoNudges++;
-          setHarnessProgress((harnessOn ? t("目标模式闭环校验 · 清单剩余 {n} 项，自动催办（第 {k} 次）", { n: pending.length, k: todoNudges }) : t("Autopilot 闭环校验 · 清单剩余 {n} 项，自动催办（第 {k} 次）", { n: pending.length, k: todoNudges })));
-          addMessage({
+          },
+        };
+      }
+      if (pending.length > 0) {
+        // 闭环强制：模型想收尾但 TODOLIST 仍有未完成项，注入系统催办继续推进。
+        extra.todoNudges++;
+        return {
+          action: "nudge",
+          progressText: (harnessOn ? t("目标模式闭环校验 · 清单剩余 {n} 项，自动催办（第 {k} 次）", { n: pending.length, k: extra.todoNudges }) : t("Autopilot 闭环校验 · 清单剩余 {n} 项，自动催办（第 {k} 次）", { n: pending.length, k: extra.todoNudges })),
+          hiddenMsg: {
             role: "user",
             content: `[系统校验] ${round + 1}/${maxRounds} 轮：任务尚未完成，TODOLIST 仍有 ${pending.length} 项未了结：\n${pending.map(t => `- [${t.id}] ${t.content}`).join("\n")}\n请统筹批量推进剩余事项（能一起完成的多项不要拆开磨），每完成一批立即调用 todo_manage 批量更新状态，让清单实时反映进度，全部了结后再输出汇报与追溯。`,
             model: "[todo_enforce]",
             hidden: true,
-          });
-          nudged = true;
-        } else if (!completedReply && (asksUserToDecide(lastMsg.content) || looksLikeActionStall(lastMsg.content) || looksLikeInspectionStall(lastMsg.content))) {
-          autopilotNudges++;
-          addMessage({
+          },
+        };
+      }
+      if (!completedReply && (asksUserToDecide(lastMsg.content) || looksLikeActionStall(lastMsg.content) || looksLikeInspectionStall(lastMsg.content))) {
+        extra.autopilotNudges++;
+        return {
+          action: "nudge",
+          progressText: t("Autopilot 自主推进 · 自动续跑（第 {k} 次）", { k: extra.autopilotNudges }),
+          hiddenMsg: {
             role: "user",
             content: `[系统自动推进] ${round + 1}/${maxRounds} 轮：你上一条回复停在计划/询问阶段，但用户希望由你自主完成，不要在可自行决策时等待“继续”或确认。任务与全部约束就在你上方的对话历史里，无需复述或重新规划。请直接从上次停下的位置继续，第一句就输出下一步的最小必要动作：需要事实就调用工具；若确实已经完成，则直接给出包含验证方式的简短最终汇报。`,
             model: "[autopilot]",
             hidden: true,
-          });
-          setHarnessProgress(t("Autopilot 自主推进 · 自动续跑（第 {k} 次）", { k: autopilotNudges }));
-          nudged = true;
-        } else if (!harnessOn && autopilotOn && !successfulToolInThisLoop && completedReply) {
-          autopilotNudges++;
-          addMessage({
+          },
+        };
+      }
+      if (!harnessOn && autopilotOn && !successfulTool && completedReply) {
+        extra.autopilotNudges++;
+        return {
+          action: "nudge",
+          progressText: t("Autopilot 自主推进 · 校验口头完成（第 {k} 次）", { k: extra.autopilotNudges }),
+          hiddenMsg: {
             role: "user",
             content: `[系统自动推进] ${round + 1}/${maxRounds} 轮：你刚才像是在汇报完成，但本轮没有任何工具执行记录。用户要求你像 Agent 一样把活做完，而不是口头承诺。任务要求就在你上方的对话历史里，不要复述任务，请直接从第一句开始读取/检查/修改/运行验证；如果确实无法操作，请说明具体阻塞原因。`,
             model: "[autopilot]",
             hidden: true,
-          });
-          setHarnessProgress(t("Autopilot 自主推进 · 校验口头完成（第 {k} 次）", { k: autopilotNudges }));
-          nudged = true;
-        }
+          },
+        };
       }
-      if (!nudged) {
-        if (autopilotOn) exitReason = pending.length === 0 ? "任务完成或模型已收尾" : "模型收尾退出";
-        break;
-      }
-      stallStreak++;
     }
-
-    if (autopilotOn) {
-      const todos = getConversationTodos(state.currentConversationId);
-      const doneCount = todos.filter(t => t.status === "done").length;
-      const todoText = todos.length ? t(" · 清单 {done}/{total}", { done: doneCount, total: todos.length }) : "";
-      setHarnessProgress((harnessOn ? t("目标模式 · 第 {x}/{n} 轮", { x: round + 1, n: maxRounds }) : t("Autopilot 自主推进 · 第 {x}/{n} 轮", { x: round + 1, n: maxRounds })) + todoText);
+    return {
+      action: "break",
+      exitReason: autopilotOn ? (pending.length === 0 ? "任务完成或模型已收尾" : "模型收尾退出") : undefined,
+    };
+  },
+  progressForRound(run) {
+    const { extra } = run;
+    if (!extra.autopilotOn) return undefined;
+    const todos = getConversationTodos(state.currentConversationId);
+    const doneCount = todos.filter(t => t.status === "done").length;
+    const todoText = todos.length ? t(" · 清单 {done}/{total}", { done: doneCount, total: todos.length }) : "";
+    return (extra.harnessOn ? t("目标模式 · 第 {x}/{n} 轮", { x: run.round + 1, n: run.maxRounds }) : t("Autopilot 自主推进 · 第 {x}/{n} 轮", { x: run.round + 1, n: run.maxRounds })) + todoText;
+  },
+  buildFeeds(run) {
+    const { calls, results, round, maxRounds, extra } = run;
+    // Keep tool results in model context without rendering them as chat bubbles.
+    // 目标模式下每轮结果开头标注轮次，让模型感知当前进度与剩余轮数预算
+    const roundTag = extra.autopilotOn ? `[${extra.harnessOn ? "目标模式" : "Autopilot"} · ${round + 1}/${maxRounds} 轮]\n` : "";
+    // 原生调用以 role:"tool" + tool_call_id 回灌（OpenAI 协议要求 assistant tool_calls 后必须配对）；
+    // 文本块调用保持 role:"user" [tool_results]（含轮次标签与推进指令）
+    const nativeFeeds = [];
+    const textParts = [];
+    for (let i = 0; i < results.length; i++) {
+      if (calls[i]?.id) nativeFeeds.push({ call: calls[i], result: results[i] });
+      else textParts.push(formatToolResultForModel(calls[i], results[i]));
     }
-
-    // 更新最后一条 assistant 消息（去掉工具标记）
-    const cleanContent = stripToolCalls(lastMsg.content);
-    lastMsg.content = cleanContent;
-
-    // 重新渲染当前消息（去掉标记）
-    const contentEl = msgEl.querySelector(".msg-content");
-    if (contentEl) {
-      contentEl.innerHTML = renderMarkdown(cleanContent);
-      contentEl.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
+    const feeds = nativeFeeds.map(({ call, result }) => ({
+      role: "tool",
+      content: String(result.output ?? "完成"),
+      tool_call_id: call.id,
+      model: "[tool_results]",
+      hidden: true,
+    }));
+    const toolResultText = roundTag
+      + textParts.join("\n\n")
+      + (textParts.length ? "\n\n" : "")
+      + buildToolFollowupInstruction({ harnessOn: extra.harnessOn, autopilotOn: extra.autopilotOn, round, maxRounds, results });
+    feeds.push({ role: "user", content: toolResultText, model: "[tool_results]", hidden: true });
+    return feeds;
+  },
+  async endTurn(run) {
+    const { extra, turn } = run;
+    const { modelId, apiKey, baseUrl, params } = run.opts;
+    if (extra.harnessOn && getTodoLoopState().closed && !detectToolCalls(turn.content).length && turn.content.trim()) {
+      clearAutoAdvanceHints(turn.message);
+      return { action: "break", exitReason: "TODOLIST 已全部了结，模型已收尾" };
     }
+    let el = await autoAdvanceIfStalled(turn.bubble, modelId, apiKey, baseUrl, params);
+    el = await autoReviewIfStalled(el, modelId, apiKey, baseUrl, run.signal);
+    return { action: "continue", bubble: el };
+  },
+  finish(run) {
+    const { extra } = run;
+    // 账本已补发取消事件，这里再投一次，停止/异常/轮数耗尽时不留悬空黄卡
+    projectBoard(run);
+    // 清理未执行的工具标记并解除渲染抑制，防止残留标记被渲染成伪造的"历史恢复"卡片
+    cleanupStaleToolMarkers();
+    if (extra.autopilotOn && !run.exitReason && !(run.signal?.aborted)) run.exitReason = t("已达 {n} 轮上限", { n: run.maxRounds });
+    if (extra.harnessOn && run.maxRounds > 5) {
+      showHarnessIdle(run.exitReason ? run.exitReason + t(" · 目标模式保持开启，下一条消息继续自主执行（点「目标模式」手动退出）") : "");
+    } else if (!extra.harnessOn && extra.autopilotOn) {
+      setHarnessProgress(null);
+    }
+    // 任务完成通知（非手动停止时触发）；空转止损退出不算"完成"，用停止标题
+    if (extra.autopilotOn && run.exitReason && !run.exitReason.includes("手动停止")) {
+      const stalled = run.exitReason.includes("停止空转");
+      notifyTaskComplete(stalled ? (extra.harnessOn ? t("目标模式已停止") : t("Autopilot 已停止")) : (extra.harnessOn ? t("目标模式任务完成") : t("Autopilot 任务完成")), run.exitReason);
+    }
+  },
+};
 
-    if (!nudged) {
-      // 执行工具
-      markActivity();
-      const stepCardIds = [];
-      // 为每个工具调用创建步骤卡片
-      for (const call of calls) {
-        const cardId = addToolStepCard(call.name, call.params, "running");
-        stepCardIds.push({ call, cardId });
-      }
-      const results = await executeToolCalls(calls);
-      if (results.some(result => result.success !== false)) successfulToolInThisLoop = true;
-      markActivity();
-      if (signal?.aborted) { exitReason = "已手动停止"; break; }
-      if (genConvId !== null && state.currentConversationId !== genConvId) { exitReason = "会话已切换"; break; }
+// 账 → 白板：一次 run 的步骤链投影，幂等可重复调用
+function projectBoard(run) {
+  if (!run.ledger) return;
+  syncToolStepCards(projectSteps(run.ledger), run.ledger.runId);
+}
 
-      // 渲染工具卡片
-      lastMsg.toolResults = [
-        ...(lastMsg.toolResults || []),
-        ...results.map((result, i) => ({ call: calls[i], result })),
-      ];
-      setMessages([...state.messages]);
-      if (lastMsg.id) {
-        try {
-          await patch(`/chat/messages/${lastMsg.id}`, {
-            content: lastMsg.content,
-            metadata: { toolResults: lastMsg.toolResults, ...(lastMsg.toolCalls ? { toolCalls: lastMsg.toolCalls } : {}) },
-          });
-        } catch (e) {
-          console.warn("工具结果保存失败:", e);
-        }
-      }
-      autoScroll();
-
-      // 更新步骤卡片状态
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        const { cardId } = stepCardIds[i];
-        const status = result.success ? "done" : "error";
-        const resultSummary = result.success 
-          ? (result.output?.slice(0, 100) || "完成")
-          : (result.output?.slice(0, 100) || "失败");
-        updateToolStepCard(cardId, status, resultSummary);
-      }
-
-      // Keep tool results in model context without rendering them as chat bubbles.
-      // 目标模式下每轮结果开头标注轮次，让模型感知当前进度与剩余轮数预算
-      const roundTag = autopilotOn ? `[${harnessOn ? "目标模式" : "Autopilot"} · ${round + 1}/${maxRounds} 轮]\n` : "";
-      // 原生调用以 role:"tool" + tool_call_id 回灌（OpenAI 协议要求 assistant tool_calls 后必须配对）；
-      // 文本块调用保持 role:"user" [tool_results]（含轮次标签与推进指令）
-      const nativeFeeds = [];
-      const textParts = [];
-      for (let i = 0; i < results.length; i++) {
-        if (calls[i]?.id) nativeFeeds.push({ call: calls[i], result: results[i] });
-        else textParts.push(formatToolResultForModel(calls[i], results[i]));
-      }
-      for (const { call, result } of nativeFeeds) {
-        addMessage({
-          role: "tool",
-          content: String(result.output ?? "完成"),
-          tool_call_id: call.id,
-          model: "[tool_results]",
-          hidden: true,
+// 桌面侧视图：气泡重锚定、正文回显、进度条、砚流进度、白板步骤卡
+const desktopView = {
+  reanchorBubble(el, index) {
+    if (el?.isConnected) return null;
+    const liveEl = chatScroll?.querySelector(`.msg[data-index="${index}"]`);
+    if (!liveEl) return null;
+    // 砚流条实例随节点迁移，本轮 DOM 写入才不落空
+    rehostInkstream(el, liveEl);
+    return liveEl;
+  },
+  renderBubble(el, content) {
+    const contentEl = el?.querySelector(".msg-content");
+    if (!contentEl) return;
+    contentEl.innerHTML = renderMarkdown(content);
+    contentEl.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
+  },
+  setProgress(text) { setHarnessProgress(text); },
+  execProgress(el) {
+    const execInk = attachInkstream(el);
+    const argKeyOf = (call) => (call?.index != null ? `n${call.index}` : "t0");
+    // 只有走 /stream 的调用才有实时进度；本地工具（user_ask/diff 确认）会等人，不演「执行中」
+    const canStream = (call) => call?.name === "skill_run";
+    return {
+      onCallStart: (call, i) => {
+        if (!canStream(call)) return;
+        execInk?.onExecStart({
+          key: `e${i}`,
+          name: call.name,
+          skill: call.params?.skill || "",
+          hide: argKeyOf(call),
         });
-      }
-      const toolResultText = roundTag
-        + textParts.join("\n\n")
-        + (textParts.length ? "\n\n" : "")
-        + buildToolFollowupInstruction({ harnessOn, autopilotOn, round, maxRounds, results });
-      addMessage({ role: "user", content: toolResultText, model: "[tool_results]", hidden: true });
-    }
+      },
+      onEvent: (env, call, i) => { if (canStream(call)) execInk?.onExecEvent(`e${i}`, env); },
+      onCallEnd: (call, i) => { if (canStream(call)) execInk?.onExecEnd(`e${i}`); },
+      endAll: (calls) => { for (let i = 0; i < calls.length; i++) execInk?.onExecEnd(`e${i}`); },
+    };
+  },
+  toolCards: {
+    // 步骤卡是账的投影：开跑时生成本轮的 running 卡，执行收尾后再投一次回写状态与摘录
+    begin(run) { projectBoard(run); },
+    finish(run) { projectBoard(run); },
+  },
+};
 
-    // 创建新的 assistant 消息（若期间已切换会话，则不向新会话注入幻影气泡）
-    if (genConvId !== null && state.currentConversationId !== genConvId) {
-      exitReason = "会话已切换";
-      break;
+// 桌面侧 IO：调用探测、工具执行、结果落库、新建气泡流式续写
+const desktopIo = {
+  detectCalls(lastMsg) {
+    return dedupeToolCalls([
+      ...detectToolCalls(lastMsg.content),
+      ...openAICallsToCalls(lastMsg.toolCalls || []),
+    ]);
+  },
+  execute(calls, opts) {
+    return executeToolCalls(calls, opts);
+  },
+  async commitResults(run) {
+    const { lastMsg } = run;
+    lastMsg.toolResults = [
+      ...(lastMsg.toolResults || []),
+      ...projectChat(run.ledger, run.round),
+    ];
+    setMessages([...state.messages]);
+    if (lastMsg.id) {
+      try {
+        await patch(`/chat/messages/${lastMsg.id}`, {
+          content: lastMsg.content,
+          metadata: {
+            toolResults: lastMsg.toolResults,
+            ...(lastMsg.toolCalls ? { toolCalls: lastMsg.toolCalls } : {}),
+            ledgerRunId: run.ledger?.runId || "",
+          },
+        });
+      } catch (e) {
+        console.warn("工具结果保存失败:", e);
+      }
     }
+    autoScroll();
+  },
+  async streamTurn(run) {
+    const { signal, genConvId } = run;
+    const { modelId, apiKey, baseUrl, params } = run.opts;
     const followUp = { role: "assistant", content: "", model: state.currentModel?.name || "" };
     addMessage(followUp);
     _pendingToolMsgs.add(followUp);
@@ -3040,7 +3009,7 @@ async function runToolLoop(
 
     // 流式续写
     await refreshKnowledgeContext(state.messages.slice(-6).map(m => m.content || "").join("\n"));
-    if (signal?.aborted) { exitReason = "已手动停止"; break; }
+    if (signal?.aborted) return { bubble: followEl, message: followUp, stop: DESKTOP_EXIT_REASONS.aborted };
     const history = buildAdapterHistory();
     history._modelId = modelId;
     const nativeCalls = [];
@@ -3049,8 +3018,9 @@ async function runToolLoop(
     let followReasoningText = "";
     let followThinkingPanel = null;
     const followMeta = {};
+    const ink = attachInkstream(followEl);
     try {
-      await streamWithNativeFallback({ history, model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, api_key: apiKey, base_url: baseUrl, temperature: params.temperature ?? 0.7, max_tokens: params.max_tokens ?? getOutputMaxTokens(), signal, meta: followMeta, onToolCall: (calls) => { nativeCalls.length = 0; nativeCalls.push(...calls); } }, (chunk) => {
+      await streamWithNativeFallback({ history, model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, api_key: apiKey, base_url: baseUrl, temperature: params.temperature ?? 0.7, max_tokens: params.max_tokens ?? getOutputMaxTokens(), signal, meta: followMeta, onToolCall: (calls) => { nativeCalls.length = 0; nativeCalls.push(...calls); ink.onCalls(calls); } }, (chunk) => {
         appendStreamChunk(chunk, {
           reasoning(text) {
             followReasoningText += text;
@@ -3063,6 +3033,7 @@ async function runToolLoop(
             followContent2 += text;
             markActivity();
             renderAssistantContent(followContent, followContent2, cursor);
+            ink.onTextContent(followContent2);
             autoScroll();
           },
         });
@@ -3090,32 +3061,34 @@ async function runToolLoop(
       const saved = await post(`/chat/conversations/${genConvId}/messages`, { role: "assistant", content: followContent2, model: modelId, ...(followUp.toolCalls ? { metadata: { toolCalls: followUp.toolCalls } } : {}) });
       if (saved.code === 0 && saved.data?.id) followUp.id = saved.data.id;
     }
+    return { bubble: followEl, message: followUp, content: followContent2 };
+  },
+};
 
-    if (signal?.aborted) { exitReason = "已手动停止"; break; }
-    if (harnessOn && getTodoLoopState().closed && !detectToolCalls(followContent2).length && followContent2.trim()) {
-      clearAutoAdvanceHints(followUp);
-      exitReason = "TODOLIST 已全部了结，模型已收尾";
-      break;
-    }
-    msgEl = await autoAdvanceIfStalled(followEl, modelId, apiKey, baseUrl, params);
-    msgEl = await autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal);
-  }
-  // 无论以何种方式退出循环（abort / 去重拦截 / 会话切换 / 轮数上限），
-  // 清理未执行的工具标记并解除渲染抑制，防止残留标记被渲染成伪造的"历史恢复"卡片
-  cleanupStaleToolMarkers();
-  _pendingToolMsgs.clear();
-  if (autopilotOn && !exitReason && !(signal?.aborted)) exitReason = t("已达 {n} 轮上限", { n: maxRounds });
-  if (harnessOn && maxRounds > 5) {
-    showHarnessIdle(exitReason ? exitReason + t(" · 目标模式保持开启，下一条消息继续自主执行（点「目标模式」手动退出）") : "");
-  } else if (!harnessOn && autopilotOn) {
-    setHarnessProgress(null);
-  }
+const desktopAgentLoop = createAgentLoop({ policy: desktopPolicy, view: desktopView, io: desktopIo });
 
-  // 任务完成通知（非手动停止时触发）；空转止损退出不算"完成"，用停止标题
-  if (autopilotOn && exitReason && !exitReason.includes("手动停止")) {
-    const stalled = exitReason.includes("停止空转");
-    notifyTaskComplete(stalled ? (harnessOn ? t("目标模式已停止") : t("Autopilot 已停止")) : (harnessOn ? t("目标模式任务完成") : t("Autopilot 任务完成")), exitReason);
-  }
+async function runToolLoop(
+  msgEl,
+  modelId,
+  apiKey,
+  baseUrl,
+  params = { temperature: 0.7, max_tokens: getOutputMaxTokens() },
+  signal = null,
+  maxRounds = 5,
+  options = {},
+) {
+  // 本循环归属会话：之后即使切换到新会话并开始新生成，旧循环也只读写自己的会话
+  await desktopAgentLoop({
+    bubble: msgEl,
+    modelId,
+    apiKey,
+    baseUrl,
+    params,
+    signal,
+    maxRounds,
+    options,
+    genConvId: activeGenerationConvId,
+  });
 }
 
 // ── 单次任务计时 ───────────────────────────────
@@ -3162,7 +3135,7 @@ async function sendMessage(queuedPayload = null) {
   if (isGenerating) {
     if (queuedPayload) inputQueue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260907-018");
+      const { toast } = await import("../app.js?v=20260907-022");
       toast(t("已加入输入队列（{n}）", { n: inputQueue.length }));
     }
     updateSendState();
@@ -3189,7 +3162,7 @@ async function sendMessage(queuedPayload = null) {
   const grindActive = grindSession && ["grinding", "collecting"].includes(grindSession.state);
   const isFreshConv = !state.currentConversationId || state.messages.length === 0;
   if (!queuedPayload && !grindActive && isFreshConv && isAbstractTask(text)) {
-    const { dlgConfirm } = await import("../services/dialog.js?v=20260907-018");
+    const { dlgConfirm } = await import("../services/dialog.js?v=20260907-022");
     const confirmed = await dlgConfirm(
       t("检测到抽象任务「{text}」，建议先进入磨墨模式细化需求后再执行。是否切换？", { text: text.slice(0, 30) }),
       { title: t("磨墨建议"), okText: t("进入磨墨"), cancelText: t("直接发送") }
@@ -3357,8 +3330,9 @@ async function sendMessage(queuedPayload = null) {
   let thinkingPanel = null;
   const streamMeta = {};
   let streamFailed = false;
+  const ink0 = attachInkstream(msgEl);
   try {
-    await streamWithNativeFallback({ history: historyForAdapter, model: modelId, provider: state.currentModel?.provider, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, use_responses: state.useResponses, signal, meta: streamMeta, onToolCall: (calls) => { nativeCalls0.length = 0; nativeCalls0.push(...calls); } }, (chunk) => {
+    await streamWithNativeFallback({ history: historyForAdapter, model: modelId, provider: state.currentModel?.provider, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, use_responses: state.useResponses, signal, meta: streamMeta, onToolCall: (calls) => { nativeCalls0.length = 0; nativeCalls0.push(...calls); ink0.onCalls(calls); } }, (chunk) => {
       // 检测 reasoning 前缀，分离思考内容
       appendStreamChunk(chunk, {
         reasoning(text) {
@@ -3373,6 +3347,7 @@ async function sendMessage(queuedPayload = null) {
           markActivity();
           const contentEl = msgEl.querySelector(".msg-content");
           renderAssistantContent(contentEl, fullContent, cursor);
+          ink0.onTextContent(fullContent);
           autoScroll();
         },
       });
@@ -3451,7 +3426,7 @@ async function sendMessage(queuedPayload = null) {
 
   } catch (err) {
     console.error("发送失败", err);
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输出 · 目标模式保持开启" : "已停止输出") : t("发送失败: {msg}", { msg: err.message }));
   } finally {
   isGenerating = false;
@@ -3503,7 +3478,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
 
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     toast(t("上下文已压缩：{n} 条消息已摘要", { n: compress_count }));
   } catch (e) {
     console.warn("上下文压缩检查失败", e);
@@ -3521,7 +3496,7 @@ async function toggleHarness() {
   state.harness = state.harness || { enabled: false, maxRounds: 50 };
   state.harness.enabled = !state.harness.enabled;
   savePersistent();
-  const { toast } = await import("../app.js?v=20260907-018");
+  const { toast } = await import("../app.js?v=20260907-022");
   toast(state.harness.enabled ? "目标模式已开启：目标→计划→执行→验证→汇报→追溯，六阶段自主闭环，大任务自动建议 TODOLIST" : "目标模式已关闭");
   showHarnessIdle();
   syncModeMenu();
@@ -3595,7 +3570,7 @@ async function handleGrindReply(content, msgEl) {
     renderGrindPanel();
     updateSendState();
     appendDraftActions(msgEl, draft);
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     toast("墨稿已成：可送入目标模式 / 投到白板 / 存为模板");
     return;
   }
@@ -3707,20 +3682,20 @@ function appendDraftActions(msgEl, draft) {
     state.harness.enabled = true;
     syncModeMenu();
     savePersistent();
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     toast("墨稿已送入目标模式，自主执行中…");
     await sendMessage({ text: grindSvc.draftToHarnessTask(draft), files: [] });
   }));
 
   bar.appendChild(mkBtn("投到白板", "作为白板卡片保存", async () => {
     addBoardCard(grindSvc.draftToBoardCard(draft));
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     toast("已投到白板");
   }));
 
   bar.appendChild(mkBtn("存为模板", "存入知识库作为可复用任务书模板", async () => {
     const ok = await grindSvc.saveDraftAsTemplate(draft);
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     toast(ok ? "已存为磨墨模板（知识中心可见）" : "保存失败");
   }));
 
@@ -3730,7 +3705,7 @@ function appendDraftActions(msgEl, draft) {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260907-018").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260907-022").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -3754,7 +3729,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -3788,7 +3763,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(t("上下文已压缩：{n} 条消息已摘要", { n: res.data.compress_count || 0 }));
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -4284,7 +4259,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260907-018");
+      const { toast } = await import("../app.js?v=20260907-022");
       toast(t("文件过大，已跳过: {name}", { name: file.name }));
       continue;
     }
@@ -4300,11 +4275,11 @@ async function handleFiles(fileList) {
         if (res.code === 0 && res.data?.content) {
           pendingFiles.push({ name: file.name, size: file.size, content: res.data.content, type: "text" });
         } else {
-          const { toast } = await import("../app.js?v=20260907-018");
+          const { toast } = await import("../app.js?v=20260907-022");
           toast(res.message || t("解析失败: {name}", { name: file.name }));
         }
       } catch (e) {
-        const { toast } = await import("../app.js?v=20260907-018");
+        const { toast } = await import("../app.js?v=20260907-022");
         toast(t("解析失败: {name}（{msg}）", { name: file.name, msg: e.message }));
       }
       continue;
@@ -4345,7 +4320,7 @@ async function handleFiles(fileList) {
   */
 async function regenerateMessage(msg, msgEl) {
   if (isGenerating) {
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     toast("正在生成中，请稍候");
     return;
   }
@@ -4366,7 +4341,7 @@ async function regenerateMessage(msg, msgEl) {
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     toast("请先在设置中配置该模型的 API Key");
     return;
   }
@@ -4376,7 +4351,7 @@ async function regenerateMessage(msg, msgEl) {
     .filter(m => !m.hidden && m.role !== "system")
     .map(mapAdapterMessage);
   if (!history.some(m => m.role === "user")) {
-    const { toast } = await import("../app.js?v=20260907-018");
+    const { toast } = await import("../app.js?v=20260907-022");
     toast("没有可重新生成的上下文");
     return;
   }
@@ -4400,6 +4375,8 @@ async function regenerateMessage(msg, msgEl) {
   const label = msgEl.querySelector(".msg-model-label");
   if (label) label.textContent = msg.model;
   msgEl.querySelector(".tool-call-group")?.remove();
+  _inkstreams.get(msgEl)?.destroy();
+  msgEl.querySelector(".inkstream")?.remove();
   const contentEl = msgEl.querySelector(".msg-content");
   if (contentEl) contentEl.innerHTML = "";
 
@@ -4412,8 +4389,9 @@ async function regenerateMessage(msg, msgEl) {
   const regenMeta = {};
   const regenNativeCalls = [];
   let streamFailed = false;
+  const inkR = attachInkstream(msgEl);
   try {
-    await streamWithNativeFallback({ history, model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, signal, meta: regenMeta, onToolCall: (calls) => { regenNativeCalls.length = 0; regenNativeCalls.push(...calls); } }, (chunk) => {
+    await streamWithNativeFallback({ history, model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, signal, meta: regenMeta, onToolCall: (calls) => { regenNativeCalls.length = 0; regenNativeCalls.push(...calls); inkR.onCalls(calls); } }, (chunk) => {
       appendStreamChunk(chunk, {
         reasoning(text) {
           reasoningText += text;
@@ -4426,6 +4404,7 @@ async function regenerateMessage(msg, msgEl) {
           fullContent += text;
           markActivity();
           renderAssistantContent(contentEl, fullContent, cursor);
+          inkR.onTextContent(fullContent);
           autoScroll();
         },
       });
@@ -4505,7 +4484,7 @@ function initChat() {
     markActivity(); // 防止重复触发
     try { activeGenerationController?.abort(); } catch {}
     try {
-      const { toast } = await import("../app.js?v=20260907-018");
+      const { toast } = await import("../app.js?v=20260907-022");
       toast("连接长时间无响应，已自动中断，可重试");
     } catch {}
   }, 15000);
@@ -4538,7 +4517,7 @@ function initChat() {
   document.getElementById("row-schedule")?.addEventListener("click", async () => {
     closeModeMenu();
     try {
-      const mod = await import("./schedule.js?v=20260907-018");
+      const mod = await import("./schedule.js?v=20260907-022");
       mod.openScheduleModal?.();
     } catch (e) {
       console.warn("定时任务模块加载失败", e);
@@ -4589,18 +4568,18 @@ function initChat() {
     const id = expertSelect.value;
     if (!id) {
       setActiveExpertId("");
-      const { toast } = await import("../app.js?v=20260907-018");
+      const { toast } = await import("../app.js?v=20260907-022");
       toast("已退出专家模式");
       return;
     }
     try {
-      const { getExpert } = await import("../services/experts.js?v=20260907-018");
+      const { getExpert } = await import("../services/experts.js?v=20260907-022");
       const detail = await getExpert(id, { force: true });
       setActiveExpertId(id, detail);
-      const { toast } = await import("../app.js?v=20260907-018");
+      const { toast } = await import("../app.js?v=20260907-022");
       toast(t("已启用专家包：{name}", { name: detail.name || id }));
     } catch (e) {
-      const { toast } = await import("../app.js?v=20260907-018");
+      const { toast } = await import("../app.js?v=20260907-022");
       toast(t("专家包加载失败: {msg}", { msg: e.message }));
       expertSelect.value = state.activeExpertId || "";
     }
@@ -4754,7 +4733,7 @@ function startVoice(btn) {
   };
   _voiceRecognition.onerror = (e) => {
     if (e.error !== "aborted" && e.error !== "no-speech") {
-      try { import("../app.js?v=20260907-018").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
+      try { import("../app.js?v=20260907-022").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
     }
     stopVoice();
   };

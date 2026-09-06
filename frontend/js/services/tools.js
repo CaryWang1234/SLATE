@@ -12,13 +12,14 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260907-018";
-import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-018";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260907-018";
-import { dlgUserAsk } from "./dialog.js?v=20260907-018";
-import { t } from "./i18n.js?v=20260907-018";
-import { makeId } from "./utils.js?v=20260907-018";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260907-018";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260907-022";
+import { get, post, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-022";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260907-022";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260907-022";
+import { dlgUserAsk } from "./dialog.js?v=20260907-022";
+import { t } from "./i18n.js?v=20260907-022";
+import { makeId } from "./utils.js?v=20260907-022";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260907-022";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -351,7 +352,7 @@ const TOOLS = {
       skill: { type: "string", description: "工具或技能名称", required: true },
       params: { type: "object", description: "工具参数" },
     },
-    async execute({ skill, params }) {
+    async execute({ skill, params }, callCtx = {}) {
       try {
         const p = params || {};
         // 自动注入项目目录作为默认工作目录
@@ -381,7 +382,16 @@ const TOOLS = {
         // 联网搜索默认配置：模型未显式指定时注入设置面板的默认引擎 / JS 渲染策略
         if (skill === "web_search" && !p.engine && state.webSearch) p.engine = state.webSearch.engine;
         if (skill === "web_fetch" && !p.render_js && state.webSearch) p.render_js = state.webSearch.renderJs;
-        const res = await post("/skills/execute", { skill, params: p });
+        // 一笔一流：进度/输出实时回推，signal 关闭即取消该笔；
+        // 仅在「连接从未建立」时回落 /execute，避免重放已经发生的副作用。
+        const streamed = await runSkillStream(skill, p, {
+          signal: callCtx.signal,
+          callId: callCtx.callId,
+          onEvent: callCtx.onEvent,
+        });
+        const res = streamed.fallback
+          ? await post("/skills/execute", { skill, params: p })
+          : (streamed.result || { code: -1, data: null, message: t("工具流式执行失败") });
         if (res.code === 0) {
           const data = res.data;
           if (data && data.type === "custom_skill" && data.content) return data.content;
@@ -1335,7 +1345,7 @@ function stripToolCalls(text) {
 
 // ── 工具执行 ──────────────────────────────────
 
-async function executeTool(name, params) {
+async function executeTool(name, params, callCtx = {}) {
   name = normalizeToolName(name);
   params = normalizeToolParams(name, params || {});
   const tool = TOOLS[name];
@@ -1345,7 +1355,7 @@ async function executeTool(name, params) {
     return { success: false, output: `[工具 ${name}] 未执行：${validationError}。请按该工具参数说明重发完整调用。` };
   }
   try {
-    const output = await tool.execute(params);
+    const output = await tool.execute(params, callCtx);
     // 结构化结果（如 file_edit / file_create）直接传递，同时生成文本摘要给 AI
     if (output && typeof output === "object" && output._type) {
       let summary = `[工具 ${name}] `;
@@ -1385,22 +1395,32 @@ async function executeTool(name, params) {
   }
 }
 
-async function executeToolCalls(calls) {
+async function executeToolCalls(calls, ctx = {}) {
   const results = [];
-  for (const call of calls) {
-    // 截断守卫：输出达到长度上限导致工具调用块未闭合、参数不完整。
-    // file_create/file_append 截断时已输出的 content 仍是有效前缀，允许执行预览并靠后续 file_append 补齐。
-    // 其余工具（尤其 file_edit 的部分编辑）执行残缺参数很危险，拒绝执行并反馈模型拆分重试。
-    if (call.params?._truncated && call.name !== "file_append" && call.name !== "file_create") {
-
-      results.push({
-        ...call,
+  for (let i = 0; i < calls.length; i++) {
+    const call = calls[i];
+    // 截断守卫（例外与理由见 agent_common.js 的 isTruncatedUnexecutable）
+    if (isTruncatedUnexecutable(call)) {
+      const result = {
         success: false,
         output: `[工具 ${call.name}] 未执行：该工具调用因输出长度达到上限被截断，参数不完整。请拆分后重试：超长文件先用 file_create 写入前半部分，再用 file_append 分一次或多次补齐剩余内容；单次调用的内容量宁小勿大。`,
-      });
+      };
+      ctx.onCallStart?.(call, i);
+      ctx.onCallEnd?.(call, i, result);
+      results.push({ ...call, ...result });
       continue;
     }
-    const result = await executeTool(call.name, call.params);
+    ctx.onCallStart?.(call, i);
+    let result;
+    try {
+      result = await executeTool(call.name, call.params, {
+        signal: ctx.signal,
+        callId: call.id,
+        onEvent: ctx.onEvent ? (env => ctx.onEvent(env, call, i)) : null,
+      });
+    } finally {
+      ctx.onCallEnd?.(call, i, result);  // result 为 undefined 表示这次调用抛了异常
+    }
     results.push({ ...call, ...result });
   }
   return results;
@@ -1579,7 +1599,7 @@ function buildOpenAITools() {
   return tools;
 }
 
-// 流式累积的 {index, id, name, arguments} → 执行器统一形态 {name, params, id}
+// 流式累积的 {index, id, name, arguments} → 执行器统一形态 {name, params, id, index}
 function openAICallsToCalls(toolCalls) {
   const calls = [];
   for (const tc of toolCalls || []) {
@@ -1597,7 +1617,7 @@ function openAICallsToCalls(toolCalls) {
     }
     if (!params || typeof params !== "object" || Array.isArray(params)) params = {};
     params = normalizeToolParams(tc.name, params);
-    calls.push({ name: tc.name, params, id: tc.id || undefined });
+    calls.push({ name: tc.name, params, id: tc.id || undefined, index: tc.index });
   }
   return calls;
 }

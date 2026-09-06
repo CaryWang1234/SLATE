@@ -2,8 +2,8 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260907-018";
-import { t } from "./i18n.js?v=20260907-018";
+import { API_BASE } from "../store.js?v=20260907-022";
+import { t } from "./i18n.js?v=20260907-022";
 
 // 思考内容标记前缀（用于在流式输出中区分 reasoning 与 content）
 export const REASONING_PREFIX = "\x00\x01R\x01\x00";
@@ -140,9 +140,9 @@ function get(path) {
   return request(path, { method: "GET" });
 }
 
-/** POST */
-function post(path, body) {
-  return request(path, { method: "POST", body });
+/** POST（opts 可携带 fetch 选项，如页面卸载时补发用的 keepalive） */
+function post(path, body, opts = {}) {
+  return request(path, { ...opts, method: "POST", body });
 }
 
 /** PUT */
@@ -330,4 +330,122 @@ async function upload(path, formData, timeoutMs = REQUEST_TIMEOUT_MS) {
   return resp.json();
 }
 
-export { get, post, put, del, patch, streamChat, upload };
+/**
+ * 砚流·一笔一流：以 SSE 执行一个技能，进度/输出实时回推，关流即取消。
+ *
+ * 返回 { ok, result, fallback, cancelled }：
+ * - ok=true：result 为该笔最终信封 {code,data,message}（与 /skills/execute 同形）；
+ * - fallback=true：连接从未建立（旧后端 / 网络故障），调用方可安全回落 /execute；
+ * - cancelled=true：用户主动取消，**不得**重放（副作用可能已经发生）；
+ * - 其余 ok=false：中途失败，result 为可回灌模型的错误信封。
+ *
+ * 超时策略：不设总时长上限（长命令靠事件续命），改为「连续 180s 无任何帧」的活动超时，
+ * 与 request() 的 180s 总超时对静默调用等价，对持续输出的流式调用则更宽松。
+ */
+async function runSkillStream(skill, params, { signal, onEvent, callId, runId } = {}) {
+  const controller = new AbortController();
+  let idleAborted = false;
+  let idleTimer = 0;
+  const resetIdle = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { idleAborted = true; controller.abort(); }, REQUEST_TIMEOUT_MS);
+  };
+  const onUserAbort = () => controller.abort();
+  if (signal) signal.addEventListener("abort", onUserAbort);
+  if (signal?.aborted) return { ok: false, cancelled: true, fallback: false };
+
+  let resp;
+  try {
+    resetIdle();
+    resp = await fetch(`${API_BASE}/skills/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ skill, params: params || {}, callId: callId || "", runId: runId || "" }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(idleTimer);
+    if (signal) signal.removeEventListener("abort", onUserAbort);
+    if (signal?.aborted) return { ok: false, cancelled: true, fallback: false };
+    if (idleAborted) return { ok: false, cancelled: false, fallback: false, result: { code: -1, data: null, message: t("流式执行超时（{s}s），已断开", { s: Math.round(REQUEST_TIMEOUT_MS / 1000) }) } };
+    // 请求根本没发出去（旧后端/断网），回落不会重复副作用
+    return { ok: false, cancelled: false, fallback: true, error: err?.message || String(err) };
+  }
+  if (!resp.ok || !resp.body) {
+    clearTimeout(idleTimer);
+    if (signal) signal.removeEventListener("abort", onUserAbort);
+    const detail = resp.ok ? "响应没有可读流" : await readErrorBody(resp);
+    const fallback = resp.status === 404 || resp.status === 405 || resp.status === 501;
+    return {
+      ok: false,
+      cancelled: false,
+      fallback,
+      result: fallback ? null : { code: -1, data: null, message: formatHttpError(resp.status, resp.statusText, detail) },
+    };
+  }
+
+  let result = null;
+  let cancelledByServer = false;
+  let sawFrame = false;
+  try {
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    const handle = (line) => {
+      if (!line.startsWith("data:")) return;
+      const payload = line.slice(5).trim();
+      if (!payload) return;
+      resetIdle();
+      sawFrame = true;
+      if (payload === "[DONE]") return;
+      let env;
+      try { env = JSON.parse(payload); } catch { return; }
+      if (!env || typeof env !== "object") return;
+      const data = env.data || {};
+      if (env.type === "call.finished") {
+        result = data.result || { code: 0, data: null, message: "ok" };
+      } else if (env.type === "call.error") {
+        result = data.result || { code: -1, data: null, message: data.message || "工具流式执行失败" };
+      } else if (env.type === "call.cancelled") {
+        cancelledByServer = true;
+      } else {
+        onEvent?.(env);
+      }
+    };
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, idx).replace(/\r$/, "");
+        buffer = buffer.slice(idx + 1);
+        handle(line);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer) handle(buffer.replace(/\r$/, ""));
+    try { await reader.cancel(); } catch { /* 已结束的流忽略 */ }
+    return {
+      ok: !!result && result.code === 0,
+      cancelled: cancelledByServer,
+      fallback: false,
+      result: result || (cancelledByServer
+        ? { code: 0, data: { cancelled: true, message: t("该笔调用已被取消，工具已停止执行。") }, message: "cancelled" }
+        : { code: -1, data: null, message: sawFrame ? t("流式连接提前结束，未收到最终结果。") : t("流式连接没有返回任何数据。") }),
+    };
+  } catch (err) {
+    if (signal?.aborted) return { ok: false, cancelled: true, fallback: false };
+    if (idleAborted) {
+      return { ok: false, cancelled: false, fallback: false, result: { code: -1, data: null, message: t("流式执行超时（{s}s 无输出），已断开", { s: Math.round(REQUEST_TIMEOUT_MS / 1000) }) } };
+    }
+    // 已经建立过连接：绝不回落，避免重放副作用
+    return { ok: false, cancelled: false, fallback: false, result: { code: -1, data: null, message: formatFetchError(err, { idleAborted }) } };
+  } finally {
+    clearTimeout(idleTimer);
+    if (signal) signal.removeEventListener("abort", onUserAbort);
+  }
+}
+
+export { get, post, put, del, patch, streamChat, upload, runSkillStream };

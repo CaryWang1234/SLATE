@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import chat, constitution, experts, files, grind, i18n, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, update, vault, workflows
+from backend.routers import chat, constitution, events, experts, files, grind, i18n, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, update, vault, workflows
 from backend import mcp_client
 
 # system_info 需要 psutil，可能不在所有环境中可用
@@ -78,6 +78,7 @@ app.include_router(proxy.router, prefix="/api")
 app.include_router(constitution.router, prefix="/api")
 app.include_router(skills.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(events.router, prefix="/api")
 app.include_router(grind.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")

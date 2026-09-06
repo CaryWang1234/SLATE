@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.subprocess_utils import hidden_subprocess_kwargs
+from backend.skills.call_ctx import CallContext
 from backend.skills.sandbox import truncate_output, MAX_OUTPUT_CHARS
 
 # 默认工作目录
@@ -170,6 +171,27 @@ def _looks_like_windows_native_command(command: str) -> bool:
 _CD_RE = re.compile(r"^\s*(?:cd|chdir|sl|Set-Location)\s*(.*?)\s*$", re.I)
 
 
+def _kill_process_tree(proc: subprocess.Popen) -> None:
+    """杀掉整棵进程树：shell=True 时孙进程不会随父进程自己退出。"""
+    try:
+        if proc.poll() is not None:
+            return
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                timeout=5,
+                **hidden_subprocess_kwargs(),
+            )
+        else:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+    except Exception:
+        pass
+
+
 class TerminalSession:
     """持久化终端会话。"""
 
@@ -247,47 +269,85 @@ class TerminalSession:
         stdout_thread.join()
         stderr_thread.join()
 
-    def _run_command_direct(self, command: str, timeout: float = TIMEOUT) -> dict[str, Any]:
+    def _run_command_direct(self, command: str, timeout: float = TIMEOUT, ctx: CallContext | None = None) -> dict[str, Any]:
         """Run a Windows native command without PowerShell's text transcoding."""
         self.current_command = command
         self.running = True
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
+
+        def pump(stream, sink: list[str]) -> None:
+            try:
+                for line in iter(stream.readline, ""):
+                    sink.append(line)
+            except Exception:
+                pass
+
         try:
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 command,
                 cwd=str(self.cwd),
                 env=self.env,
                 shell=True,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 encoding=TERMINAL_ENCODING,
                 errors="replace",
-                timeout=max(float(timeout or TIMEOUT), 0.1),
+                bufsize=1,
                 **hidden_subprocess_kwargs(),
             )
-            output = (proc.stdout or "").strip()
-            errors = (proc.stderr or "").strip()
+            readers = [
+                threading.Thread(target=pump, args=(proc.stdout, stdout_lines), daemon=True),
+                threading.Thread(target=pump, args=(proc.stderr, stderr_lines), daemon=True),
+            ]
+            for reader in readers:
+                reader.start()
+
+            deadline = time.monotonic() + max(float(timeout or TIMEOUT), 0.1)
+            timed_out = False
+            cancelled = False
+            emitted = 0
+            out_bytes = 0
+            while proc.poll() is None:
+                if ctx is not None:
+                    fresh = stdout_lines[emitted:]
+                    if fresh:
+                        chunk = "".join(fresh)
+                        ctx.output(chunk, stream="stdout", offset=out_bytes)
+                        out_bytes += len(chunk.encode("utf-8"))
+                        emitted = len(stdout_lines)
+                    if ctx.cancelled:
+                        cancelled = True
+                        break
+                if time.monotonic() >= deadline:
+                    timed_out = True
+                    break
+                time.sleep(0.05)
+
+            if cancelled or timed_out:
+                _kill_process_tree(proc)
+            for reader in readers:
+                reader.join(timeout=1)
+
+            output = "".join(stdout_lines).strip()
+            errors = "".join(stderr_lines).strip()
             if errors:
                 output += f"\n[STDERR]\n{errors}"
+            base = {
+                "command": command,
+                "session_id": self.session_id,
+                "work_dir": str(self.cwd),
+            }
+            if cancelled:
+                partial, was_truncated = truncate_output(output or "(无输出)")
+                return {**base, "error": "已取消：连接已关闭，命令进程已终止", "output": partial,
+                        "truncated": was_truncated, "cancelled": True}
+            if timed_out:
+                partial, was_truncated = truncate_output(output or "(无输出)")
+                return {**base, "error": f"命令超时（{timeout}s）", "output": partial, "truncated": was_truncated}
             output, was_truncated = truncate_output(output or "(无输出)")
-            return {
-                "command": command,
-                "session_id": self.session_id,
-                "work_dir": str(self.cwd),
-                "output": output,
-                "exit_code": proc.returncode,
-                "truncated": was_truncated,
-            }
-        except subprocess.TimeoutExpired as e:
-            partial = "\n".join(part for part in (e.stdout, e.stderr) if part)
-            partial, was_truncated = truncate_output(partial or "(无输出)")
-            return {
-                "error": f"命令超时（{timeout}s）",
-                "command": command,
-                "session_id": self.session_id,
-                "work_dir": str(self.cwd),
-                "output": partial,
-                "truncated": was_truncated,
-            }
+            return {**base, "output": output, "exit_code": proc.returncode, "truncated": was_truncated}
         except Exception as e:
             return {"error": f"执行失败: {e}"}
         finally:
@@ -319,18 +379,18 @@ class TerminalSession:
             pass
         return True
 
-    def run_command(self, command: str, timeout: float = TIMEOUT) -> dict[str, Any]:
+    def run_command(self, command: str, timeout: float = TIMEOUT, ctx: CallContext | None = None) -> dict[str, Any]:
         """在会话中执行命令。"""
         with self._lock:  # 防止并发串扰
-            return self._run_command_locked(command, timeout)
+            return self._run_command_locked(command, timeout, ctx)
 
-    def _run_command_locked(self, command: str, timeout: float = TIMEOUT) -> dict[str, Any]:
+    def _run_command_locked(self, command: str, timeout: float = TIMEOUT, ctx: CallContext | None = None) -> dict[str, Any]:
         """在持有锁的情况下执行命令（内部方法）。"""
         # 先同步 cwd（cd 命令本身仍交给 shell 执行）
         self._apply_cd(command)
 
         if _looks_like_windows_native_command(command):
-            return self._run_command_direct(command, timeout)
+            return self._run_command_direct(command, timeout, ctx)
 
         if not self.process or self.process.poll() is not None:
             self.start()
@@ -352,7 +412,23 @@ class TerminalSession:
             
             deadline = time.monotonic() + max(float(timeout or TIMEOUT), 0.1)
             timed_out = False
+            cancelled = False
+            emitted = 0
+            out_bytes = 0
             while True:
+                if ctx is not None:
+                    current = len(self.output_buffer)
+                    if current < emitted:  # 缓冲区丢弃过旧行，索引已失效
+                        emitted = current
+                    fresh = self.output_buffer[emitted:current]
+                    if fresh:
+                        chunk = "".join(fresh)
+                        ctx.output(chunk, stream="stdout", offset=out_bytes)
+                        out_bytes += len(chunk.encode("utf-8"))
+                        emitted = current
+                    if ctx.cancelled:
+                        cancelled = True
+                        break
                 output_snapshot = "".join(self.output_buffer)
                 if marker in output_snapshot:
                     break
@@ -371,16 +447,18 @@ class TerminalSession:
             if errors:
                 output += f"\n[STDERR]\n{errors}"
             
-            if timed_out:
+            if cancelled or timed_out:
                 partial, was_truncated = truncate_output(output or "(无输出)")
                 self.kill_process()
+                reason = "已取消：连接已关闭，命令进程已终止" if cancelled else f"命令超时（{timeout}s）"
                 return {
-                    "error": f"命令超时（{timeout}s）",
+                    "error": reason,
                     "command": command,
                     "session_id": self.session_id,
                     "work_dir": str(self.cwd),
                     "output": partial,
                     "truncated": was_truncated,
+                    **({"cancelled": True} if cancelled else {}),
                 }
 
             # 截断
@@ -442,7 +520,15 @@ def _get_or_create_session(session_id: str, cwd: str) -> TerminalSession:
     return _sessions[session_id]
 
 
-def execute(
+def execute(**params: Any) -> dict[str, Any]:
+    return _execute(**params)
+
+
+def run_stream(ctx: CallContext, **params: Any) -> dict[str, Any]:
+    return _execute(ctx=ctx, **params)
+
+
+def _execute(
     command: str = "",
     work_dir: str = DEFAULT_WORK_DIR,
     approved: bool = False,
@@ -450,6 +536,7 @@ def execute(
     action: str = "",
     session_id: str = "default",
     timeout: float = TIMEOUT,
+    ctx: CallContext | None = None,
     **_: Any,
 ) -> dict[str, Any]:
     """在持久化终端会话中执行命令或管理会话。
@@ -462,6 +549,7 @@ def execute(
         action: 操作类型 - create/list/close/kill 或空（执行命令）
         session_id: 会话 ID（默认 "default"）
         timeout: 命令超时秒数（默认 30）
+        ctx: 流式调用上下文（进度/输出/取消），/execute 路径为 None
     """
     # ── 会话管理操作 ─────────────────────────────
     
@@ -538,5 +626,5 @@ def execute(
     session = _get_or_create_session(session_id, str(cwd))
     
     # 执行命令
-    result = session.run_command(command, timeout=timeout)
+    result = session.run_command(command, timeout=timeout, ctx=ctx)
     return result

@@ -18,6 +18,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from backend.skills.call_ctx import CallContext
+
 # 默认扫描的文件扩展名
 SCAN_EXTENSIONS = {
     ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rb", ".php",
@@ -202,6 +204,23 @@ def execute(
     max_files: int = 100,
     **_: Any,
 ) -> dict[str, Any]:
+    """扫描项目代码中的安全漏洞（一次性返回）。"""
+    return _run(directory=directory, severity=severity, category=category, max_files=max_files)
+
+
+def run_stream(ctx: CallContext, **params: Any) -> dict[str, Any]:
+    """流式扫描：逐文件报进度、逐发现报输出；客户端关流即提前收手。"""
+    return _run(ctx=ctx, **params)
+
+
+def _run(
+    directory: str = "",
+    severity: str = "",
+    category: str = "",
+    max_files: int = 100,
+    ctx: CallContext | None = None,
+    **_: Any,
+) -> dict[str, Any]:
     """扫描项目代码中的安全漏洞。
 
     参数：
@@ -259,9 +278,27 @@ def execute(
 
     # 扫描
     all_findings: list[dict[str, Any]] = []
-    for fpath in files_to_scan:
+    cancelled_early = False
+    done_files = 0
+    out_bytes = 0
+    for idx, fpath in enumerate(files_to_scan, 1):
+        try:
+            shown = str(fpath.relative_to(scan_dir))
+        except ValueError:
+            shown = fpath.name
+        if ctx is not None:
+            if ctx.cancelled:
+                cancelled_early = True
+                break
+            ctx.progress(progress=idx, total=len(files_to_scan), message=shown)
         findings = _scan_file(fpath, rules)
+        for f in findings:
+            if ctx is not None:
+                chunk = f"[{f['severity']}] {f['category']} · {shown}:{f['line']}  {f['code']}"
+                ctx.output(chunk, stream="log", offset=out_bytes)
+                out_bytes += len(chunk.encode("utf-8")) + 1
         all_findings.extend(findings)
+        done_files = idx
 
     # 过滤严重级别
     filtered = [f for f in all_findings if severity_order.get(f["severity"], 3) <= min_severity]
@@ -277,11 +314,12 @@ def execute(
         category_counts[f["category"]] = category_counts.get(f["category"], 0) + 1
 
     return {
-        "scanned_files": len(files_to_scan),
+        "scanned_files": done_files,
         "skipped_files": skipped_count,
         "total_findings": len(filtered),
         "severity_summary": severity_counts,
         "category_summary": category_counts,
         "findings": filtered[:50],  # 最多返回 50 条
         "truncated": len(filtered) > 50,
+        "cancelled": cancelled_early,
     }

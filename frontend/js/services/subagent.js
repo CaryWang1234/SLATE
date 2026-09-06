@@ -6,8 +6,9 @@
  * tools 相关函数经 deps 注入，避免与 tools.js 循环导入。
  */
 
-import { state, getModelKey } from "../store.js?v=20260907-018";
-import { streamChat } from "./api.js?v=20260907-018";
+import { state, getModelKey } from "../store.js?v=20260907-022";
+import { streamChat } from "./api.js?v=20260907-022";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260907-022";
 
 export const SUBAGENT_MAX_PARALLEL = 5;     // 单次派出的并行上限
 export const SUBAGENT_MAX_ROUNDS = 8;       // 每个子代理的工具轮次预算
@@ -126,7 +127,7 @@ async function runOneSubAgent(spec, index, deps, signal) {
           resultParts.push("[工具 subagent_run] 未执行：子代理不允许再派生子代理，请自行完成该部分任务。");
           continue;
         }
-        if (call.params?._truncated && call.name !== "file_append" && call.name !== "file_create") {
+        if (isTruncatedUnexecutable(call)) {
           resultParts.push(`[工具 ${call.name}] 未执行：该调用因输出长度上限被截断、参数不完整。请拆分为更小的调用后重试。`);
           continue;
         }

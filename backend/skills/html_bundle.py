@@ -22,6 +22,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from backend.skills.call_ctx import CallCancelled, CallContext
+
 # 按文档出现顺序同时匹配 <link ...> 标签与完整 <script>...</script> 元素
 TAG_RE = re.compile(
     r"<link\b[^>]*>"
@@ -209,8 +211,16 @@ def _handle_script(tag: str, html_dir: str, report: _Report) -> str:
     return new_open + js_text + "</script>"
 
 
-def _bundle(src: str, out: str | None = None) -> tuple[str, _Report]:
-    """打包入口。返回 (输出路径, Report)。失败抛 ValueError。"""
+def _tag_ref(tag: str) -> str:
+    """取标签上的 href/src，用于逐资源进度文案。"""
+    m = re.search(r"""\s(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", tag, re.I)
+    if not m:
+        return ""
+    return m.group(1) or m.group(2) or m.group(3) or ""
+
+
+def _bundle(src: str, out: str | None = None, ctx: CallContext | None = None) -> tuple[str, _Report]:
+    """打包入口。返回 (输出路径, Report)。失败抛 ValueError，用户取消抛 CallCancelled。"""
     src = os.path.abspath(src)
     if not os.path.isfile(src):
         raise ValueError(f"源文件不存在: {src}")
@@ -231,14 +241,29 @@ def _bundle(src: str, out: str | None = None) -> tuple[str, _Report]:
     report.src_bytes = os.path.getsize(src)
 
     pieces, pos = [], 0
-    for m in TAG_RE.finditer(text):
+    matches = list(TAG_RE.finditer(text))
+    total = len(matches)
+    done = 0
+    out_bytes = 0
+    for m in matches:
         pieces.append(text[pos:m.start()])
         tag = m.group(0)
+        inlined_before = len(report.inlined)
         if tag.lower().startswith("<link"):
             pieces.append(_handle_link(tag, html_dir, report))
         else:
             pieces.append(_handle_script(tag, html_dir, report))
         pos = m.end()
+        done += 1
+        if ctx is not None:
+            if ctx.cancelled:
+                raise CallCancelled()  # 尚未写出文件，取消不留半成品
+            ref = _tag_ref(tag)
+            verdict = "内联" if len(report.inlined) > inlined_before else "保留外链"
+            ctx.progress(progress=done, total=total, message=f"{ref} · {verdict}")
+            chunk = f"[{done}/{total}] {verdict} {ref}"
+            ctx.output(chunk, stream="log", offset=out_bytes)
+            out_bytes += len(chunk.encode("utf-8")) + 1
     pieces.append(text[pos:])
     result = "".join(pieces)
 
@@ -261,13 +286,22 @@ def _bundle(src: str, out: str | None = None) -> tuple[str, _Report]:
 # ---------------------------------------------------------------------------
 
 def execute(src: str = "", out: str = "", **_kwargs) -> dict[str, Any]:
-    """将 html 及其相对路径引用的 css/js 合并为单个 html 文件。
+    """将 html 及其相对路径引用的 css/js 合并为单个 html 文件（一次性返回）。
 
     参数：
     - src : 源 html 文件路径（必填）
     - out : 输出路径（可选，缺省为源同目录 <原名>.bundled.html；
             建议保持同目录，图片/字体等未内联资源依赖相对位置）
     """
+    return _run(src, out)
+
+
+def run_stream(ctx: CallContext, **params: Any) -> dict[str, Any]:
+    """流式打包：逐资源报进度与去向；关流即停，且不写出文件。"""
+    return _run(params.get("src", ""), params.get("out", ""), ctx)
+
+
+def _run(src: Any, out: Any, ctx: CallContext | None = None) -> dict[str, Any]:
     src_path = str(src or "").strip()
     if not src_path:
         return {"error": "缺少 src 参数：请提供源 html 文件路径"}
@@ -275,7 +309,9 @@ def execute(src: str = "", out: str = "", **_kwargs) -> dict[str, Any]:
     out_path = os.path.expanduser(str(out or "").strip()) if str(out or "").strip() else None
 
     try:
-        out_file, report = _bundle(src_path, out_path)
+        out_file, report = _bundle(src_path, out_path, ctx)
+    except CallCancelled:
+        return {"message": "cancelled", "cancelled": True, "note": "用户中途取消，未写出打包文件"}
     except (ValueError, OSError) as e:
         return {"error": f"打包失败: {e}"}
 

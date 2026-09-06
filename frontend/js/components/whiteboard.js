@@ -2,12 +2,12 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260907-018";
-import { get, streamChat } from "../services/api.js?v=20260907-018";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260907-018";
-import { t } from "../services/i18n.js?v=20260907-018";
-import { iconSvgEl } from "../services/icons.js?v=20260907-018";
-import { makeId } from "../services/utils.js?v=20260907-018";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260907-022";
+import { get, streamChat } from "../services/api.js?v=20260907-022";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260907-022";
+import { t } from "../services/i18n.js?v=20260907-022";
+import { iconSvgEl } from "../services/icons.js?v=20260907-022";
+import { makeId } from "../services/utils.js?v=20260907-022";
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -2294,85 +2294,72 @@ function initWhiteboard() {
   refreshWhiteboard();
 }
 
-// ── 自动记录：工具执行步骤可视化 ─────────────────────────────────
+// ── 自动记录：工具步骤卡（agent 事件账本的投影） ─────────────────
 
-/** 工具执行时自动创建步骤卡片，形成逻辑链 */
-function addToolStepCard(toolName, params, status = "running") {
-  // 生成步骤编号
-  const stepCards = state.boardCards.filter(c => c._isToolStep);
-  const stepNum = stepCards.length + 1;
-  
-  // 工具描述映射
-  const toolDescs = {
-    file_tree: "查看目录结构", file_peek: "读取文件内容", file_edit: "编辑文件",
-    file_create: "创建文件", terminal: "执行命令", code_scan: "代码扫描",
-    todo_scan: "任务扫描", board_add: "添加卡片", board_update: "更新卡片",
-    board_batch: "批量操作", board_read: "读取黑板", knowledge_search: "搜索知识",
-    knowledge_add: "添加知识", memory_manage: "管理记忆",
-  };
-  const desc = toolDescs[toolName] || toolName;
-  
-  // 提取关键参数作为摘要
-  let summary = "";
-  if (params.path) summary = params.path;
-  else if (params.command) summary = params.command.slice(0, 40);
-  else if (params.query) summary = params.query;
-  else if (params.title) summary = params.title;
-  else if (params.directory) summary = params.directory;
-  
-  // 状态颜色：running=yellow, done=green, error=red
-  const statusColors = { running: "yellow", done: "green", error: "red" };
-  const color = statusColors[status] || "default";
-  
-  // 创建步骤卡片
-  const card = placeNewCard({
-    id: makeId("step_"),
-    title: `步骤 ${stepNum}: ${desc}`,
-    body: summary || "(无参数)",
-    color,
-    arrows: [],
-    _isToolStep: true,
-    _toolName: toolName,
-    _stepNum: stepNum,
-    _status: status,
-    _timestamp: Date.now(),
-  });
-  
-  // 连接到上一步
-  if (stepCards.length > 0) {
-    const prevCard = stepCards[stepCards.length - 1];
-    card.arrows = [prevCard.id];
+/** 步骤状态 → 卡片颜色：running=黄，done=绿，error/failed=红，cancelled=灰 */
+const STEP_COLORS = { running: "yellow", done: "green", error: "red", failed: "red", cancelled: "default" };
+
+/** 卡片正文：跑完显示结果摘录，跑前显示账本里的参数摘要 */
+function stepCardBody(step) {
+  if (step.status === "error" || step.status === "failed") {
+    return t("失败：{detail}", { detail: step.excerpt || t("执行失败") });
   }
-  
-  addBoardCard(card);
-  return card.id;
+  if (step.status === "cancelled") return t("已取消");
+  if (step.status === "done") return step.excerpt || t("完成");
+  return step.argsSummary || t("(无参数)");
 }
 
-/** 更新步骤卡片状态 */
-function updateToolStepCard(cardId, status, result = "") {
-  const card = state.boardCards.find(c => c.id === cardId);
-  if (!card || !card._isToolStep) return;
-  
-  const statusColors = { running: "yellow", done: "green", error: "red" };
-  card.color = statusColors[status] || card.color;
-  card._status = status;
-  
-  // 更新 body 显示结果摘要
-  if (result && status === "done") {
-    const maxLen = 100;
-    card.body = result.length > maxLen ? result.slice(0, maxLen) + "..." : result;
-  } else if (status === "error") {
-    card.body = "失败：" + (result || "执行失败");
+/**
+ * 用投影出的步骤描述符刷新画布上的步骤链（agent_ledger.projectSteps 的产物）。
+ * 以 callId 为键复用：已存在的卡只回写状态与正文，位置与编号不动；新出现的按账序追加，
+ * 并串到上一步的箭头上。runId 不同的旧步骤链整批淘汰（一次任务一条链）。
+ */
+function syncToolStepCards(steps, runId = "") {
+  const kept = state.boardCards.filter(c => !c._isToolStep || c._stepRunId === runId);
+  const byCallId = new Map(kept.filter(c => c._isToolStep).map(c => [c._stepCallId, c]));
+  const next = [...kept];
+  let prevStepId = null;
+  let dirty = kept.length !== state.boardCards.length;
+  for (const step of steps) {
+    const existing = byCallId.get(step.callId);
+    if (existing) {
+      const body = stepCardBody(step);
+      if (existing._status !== step.status || existing.body !== body) {
+        existing.color = STEP_COLORS[step.status] || existing.color;
+        existing._status = step.status;
+        existing.body = body;
+        dirty = true;
+      }
+      prevStepId = existing.id;
+      continue;
+    }
+    const stepNum = next.filter(c => c._isToolStep).length + 1;
+    const card = placeNewCard({
+      id: makeId("step_"),
+      title: t("步骤 {n}: {label}", { n: stepNum, label: step.label }),
+      body: stepCardBody(step),
+      color: STEP_COLORS[step.status] || "default",
+      arrows: prevStepId ? [prevStepId] : [],
+      _isToolStep: true,
+      _stepRunId: runId,
+      _stepCallId: step.callId,
+      _toolName: step.tool,
+      _stepNum: stepNum,
+      _status: step.status,
+      _timestamp: Date.now(),
+    });
+    next.push(card);
+    byCallId.set(step.callId, card);
+    prevStepId = card.id;
+    dirty = true;
   }
-  
-  // 触发更新
-  setBoardCards([...state.boardCards]);
+  if (dirty) setBoardCards(next);
 }
 
-/** 清除所有步骤卡片 */
-function clearToolStepCards() {
-  const nonStepCards = state.boardCards.filter(c => !c._isToolStep);
-  setBoardCards(nonStepCards);
+/** 新任务开始：只淘汰别的 run 的步骤链，本次 run 的卡片由投影自己维护 */
+function clearToolStepCards(runId = "") {
+  const nonStepCards = state.boardCards.filter(c => !c._isToolStep || c._stepRunId === runId);
+  if (nonStepCards.length !== state.boardCards.length) setBoardCards(nonStepCards);
 }
 
-export { initWhiteboard, refreshWhiteboard, parseCardsFromLLM, cardsToMermaid, addToolStepCard, updateToolStepCard, clearToolStepCards };
+export { initWhiteboard, refreshWhiteboard, parseCardsFromLLM, cardsToMermaid, syncToolStepCards, clearToolStepCards };
