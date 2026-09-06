@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE（砚）· 本地 AI 协作调度台</title>
-  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Agent Autopilot、目标模式自主执行、磨墨模式、30 个 Unicode-safe 内置工具 + 外部 MCP Server 连接、专家包、AI 团队辩论与 DAG 工作流、带 Git 树的升级黑板、项目理解三档扫描，将灵感转化为结构化方案。开源免费，安装即用。">
+  <meta name="description" content="SLATE（砚）—— 轻量级本地 AI 协作工具：多模型对话、Agent Autopilot、目标模式自主执行、磨墨模式、34 个 Unicode-safe 内置工具 + 外部 MCP Server 连接、专家包、AI 团队辩论与 DAG 工作流、带 Git 树的升级黑板、项目理解三档扫描，将灵感转化为结构化方案。开源免费，安装即用。">
   <link rel="icon" type="image/png" href="../icon.png">
   <link rel="stylesheet" href="../style.css">
 </head>
@@ -224,7 +224,7 @@
     <div class="container">
       <div class="stats-grid">
         <div class="reveal" data-stagger>
-          <div class="stat-num" data-count="30">0</div>
+          <div class="stat-num" data-count="34">0</div>
           <div class="stat-label">个内置工具</div>
           <div class="stat-hint">文件、终端、PPT / Word / Excel、PDF、图表 / 二维码、文档安全扫描、联网检索随叫随到</div>
         </div>
@@ -282,8 +282,8 @@
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🛠️</div>
-          <div class="feature-name">30 个内置工具</div>
-          <div class="feature-desc">文件读写编辑追加（含复制/粘贴/剪切）、Unicode-safe 终端、PPT / Word / Excel 文档生成、PDF 文本与表格提取、SVG 图表与二维码、代码与文档安全扫描、仓库统计、正则测试、联网搜索与网页抓取等，聊天时 @提及即用。文件编辑可保留 UTF-8/BOM/GB18030/GBK/UTF-16，中文和 emoji 安全写入。</div>
+          <div class="feature-name">34 个内置工具</div>
+          <div class="feature-desc">文件读写编辑追加（含复制/粘贴/剪切）、全局代码搜索、Unicode-safe 终端、PPT / Word / Excel 文档生成、PDF 文本与表格提取、SVG 图表与二维码、代码与文档安全扫描、仓库统计、Git 只读信息、正则测试、联网搜索与网页抓取、AI 图片与视频生成等，聊天时 @提及即用。文件编辑可保留 UTF-8/BOM/GB18030/GBK/UTF-16，中文和 emoji 安全写入。</div>
           <div class="feature-plain">工具就是“AI 的双手”——给 AI 接上工具，它不但会说，还会动手做。</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -395,6 +395,8 @@
             <li>模型侧失败、零输出、重复调用均自动拦截并恢复推进，循环不中断</li>
             <li>金色进度条实时显示执行轮次与清单进度，清单未了结自动催办</li>
             <li>输出截断四层防线：6 轮断点续写 + 截断守卫 + file_append 分段补齐，超长文件一定写完整</li>
+            <li>砚流 · 落笔即所见：模型逐 token 写工具参数时，按本地 schema 实时演出行列预览，半成品参数永不触发执行</li>
+            <li>停止是真取消：一键同时关闭模型流与工具调用流，后端随即终止子进程与在跑任务，不再"界面停了、活还在干"</li>
           </ul>
         </div>
         <div class="code-box reveal from-right">
@@ -431,7 +433,7 @@
       <div class="highlight">
         <div class="highlight-text reveal from-left">
           <h3>🧩 能力即文件</h3>
-          <p>30 个内置工具开箱即用，自定义能力只需一个 SKILL.md 文件——不写代码、不装插件、不重启，放进 data/skills 目录即刻生效。</p>
+          <p>34 个内置工具开箱即用，自定义能力只需一个 SKILL.md 文件——不写代码、不装插件、不重启，放进 data/skills 目录即刻生效。</p>
           <div class="highlight-plain">给 AI 加新本事，就像往书架上放一本说明书，不用拆墙也不用布线。</div>
           <ul>
             <li>file_tree / file_edit / terminal / repo_stats …</li>
@@ -474,7 +476,7 @@
         <div class="scene-card reveal" data-stagger>
           <div class="scene-icon">🧪</div>
           <h3>轻量开发助手</h3>
-          <p>读代码、改文件、跑命令、生成文档、PPT 与图表，这些都由 30 个内置工具在沙箱里完成；不想让它动手，也能只出一份高质量 Prompt 交给专业 Coding Agent。</p>
+          <p>读代码、改文件、跑命令、生成文档、PPT 与图表，这些都由 34 个内置工具在沙箱里完成；不想让它动手，也能只出一份高质量 Prompt 交给专业 Coding Agent。</p>
         </div>
         <div class="scene-card reveal" data-stagger>
           <div class="scene-icon">💡</div>
@@ -500,7 +502,7 @@
     <div class="container">
       <div class="reveal">
         <div class="section-tag">Built-in Tools</div>
-        <h2 class="section-title">30 个内置工具</h2>
+        <h2 class="section-title">34 个内置工具</h2>
         <p class="section-desc">工具可以理解为"AI 的双手"：它们按统一接口接入，模型在对话中自主决定何时使用。以下工具全部以 Python 实现于 backend/skills/，开箱即用。</p>
         <p class="section-note">用法只有一句：聊天时 <strong>@工具名</strong> 提及，或直接描述需求，模型会自己挑工具干活，并把执行结果展示给你。</p>
       </div>
@@ -531,6 +533,14 @@
         <div class="tool-item reveal" data-stagger><code>browser_automation</code><span>浏览器自动化，网页截图/表单填写/数据采集</span></div>
         <div class="tool-item reveal" data-stagger><code>computer_use</code><span>桌面操控，键鼠模拟跨应用自动化</span></div>
         <div class="tool-item reveal" data-stagger><code>screenshot_to_code</code><span>截图转代码，图片变 HTML/CSS 一键还原</span></div>
+        <div class="tool-item reveal" data-stagger><code>code_search</code><span>全局代码搜索，文本/正则按项目根检索</span></div>
+        <div class="tool-item reveal" data-stagger><code>doc_scan</code><span>文档安全扫描，查 PII/凭证/机密标记</span></div>
+        <div class="tool-item reveal" data-stagger><code>system_info</code><span>系统元认知，日期硬件电量网络随问随答</span></div>
+        <div class="tool-item reveal" data-stagger><code>excel_tool</code><span>Excel/CSV 表格，生成 .xlsx 与互转读取</span></div>
+        <div class="tool-item reveal" data-stagger><code>pdf_tool</code><span>PDF 处理，元信息、正文与表格提取</span></div>
+        <div class="tool-item reveal" data-stagger><code>git_tool</code><span>Git 只读信息，分支/日志/diff 统计一览</span></div>
+        <div class="tool-item reveal" data-stagger><code>image_gen</code><span>AI 图片生成，描述直达本地图与预览链接</span></div>
+        <div class="tool-item reveal" data-stagger><code>video_gen</code><span>AI 视频生成，短视频异步任务轮询取回</span></div>
       </div>
     </div>
   </section>
@@ -733,7 +743,7 @@
     const phrases = [
       "把「帮我整理项目文档」变成一份真正交付的报告",
       "磨墨模式：一句粗糙想法，磨成结构化任务书",
-      "30 个内置工具，@ 一下就开始干活",
+      "34 个内置工具，@ 一下就开始干活",
       "专家包 @提及，AI 秒变你的专属专家",
       "三档扫描项目：AI 先读懂项目，再动手干活",
       "灵感 → 卡片 → 逻辑链 → 可执行方案",

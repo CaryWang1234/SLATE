@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE · Local AI Collaboration Studio</title>
-  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Agent Autopilot, Target Mode autonomous execution, Grind Mode, 30 Unicode-safe tools, external MCP Server support, Expert Packs, AI team debates & 8 DAG workflow templates, Code Review, voice input, upgraded whiteboard with Git tree, full sandbox security. Open source, install and use.">
+  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Agent Autopilot, Target Mode autonomous execution, Grind Mode, 34 Unicode-safe tools, external MCP Server support, Expert Packs, AI team debates & 8 DAG workflow templates, Code Review, voice input, upgraded whiteboard with Git tree, full sandbox security. Open source, install and use.">
   <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -224,9 +224,9 @@
     <div class="container">
       <div class="stats-grid">
         <div class="reveal" data-stagger>
-          <div class="stat-num" data-count="30">0</div>
+          <div class="stat-num" data-count="34">0</div>
           <div class="stat-label">Built-in Tools</div>
-          <div class="stat-hint">Files, terminal, PPT / Word / Excel, PDF, charts / QR codes, doc security scan, web search & scraping — always ready</div>
+          <div class="stat-hint">Files, code search, terminal, PPT / Word / Excel, PDF, charts / QR codes, code &amp; document security scans, git info, web search & scraping — always ready</div>
         </div>
         <div class="reveal" data-stagger>
           <div class="stat-num"><span data-count="10">0</span>+</div>
@@ -282,8 +282,8 @@
         </div>
         <div class="feature-card reveal" data-stagger>
           <div class="feature-icon">🛠️</div>
-          <div class="feature-name">30 Built-in Tools</div>
-          <div class="feature-desc">File read/write/edit with clipboard, Unicode-safe terminal, PPT / Word / Excel generation, PDF text & table extraction, SVG charts & QR codes, code & document security scanning, repo stats, regex testing, web search & page scraping, screenshot-to-code, browser & desktop automation — @mention in chat to use, model autonomously calls and displays results. File edits preserve UTF-8/BOM/GB18030/GBK/UTF-16 and handle Chinese/emoji safely.</div>
+          <div class="feature-name">34 Built-in Tools</div>
+          <div class="feature-desc">File read/write/edit with clipboard, project-wide code search, Unicode-safe terminal, PPT / Word / Excel generation, PDF text & table extraction, SVG charts & QR codes, code & document security scanning, repo stats, read-only git info, regex testing, web search & page scraping, screenshot-to-code, AI image & video generation, browser & desktop automation — @mention in chat to use, model autonomously calls and displays results. File edits preserve UTF-8/BOM/GB18030/GBK/UTF-16 and handle Chinese/emoji safely.</div>
           <div class="feature-plain">Tools are "AI's hands" — plug in tools and it doesn't just talk, it acts.</div>
         </div>
         <div class="feature-card reveal" data-stagger>
@@ -419,6 +419,8 @@
             <li>Model failures, zero output, repeated calls all auto-intercepted and recovered, loop never breaks</li>
             <li>Gold progress bar shows round count and checklist progress in real-time, auto-reminds until checklist done</li>
             <li>Four-layer truncation defense: 6-round anchor continuation + truncation guard + file_append segmented write, long files always complete</li>
+            <li>InkStream: as the model writes tool arguments token by token, a live one-line preview shows which fields are closed and which is still being written — incomplete arguments never reach execution</li>
+            <li>Stop really cancels: one click closes both the model stream and the tool-call stream, and the backend terminates the running subprocess or task</li>
           </ul>
         </div>
         <div class="code-box reveal from-right">
@@ -455,7 +457,7 @@
       <div class="highlight">
         <div class="highlight-text reveal from-left">
           <h3>🧩 Capabilities as Files</h3>
-          <p>30 built-in tools work out of the box. Custom capabilities need just one SKILL.md file — no code, no plugin installation, no restart. Drop it in the data/skills directory and it takes effect.</p>
+          <p>34 built-in tools work out of the box. Custom capabilities need just one SKILL.md file — no code, no plugin installation, no restart. Drop it in the data/skills directory and it takes effect.</p>
           <div class="highlight-plain">Adding new capabilities for AI is like placing a manual on a shelf — no wall demolition, no rewiring.</div>
           <ul>
             <li>file_tree / file_edit / terminal / repo_stats …</li>
@@ -498,7 +500,7 @@
         <div class="scene-card reveal" data-stagger>
           <div class="scene-icon">🧪</div>
           <h3>Lightweight Dev Assistant</h3>
-          <p>Read code, edit files, run commands, generate docs, PPTs and charts — all done by 30 built-in tools in a sandbox. Don't want it to act? Just get a high-quality prompt for a professional Coding Agent instead.</p>
+          <p>Read code, edit files, run commands, generate docs, PPTs and charts — all done by 34 built-in tools in a sandbox. Don't want it to act? Just get a high-quality prompt for a professional Coding Agent instead.</p>
         </div>
         <div class="scene-card reveal" data-stagger>
           <div class="scene-icon">💡</div>
@@ -524,7 +526,7 @@
     <div class="container">
       <div class="reveal">
         <div class="section-tag">Built-in Tools</div>
-        <h2 class="section-title">30 Built-in Tools</h2>
+        <h2 class="section-title">34 Built-in Tools</h2>
         <p class="section-desc">Tools can be understood as "AI's hands": they connect via a unified interface, and the model autonomously decides when to use them. All tools below are implemented in Python at backend/skills/, ready out of the box.</p>
         <p class="section-note">Usage is simple: <strong>@tool-name</strong> in chat, or just describe what you need — the model picks the right tool and shows you the results.</p>
       </div>
@@ -555,6 +557,14 @@
         <div class="tool-item reveal" data-stagger><code>browser_automation</code><span>Chromium automation — navigate, screenshot, click, type</span></div>
         <div class="tool-item reveal" data-stagger><code>computer_use</code><span>Desktop automation — mouse, keyboard, screenshot, OCR</span></div>
         <div class="tool-item reveal" data-stagger><code>screenshot_to_code</code><span>Screenshot to code — AI reads image, generates HTML/CSS</span></div>
+        <div class="tool-item reveal" data-stagger><code>code_search</code><span>Project-wide search by text or regex, scope optional</span></div>
+        <div class="tool-item reveal" data-stagger><code>doc_scan</code><span>Document security scan — PII, credentials, confidential marks</span></div>
+        <div class="tool-item reveal" data-stagger><code>system_info</code><span>System metacognition — date, hardware, battery, network</span></div>
+        <div class="tool-item reveal" data-stagger><code>excel_tool</code><span>Excel/CSV — generate .xlsx, read tables, csv↔xlsx</span></div>
+        <div class="tool-item reveal" data-stagger><code>pdf_tool</code><span>PDF — metadata, text and table extraction</span></div>
+        <div class="tool-item reveal" data-stagger><code>git_tool</code><span>Read-only git — branches, log, diff stats</span></div>
+        <div class="tool-item reveal" data-stagger><code>image_gen</code><span>AI image generation — prompt to local file with preview</span></div>
+        <div class="tool-item reveal" data-stagger><code>video_gen</code><span>AI video generation — short clip via async task polling</span></div>
       </div>
     </div>
   </section>
@@ -762,7 +772,7 @@
     const phrases = [
       "Turn 'organize project docs' into a real deliverable report",
       "Grind Mode: a rough idea, ground into a structured task brief",
-      "30 built-in tools — @mention and start working",
+      "34 built-in tools — @mention and start working",
       "Code Review: AI reads git diff, reviews 4 dimensions, inline comments",
       "Task done? 🔔 Chime + system notification — step away worry-free",
       "7-layer sandbox security — blocks threats silently, never slows you down",

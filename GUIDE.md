@@ -31,7 +31,7 @@
 
 ### 1. SLATE 是什么？
 
-SLATE（砚）是一款**本地优先**的 AI 协作调度台。它把主流大模型、30 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。
+SLATE（砚）是一款**本地优先**的 AI 协作调度台。它把主流大模型、34 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。
 
 核心理念：**让灵感直达行动，中间不隔工具摩擦。**
 
@@ -95,7 +95,11 @@ Autopilot 是默认的“少打继续”执行层。只要你的消息明显是�
 4. 修改后重新读取、运行检查、测试或构建
 5. 没有工具记录却口头说“完成”时，系统会要求它先验证
 
-**什么时候还用 Harness：** 需要更强约束、明确 TODOLIST、长任务 50 轮闭环时，点击 ⚡ Harness。
+**砚流 · 落笔即所见：** 模型正在逐个 token 写工具参数时，SLATE 会按本地工具 schema 解析这份还没写完的参数，实时演成一行预览——哪些字段已经闭合、哪个字段正在写。它只做预览，**半成品参数永不触发执行**；几十 KB 的正文类字段一律折叠成行数与字数，不刷屏。
+
+**停止是真取消：** 点击停止会同时关闭模型流与工具调用的流式通道，后端随即终止对应的子进程与在跑任务，不再是“界面停了、活还在干”。被取消的调用会以独立状态记进本地事件账，与正常完成区分开。
+
+**什么时候还用 Harness：** 需要更强约束、明确 TODOLIST、长任务 50 轮闭环时，点击输入框左侧 **＋** 菜单里的「目标模式」开关。
 
 ---
 
@@ -187,7 +191,7 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 
 ### 9. MCP 工具箱
 
-SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
+SLATE 内置 34 个 MCP 工具，模型在对话中自主决定何时使用。
 
 **使用方式：**
 - 直接描述需求（如"帮我搜索 xxx"）
@@ -199,13 +203,15 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 |------|------|
 | 文件操作 | `file_tree` `file_peek` `file_create` `file_edit` `file_append` |
 | 终端 | `terminal`（沙箱执行，高危命令需审批） |
+| 检索与代码 | `code_search` `code_scan` `doc_scan` `repo_stats` `todo_scan` `python_api_extract` |
 | 文档生成 | `doc_write` `ppt_create` `word_create` `html_render` `html_bundle` |
+| 办公与 PDF | `excel_tool` `pdf_tool` |
 | 数据处理 | `json_tool` `regex_test` `text_summarize` `chart_create` `qrcode_create` |
 | 网络 | `web_search` `web_fetch` |
-| 代码 | `code_scan` `repo_stats` `todo_scan` `python_api_extract` |
+| 系统与环境 | `system_info` `git_tool` `css_color` |
 | 自动化 | `browser_automation` `computer_use` `screenshot_to_code` |
+| AI 生成 | `image_gen` `video_gen`（需在设置中配置模型与 API Key） |
 | 扩展 | `mcp_factory`（动态注册外部 MCP 工具） |
-| 样式 | `css_color` |
 
 **特殊字符与编码：**
 - `file_peek` / `file_edit` 自动识别 UTF-8、UTF-8 BOM、GB18030、GBK、UTF-16 等常见文本编码
@@ -369,7 +375,7 @@ SLATE 内置 30 个 MCP 工具，模型在对话中自主决定何时使用。
 
 ### 1. What is SLATE?
 
-SLATE is a **local-first** AI collaboration studio. It integrates mainstream LLMs, 30 built-in tools, team debates, DAG workflows, whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.
+SLATE is a **local-first** AI collaboration studio. It integrates mainstream LLMs, 34 built-in tools, team debates, DAG workflows, whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.
 
 Core philosophy: **Let ideas go straight to action, without tool friction in between.**
 
@@ -433,7 +439,11 @@ Autopilot is the default "do not make me type continue" execution layer. When yo
 4. Re-reads files or runs checks/tests/builds after changes
 5. If the model claims completion without tool evidence, SLATE asks it to verify or actually act first
 
-**When to use Harness:** use the ⚡ Harness button when you want the stronger six-phase mode, explicit TODOLIST enforcement, and a 50-round long-task loop.
+**InkStream — arguments as they are written:** while the model streams a tool call token by token, SLATE parses the half-formed arguments against the local tool schema and shows a live one-line preview of which fields are already closed and which one is still being written. It is preview only — **incomplete arguments never reach execution**; multi-KB text fields fold into line and character counts instead of flooding the screen.
+
+**Stop really cancels:** pressing Stop closes both the model stream and the tool-call stream, so the backend terminates the matching subprocess or running task instead of "UI stopped, work still going". Cancelled calls are recorded in the local event ledger under their own status, kept apart from successful ones.
+
+**When to use Harness:** use the **Target Mode** toggle in the **＋** menu (left of the chat input) when you want the stronger six-phase mode, explicit TODOLIST enforcement, and a 50-round long-task loop.
 
 ---
 
@@ -525,7 +535,7 @@ Visual cards + connections system for reasoning and planning.
 
 ### 9. MCP Toolbox
 
-SLATE includes 30 built-in MCP tools. The model decides when to use them during conversations.
+SLATE includes 34 built-in MCP tools. The model decides when to use them during conversations.
 
 **Usage:**
 - Describe your need naturally (e.g., "search for xxx")
@@ -537,13 +547,15 @@ SLATE includes 30 built-in MCP tools. The model decides when to use them during 
 |----------|-------|
 | File Ops | `file_tree` `file_peek` `file_create` `file_edit` `file_append` |
 | Terminal | `terminal` (sandbox execution, high-risk commands need approval) |
+| Search & Code | `code_search` `code_scan` `doc_scan` `repo_stats` `todo_scan` `python_api_extract` |
 | Doc Gen | `doc_write` `ppt_create` `word_create` `html_render` `html_bundle` |
+| Office & PDF | `excel_tool` `pdf_tool` |
 | Data | `json_tool` `regex_test` `text_summarize` `chart_create` `qrcode_create` |
 | Web | `web_search` `web_fetch` |
-| Code | `code_scan` `repo_stats` `todo_scan` `python_api_extract` |
+| System & Environment | `system_info` `git_tool` `css_color` |
 | Automation | `browser_automation` `computer_use` `screenshot_to_code` |
+| AI Generation | `image_gen` `video_gen` (model and API key configured in Settings) |
 | Extension | `mcp_factory` (dynamically register external MCP tools) |
-| Style | `css_color` |
 
 **Unicode and encoding:**
 - `file_peek` / `file_edit` auto-detect UTF-8, UTF-8 BOM, GB18030, GBK, UTF-16, and other common text encodings

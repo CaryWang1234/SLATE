@@ -33,9 +33,11 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 
 - 🗣️ **多模型统一接入** —— 国内外主流 LLM + 自定义 OpenAI 兼容端点 + 本地模型（Ollama / LM Studio）
 - ⚡ **Agent Autopilot + 目标模式** —— 普通项目任务会自动进入 Agent 循环，不再需要反复发送”继续”；目标模式仍是显式六阶段、50 轮强闭环模式
+- ✒️ **砚流 · 落笔即所见** —— 模型正在逐个 token 写工具参数时，按本地 schema 实时把「已闭合字段 / 正在写字段」演出来；半成品参数永不触发执行，长正文只显示行数字数
+- 🛑 **停止是真取消** —— 点停止即关闭工具调用的流式通道，后端随之终止子进程与在跑任务，不再是「界面停了、活还在干」；取消笔数会记入事件账供回溯
 - 🖌️ **磨墨模式** —— `/grind` 一句粗糙想法，AI 三段式追问研磨成结构化任务书，一键送入目标模式
 - 🗂️ **对话与数据管理** —— 历史全文搜索、会话导出 / 改名 / 批量管理、消息编辑删除，一键备份恢复全部数据，存储用量可视可清理
-- 🛠️ **30 个内置 MCP 工具** —— 文件读写编辑追加、Unicode-safe 终端、PPT / Word / Excel / PDF 工具、SVG 图表与二维码、Python API 文档提取、便携网页打包、联网搜索与网页抓取、MCP 工厂自生产工具、截图转代码、浏览器与桌面自动化等
+- 🛠️ **34 个内置 MCP 工具** —— 文件读写编辑追加、全局代码搜索、Unicode-safe 终端、PPT / Word / Excel / PDF 工具、SVG 图表与二维码、Python API 文档提取、便携网页打包、代码与文档安全扫描、Git 仓库只读信息、联网搜索与网页抓取、MCP 工厂自生产工具、截图转代码、AI 图片与视频生成、浏览器与桌面自动化等
 - 🧩 **自定义 Skill 系统** —— `SKILL.md` 即插即用，聊天中 `@` 提及即注入上下文
 - 🎓 **专家包（Expert Pack）** —— 人格 + 规则 + 知识 + 技能五件套，zip 导入导出，对话 / 团队 / @提及三路注入
 - 📖 **Better Project Understanding** —— 简略 / 平衡 / 详细三档扫描项目，自动生成导览·百科与规则手册
@@ -71,6 +73,9 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 - 普通任务默认最多 18 轮，全面排查 / 项目级 / 多文件任务默认最多 28 轮；目标模式仍保留 50 轮强模式
 - 如果模型只说“我将检查 / 接下来修改 / 是否继续”，系统会自动催它直接调工具；如果没执行任何工具却口头说完成，会要求它验证或真正动手
 - 工具结果会作为隐藏上下文回灌给模型，让它一次性完成观察 → 执行 → 验证 → 汇报
+- **砚流（InkStream）**：模型逐 token 写出工具参数时，本地按工具 schema 与前缀扫描实时推断哪些字段已闭合、哪个字段正在写，把参数成形过程演成一行可见预览；只做预览，半成品参数永不进入执行判定，长正文字段一律折叠为行数 / 字数
+- **停止真取消**：停止按钮会同时关闭 LLM 流与工具调用的流式通道，后端按 `CallContext` 终止子进程 / 在跑任务；取消的调用以独立状态记账，不与「已完成」混淆
+- **界面同源**：桌面与移动端跑同一条 agent 循环 kernel，聊天工具卡、移动端卡片、白板步骤卡的标题同出一个事实源（`services/tool_meta.js`），不会出现某一端退化成裸英文工具名；每轮调用的计划 / 开始 / 结束 / 取消会以事件形式落进本地账本（`runs` + `tool_events`）
 
 ### 目标模式（Target Mode）
 
@@ -89,7 +94,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 
 ### MCP 工具 & Skill 系统
 
-内置工具（`backend/skills/`）：
+内置工具共 34 个（`backend/skills/`）：
 
 | 工具 | 说明 |
 |------|------|
@@ -100,15 +105,20 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 | `html_render` / `css_color` | HTML 骨架生成 / CSS 调色 |
 | `doc_write` / `text_summarize` | Markdown 文档编写 / 文本摘要 |
 | `ppt_create` / `word_create` | .pptx 演示文稿 / .docx Word 文档生成 |
+| `excel_tool` / `pdf_tool` | Excel/CSV 办公表格（生成 .xlsx、读取表格、csv↔xlsx 互转）/ PDF 元信息与文本、表格提取 |
 | `json_tool` / `regex_test` | JSON 处理 / 正则测试 |
+| `code_search` | 项目内全局代码搜索，文本 / 正则，默认项目根，可缩小到子目录 |
 | `repo_stats` / `todo_scan` | 仓库统计 / TODO 扫描 |
 | `system_info` | 系统元认知：日期时间、硬件配置、电量、网络状态 |
+| `git_tool` | Git 仓库只读信息：分支状态、提交日志、diff 统计、分支与远程列表 |
 | `web_search` / `web_fetch` | 联网搜索（免 Key）/ 网页内容获取 |
 | `chart_create` / `qrcode_create` | SVG 图表生成（柱状/条形/折线/饼图）/ 二维码生成，产出内联预览 |
 | `python_api_extract` / `html_bundle` | Python 库公共 API 文档提取（JSON/Markdown）/ 网页 css/js 内联单文件打包 |
-| `code_scan` / `mcp_factory` | 代码安全扫描 / MCP 工具自生产（让 SLATE 自生产适配自身的 MCP） |
+| `code_scan` / `doc_scan` | 代码安全扫描（硬编码密钥 / SQL 注入 / XSS / 弱加密 / 调试残留）/ 文档安全扫描（PII、凭证、财务数据、机密标记，支持 md/docx/pptx/xlsx/pdf） |
+| `mcp_factory` | MCP 工具自生产（让 SLATE 自生产适配自身的 MCP） |
 | `browser_automation` / `computer_use` | 浏览器自动化（Playwright 控制 Chromium）/ 桌面自动化（鼠标键盘控制） |
 | `screenshot_to_code` | 截图转代码——AI 视觉分析截图内容，生成 HTML/CSS 还原视觉效果 |
+| `image_gen` / `video_gen` | AI 图片生成 / AI 视频生成（OpenAI 兼容端点，需在设置中配置模型与 API Key），返回本地文件与预览链接 |
 
 自定义 Skill：上传或导入 `SKILL.md` 即可扩展新能力；聊天输入框 `@` 提及 MCP 工具、Skill 或专家包，发送时自动注入对应上下文。
 
@@ -153,7 +163,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 
 - 手机 / 平板浏览器访问局域网地址自动进入专属移动端 UI（桌面 UA 仍获完整桌面界面，零回归）
 - 底部 Tab 导航五大面板：对话 / 会话 / 记忆 / 待办 / 设置
-- 对话全能力：流式输出、工具循环（高危命令与文件 diff 底部弹层确认）、@ 提及、语音输入
+- 对话全能力：流式输出、工具循环（与桌面共用同一条 agent 循环 kernel；高危命令与文件 diff 底部弹层确认）、@ 提及、语音输入
 - 会话历史管理、长期记忆增删改查、待办 / 定时任务、精简设置（模型切换 / API Key / 主题 / 局域网信息）
 
 ### AI 团队协作
@@ -171,7 +181,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 - Mermaid.js 渲染 flowchart / mindmap
 - 显示模式：主黑板自由画布、Git 树、流程、看板、纲要
 - Git 树会识别已打开项目的仓库状态：HEAD、本地 / 远程分支、提交、标签、remote、worktree、已暂存 / 已修改 / 未跟踪计数、stash、未推送提交；节点与视野均可拖动，保持 SLATE UI 风格
-- **自动记录**：工具执行自动创建步骤卡片，带工具图标、描述、状态颜色（黄色=执行中、绿色=完成、红色=错误）
+- **自动记录**：工具执行自动创建步骤卡片，带工具图标、描述、状态颜色（黄色=执行中、绿色=完成、红色=错误）；步骤卡是同一份调用事件账的投影，按调用编号建卡与更新，新一轮运行开始时自动清空上一批，标题与聊天工具卡共用同一个标签事实源
 - **思考过程显示**：模型推理/思考过程实时显示在可折叠面板中，思考完成后自动折叠
 
 ### 更多
@@ -263,7 +273,8 @@ SLATE/
 │   │   ├── knowledge.py        # 知识库检索
 │   │   ├── projects.py         # 项目管理 / Better Project Understanding 扫描 / Code Review
 │   │   ├── experts.py          # 专家包增删改查 / zip 导入导出
-│   │   ├── skills.py           # 技能调用
+│   │   ├── skills.py           # 技能调用（含 /skills/stream 流式端点，关流即取消）
+│   │   ├── events.py           # Agent 调用事件账写入（runs / tool_events）
 │   │   ├── settings.py         # 设置 / 跨设备同步 / 存储空间管理
 │   │   ├── constitution.py     # 项目宪法
 │   │   ├── grind.py            # 磨墨模式会话状态机
@@ -271,7 +282,7 @@ SLATE/
 │   │   ├── update.py           # 启动更新检查（GitHub Releases）
 │   │   ├── workflows.py        # 团队工作流 DAG 定义
 │   │   └── files.py            # 多模态文件解析
-│   └── skills/                 # 30 个内置 MCP 工具实现（含 Unicode-safe 文件/终端工具与高危命令双层拦截）
+│   └── skills/                 # 34 个内置 MCP 工具实现（含 Unicode-safe 文件/终端工具、高危命令双层拦截与可取消调用上下文）
 ├── frontend/
 │   ├── index.html              # 三栏布局入口（对话 / 黑板 / 工厂+能力）
 │   ├── m.html                  # 移动端遥控 UI 入口（SLATE Mobile）
@@ -281,7 +292,7 @@ SLATE/
 │       ├── app.js              # 主控初始化
 │       ├── store.js            # 全局状态管理
 │       ├── components/         # 聊天 / 白板 / 团队 / 技能 / 记忆 / 定时等
-│       └── services/           # api / adapter / tools / markdown / i18n / grind
+│       └── services/           # api / adapter / tools / i18n / grind / agent_loop（循环 kernel）/ agent_ledger（事件账）/ tool_meta（标签事实源）/ inkstream（砚流）
 ├── docs/                       # 官网 Landing Page（GitHub Pages）
 │   ├── index.html              # 英文版
 │   ├── zh/index.html           # 中文版

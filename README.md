@@ -33,9 +33,11 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 
 - 🗣️ **Unified Multi-Model Access** — Major LLMs worldwide + custom OpenAI-compatible endpoints + local models (Ollama / LM Studio)
 - ⚡ **Agent Autopilot + Target Mode** — Ordinary project requests now auto-run in an Agent loop without needing repeated "continue" prompts; Target Mode remains the explicit six-phase, 50-round closed-loop mode for large tasks
+- ✒️ **InkStream — arguments as they are written** — While the model streams a tool call token by token, SLATE parses the half-formed JSON against the local schema and shows which fields are closed and which is still being written; preview only — incomplete arguments never reach execution, and long body fields collapse to line/char counts
+- 🛑 **Stop really cancels** — Pressing Stop closes both the LLM stream and the tool-call stream, so the backend terminates the running subprocess or task instead of "UI stopped, work still going"; cancelled calls are recorded as their own status in the event ledger
 - 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Target Mode
 - 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
-- 🛠️ **30 Built-in MCP Tools** — File read/write/edit/append, Unicode-safe terminal, PPT/Word/Excel/PDF tools, SVG charts & QR codes, Python API doc extraction, portable web bundling, web search & page scraping, MCP Factory for self-production, screenshot-to-code, browser & desktop automation
+- 🛠️ **34 Built-in MCP Tools** — File read/write/edit/append, project-wide code search, Unicode-safe terminal, PPT/Word/Excel/PDF tools, SVG charts & QR codes, Python API doc extraction, portable web bundling, code & document security scanning, read-only git info, web search & page scraping, MCP Factory for self-production, screenshot-to-code, AI image & video generation, browser & desktop automation
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
@@ -71,6 +73,9 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 - Default loop budget: 18 rounds for ordinary environment tasks, 28 rounds for broad project-wide tasks; Harness keeps its configurable 50-round strong mode
 - If a model only says it will inspect/edit/verify, SLATE nudges it to call tools; if it claims completion without tool evidence, SLATE asks it to verify or actually act
 - Tool results are fed back invisibly so the model can observe → act → verify → report in one run
+- **InkStream**: while the model writes a tool call token by token, a local schema-aware prefix parser infers which fields are already closed and which one is still being written, and renders that as a live one-line preview — preview only, half-formed arguments never enter execution, and large content fields fold into line / character counts
+- **Real cancellation**: Stop closes the LLM stream and the tool-call stream together, and the backend terminates the subprocess or task through its `CallContext`; cancelled calls get their own status instead of being blurred into "done"
+- **One loop, one ledger, one label source**: desktop and mobile run the same agent-loop kernel, and every plan / start / finish / cancel is written as an event into the local ledger (`runs` + `tool_events`). The chat tool card, the mobile card, and the whiteboard step card are projections of that ledger and take their titles from one label source (`services/tool_meta.js`), so no surface ever degrades to a raw tool name
 
 ### Target Mode (Harness)
 
@@ -89,7 +94,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 
 ### MCP Tools & Skill System
 
-Built-in tools (`backend/skills/`):
+Built-in tools — 34 in total (`backend/skills/`):
 
 | Tool | Description |
 |------|-------------|
@@ -100,15 +105,20 @@ Built-in tools (`backend/skills/`):
 | `html_render` / `css_color` | HTML skeleton generation / CSS color tuning |
 | `doc_write` / `text_summarize` | Markdown writing / Text summarization |
 | `ppt_create` / `word_create` | .pptx presentations / .docx Word documents |
+| `excel_tool` / `pdf_tool` | Excel/CSV spreadsheets (generate .xlsx, read tables, csv↔xlsx conversion) / PDF metadata, text and table extraction |
 | `json_tool` / `regex_test` | JSON processing / Regex testing |
+| `code_search` | Project-wide code search by text or regex, defaults to the project root, scope narrowable to a subdirectory |
 | `repo_stats` / `todo_scan` | Repository stats / TODO scanning |
 | `system_info` | System metacognition: date/time, hardware specs, battery, network status |
+| `git_tool` | Read-only git info: branch state, commit log, diff stats, branch and remote lists |
 | `web_search` / `web_fetch` | Web search (no key needed) / Page content retrieval |
 | `chart_create` / `qrcode_create` | SVG charts (bar/line/pie) / QR codes, inline preview |
 | `python_api_extract` / `html_bundle` | Python library API extraction / Web page bundling |
-| `code_scan` / `mcp_factory` | Code security scanning / MCP tool self-production |
+| `code_scan` / `doc_scan` | Code security scanning (hardcoded keys / SQL injection / XSS / weak crypto / debug leftovers) / Document security scanning (PII, credentials, financial data, confidentiality marks across md/docx/pptx/xlsx/pdf) |
+| `mcp_factory` | MCP tool self-production — SLATE generates its own adapters |
 | `browser_automation` / `computer_use` | Browser automation (Playwright) / Desktop automation (mouse/keyboard) |
 | `screenshot_to_code` | Screenshot to code — AI reads image and generates HTML/CSS to match |
+| `image_gen` / `video_gen` | AI image generation / AI video generation (OpenAI-compatible endpoints, model and API key configured in Settings), returns local file and preview link |
 
 Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention in chat to auto-inject context.
 
@@ -153,7 +163,7 @@ Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention i
 
 - Phone/tablet browsers visiting the LAN address automatically get the dedicated mobile UI (desktop UAs keep the full desktop interface — zero regression)
 - Bottom-tab navigation with five panels: Chat / Conversations / Memory / Schedule / Settings
-- Full chat capability: streaming output, tool loop with bottom-sheet risk approval and diff previews, @-mentions, voice input
+- Full chat capability: streaming output, tool loop on the same agent-loop kernel as the desktop, bottom-sheet risk approval and diff previews, @-mentions, voice input
 - Session history management, long-term memory CRUD, scheduled tasks, and streamlined settings (model switching, API keys, theme, LAN info)
 
 ### AI Team Collaboration
@@ -171,7 +181,7 @@ Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention i
 - Mermaid.js rendered flowcharts & mindmaps
 - Display modes: main freeform board, Git tree, flow, kanban, and outline
 - Git tree recognizes the opened project's repository state: HEAD, local/remote branches, commits, tags, remotes, worktrees, staged/changed/untracked counts, stashes, and unpushed commits; nodes and canvas are draggable in SLATE style
-- **Auto-logging**: Tool execution steps automatically create step cards with icons, descriptions, and status colors (yellow=running, green=done, red=error)
+- **Auto-logging**: Tool execution steps automatically create step cards with icons, descriptions, and status colors (yellow=running, green=done, red=error); the cards are a projection of the call event ledger — created and updated per call id, cleared when a new run starts, and titled from the same label source as the chat tool cards
 - **Thinking process display**: Model reasoning/thinking shown in collapsible panel, auto-collapses after thinking completes
 
 ### More
@@ -263,7 +273,8 @@ SLATE/
 │   │   ├── knowledge.py        # Knowledge base retrieval
 │   │   ├── projects.py         # Project management / Better Project Understanding / Code Review
 │   │   ├── experts.py          # Expert pack CRUD / zip import/export
-│   │   ├── skills.py           # Skill invocation
+│   │   ├── skills.py           # Skill invocation (incl. /skills/stream — closing the stream cancels)
+│   │   ├── events.py           # Agent call event ledger writes (runs / tool_events)
 │   │   ├── settings.py         # Settings / cross-device sync / storage management
 │   │   ├── constitution.py     # Project constitution
 │   │   ├── grind.py            # Grind Mode session state machine
@@ -271,7 +282,7 @@ SLATE/
 │   │   ├── update.py           # Startup update check (GitHub Releases)
 │   │   ├── workflows.py        # Team workflow DAG definition
 │   │   └── files.py            # Multimodal file parsing
-│   └── skills/                 # 30 built-in MCP tool implementations (incl. Unicode-safe file/terminal tools and high-risk command dual interception)
+│   └── skills/                 # 34 built-in MCP tool implementations (incl. Unicode-safe file/terminal tools, high-risk command dual interception, and a cancellable call context)
 ├── frontend/
 │   ├── index.html              # Three-column layout entry (Chat / Whiteboard / Factory+Capabilities)
 │   ├── m.html                  # Mobile remote UI entry (SLATE Mobile)
@@ -281,7 +292,7 @@ SLATE/
 │       ├── app.js              # Main controller initialization
 │       ├── store.js            # Global state management
 │       ├── components/         # Chat / Whiteboard / Team / Skills / Memory / Schedule etc.
-│       ├── services/           # api / adapter / tools / markdown / i18n / grind
+│       ├── services/           # api / adapter / tools / i18n / grind / agent_loop (loop kernel) / agent_ledger (event ledger) / tool_meta (label source) / inkstream
 │       └── mobile/             # Mobile modules (init / app / ui / chat / conversations / memory / schedule / settings)
 ├── docs/                       # Website Landing Page (GitHub Pages)
 │   ├── index.html              # English version

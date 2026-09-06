@@ -412,11 +412,11 @@
         </div>
         <div class="chapter-body">
           <div class="lang-zh">
-            <p>SLATE（砚）是一款<strong>本地优先</strong>的 AI 协作调度台。它把主流大模型、30 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。</p>
+            <p>SLATE（砚）是一款<strong>本地优先</strong>的 AI 协作调度台。它把主流大模型、34 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。</p>
             <div class="ink-note"><strong>核心理念：</strong>让灵感直达行动，中间不隔工具摩擦。</div>
           </div>
           <div class="lang-en">
-            <p>SLATE is a <strong>local-first</strong> AI collaboration studio. It integrates mainstream LLMs, 30 built-in tools, team debates, DAG workflows, and whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.</p>
+            <p>SLATE is a <strong>local-first</strong> AI collaboration studio. It integrates mainstream LLMs, 34 built-in tools, team debates, DAG workflows, and whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.</p>
             <div class="ink-note"><strong>Core philosophy:</strong> Let ideas go straight to action, without tool friction in between.</div>
           </div>
         </div>
@@ -506,6 +506,8 @@ python desktop.py</pre>
             <p><strong>Agent Autopilot</strong> 是默认的”少打继续”执行层。只要你要求 SLATE 查看项目、修改文件、运行命令、排查 bug、提交代码或生成文件，它会自动进入多轮 Agent Loop，不需要反复发送”继续”。</p>
             <p><strong>默认轮数：</strong>普通环境任务最多 18 轮；全面排查、项目级、多文件任务最多 28 轮。系统会把工具结果隐藏回灌给模型，让它继续观察 → 执行 → 验证 → 汇报。</p>
             <p>如果模型只说”我将检查 / 接下来修改 / 是否继续”，系统会自动催它直接调工具；如果没有任何工具记录却口头说完成，系统会要求它先验证或真正动手。</p>
+            <p><strong>砚流 · 落笔即所见：</strong>模型正在逐个 token 写工具参数时，SLATE 会按本地工具 schema 解析这份还没写完的参数，实时演成一行预览——哪些字段已经闭合、哪个字段正在写。它只做预览，<strong>半成品参数永不触发执行</strong>；几十 KB 的正文类字段一律折叠成行数与字数，不刷屏。</p>
+            <p><strong>停止是真取消：</strong>点击停止会同时关闭模型流与工具调用的流式通道，后端随即终止对应的子进程与在跑任务，不再是“界面停了、活还在干”。被取消的调用会以独立状态记进本地事件账，与正常完成区分开。</p>
             <p><strong>目标模式</strong> 是更强的显式闭环模式。需要 50 轮长任务、明确 TODOLIST 和六阶段约束时，点击输入框左侧 <strong>＋</strong> 菜单里的「目标模式」开关，或在消息中提及「用目标模式执行」。</p>
             <p><strong>六阶段流程：</strong></p>
             <ol>
@@ -522,6 +524,8 @@ python desktop.py</pre>
             <p><strong>Agent Autopilot</strong> is the default "do not make me type continue" execution layer. When you ask SLATE to inspect a project, edit files, run commands, debug, commit, or generate files, it automatically enters a multi-round Agent Loop.</p>
             <p><strong>Default budgets:</strong> ordinary environment tasks can auto-advance up to 18 rounds; broad project-wide or multi-file tasks can auto-advance up to 28 rounds. Tool results are fed back invisibly so the model can continue Observe → Act → Verify → Report.</p>
             <p>If the model only says it will inspect/edit/continue, SLATE nudges it to call tools. If it claims completion without any tool evidence, SLATE asks it to verify or actually act first.</p>
+            <p><strong>InkStream — arguments as they are written:</strong> while the model streams a tool call token by token, SLATE parses the half-formed arguments against the local tool schema and shows a live one-line preview of which fields are already closed and which one is still being written. It is preview only — <strong>incomplete arguments never reach execution</strong>; multi-KB text fields fold into line and character counts instead of flooding the screen.</p>
+            <p><strong>Stop really cancels:</strong> pressing Stop closes both the model stream and the tool-call stream, so the backend terminates the matching subprocess or running task instead of "UI stopped, work still going". Cancelled calls are recorded in the local event ledger under their own status, kept apart from successful ones.</p>
             <p><strong>Target Mode</strong> is the stronger explicit loop. Toggle "Target Mode" in the <strong>＋</strong> menu (left of the chat input), or mention "use Target Mode", when you want 50 rounds, TODOLIST enforcement, and six-phase constraints.</p>
             <p><strong>Six-Phase Flow:</strong></p>
             <ol>
@@ -618,6 +622,7 @@ python desktop.py</pre>
               <li>顶栏可切换 Git / 流程 / 看板 / 纲要等显示模式；主黑板就是默认自由画布</li>
               <li>Git 树识别 HEAD、branch、remote branch、commit、tag、remote、worktree、stash、暂存 / 修改 / 未跟踪计数、未推送提交；节点与视野均可拖动</li>
               <li>4 种 AI 白板工具：<code>card_create</code> · <code>card_edit</code> · <code>arrow_create</code> · <code>board_summarize</code></li>
+              <li>工具执行自动记录为步骤卡片：按调用编号建卡与更新，执行中 / 完成 / 错误以颜色区分，新一轮运行开始清空上一批，标题与聊天工具卡片同出一个标签事实源</li>
             </ul>
           </div>
           <div class="lang-en">
@@ -629,6 +634,7 @@ python desktop.py</pre>
               <li>Switch display modes from the header: Git, Flow, Kanban, and Outline. The main whiteboard is the default freeform canvas.</li>
               <li>Git Tree recognizes HEAD, branches, remote branches, commits, tags, remotes, worktrees, stash, staged/changed/untracked counts, and unpushed commits. Nodes and viewport are draggable.</li>
               <li>4 AI tools: <code>card_create</code> · <code>card_edit</code> · <code>arrow_create</code> · <code>board_summarize</code></li>
+              <li>Tool execution is auto-logged as step cards: created and updated per call id, colour-coded running / done / error, cleared when a new run starts, and titled from the same label source as the chat tool cards</li>
             </ul>
           </div>
         </div>
@@ -637,7 +643,7 @@ python desktop.py</pre>
       <!-- Ch8 -->
       <div class="scroll-section" id="ch8">
         <div class="chapter-title"><span class="chapter-num">8</span>
-          <span class="lang-zh">工具箱（30 个）</span><span class="lang-en">Toolbox (30 Tools)</span>
+          <span class="lang-zh">工具箱（34 个）</span><span class="lang-en">Toolbox (34 Tools)</span>
         </div>
         <div class="chapter-body">
           <div class="lang-zh">
@@ -646,11 +652,14 @@ python desktop.py</pre>
               <tr><th>类别</th><th>工具</th></tr>
               <tr><td>文件操作</td><td><code>file_tree</code> <code>file_peek</code> <code>file_create</code> <code>file_edit</code> <code>file_append</code></td></tr>
               <tr><td>终端</td><td><code>terminal</code>（沙箱执行，高危需审批）</td></tr>
+              <tr><td>检索与代码</td><td><code>code_search</code> <code>code_scan</code> <code>doc_scan</code> <code>repo_stats</code> <code>todo_scan</code> <code>python_api_extract</code></td></tr>
               <tr><td>文档生成</td><td><code>doc_write</code> <code>ppt_create</code> <code>word_create</code> <code>html_render</code> <code>html_bundle</code></td></tr>
+              <tr><td>办公与 PDF</td><td><code>excel_tool</code> <code>pdf_tool</code></td></tr>
               <tr><td>数据处理</td><td><code>json_tool</code> <code>regex_test</code> <code>text_summarize</code> <code>chart_create</code> <code>qrcode_create</code></td></tr>
               <tr><td>网络</td><td><code>web_search</code> <code>web_fetch</code></td></tr>
-              <tr><td>代码</td><td><code>code_scan</code> <code>repo_stats</code> <code>todo_scan</code> <code>python_api_extract</code></td></tr>
+              <tr><td>系统与环境</td><td><code>system_info</code> <code>git_tool</code> <code>css_color</code></td></tr>
               <tr><td>自动化</td><td><code>browser_automation</code> <code>computer_use</code> <code>screenshot_to_code</code></td></tr>
+              <tr><td>AI 生成</td><td><code>image_gen</code> <code>video_gen</code>（需在设置中配置模型与 API Key）</td></tr>
               <tr><td>扩展</td><td><code>mcp_factory</code>（动态注册外部工具）</td></tr>
             </table>
             <p><strong>特殊字符与编码：</strong><code>file_peek</code> / <code>file_edit</code> 自动识别 UTF-8、UTF-8 BOM、GB18030、GBK、UTF-16 等常见文本编码；中文、emoji、全角符号会原样保留。Windows 下 <code>terminal</code> 隐藏 PowerShell 子窗口，并对 Python / Node / Git / npm / rg 等原生命令做 Unicode-safe 输出捕获。</p>
@@ -661,11 +670,14 @@ python desktop.py</pre>
               <tr><th>Category</th><th>Tools</th></tr>
               <tr><td>File Ops</td><td><code>file_tree</code> <code>file_peek</code> <code>file_create</code> <code>file_edit</code> <code>file_append</code></td></tr>
               <tr><td>Terminal</td><td><code>terminal</code> (sandbox, high-risk needs approval)</td></tr>
+              <tr><td>Search &amp; Code</td><td><code>code_search</code> <code>code_scan</code> <code>doc_scan</code> <code>repo_stats</code> <code>todo_scan</code> <code>python_api_extract</code></td></tr>
               <tr><td>Doc Gen</td><td><code>doc_write</code> <code>ppt_create</code> <code>word_create</code> <code>html_render</code> <code>html_bundle</code></td></tr>
+              <tr><td>Office &amp; PDF</td><td><code>excel_tool</code> <code>pdf_tool</code></td></tr>
               <tr><td>Data</td><td><code>json_tool</code> <code>regex_test</code> <code>text_summarize</code> <code>chart_create</code> <code>qrcode_create</code></td></tr>
               <tr><td>Web</td><td><code>web_search</code> <code>web_fetch</code></td></tr>
-              <tr><td>Code</td><td><code>code_scan</code> <code>repo_stats</code> <code>todo_scan</code> <code>python_api_extract</code></td></tr>
+              <tr><td>System &amp; Environment</td><td><code>system_info</code> <code>git_tool</code> <code>css_color</code></td></tr>
               <tr><td>Automation</td><td><code>browser_automation</code> <code>computer_use</code> <code>screenshot_to_code</code></td></tr>
+              <tr><td>AI Generation</td><td><code>image_gen</code> <code>video_gen</code> (requires model and API key in Settings)</td></tr>
               <tr><td>Extension</td><td><code>mcp_factory</code> (register external tools)</td></tr>
             </table>
             <p><strong>Unicode and encoding:</strong> <code>file_peek</code> / <code>file_edit</code> auto-detect UTF-8, UTF-8 BOM, GB18030, GBK, UTF-16, and other common text encodings. Chinese, emoji, and full-width symbols are preserved as-is. On Windows, <code>terminal</code> hides PowerShell windows and captures Unicode-safe output for native commands such as Python / Node / Git / npm / rg.</p>
