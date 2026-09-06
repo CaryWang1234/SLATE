@@ -45,6 +45,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 - 🛡️ **High-Risk Command Approval** — Dual-layer frontend+backend interception with hardcoded rules; AI explains command purpose before approval; catastrophic commands unconditionally blocked
 - 👥 **AI Team Multi-Round Debate** — Multi-role propose/oppose/decide with light/heavy model division; plus DAG workflow pipeline with **8 built-in templates** (Dev Flow, Code Review, Doc Generation, Data Analysis, Research Report, Product Requirements, Bug Investigation, Parallel Research); stop button for mid-debate interruption; **9 built-in team presets** (Code Review, Product Brainstorm, Red-Blue Debate, etc.) + custom configuration; workflow import/export/delete
 - ⏰ **Scheduled Chat Tasks** — Auto-execute preset prompts on schedule, results archived as separate sessions
+- ➕ **Unified ＋ Mode Menu** — one ＋ button left of the chat input consolidates every mode entry: Grind / Brainstorm / Target Mode / Scheduled Tasks, plus an **@-mention group** (Skills / Tools / MCP / Files) that opens a filtered picker; works in both the classic and the minimal Codex UI
 - 🧠 **Upgraded Whiteboard** — Card + connector brainstorming, Mermaid-rendered flowcharts & mindmaps, flow/kanban/outline modes, draggable Git tree view for branches/commits/worktrees/staged/unpushed state, and auto-logged tool execution steps
 - 💾 **Long-Term Memory & Knowledge Base** — Auto-distill chat highlights, cross-session recall; **overwrite outdated memories and delete obsolete ones** via AI-driven add/overwrite/delete actions; **✨ Spark** — auto-capture technical insights when conversations end, archive as knowledge docs for future RAG injection
 - 🗜️ **Smart Context Compression** — Auto-summarize over threshold, four-layer truncation defense with auto-continuation, four-layer timeout prevention
@@ -81,7 +82,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 
 ### Grind Mode
 
-- Type `/grind <idea>` or click the 🖌 sidebar button to refine rough ideas into a structured task brief
+- Type `/grind <idea>`, or open the **＋ menu** (left of the chat input) → Grind Mode, to refine rough ideas into a structured task brief
 - Three-phase questioning: Receive → Grind → Collect (up to 10 rounds), sidebar ink panel marks ✔ resolved / ✘ unknown in real-time
 - Brief includes goals / audience / deliverables / acceptance criteria / boundaries / suggested path / open questions; three actions: send to Target Mode / push to whiteboard / save as template
 - Grind sessions persist and auto-restore on refresh or switch

@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260907-017";
+import { makeId } from "./services/utils.js?v=20260907-018";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -218,6 +218,7 @@ function savePersistent() {
 function getSharedPersistentData(data = buildPersistentData()) {
   return {
     theme: normalizeTheme(data.theme),
+    uiMode: data.uiMode === "codex" ? "codex" : "classic",
     modelKeys: data.modelKeys || {},
     customModels: data.customModels || [],
     currentModelId: data.currentModelId || null,
@@ -323,6 +324,9 @@ async function loadSharedPersistent() {
     }
     if (Object.prototype.hasOwnProperty.call(data, "theme")) {
       state.theme = normalizeTheme(data.theme);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "uiMode")) {
+      state.uiMode = data.uiMode === "codex" ? "codex" : "classic";
     }
     if (Object.prototype.hasOwnProperty.call(data, "maxTokens")) {
       state.maxTokens = Math.max(1000, parseInt(data.maxTokens) || 64000);

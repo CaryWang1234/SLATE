@@ -41,6 +41,7 @@ async def get_shared_state():
 async def save_shared_state(req: SharedStateRequest):
     allowed_keys = {
         "theme",
+        "uiMode",
         "modelKeys",
         "customModels",
         "currentModelId",

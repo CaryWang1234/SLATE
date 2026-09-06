@@ -5448,20 +5448,114 @@ img.file-type-icon {
   }
 }
 
-/* ── 头脑风暴模式按钮激活态 ─────────── */
+/* ── 模式与功能弹窗（输入框"+"入口，经典/Codex 通用）──── */
 
-#btn-brainstorm.active {
+.mode-menu-content {
+  max-width: 340px;
+}
+
+.mode-menu-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+}
+
+.mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition);
+}
+
+.mode-row:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.mode-row.on {
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
+}
+
+.mode-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mode-row-hint {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.mode-row.on .mode-row-hint {
+  color: var(--gold);
+}
+
+.mode-row-caret {
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.mode-menu-divider {
+  margin: 6px 10px 2px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+.mode-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 18px;
+  border-radius: 99px;
+  background: var(--border);
+  transition: background-color var(--transition);
+}
+
+.mode-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: left var(--transition);
+}
+
+.mode-row.on .mode-switch {
   background: var(--gold);
-  color: var(--bg);
-  border-color: var(--gold);
+}
+
+.mode-row.on .mode-switch::after {
+  left: 18px;
 }
 
 /* ── 目标自主执行 ─────────────── */
 
-#btn-harness.active {
-  background: var(--gold);
-  color: var(--bg);
-  border-color: var(--gold);
+/* 状态条为空时彻底隐藏，避免残留空的金色虚线框 */
+.harness-status.hidden {
+  display: none;
 }
 
 .harness-status {
@@ -8576,24 +8670,6 @@ html[data-ui="codex"] .chat-scroll:empty::before {
   font-weight: 650;
   letter-spacing: 0.5px;
   color: var(--text);
-}
-
-/* 空对话欢迎态：Slogan + 工具行 + 状态条 + 输入框作为整组垂直居中
-   注意：不能写 :not(:has(...)) —— :has 嵌套在 :not 里 Chromium 解析会整条丢弃；
-   因此用两条并列 :has 覆盖两条空态路径（.chat-scroll 空 DOM 的 ::before 路径、
-   以及已渲染 .chat-welcome 的路径） */
-html[data-ui="codex"] #chat-area:has(.chat-scroll:empty),
-html[data-ui="codex"] #chat-area:has(.chat-welcome) {
-  justify-content: center;
-}
-
-html[data-ui="codex"] #chat-area:has(.chat-scroll:empty) .chat-area-row,
-html[data-ui="codex"] #chat-area:has(.chat-welcome) .chat-area-row {
-  flex: 0 0 auto;
-}
-
-html[data-ui="codex"] #chat-area:has(.chat-welcome) .chat-welcome {
-  margin: 0 auto;
 }
 
 /* 其余面板（黑板/工厂/设置等）头部与左侧栏同底色，极简扁平 */

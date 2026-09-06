@@ -12,13 +12,13 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260907-017";
-import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-017";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260907-017";
-import { dlgUserAsk } from "./dialog.js?v=20260907-017";
-import { t } from "./i18n.js?v=20260907-017";
-import { makeId } from "./utils.js?v=20260907-017";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260907-017";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260907-018";
+import { get, post, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-018";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260907-018";
+import { dlgUserAsk } from "./dialog.js?v=20260907-018";
+import { t } from "./i18n.js?v=20260907-018";
+import { makeId } from "./utils.js?v=20260907-018";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260907-018";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
