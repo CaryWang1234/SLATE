@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20260907-022";
-import { getToolsSystemPrompt } from "./tools.js?v=20260907-022";
+import { state } from "../store.js?v=20260910-004";
+import { getToolsSystemPrompt } from "./tools.js?v=20260910-004";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -49,8 +49,8 @@ const SYSTEM_PROMPTS = {
 
 // ── 模型分类 ────────────────────────────────
 
-const REASONING_MODELS = ["gpt-5.6-sol", "claude-fable-5"];
-const LIGHTWEIGHT_MODELS = ["gpt-5.6-luna", "gemini-3.6-flash", "gemini-3.5-flash-lite", "deepseek-v4-flash", "kimi-k2.7-code", "doubao-seed-2-1-turbo-260628"];
+const REASONING_MODELS = ["gpt-5.6-sol", "claude-fable-5", "claude-fable-5-1"];
+const LIGHTWEIGHT_MODELS = ["gpt-5.6-luna", "gemini-3.6-flash", "gemini-3.5-flash-lite", "deepseek-flash", "kimi-k2.7-code", "doubao-seed-2-1-turbo-260628"];
 
 /**
  * 根据模型 ID 获取适配的系统提示 */
@@ -121,16 +121,10 @@ function getExpertSystemPrompt() {
 }
 
 /**
- * 构建完整的消息列表（注入系统提示 + 宪法 + 专家/记忆/知识 + 工具）。
- * 顺序：角色定义、项目宪法、专家/记忆/知识上下文、工具说明（贴近对话，降低遗忘）。
- * toolMode：native=序列化原生工具协议（assistant.tool_calls + role:"tool"）；
- *           text=剥离协议（tool 消息降为 user，便于不支持 tools 的端点消费）。
+ * 组装发往模型的完整系统提示：角色定义 → 项目宪法 → 专家包/记忆/知识 → 工具目录。
+ * 上下文估算与实际载荷共用此函数，避免两处口径漂移。
  */
-function buildMessages(userMessages, constitution, toolMode = "text") {
-  const messages = [];
-
-  // 系统提示
-  const modelId = userMessages._modelId || "";
+function buildSystemContent(modelId, constitution) {
   let systemContent = getSystemPrompt(modelId);
 
   // 注入项目宪法（项目开发规则，先于上下文注入）
@@ -148,7 +142,19 @@ function buildMessages(userMessages, constitution, toolMode = "text") {
   // 注入工具描述（默认使用精简 Agent 版，避免长工具目录稀释关键指令）
   systemContent += getToolsSystemPrompt({ compact: true });
 
-  messages.push({ role: "system", content: systemContent });
+  return systemContent;
+}
+
+/**
+ * 构建完整的消息列表（注入系统提示 + 宪法 + 专家/记忆/知识 + 工具）。
+ * 顺序：角色定义、项目宪法、专家/记忆/知识上下文、工具说明（贴近对话，降低遗忘）。
+ * toolMode：native=序列化原生工具协议（assistant.tool_calls + role:"tool"）；
+ *           text=剥离协议（tool 消息降为 user，便于不支持 tools 的端点消费）。
+ */
+function buildMessages(userMessages, constitution, toolMode = "text") {
+  const messages = [];
+
+  messages.push({ role: "system", content: buildSystemContent(userMessages._modelId || "", constitution) });
 
   const native = toolMode === "native";
   // 历史中已存在的 tool 结果 id（原生协议要求 assistant tool_calls 后必须有匹配的 tool 消息）
@@ -238,4 +244,4 @@ function getDefaultParams(modelId) {
   return { temperature: 0.7, max_tokens };
 }
 
-export { getSystemPrompt, buildMessages, getDefaultParams, getOutputMaxTokens, SYSTEM_PROMPTS };
+export { getSystemPrompt, buildSystemContent, buildMessages, getDefaultParams, getOutputMaxTokens, SYSTEM_PROMPTS };

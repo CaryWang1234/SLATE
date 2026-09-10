@@ -5,18 +5,19 @@
  * 3. 装配外壳与各面板
  */
 
-import { state, loadPersistent, loadSharedPersistent, setModelRegistry } from "../store.js?v=20260907-022";
-import { setLanToken, get } from "../services/api.js?v=20260907-022";
-import { initI18n } from "../services/i18n.js?v=20260907-022";
-import { initMApp } from "./m-app.js?v=20260907-022";
-import { mToast } from "./m-ui.js?v=20260907-022";
-import { initMChat } from "./m-chat.js?v=20260907-022";
-import { initMChatInput } from "./m-chat-input.js?v=20260907-022";
-import { initMConversations } from "./m-conversations.js?v=20260907-022";
-import { initMMemory } from "./m-memory.js?v=20260907-022";
-import { initMSchedule } from "./m-schedule.js?v=20260907-022";
-import { initMSettings } from "./m-settings.js?v=20260907-022";
-import { mGuardTerminal } from "./m-auth.js?v=20260907-022";
+import { state, subscribe, loadPersistent, loadSharedPersistent, setModelRegistry } from "../store.js?v=20260910-004";
+import { measureContext } from "../services/context_meter.js?v=20260910-004";
+import { setLanToken, get } from "../services/api.js?v=20260910-004";
+import { initI18n } from "../services/i18n.js?v=20260910-004";
+import { initMApp } from "./m-app.js?v=20260910-004";
+import { mToast } from "./m-ui.js?v=20260910-004";
+import { initMChat } from "./m-chat.js?v=20260910-004";
+import { initMChatInput } from "./m-chat-input.js?v=20260910-004";
+import { initMConversations } from "./m-conversations.js?v=20260910-004";
+import { initMMemory } from "./m-memory.js?v=20260910-004";
+import { initMSchedule } from "./m-schedule.js?v=20260910-004";
+import { initMSettings } from "./m-settings.js?v=20260910-004";
+import { mGuardTerminal } from "./m-auth.js?v=20260910-004";
 
 // 移动端接管高危命令审批 UI（底部 sheet），桌面不受影响
 window.__slateGuardOverride = mGuardTerminal;
@@ -62,6 +63,10 @@ async function init() {
   initMMemory();
   initMSchedule();
   initMSettings();
+
+  // 移动端无用量条，但 chat_context 工具读上下文分桶快照，需在此保持新鲜
+  subscribe("messages", () => measureContext());
+  subscribe("model", () => measureContext());
 
   console.log("[SLATE-Mobile] ready");
 }

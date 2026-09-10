@@ -12,14 +12,14 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260907-022";
-import { get, post, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260907-022";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260907-022";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260907-022";
-import { dlgUserAsk } from "./dialog.js?v=20260907-022";
-import { t } from "./i18n.js?v=20260907-022";
-import { makeId } from "./utils.js?v=20260907-022";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260907-022";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260910-004";
+import { get, post, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260910-004";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260910-004";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260910-004";
+import { dlgUserAsk } from "./dialog.js?v=20260910-004";
+import { t } from "./i18n.js?v=20260910-004";
+import { makeId } from "./utils.js?v=20260910-004";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260910-004";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -929,18 +929,24 @@ const TOOLS = {
 
   chat_context: {
     name: "查看对话上下文",
-    description: "查看当前对话的统计信息",
+    description: "查看当前对话的统计信息。上下文按系统提示词/工具目录/Skill 注入/工具调用与结果/对话消息分桶给出，用于判断是哪一类内容占用了上下文",
     params: {},
     async execute() {
       const msgs = state.messages;
-      const ctxTokens = msgs.reduce((sum, m) => sum + Math.ceil((m.content || "").length / 3) + 4, 0);
-      return [
+      const snap = state.contextSnapshot;
+      const lines = [
         `模型: ${state.currentModel?.name || "未选择"}`,
         `消息数: ${msgs.length}`,
-        `上下文估算: ~${ctxTokens.toLocaleString()} tokens`,
-        `上下文上限: ${state.currentModel?.context_window || "未知"}`,
-        `黑板卡片: ${state.boardCards.length}`,
-      ].join("\n");
+      ];
+      if (snap) {
+        lines.push(`上下文估算: ~${snap.total.toLocaleString()} tokens`);
+        lines.push(snap.buckets.filter(b => b.tokens > 0).map(b => `  ${b.label}: ${b.tokens.toLocaleString()}`).join("\n"));
+      } else {
+        lines.push("上下文估算: 未测量");
+      }
+      lines.push(`上下文上限: ${state.currentModel?.context_window || "未知"}`);
+      lines.push(`黑板卡片: ${state.boardCards.length}`);
+      return lines.join("\n");
     },
   },
 

@@ -2,27 +2,30 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, resetUsage } from "./store.js?v=20260907-022";
-import { initI18n, t } from "./services/i18n.js?v=20260907-022";
-import { iconSvgEl } from "./services/icons.js?v=20260907-022";
-import { get, post, put } from "./services/api.js?v=20260907-022";
-import { dlgConfirm } from "./services/dialog.js?v=20260907-022";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260907-022";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260907-022";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260907-022";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260907-022";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260907-022";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260907-022";
-import { initTeamPanel } from "./components/team.js?v=20260907-022";
-import { initProjectBar } from "./components/project_bar.js?v=20260907-022";
-import { initMemoryPanel } from "./components/memory.js?v=20260907-022";
-import { initExpertsPanel } from "./components/experts.js?v=20260907-022";
-import { initSchedule } from "./components/schedule.js?v=20260907-022";
-import { initRiskGuard } from "./services/riskguard.js?v=20260907-022";
-import { initUnderstandPanel } from "./components/understand.js?v=20260907-022";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260907-022";
-import { setProject, setProjectFileTree } from "./store.js?v=20260907-022";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260907-022";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme } from "./store.js?v=20260910-004";
+import { initI18n, t } from "./services/i18n.js?v=20260910-004";
+import { iconSvgEl } from "./services/icons.js?v=20260910-004";
+import { get, post, put } from "./services/api.js?v=20260910-004";
+import { dlgConfirm } from "./services/dialog.js?v=20260910-004";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260910-004";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260910-004";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260910-004";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260910-004";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260910-004";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260910-004";
+import { initTeamPanel } from "./components/team.js?v=20260910-004";
+import { initProjectBar } from "./components/project_bar.js?v=20260910-004";
+import { initSessionSummary } from "./components/session_summary.js?v=20260910-004";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260910-004";
+import { initTypingGame } from "./components/typing_game.js?v=20260910-004";
+import { initMemoryPanel } from "./components/memory.js?v=20260910-004";
+import { initExpertsPanel } from "./components/experts.js?v=20260910-004";
+import { initSchedule } from "./components/schedule.js?v=20260910-004";
+import { initRiskGuard } from "./services/riskguard.js?v=20260910-004";
+import { initUnderstandPanel } from "./components/understand.js?v=20260910-004";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260910-004";
+import { setProject, setProjectFileTree } from "./store.js?v=20260910-004";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260910-004";
 
 // ── Toast 通知 ──────────────────────────────
 
@@ -230,7 +233,6 @@ function handleModelSelect(e) {
 
       } else {
         setCurrentModel(found);
-        resetUsage();
         toast(t("已切换: {name}", { name: found.name }));
       }
       return;
@@ -246,7 +248,6 @@ function handleModelSelect(e) {
       openKeyInputModal(custom);
     } else {
       setCurrentModel(custom);
-      resetUsage();
       toast(t("已切换: {name}", { name: custom.name }));
     }
   }
@@ -329,7 +330,6 @@ function saveCustomModel() {
   setModelKey(name, key);
   const wasEditing = !!editingCustomModelId;
   setCurrentModel(model);
-  resetUsage();
   populateModelSelect();
   populateAutoReviewModelSelect();
   renderCustomModelManagement();
@@ -444,7 +444,6 @@ function renderKeyManagement() {
       populateModelSelect();
       if (val && pendingKeyModel?.id === m.id) {
         setCurrentModel(m);
-        resetUsage();
         pendingKeyModel = null;
         populateModelSelect();
       }
@@ -494,6 +493,7 @@ function openSettings(options = {}) {
   }
   renderCustomModelManagement();
   renderKeyManagement();
+  refreshApiTestModels();
   renderUsageSummary();
   renderAbout();
   renderLanInfo();
@@ -1032,7 +1032,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260907-022").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260910-004").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1458,6 +1458,37 @@ function initUiMode() {
   applyUiMode();
 }
 
+// ── 左栏三页签：项目 / 任务 / 总结（滑块切换）──────────────
+
+const LS_PANES = ["project", "task", "summary"];
+
+function activateLeftPane(name) {
+  const idx = LS_PANES.indexOf(name);
+  if (idx < 0) return;
+  document.querySelectorAll("#left-slider .ls-seg").forEach(seg => {
+    const on = seg.dataset.pane === name;
+    seg.classList.toggle("active", on);
+    seg.setAttribute("aria-selected", String(on));
+  });
+  document.querySelectorAll("#project-sidebar .ls-pane").forEach(pane => {
+    pane.classList.toggle("active", pane.id === `ls-pane-${name}`);
+  });
+  const thumb = document.getElementById("left-slider-thumb");
+  if (thumb) thumb.style.transform = `translateX(${idx * 100}%)`;
+  window.dispatchEvent(new CustomEvent("slate:left-pane", { detail: { pane: name } }));
+}
+
+function initLeftSidebar() {
+  const slider = document.getElementById("left-slider");
+  if (!slider) return;
+  slider.addEventListener("click", (e) => {
+    const seg = e.target.closest(".ls-seg");
+    if (seg) activateLeftPane(seg.dataset.pane);
+  });
+  activateLeftPane(slider.querySelector(".ls-seg.active")?.dataset.pane || "project");
+  initSessionSummary();
+}
+
 // ── 媒体生成配置（图片/视频）──────────────────
 
 const GEN_CONFIGS = {
@@ -1545,7 +1576,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260907-022");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260910-004");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1719,6 +1750,7 @@ async function init() {
   safeInit("MCP Server", initMcpServerPanel);
   safeInit("AI 团队", initTeamPanel);
   safeInit("项目栏", initProjectBar);
+  safeInit("左栏页签", initLeftSidebar);
   safeInit("记忆面板", initMemoryPanel);
   safeInit("专家包", initExpertsPanel);
   safeInit("定时任务", initSchedule);
@@ -1757,6 +1789,8 @@ async function init() {
   initWebSearchPersistence();
   initGenSettingsPersistence();
   initUiMode();
+  safeInit("API 测试", initApiTest);
+  safeInit("打字小游戏", initTypingGame);
   window.addEventListener("slate:open-settings", (event) => openSettings(event.detail || {}));
 
   // 设置页导航与关于
@@ -1777,7 +1811,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260907-022");
+        const { openProject } = await import("./services/project.js?v=20260910-004");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }

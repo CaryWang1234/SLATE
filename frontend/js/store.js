@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260907-022";
+import { makeId } from "./services/utils.js?v=20260910-004";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -36,6 +36,9 @@ const state = {
 
   // 每个对话的用量统计（convId → usage）
   conversationUsage: {},
+
+  // 最近一次上下文分桶结果（由 services/context_meter.js 写入，不持久化）
+  contextSnapshot: null,
 
   // 每个对话的 TODOLIST（convId → items），目标六阶段闭环的任务清单
   conversationTodos: {},
@@ -249,6 +252,35 @@ function saveSharedPersistent(data) {
   } catch (e) {}
 }
 
+// 注册表中的 id 同时是 API Key 与「当前模型」的存储键，改名后必须把旧键的值搬到新键，
+// 否则用户凭据会静默失联。旧键保留，便于回滚到旧版本。
+const MODEL_ID_RENAMES = {
+  "deepseek-chat": "deepseek-v4-pro",
+  "deepseek-v4-flash": "deepseek-flash",
+  "deepseek-v4-flash-vision-exp": "deepseek-flash",
+  "gemini-3.1-pro": "gemini-3.1-pro-preview",
+  "minimax-m3": "MiniMax-M3",
+};
+
+function migrateModelIds() {
+  let changed = false;
+  for (const [oldId, newId] of Object.entries(MODEL_ID_RENAMES)) {
+    if (state.modelKeys[oldId] && !state.modelKeys[newId]) {
+      state.modelKeys[newId] = state.modelKeys[oldId];
+      changed = true;
+    }
+    if (state._pendingModelId === oldId) {
+      state._pendingModelId = newId;
+      changed = true;
+    }
+    if (state.autoReview?.modelId === oldId) {
+      state.autoReview.modelId = newId;
+      changed = true;
+    }
+  }
+  if (changed) savePersistent();
+}
+
 function loadPersistent() {
   try {
     const raw = localStorage.getItem("slate_state");
@@ -302,6 +334,7 @@ function loadPersistent() {
     state.webSearch = normalizeWebSearch(data.webSearch);
     state.imageGen = normalizeGenConfig(data.imageGen);
     state.videoGen = normalizeGenConfig(data.videoGen);
+    migrateModelIds();
   } catch (e) {}
 }
 
@@ -377,6 +410,7 @@ async function loadSharedPersistent() {
     if (Object.prototype.hasOwnProperty.call(data, "videoGen")) {
       state.videoGen = normalizeGenConfig(data.videoGen);
     }
+    migrateModelIds();
     saveLocalPersistent();
   } catch (e) {}
 }
@@ -517,14 +551,6 @@ function estimateTokens(text) {
   if (!text) return 0;
   // 粗略估算：中英文混合约 3 字符/token
   return Math.ceil(text.length / 3);
-}
-
-function estimateContextTokens(messages) {
-  let total = 0;
-  for (const msg of messages) {
-    total += estimateTokens(msg.content || "") + 4; // role overhead
-  }
-  return total;
 }
 
 function setMessages(msgs) {
@@ -717,7 +743,7 @@ export {
   API_BASE, state, subscribe, notify,
   setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel,
   setActiveExpertId,
-  resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens, estimateContextTokens,
+  resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens,
   getConversationTodos, setConversationTodos,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage,

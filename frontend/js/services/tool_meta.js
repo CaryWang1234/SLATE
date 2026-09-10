@@ -6,8 +6,8 @@
  * 短标签表 + TOOLS schema，两个投影都只认这里。
  */
 
-import { TOOLS } from "./tools.js?v=20260907-022";
-import { t } from "./i18n.js?v=20260907-022";
+import { TOOLS } from "./tools.js?v=20260910-004";
+import { t } from "./i18n.js?v=20260910-004";
 
 const SUMMARY_MAX = 60;
 

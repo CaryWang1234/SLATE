@@ -3,16 +3,16 @@
  * 轻量模型初步讨论，重型模型最终决策。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260907-022";
-import { notifyTaskComplete } from "../services/notify.js?v=20260907-022";
-import { streamChat } from "../services/api.js?v=20260907-022";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260907-022";
-import { renderMarkdown } from "../services/markdown.js?v=20260907-022";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260907-022";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260907-022";
-import { getExpertsCached } from "./experts.js?v=20260907-022";
-import { t } from "../services/i18n.js?v=20260907-022";
-import { makeId } from "../services/utils.js?v=20260907-022";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260910-004";
+import { notifyTaskComplete } from "../services/notify.js?v=20260910-004";
+import { streamChat } from "../services/api.js?v=20260910-004";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260910-004";
+import { renderMarkdown } from "../services/markdown.js?v=20260910-004";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260910-004";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260910-004";
+import { getExpertsCached } from "./experts.js?v=20260910-004";
+import { t } from "../services/i18n.js?v=20260910-004";
+import { makeId } from "../services/utils.js?v=20260910-004";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -30,7 +30,7 @@ const TEAM_HISTORY_KEY = "slate_team_history";
 // ── 默认团队成员 ────────────────────────────
 
 const DEFAULT_MEMBERS = [
-  { id: "member-1", name: "分析师", modelId: "deepseek-v4-flash", persona: "你是务实派分析师。关注可行性和成本，回答简洁（1-3句）。", role: "analyst" },
+  { id: "member-1", name: "分析师", modelId: "deepseek-flash", persona: "你是务实派分析师。关注可行性和成本，回答简洁（1-3句）。", role: "analyst" },
   { id: "member-2", name: "创意官", modelId: "gemini-3.6-flash", persona: "你是创意导向的思考者。关注创新可能性和用户体验，回答简洁（1-3句）。", role: "creative" },
   { id: "member-3", name: "决策者", modelId: "gpt-5.6-sol", persona: "你是最终决策者。综合各方观点给出明确建议和理由，回答简洁（1-3句）。", role: "decider" },
 ];
@@ -45,7 +45,7 @@ const TEAM_PRESETS = [
     "members": [
       {
         "name": "分析师",
-        "modelId": "deepseek-v4-flash",
+        "modelId": "deepseek-flash",
         "persona": "你是务实派分析师。关注可行性和成本，回答简洁（1-3句）。",
         "role": "analyst"
       },
@@ -70,7 +70,7 @@ const TEAM_PRESETS = [
     "members": [
       {
         "name": "安全专家",
-        "modelId": "deepseek-v4-flash",
+        "modelId": "deepseek-flash",
         "persona": "你是安全审计专家。专注代码安全漏洞、注入风险、敏感信息泄露，回答简洁。",
         "role": "analyst"
       },
@@ -101,7 +101,7 @@ const TEAM_PRESETS = [
       },
       {
         "name": "设计师",
-        "modelId": "deepseek-v4-flash",
+        "modelId": "deepseek-flash",
         "persona": "你是交互设计师。关注用户体验、信息架构和视觉层次，回答简洁。",
         "role": "creative"
       },
@@ -126,7 +126,7 @@ const TEAM_PRESETS = [
     "members": [
       {
         "name": "前端专家",
-        "modelId": "deepseek-v4-flash",
+        "modelId": "deepseek-flash",
         "persona": "你是前端技术专家。从框架生态、开发体验、性能角度评估技术方案，回答简洁。",
         "role": "analyst"
       },
@@ -163,7 +163,7 @@ const TEAM_PRESETS = [
       },
       {
         "name": "反方辩手",
-        "modelId": "deepseek-v4-flash",
+        "modelId": "deepseek-flash",
         "persona": "你是反方辩手。尖锐质疑方案的漏洞、风险和盲点，用反例和数据反驳，回答简洁。",
         "role": "analyst"
       },
@@ -182,7 +182,7 @@ const TEAM_PRESETS = [
     "members": [
       {
         "name": "前端评审",
-        "modelId": "deepseek-v4-flash",
+        "modelId": "deepseek-flash",
         "persona": "你负责前端评审。关注组件设计、状态管理、渲染性能和可访问性，回答简洁。",
         "role": "analyst"
       },
@@ -200,7 +200,7 @@ const TEAM_PRESETS = [
       },
       {
         "name": "运维评审",
-        "modelId": "deepseek-v4-flash",
+        "modelId": "deepseek-flash",
         "persona": "你负责运维评审。关注部署流程、日志监控、容灾恢复和成本，回答简洁。",
         "role": "analyst"
       },
@@ -225,7 +225,7 @@ const TEAM_PRESETS = [
       },
       {
         "name": "文案写手",
-        "modelId": "deepseek-v4-flash",
+        "modelId": "deepseek-flash",
         "persona": "你是文案写手。负责文字表达、修辞润色和节奏把控，回答简洁。",
         "role": "creative"
       },
@@ -250,7 +250,7 @@ const TEAM_PRESETS = [
       },
       {
         "name": "技术顾问",
-        "modelId": "deepseek-v4-flash",
+        "modelId": "deepseek-flash",
         "persona": "你是技术顾问。关注技术可行性、MVP 范围、开发周期和技术债，回答简洁。",
         "role": "analyst"
       },
@@ -287,7 +287,7 @@ const TEAM_PRESETS = [
       },
       {
         "name": "实证研究者",
-        "modelId": "deepseek-v4-flash",
+        "modelId": "deepseek-flash",
         "persona": "你是实证研究者。关注数据证据、实验设计和统计分析，回答简洁。",
         "role": "analyst"
       },

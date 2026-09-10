@@ -146,7 +146,7 @@ def _get_stream_client(base_url: str) -> httpx.AsyncClient:
         )
     return _http_clients[key]
 
-# ── 模型注册表（2026-08 时效性校验） ──────────────────────────
+# ── 模型注册表（2026-09 时效性校验） ──────────────────────────
 
 MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
     "international": [
@@ -156,6 +156,8 @@ MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
          "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True},
         {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna", "provider": "openai",
          "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True},
+        {"id": "claude-fable-5-1", "name": "Claude Fable 5.1", "provider": "anthropic",
+         "base_url": "https://api.anthropic.com", "context_window": 1000000},
         {"id": "claude-fable-5", "name": "Claude Fable 5", "provider": "anthropic",
          "base_url": "https://api.anthropic.com", "context_window": 1000000},
         {"id": "claude-opus-5", "name": "Claude Opus 5", "provider": "anthropic",
@@ -164,32 +166,31 @@ MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
          "base_url": "https://api.anthropic.com", "context_window": 1000000},
         {"id": "gemini-3.6-flash", "name": "Gemini 3.6 Flash", "provider": "google",
          "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576},
-        {"id": "gemini-3.1-pro", "name": "Gemini 3.1 Pro", "provider": "google",
+        {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "provider": "google",
          "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576},
         {"id": "gemini-3.5-flash-lite", "name": "Gemini 3.5 Flash-Lite", "provider": "google",
          "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576},
     ],
     "domestic": [
-        {"id": "deepseek-chat", "name": "DeepSeek-V4-Pro", "provider": "openai",
-         "base_url": "https://api.deepseek.com/v1", "context_window": 131072},
-        {"id": "deepseek-v4-flash-vision-exp", "name": "DeepSeek-V4-Flash-Vision-Exp", "provider": "openai",
-         "base_url": "https://api.deepseek.com/v1", "context_window": 131072},
-        {"id": "deepseek-v4-flash", "name": "DeepSeek-V4-Flash", "provider": "openai",
-         "base_url": "https://api.deepseek.com/v1", "context_window": 131072, "supports_responses": True},
+        # 官方仅接受这两个模型名：deepseek-chat 已下线，识图/快速/专家模式已并入其中
+        {"id": "deepseek-v4-pro", "name": "DeepSeek-V4-Pro", "provider": "openai",
+         "base_url": "https://api.deepseek.com/v1", "context_window": 1048576},
+        {"id": "deepseek-flash", "name": "DeepSeek-V4.1-Flash", "provider": "openai",
+         "base_url": "https://api.deepseek.com/v1", "context_window": 1048576},
         {"id": "kimi-k3", "name": "Kimi K3", "provider": "openai",
          "base_url": "https://api.moonshot.cn/v1", "context_window": 1048576},
         {"id": "kimi-k2.7-code", "name": "Kimi K2.7 Code", "provider": "openai",
          "base_url": "https://api.moonshot.cn/v1", "context_window": 262144},
         {"id": "qwen3.8-max", "name": "Qwen3.8-Max", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True},
         {"id": "qwen3.8-flash", "name": "Qwen3.8-Flash", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True},
         {"id": "qwen3.7-max", "name": "Qwen3.7-Max", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True},
         {"id": "qwen3.7-plus", "name": "Qwen3.7-Plus", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 131072, "supports_responses": True},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True},
         {"id": "glm-5.2", "name": "GLM-5.2", "provider": "openai",
-         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 131072},
+         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576},
         {"id": "glm-5.3", "name": "GLM-5.3", "provider": "openai",
          "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576},
         {"id": "glm-5.3-flash", "name": "GLM-5.3-Flash", "provider": "openai",
@@ -198,8 +199,8 @@ MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
          "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144},
         {"id": "doubao-seed-2-1-turbo-260628", "name": "Doubao-Seed-2.1-Turbo-260628", "provider": "openai",
          "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144},
-        {"id": "minimax-m3", "name": "MiniMax M3", "provider": "openai",
-         "base_url": "https://api.minimax.chat/v1", "context_window": 1048576},
+        {"id": "MiniMax-M3", "name": "MiniMax M3", "provider": "openai",
+         "base_url": "https://api.minimax.cn/v1", "context_window": 1000000, "supports_responses": True},
         {"id": "ernie-5.1", "name": "ERNIE 5.1", "provider": "openai",
          "base_url": "https://qianfan.baidubce.com/v2", "context_window": 131072},
     ],
