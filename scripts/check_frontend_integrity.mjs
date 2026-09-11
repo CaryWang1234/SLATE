@@ -9,7 +9,7 @@
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
@@ -30,13 +30,22 @@ function readUtf8(file) {
   return readFileSync(path.join(root, file), "utf8");
 }
 
-function rgFiles(args) {
-  const rg = spawnSync("rg", args, { cwd: root, encoding: "utf8" });
-  if (rg.status !== 0 && !rg.stdout) return [];
-  return rg.stdout.split(/\r?\n/).filter(Boolean);
+/**
+ * 递归列出目录下所有文件（仓库相对路径，正斜杠分隔）。
+ * 刻意不依赖 rg / git 等外部命令：检查脚本此前用 `rg --files` 枚举前端文件，
+ * 机器上没装 ripgrep 时列表为空，脚本会以「no frontend files found」假失败，
+ * 把环境缺工具误报成代码问题。纯 node:fs 实现与项目零依赖基调一致。
+ */
+function walkFiles(dir, acc = []) {
+  for (const entry of readdirSync(path.join(root, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) walkFiles(rel, acc);
+    else if (entry.isFile()) acc.push(rel);
+  }
+  return acc;
 }
 
-const frontendFiles = rgFiles(["--files", "frontend"]);
+const frontendFiles = existsSync(path.join(root, "frontend")) ? walkFiles("frontend") : [];
 const jsFiles = frontendFiles.filter(f => f.endsWith(".js"));
 const htmlFiles = frontendFiles.filter(f => f.endsWith(".html"));
 const cssFiles = frontendFiles.filter(f => f.endsWith(".css"));

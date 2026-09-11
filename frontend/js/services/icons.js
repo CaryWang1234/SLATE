@@ -8,7 +8,7 @@
  *   iconText(name, text) → 返回 <span class="icon-text">图标+文本</span>（文本走 textNode，无 XSS）
  */
 
-import { CUSTOM_ICONS, CUSTOM_VIEWBOXES } from "./icons_custom.js?v=20260910-004";
+import { CUSTOM_ICONS, CUSTOM_VIEWBOXES } from "./icons_custom.js?v=20260910-006";
 
 const ICONS = {
   key: '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
@@ -78,6 +78,28 @@ const ICONS = {
   "corner-down-right": '<path d="M15 10l5 5-5 5M20 15H9a6 6 0 0 1-6-6V5"/>',
   "arrow-down": '<path d="M12 5v14M19 12l-7 7-7-7"/>',
   sparkles: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/>',
+  terminal: '<path d="M4 17l6-5-6-5M12 19h8"/>',
+  code: '<path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/>',
+  git: '<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  node: '<path d="M12 2l8.7 5v10L12 22l-8.7-5V7z"/><path d="M9.4 16.2V8.6l5.2 7.3V8.6"/>',
+  python: '<path d="M11.4 3.4c-2.6 0-4.4.9-4.4 2.9v2.5h4.5M12.6 20.6c2.6 0 4.4-.9 4.4-2.9v-2.5h-4.5"/><rect x="7" y="8.6" width="10" height="6.8" rx="3.4"/><path d="M9.4 5.8h.01M14.6 18.2h.01"/>',
+  docker: '<path d="M3.4 12.8h15.2c2.1-2.6 1.3-5.1-.9-6.4.2 1.6-.7 2.6-1.8 2.9"/><rect x="5.4" y="10" width="2.7" height="2.7" rx=".5" stroke-width="1.3"/><rect x="8.7" y="10" width="2.7" height="2.7" rx=".5" stroke-width="1.3"/><rect x="12" y="10" width="2.7" height="2.7" rx=".5" stroke-width="1.3"/><rect x="8.7" y="6.9" width="2.7" height="2.7" rx=".5" stroke-width="1.3"/>',
+  curl: '<path d="M14.3 7.2A5.8 5.8 0 1 0 14.3 16.8"/><path d="M13 12h8.6M18.4 9.4l3.2 2.6-3.2 2.6"/>',
+  kubectl: '<path d="M12 3l6.6 2.4 2.6 6.4-3.8 5.8H8.6l-3.8-5.8 2.6-6.4z"/><circle cx="12" cy="12" r="2.2"/><path d="M12 9.8V6.9M13.9 13.2l2.3 1.8M10.1 13.2l-2.3 1.8"/>',
+  braces: '<path d="M8.5 3.5H7.2a2.2 2.2 0 0 0-2.2 2.2v3a2.5 2.5 0 0 0-2.5 2.5 2.5 2.5 0 0 0 2.5 2.5v3a2.2 2.2 0 0 0 2.2 2.2h1.3M15.5 3.5h1.3a2.2 2.2 0 0 1 2.2 2.2v3a2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5v3a2.2 2.2 0 0 1-2.2 2.2h-1.3"/>',
+  hash: '<path d="M4.5 9h15M4.5 15h15M10 3.5L8 20.5M16 3.5l-2 17"/>',
+  image: '<rect x="3" y="3.5" width="18" height="17" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M21 15.5l-4.5-4.5L6 20.5"/>',
+  video: '<rect x="2.5" y="6" width="13" height="12" rx="2"/><path d="M15.5 10.6L21.5 7v10l-6-3.6z"/>',
+  qr: '<rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1"/><path d="M14 14h2.6v2.6H14zM20.5 14h.01M14 20.5h2.6M20.5 17.5v3"/>',
+  palette: '<path d="M12 21.3a9.3 9.3 0 1 1 0-18.6c5.1 0 9.3 3.5 9.3 7.8 0 2.6-2.1 4.4-4.6 4.4H15a2 2 0 0 0-1.4 3.3 1.9 1.9 0 0 1-1.6 3.1z"/><circle cx="7.8" cy="11.3" r="1.1"/><circle cx="10.2" cy="7.3" r="1.1"/><circle cx="14.9" cy="8.1" r="1.1"/>',
+  table: '<rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M3 10h18M9.5 10v9.5M15.5 10v9.5"/>',
+  presentation: '<rect x="3" y="3.5" width="18" height="12.5" rx="2"/><path d="M12 16v4.5M8.5 20.5h7M7.5 12l3-3.5 2.2 2 3.8-4"/>',
+  plug: '<path d="M9 2.5v5M15 2.5v5M6 7.5h12v3.2a6 6 0 0 1-12 0zM12 16.7v4.8"/>',
+  "file-plus": '<path d="M14 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8z"/><path d="M14 2.5V8h4.5M12 12v5.5M9.2 14.8h5.5"/>',
+  cloud: '<path d="M17.5 18.5H7a4.5 4.5 0 1 1 .8-9A6 6 0 0 1 19.7 11a4 4 0 0 1-2.2 7.5z"/>',
+  activity: '<path d="M21.5 12h-4l-3 8-4-16-3 8h-4"/>',
+  maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>',
+  minimize: '<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>',
 };
 
 const ICON_ALIASES = {

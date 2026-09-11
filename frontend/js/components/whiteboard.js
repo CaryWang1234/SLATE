@@ -2,20 +2,21 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260910-004";
-import { get, streamChat } from "../services/api.js?v=20260910-004";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260910-004";
-import { t } from "../services/i18n.js?v=20260910-004";
-import { iconSvgEl } from "../services/icons.js?v=20260910-004";
-import { makeId } from "../services/utils.js?v=20260910-004";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260910-006";
+import { get, streamChat } from "../services/api.js?v=20260910-006";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260910-006";
+import { t } from "../services/i18n.js?v=20260910-006";
+import { iconSvgEl } from "../services/icons.js?v=20260910-006";
+import { makeId } from "../services/utils.js?v=20260910-006";
 
-let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel;
+let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel, whiteboardPanel, boardModesBar, wfStopBtn;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
 let btnCardDelete, btnCardSave, btnCardCancel;
 let editingCardId = null;
 let selectedColor = "default";
 let svgOverlay = null;
 let mermaidVisible = false;
+let boardViewFullscreen = false;
 const DEFAULT_BOARD_VIEW = "kanban";
 
 let currentBoardView = DEFAULT_BOARD_VIEW;
@@ -439,10 +440,32 @@ function buildFlowLevels(cards) {
   return { incoming, outgoing, cardMap, columns: [...columns.entries()].sort((a, b) => a[0] - b[0]) };
 }
 
+const boardControlHomes = new Map();
+
+function parkBoardControl(el, slot) {
+  if (!el) return;
+  if (slot) {
+    slot.appendChild(el);
+    return;
+  }
+  const home = boardControlHomes.get(el);
+  const parent = home?.parent;
+  if (!parent) return;
+  const next = home.next && home.next.parentNode === parent ? home.next : null;
+  parent.insertBefore(el, next);
+}
+
+// 全屏时把视图切换条与工作流停止按钮搬进看板栏头部，退出时送回 panel-header
+function mountBoardViewControls(modesSlot, stopSlot) {
+  parkBoardControl(boardModesBar, boardViewFullscreen ? modesSlot : null);
+  parkBoardControl(wfStopBtn, boardViewFullscreen ? stopSlot : null);
+}
+
 function renderBoardView() {
   if (!boardViewPanel || !currentBoardView) return;
   boardViewPanel.classList.toggle("git-mode", currentBoardView === "git" && !boardViewCollapsed);
   if (boardViewCollapsed) {
+    setBoardViewFullscreen(false, { skipRender: true });
     boardViewPanel.innerHTML = "";
     const strip = document.createElement("div");
     strip.className = "board-view-collapse-strip";
@@ -471,7 +494,9 @@ function renderBoardView() {
   titleGroup.className = "board-view-title-group";
   const title = document.createElement("strong");
   title.textContent = t(BOARD_VIEW_LABELS[currentBoardView] || "视图");
-  titleGroup.append(title);
+  const modesSlot = document.createElement("div");
+  modesSlot.className = "board-view-header-modes";
+  titleGroup.append(title, modesSlot);
   const actions = document.createElement("div");
   actions.className = "board-view-header-actions";
   const hiddenSteps = allCards.length - cards.length;
@@ -496,9 +521,19 @@ function renderBoardView() {
     boardViewCollapsed = true;
     setBoardView(currentBoardView, { preserveCollapse: true });
   });
-  actions.append(meta, stepToggle, collapse);
+  const fullscreenBtn = document.createElement("button");
+  fullscreenBtn.type = "button";
+  fullscreenBtn.className = "board-view-collapse-btn" + (boardViewFullscreen ? " active" : "");
+  fullscreenBtn.appendChild(iconSvgEl(boardViewFullscreen ? "minimize" : "maximize"));
+  fullscreenBtn.title = t(boardViewFullscreen ? "退出全屏" : "全屏");
+  fullscreenBtn.setAttribute("aria-pressed", boardViewFullscreen ? "true" : "false");
+  fullscreenBtn.addEventListener("click", () => setBoardViewFullscreen(!boardViewFullscreen));
+  const stopSlot = document.createElement("span");
+  stopSlot.className = "board-view-header-stop";
+  actions.append(meta, stepToggle, stopSlot, collapse, fullscreenBtn);
   header.append(titleGroup, actions);
   boardViewPanel.appendChild(header);
+  mountBoardViewControls(modesSlot, stopSlot);
   if (currentBoardView === "git") {
     renderGitTreeView(meta);
     return;
@@ -1163,6 +1198,7 @@ function setBoardView(view, options = {}) {
   const nextView = BOARD_VIEW_LABELS[view] ? view : "";
   if (!options.preserveCollapse || !nextView) boardViewCollapsed = false;
   currentBoardView = nextView;
+  if (!nextView || boardViewCollapsed) setBoardViewFullscreen(false, { skipRender: true });
   const mainBoardMode = !currentBoardView;
   const showCanvas = mainBoardMode || boardViewCollapsed;
   boardCanvas?.classList.toggle("hidden", !showCanvas);
@@ -2030,6 +2066,15 @@ async function renderMermaid() {
   }
 }
 
+function setBoardViewFullscreen(on, options = {}) {
+  const next = !!on;
+  if (next === boardViewFullscreen) return;
+  boardViewFullscreen = next;
+  whiteboardPanel?.classList.toggle("board-view-fullscreen", next);
+  if (!next) mountBoardViewControls(null, null);
+  if (!options.skipRender) renderBoardView();
+}
+
 function toggleMermaid() {
   mermaidVisible = !mermaidVisible;
   if (mermaidVisible) {
@@ -2179,6 +2224,12 @@ function initWhiteboard() {
   mermaidPreview = document.getElementById("mermaid-preview");
   mermaidCode = document.getElementById("mermaid-code");
   mermaidRenderArea = document.getElementById("mermaid-render-area");
+  whiteboardPanel = document.getElementById("panel-whiteboard");
+  boardModesBar = document.getElementById("board-view-modes");
+  wfStopBtn = document.getElementById("btn-wf-stop");
+  for (const el of [boardModesBar, wfStopBtn]) {
+    if (el?.parentElement) boardControlHomes.set(el, { parent: el.parentElement, next: el.nextElementSibling });
+  }
 
   // 卡片模态框
   cardModal = document.getElementById("card-modal");

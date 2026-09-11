@@ -18,6 +18,7 @@
   --accent-fg: #FFFFFF;
   --gold: #bfa365;
   --gold-dim: rgba(215, 181, 107, 0.05);
+  --gold-strong: #8f7331;
   --code-bg: #1e1e1e;
   --code-fg: #d4d4d4;
   --inline-code-bg: rgba(0,0,0,0.06);
@@ -31,6 +32,8 @@
   --modal-backdrop: rgba(0,0,0,0.25);
   --toast-bg: #1A1A1A;
   --toast-fg: #FFFFFF;
+  --danger: #C0392B;
+  --danger-dim: rgba(192, 57, 43, 0.08);
   --font-main: "Microsoft YaHei", "微软雅黑", "PingFang SC", sans-serif;
   --font-code: Consolas, "JetBrains Mono", "Courier New", monospace;
   --font-mono: var(--font-code);
@@ -54,6 +57,7 @@
   --accent-fg: #0A0A0A;
   --gold: #ceb381;
   --gold-dim: rgba(201, 169, 110, 0.10);
+  --gold-strong: #ceb381;
   --code-bg: #151515;
   --code-fg: #D4C8B0;
   --inline-code-bg: rgba(201,169,110,0.08);
@@ -67,6 +71,8 @@
   --modal-backdrop: rgba(0,0,0,0.65);
   --toast-bg: #c6ae82;
   --toast-fg: #0A0A0A;
+  --danger: #E2725B;
+  --danger-dim: rgba(226, 114, 91, 0.12);
 }
 
 /* ── Reset ────────────────────────────── */
@@ -2479,6 +2485,38 @@ textarea::-webkit-scrollbar-thumb {
 .mermaid-render-area svg {
   max-width: 100%;
   height: auto;
+}
+
+/* 看板栏全屏：模式区向上铺满黑板面板 */
+#panel-whiteboard.board-view-fullscreen > .panel-header,
+#panel-whiteboard.board-view-fullscreen > .board-toolbar,
+#panel-whiteboard.board-view-fullscreen > .board-canvas,
+#panel-whiteboard.board-view-fullscreen > .mermaid-preview {
+  display: none;
+}
+
+#panel-whiteboard.board-view-fullscreen > .board-view-panel {
+  border: none;
+  border-radius: 0;
+  padding: 14px 16px 16px;
+}
+
+#panel-whiteboard.board-view-fullscreen .board-view-modes {
+  margin-left: 10px;
+  margin-right: 0;
+}
+
+.board-view-header-modes,
+.board-view-header-stop {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.board-view-collapse-btn .svg-icon {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
 }
 
 /* ── 工厂面板 ─────────────────────────── */
@@ -5367,71 +5405,169 @@ body.resizing {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 2px 10px 12px;
+  padding: 4px 10px 16px;
 }
 
 .ss-empty {
+  margin-top: 10px;
+  padding: 18px 12px;
   font-size: 11px;
   line-height: 1.7;
-  color: var(--text-muted);
-  padding: 10px 2px;
+  color: var(--text-secondary);
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
 }
 
-.ss-group { margin-top: 12px; }
+/* 总览卡：金色顶线撑起层次，四格统计用等宽数字对齐 */
+.ss-overview {
+  margin-top: 8px;
+  padding: 11px 12px 12px;
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--gold);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+}
 
-.ss-group:first-child { margin-top: 4px; }
+.ss-overview-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.ss-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 8px;
+}
+
+.ss-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ss-stat-num {
+  font-family: var(--font-code);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text);
+}
+
+.ss-stat-label {
+  max-width: 100%;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ss-overview-warn {
+  margin-top: 10px;
+  padding: 4px 6px;
+  font-size: 10px;
+  color: var(--danger);
+  background: var(--danger-dim);
+  border-radius: var(--radius);
+}
+
+.ss-group { margin-top: 16px; }
 
 .ss-group-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-bottom: 4px;
-  margin-bottom: 4px;
+  gap: 6px;
+  padding-bottom: 5px;
+  margin-bottom: 3px;
   border-bottom: 1px solid var(--border);
 }
 
+.ss-group-icon {
+  display: inline-flex;
+  color: var(--gold-strong);
+  flex: none;
+}
+
+.ss-group-icon .svg-icon {
+  width: 14px;
+  height: 14px;
+  vertical-align: 0;
+}
+
 .ss-group-title {
-  font-size: 10px;
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 1px;
-  color: var(--text-secondary);
+  letter-spacing: 1.2px;
+  color: var(--text);
 }
 
 .ss-group-count {
+  flex: none;
+  padding: 0 6px;
   font-size: 10px;
-  color: var(--text-faint);
+  font-family: var(--font-code);
+  color: var(--text-secondary);
+  background: var(--gold-dim);
+  border-radius: 8px;
 }
 
 .ss-item {
   display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: var(--radius);
+  transition: background var(--transition);
+}
+
+.ss-item:hover { background: var(--gold-dim); }
+
+.ss-item-icon {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 0;
-  font-size: 11px;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  flex: none;
   color: var(--text-secondary);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: color var(--transition), border-color var(--transition);
 }
 
-.ss-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--gold);
-  flex-shrink: 0;
+.ss-item-icon .svg-icon {
+  width: 12px;
+  height: 12px;
+  vertical-align: 0;
 }
 
-.ss-item.is-failed .ss-dot { background: #c0392b; }
-
-.ss-item.is-failed .ss-item-name { color: #c0392b; }
+.ss-item:hover .ss-item-icon {
+  color: var(--gold-strong);
+  border-color: var(--gold);
+}
 
 .ss-item-main {
   display: flex;
-  align-items: baseline;
-  gap: 5px;
+  flex-direction: column;
+  gap: 1px;
   min-width: 0;
   flex: 1;
 }
 
 .ss-item-name {
+  font-size: 12px;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5439,7 +5575,7 @@ body.resizing {
 
 .ss-item-detail {
   font-size: 10px;
-  color: var(--text-faint);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5448,8 +5584,27 @@ body.resizing {
 
 .ss-item-count {
   font-size: 10px;
-  color: var(--text-muted);
+  font-family: var(--font-code);
+  color: var(--text-secondary);
   flex-shrink: 0;
+  padding-top: 4px;
+}
+
+/* 命令行与路径按等宽读更清楚 */
+.ss-group-commands .ss-item-name,
+.ss-group-files .ss-item-detail {
+  font-family: var(--font-code);
+}
+
+.ss-item.is-failed {
+  box-shadow: inset 2px 0 0 var(--danger);
+}
+
+.ss-item.is-failed .ss-item-name { color: var(--danger); }
+
+.ss-item.is-failed .ss-item-icon {
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .chat-main {

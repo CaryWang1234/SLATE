@@ -7,9 +7,9 @@
  * 可信的是占比与趋势，不是与上游账单的逐位一致。
  */
 
-import { state, estimateTokens } from "../store.js?v=20260910-004";
-import { buildSystemContent } from "./adapter.js?v=20260910-004";
-import { getToolsSystemPrompt } from "./tools.js?v=20260910-004";
+import { state, estimateTokens } from "../store.js?v=20260910-006";
+import { buildSystemContent } from "./adapter.js?v=20260910-006";
+import { getToolsSystemPrompt } from "./tools.js?v=20260910-006";
 
 // 每条消息的角色与分隔符开销（OpenAI 风格 chatml 的近似值）
 const MSG_OVERHEAD = 4;

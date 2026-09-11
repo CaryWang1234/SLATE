@@ -1,15 +1,19 @@
 /**
- * 会话总结栏（左栏第三页签）：把当前会话用到的工具、SKILL.md 技能、远程 MCP、
+ * 会话总结栏（左栏第三页签）：把当前会话用到的命令、工具、SKILL.md 技能、远程 MCP、
  * 改动过的文件、访问过的网页投影成一份可滚动的清单。
  *
  * 数据源只认 state.messages 上的 toolResults：事件账本按 run 活在内存里，后端又只有写入口，
  * 刷新或切会话就拿不回来；toolResults 随消息落库，是唯一能重载后复原的事实源。
  * 历史恢复出来的卡片（result.historical）不是本次会话真实发生的调用，一律跳过。
+ *
+ * terminal / git_tool 不进「工具」组：一句「执行命令」看不出跑了什么，改由 commandOf
+ * 还原成 git commit、npm test 这样的行，单独成组并带品牌图标。
  */
 
-import { state, subscribe } from "../store.js?v=20260910-004";
-import { t } from "../services/i18n.js?v=20260910-004";
-import { toolLabel } from "../services/tool_meta.js?v=20260910-004";
+import { state, subscribe } from "../store.js?v=20260910-006";
+import { t } from "../services/i18n.js?v=20260910-006";
+import { toolLabel, toolArgsSummary, toolIcon, fileIcon, commandOf } from "../services/tool_meta.js?v=20260910-006";
+import { iconSvg } from "../services/icons.js?v=20260910-006";
 
 const FILE_WRITE_OPS = ["file_edit", "file_create", "file_append"];
 const FILE_READ_ACTIONS = ["view", "read"];
@@ -19,13 +23,15 @@ const FILE_OUTPUT_SKILLS = new Set([
   "qrcode_create", "python_api_extract", "mcp_factory", "image_gen", "video_gen",
 ]);
 const RENAME_MAX = 48;
+const DETAIL_MAX = 52;
 
 const GROUPS = [
-  { key: "tools", title: () => t("工具") },
-  { key: "skills", title: () => t("技能") },
-  { key: "mcp", title: () => t("MCP 工具") },
-  { key: "files", title: () => t("修改的文件") },
-  { key: "web", title: () => t("访问的网页") },
+  { key: "commands", icon: "terminal", title: () => t("执行的命令") },
+  { key: "tools", icon: "tool", title: () => t("工具") },
+  { key: "skills", icon: "sparkles", title: () => t("技能") },
+  { key: "mcp", icon: "plug", title: () => t("MCP 工具") },
+  { key: "files", icon: "file-plus", title: () => t("修改的文件") },
+  { key: "web", icon: "globe", title: () => t("访问的网页") },
 ];
 
 function el(tag, cls, text) {
@@ -102,7 +108,11 @@ function groupKeyFor(name) {
 }
 
 function collect() {
-  const buckets = { tools: new Map(), skills: new Map(), mcp: new Map(), files: new Map(), web: new Map() };
+  const buckets = {
+    commands: new Map(), tools: new Map(), skills: new Map(),
+    mcp: new Map(), files: new Map(), web: new Map(),
+  };
+  const stats = { calls: 0, failed: 0, commandCalls: 0 };
 
   const add = (kind, key, build, touch) => {
     if (!key) return;
@@ -122,16 +132,38 @@ function collect() {
       if (!name) continue;
       const failed = result?.success === false;
       const out = parseOutput(result);
+      stats.calls += 1;
+      if (failed) stats.failed += 1;
 
-      add(groupKeyFor(name), name, (key) => {
-        if (key.startsWith("mcp__")) {
-          const parts = key.split("__");
-          const label = clip(parts[parts.length - 1] || key, 28);
-          const server = clip(parts[1] || "mcp", 24);
-          return { label, detail: server === label ? "" : server, title: key, count: 1, failed };
+      const cmd = commandOf(name, params);
+      if (cmd) {
+        stats.commandCalls += 1;
+        const detail = clip(cmd.command, DETAIL_MAX);
+        for (const seg of cmd.segments) {
+          add("commands", seg.label, () => ({
+            label: seg.label, detail, title: cmd.command, icon: seg.icon, count: 1, failed,
+          }), (cur) => { cur.failed = failed; cur.detail = detail; cur.title = cmd.command; });
         }
-        return { label: toolLabel(key, { skill: key }) || key, detail: "", title: key, count: 1, failed };
-      }, (cur) => { cur.failed = failed; });
+      } else {
+        add(groupKeyFor(name), name, (key) => {
+          const detail = clip(toolArgsSummary(params, key), DETAIL_MAX);
+          if (key.startsWith("mcp__")) {
+            const parts = key.split("__");
+            const label = clip(parts[parts.length - 1] || key, 28);
+            const server = clip(parts[1] || "mcp", 24);
+            return { label, detail: server === label ? "" : server, title: key, icon: "plug", count: 1, failed };
+          }
+          return {
+            label: toolLabel(key, { skill: key }) || key,
+            detail, title: key, icon: toolIcon(key, { skill: key }), count: 1, failed,
+          };
+        }, (cur) => {
+          cur.failed = failed;
+          if (!cur.title.startsWith("mcp__")) {
+            cur.detail = clip(toolArgsSummary(params, cur.title), DETAIL_MAX) || cur.detail;
+          }
+        });
+      }
 
       const path = filePathOf(name, params, result, out);
       if (path) {
@@ -140,35 +172,59 @@ function collect() {
         add("files", rel.toLowerCase(), (key) => ({
           label: idx >= 0 ? rel.slice(idx + 1) : rel,
           detail: idx > 0 ? rel.slice(0, idx) : "",
-          title: rel, count: 1, failed,
+          title: rel, icon: fileIcon(rel), count: 1, failed,
         }), (cur) => { cur.failed = failed; });
       }
 
       for (const url of webUrlsOf(name, params, out)) {
         if (!isHttp(url)) continue;
-        let host = "", path = "";
+        let host = "", urlPath = "";
         try {
-          const u = new URL(url); host = u.hostname; path = (u.pathname + u.search).replace(/\/$/, "");
+          const u = new URL(url); host = u.hostname; urlPath = (u.pathname + u.search).replace(/\/$/, "");
         } catch (e) { continue; }
         add("web", url, () => ({
-          label: clip(host, 28), detail: clip(path, 40), title: url, count: 1, failed,
+          label: clip(host, 28), detail: clip(urlPath, 40), title: url, icon: "globe", count: 1, failed,
         }), (cur) => { cur.failed = failed; });
       }
     }
   }
-  return buckets;
+  return { buckets, stats };
 }
 
 function rowOf(item) {
   const row = el("div", "ss-item" + (item.failed ? " is-failed" : ""));
   row.title = item.title || item.label;
-  row.append(el("span", "ss-dot"));
+  const icon = el("span", "ss-item-icon");
+  icon.innerHTML = iconSvg(item.icon || "tool");
+  row.append(icon);
   const main = el("span", "ss-item-main");
   main.append(el("span", "ss-item-name", item.label));
   if (item.detail) main.append(el("span", "ss-item-detail", item.detail));
   row.append(main);
   if (item.count > 1) row.append(el("span", "ss-item-count", `×${item.count}`));
   return row;
+}
+
+function overviewOf(stats, buckets) {
+  const box = el("div", "ss-overview");
+  box.append(el("div", "ss-overview-title", t("会话总览")));
+  const grid = el("div", "ss-stats");
+  const kinds = buckets.tools.size + buckets.skills.size + buckets.mcp.size;
+  const cells = [
+    { label: t("调用次数"), value: stats.calls },
+    { label: t("工具种类"), value: kinds },
+    { label: t("命令条数"), value: stats.commandCalls },
+    { label: t("改动文件"), value: buckets.files.size },
+  ];
+  for (const c of cells) {
+    const cell = el("div", "ss-stat");
+    cell.append(el("span", "ss-stat-num", String(c.value)));
+    cell.append(el("span", "ss-stat-label", c.label));
+    grid.append(cell);
+  }
+  box.append(grid);
+  if (stats.failed) box.append(el("div", "ss-overview-warn", t("{n} 项调用失败", { n: stats.failed })));
+  return box;
 }
 
 let root = null;
@@ -182,19 +238,22 @@ function isShown() {
 
 export function renderSessionSummary() {
   if (!root) return;
-  const buckets = collect();
+  const { buckets, stats } = collect();
   root.textContent = "";
   const used = GROUPS.reduce((sum, g) => sum + buckets[g.key].size, 0);
   if (!used) {
     root.append(el("div", "ss-empty", t("本次会话还没有工具调用")));
     return;
   }
+  root.append(overviewOf(stats, buckets));
   for (const g of GROUPS) {
     const items = buckets[g.key];
     if (!items.size) continue;
-    const sec = el("div", "ss-group");
+    const sec = el("div", "ss-group ss-group-" + g.key);
     const head = el("div", "ss-group-header");
-    head.append(el("span", "ss-group-title", g.title()));
+    const headIcon = el("span", "ss-group-icon");
+    headIcon.innerHTML = iconSvg(g.icon);
+    head.append(headIcon, el("span", "ss-group-title", g.title()));
     head.append(el("span", "ss-group-count", String(items.size)));
     sec.append(head);
     for (const item of items.values()) sec.append(rowOf(item));

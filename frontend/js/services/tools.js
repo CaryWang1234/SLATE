@@ -12,14 +12,14 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260910-004";
-import { get, post, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260910-004";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260910-004";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260910-004";
-import { dlgUserAsk } from "./dialog.js?v=20260910-004";
-import { t } from "./i18n.js?v=20260910-004";
-import { makeId } from "./utils.js?v=20260910-004";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260910-004";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260910-006";
+import { get, post, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260910-006";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260910-006";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260910-006";
+import { dlgUserAsk } from "./dialog.js?v=20260910-006";
+import { t } from "./i18n.js?v=20260910-006";
+import { makeId } from "./utils.js?v=20260910-006";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260910-006";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
