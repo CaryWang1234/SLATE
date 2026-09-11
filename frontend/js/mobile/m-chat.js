@@ -7,18 +7,18 @@
 
 import {
   state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe,
-} from "../store.js?v=20260910-006";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260910-006";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260910-006";
-import { detectToolCalls, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260910-006";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction } from "../services/agent_common.js?v=20260910-006";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260910-006";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260910-006";
-import { toolLabel } from "../services/tool_meta.js?v=20260910-006";
-import { renderMarkdown } from "../services/markdown.js?v=20260910-006";
-import { mToast, t } from "./m-ui.js?v=20260910-006";
-import { mHandleStructured } from "./m-auth.js?v=20260910-006";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260910-006";
+} from "../store.js?v=20260911-001";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260911-001";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260911-001";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260911-001";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction } from "../services/agent_common.js?v=20260911-001";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260911-001";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260911-001";
+import { toolLabel } from "../services/tool_meta.js?v=20260911-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260911-001";
+import { mToast, t } from "./m-ui.js?v=20260911-001";
+import { mHandleStructured } from "./m-auth.js?v=20260911-001";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260911-001";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -104,7 +104,7 @@ function splitStreamChunk(chunk) {
 /** 渲染助手内容：剥离推理标记与工具调用块后做 Markdown */
 function renderAssistantHtml(content) {
   const clean = stripReasoningFromContent(String(content || ""));
-  const display = detectToolCalls(clean).length > 0 ? stripToolCalls(clean) : clean;
+  const display = hasToolMarkup(clean) ? stripToolCalls(clean) : clean;
   const html = renderMarkdown(display);
   return `<div class="m-msg-content">${html}</div>`;
 }
@@ -395,7 +395,10 @@ const mobileView = {
 // 移动侧 IO：调用探测、工具执行、结果落库、新建气泡流式续写
 const mobileIo = {
   detectCalls(lastMsg) {
-    return dedupeToolCalls(detectToolCalls(lastMsg.content));
+    return dedupeToolCalls([
+      ...detectToolCalls(lastMsg.content),
+      ...detectDsmlCalls(lastMsg.content),
+    ]);
   },
   execute(calls, opts) {
     return executeToolCalls(calls, opts);

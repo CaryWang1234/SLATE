@@ -7,7 +7,7 @@
  * 一次事件塞进多个字符视为粘贴，成绩照算但不进最佳纪录。
  */
 
-import { t } from "../services/i18n.js?v=20260910-006";
+import { t } from "../services/i18n.js?v=20260911-001";
 
 const CORPUS = [
   "git commit -m 'feat: ship the thing'",

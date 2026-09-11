@@ -12,14 +12,14 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260910-006";
-import { get, post, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260910-006";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260910-006";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260910-006";
-import { dlgUserAsk } from "./dialog.js?v=20260910-006";
-import { t } from "./i18n.js?v=20260910-006";
-import { makeId } from "./utils.js?v=20260910-006";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260910-006";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260911-001";
+import { get, post, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260911-001";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260911-001";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260911-001";
+import { dlgUserAsk } from "./dialog.js?v=20260911-001";
+import { t } from "./i18n.js?v=20260911-001";
+import { makeId } from "./utils.js?v=20260911-001";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260911-001";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -1336,8 +1336,70 @@ function hasTruncatedTail(text) {
   return calls.length > 0 && calls[calls.length - 1].params._truncated === true;
 }
 
+// ── DSML 兜底：DeepSeek 系模型有时把内部工具调用标记当正文吐出来 ──────────
+// 分隔符按码位收类：官方 tokenizer 是全角竖线，端点与复制链路会换成双竖线等形近字符
+const DSML_SEP = "[\\u007C\\uFF5C\\u00A6\\u01C0\\u2016\\u2223]{1,3}";
+const DSML_TAG = `<${DSML_SEP}DSML${DSML_SEP}[ \\t\\r\\n]*`;
+const DSML_END_TAG = `</${DSML_SEP}DSML${DSML_SEP}[ \\t\\r\\n]*`;
+const DSML_INVOKE_RE = `${DSML_TAG}invoke\\s+name\\s*=\\s*"([^"]+)"[^>]*>([\\s\\S]*?)${DSML_END_TAG}invoke\\s*>`;
+const DSML_PARAM_RE = `${DSML_TAG}parameter\\s+name\\s*=\\s*"([^"]*)"([^>]*)>([\\s\\S]*?)${DSML_END_TAG}parameter\\s*>`;
+
+function hasDsmlMarkup(text) {
+  if (!text) return false;
+  return new RegExp(`${DSML_TAG}(?:invoke|parameter|tool_calls|calls)`).test(text);
+}
+
+// string="true" 时值是原文；其余按 JSON 解析，解不动再退回字符串
+function _dsmlValue(raw, attrs) {
+  const val = String(raw || "").replace(/^\r?\n/, "").replace(/\r?\n$/, "");
+  if (/string\s*=\s*"true"/i.test(attrs || "")) return val;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return val;
+  }
+}
+
+// 只认闭合完整的 invoke：半截的 file_edit 参数宁可让模型重发，也不能猜着执行
+function detectDsmlCalls(text) {
+  if (!hasDsmlMarkup(text)) return [];
+  const calls = [];
+  const invokeRe = new RegExp(DSML_INVOKE_RE, "g");
+  let m;
+  while ((m = invokeRe.exec(text)) !== null) {
+    const name = normalizeToolName(m[1]);
+    const params = {};
+    const paramRe = new RegExp(DSML_PARAM_RE, "g");
+    let p;
+    while ((p = paramRe.exec(m[2])) !== null) params[p[1]] = _dsmlValue(p[3], p[2]);
+    calls.push({ name, params: normalizeToolParams(name, params) });
+  }
+  return calls;
+}
+
+// 「这条回复里有没有工具调用」的统一判据：只看 ◈◈ 会把 DSML 泄漏当成纯文本轮
+function detectAllCalls(text) {
+  return [...detectToolCalls(text || ""), ...detectDsmlCalls(text || "")];
+}
+
+function hasToolMarkup(text) {
+  const body = text || "";
+  return detectToolCalls(body).length > 0 || hasDsmlMarkup(body);
+}
+
 function stripToolCalls(text) {
   let stripped = text.replace(TOOL_RE, "");
+  // 先整块摘除已闭合的 invoke（其内部 parameter 一并带走），再清包裹标记，
+  // 然后从残留的裸标记处截断（说明这里是被截断的半截调用），最后兜底扫尾
+  stripped = stripped
+    .replace(new RegExp(DSML_INVOKE_RE, "g"), "")
+    .replace(new RegExp(`${DSML_TAG}(?:tool_calls|calls)\\s*>`, "g"), "")
+    .replace(new RegExp(`${DSML_END_TAG}(?:tool_calls|calls)\\s*>`, "g"), "")
+    .replace(new RegExp(`${DSML_END_TAG}(?:parameter|invoke)\\s*>`, "g"), "")
+    .replace(new RegExp(`${DSML_TAG}[\\s\\S]*$`), "")
+    .replace(new RegExp(`${DSML_TAG}[^>]*>`, "g"), "")
+    .replace(/<\s*\/?\s*DSML[^>]*>/gi, "")
+    .replace(new RegExp(`${DSML_SEP}DSML${DSML_SEP}`, "g"), "");
   // 移除 reasoning 标记前缀（子代理输出中不应包含）
   stripped = stripped
     .replace(new RegExp(REASONING_PREFIX, "g"), "")
@@ -1659,7 +1721,7 @@ function _example(params) {
 }
 
 export {
-  TOOLS, detectToolCalls, stripToolCalls, hasTruncatedTail,
+  TOOLS, detectToolCalls, detectDsmlCalls, detectAllCalls, hasToolMarkup, hasDsmlMarkup, stripToolCalls, hasTruncatedTail,
   executeTool, executeToolCalls,
   getToolsSystemPrompt,
   buildOpenAITools, openAICallsToCalls,

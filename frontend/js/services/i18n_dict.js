@@ -1403,6 +1403,7 @@ export const EN_DICT = {
   "Autopilot 已停止": "Autopilot stopped",
   "目标模式 · 连续 {n} 轮未调用工具，强警告（第 {k} 次）": "Target Mode · {n} consecutive rounds without tool calls, hard warning (#{k})",
   "Autopilot · 连续 {n} 轮未调用工具，强警告（第 {k} 次）": "Autopilot · {n} consecutive rounds without tool calls, hard warning (#{k})",
+  "检测到模型用内部标记输出了工具调用，已要求重发": "The model emitted its tool call as internal markup, so it was asked to resend",
   "团队讨论完成": "Team discussion complete",
   "辩论已结束": "Debate finished",
   "工作流完成": "Workflow complete",
