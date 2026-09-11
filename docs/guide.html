@@ -1093,5 +1093,29 @@ python desktop.py</pre>
       }
     } catch(e) {}
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js" defer></script>
+  <script>
+    // ── 章节落章：anime.js 就绪后为每个章号补一次盖章动效 ──
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof window.anime !== 'function') return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const seals = document.querySelectorAll('.scroll-section .chapter-num');
+      if (!seals.length) return;
+      const stamp = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          stamp.unobserve(entry.target);
+          window.anime({
+            targets: entry.target,
+            scale: [0.42, 1],
+            rotate: [-14, 0],
+            duration: 640,
+            easing: 'easeOutBack'
+          });
+        });
+      }, { threshold: 0.4 });
+      seals.forEach(s => stamp.observe(s));
+    });
+  </script>
 </body>
 </html>
