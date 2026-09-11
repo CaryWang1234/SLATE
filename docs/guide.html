@@ -400,6 +400,7 @@
           <li><a href="#ch14"><span class="lang-zh">截图转代码</span><span class="lang-en">Screenshot to Code</span></a></li>
           <li><a href="#ch15"><span class="lang-zh">定时任务</span><span class="lang-en">Scheduled Tasks</span></a></li>
           <li><a href="#ch16"><span class="lang-zh">设置与个性化</span><span class="lang-en">Settings</span></a></li>
+          <li><a href="#ch17"><span class="lang-zh">能力总清单</span><span class="lang-en">Capability Index</span></a></li>
         </ol>
       </div>
 
@@ -883,6 +884,131 @@ python desktop.py</pre>
               <tr><td>Context Compression</td><td>Auto/manual history compression</td></tr>
               <tr><td>Short Reply Review</td><td>Auto-check if reply needs follow-up</td></tr>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="ink-divider">◈ ◈ ◈</div>
+
+      <!-- Ch17 -->
+      <div class="scroll-section" id="ch17">
+        <div class="chapter-title"><span class="chapter-num">17</span>
+          <span class="lang-zh">能力总清单</span><span class="lang-en">Capability Index</span>
+        </div>
+        <div class="chapter-body">
+          <div class="lang-zh">
+            <p>首页只讲「与常见托管型 Agent 的四点差异」，完整清单收在这里。以下能力随安装包一起交付，不需要额外插件或订阅。</p>
+            <table class="ink-table">
+              <tr><th>能力</th><th>一句话说明</th><th>详见</th></tr>
+              <tr><td>统一多模型接入</td><td>GPT / Claude / Gemini、DeepSeek / Kimi / Qwen / GLM 等十余家，加自定义 OpenAI 兼容端点与本地模型（Ollama / LM Studio），一个界面随时换「大脑」</td><td><a href="#ch3">3</a></td></tr>
+              <tr><td>Agent 自动驾驶 + 目标模式</td><td>普通请求自动进入 Agent 循环，默认 18 轮、宽泛项目任务 28 轮；目标模式是显式 50 轮六阶段循环并强制 TODOLIST</td><td><a href="#ch4">4</a></td></tr>
+              <tr><td>磨墨模式</td><td><code>/grind</code> + 一个粗略想法，三阶段追问（接 → 磨 → 收，最多 10 轮）产出含目标、交付物、验收标准的任务书</td><td><a href="#ch5">5</a></td></tr>
+              <tr><td>34 个内置工具</td><td>文件读写编辑、全项目代码检索、Unicode 安全终端、PPT / Word / Excel、PDF 抽取、图表 / 二维码、代码与文档安全扫描、git 信息、联网搜索与抓取、图像视频生成、浏览器与桌面自动化</td><td><a href="#ch8">8</a></td></tr>
+              <tr><td>外部 MCP Server</td><td>SSE 传输接入远端 MCP Server，工具自动发现，与内置工具同列展示、同一接口调用</td><td><a href="#ch8">8</a></td></tr>
+              <tr><td>高危命令审批</td><td>23 类高危操作需你确认，灾难性命令无条件阻止，审批弹窗附带 AI 对这条命令用途的解释</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>全沙箱安全</td><td>路径校验 + 高危规则拦截 + 独立数据目录，删除与覆盖前先给看清楚</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>自定义技能体系</td><td>SKILL.md 即插即用，上传或导入后 <code>@</code> 提及自动注入上下文；其他 Agent 生态的技能目录可原样导入</td><td><a href="#ch9">9</a></td></tr>
+              <tr><td>专家包</td><td>persona.md + rules.md + knowledge/ + skills/ 五个文件打成一个 zip，聊天下拉 / 成员卡 / <code>@</code> 提及三处注入</td><td><a href="#ch9">9</a></td></tr>
+              <tr><td>AI 团队多轮辩论</td><td>提案 / 支持 / 反对 / 反驳 / 决策五种角色，轻模型讨论、重模型定稿，纪要自动生成以省 token</td><td><a href="#ch6">6</a></td></tr>
+              <tr><td>团队工作流 DAG</td><td>需求 → 拆解 → 编码 → 审查 → 总结，上游输出流向下游，节点状态与输入输出实时可见，成品自动归档，附 8 个模板</td><td><a href="#ch10">10</a></td></tr>
+              <tr><td>定时对话任务</td><td>到点自动发起对话任务，结果归档进专属文件夹，无需人守着</td><td><a href="#ch15">15</a></td></tr>
+              <tr><td>白板逻辑链</td><td>卡片 + 箭头 + Mermaid 流程图 + Git 树视图，看板栏支持全屏推进</td><td><a href="#ch7">7</a></td></tr>
+              <tr><td>长期记忆与知识库</td><td>项目知识长期存储，对话时自动注入相关上下文，跨会话生效</td><td><a href="#ch11">11</a></td></tr>
+              <tr><td>Markdown 笔记库</td><td>本地 wiki：双向链接、全文检索，把散落的记录连成网</td><td><a href="#ch11">11</a></td></tr>
+              <tr><td>项目理解</td><td>先给 AI 做「入职培训」：结构、规则、约定写成文档，作为系统上下文注入</td><td><a href="#ch11">11</a></td></tr>
+              <tr><td>Code Review</td><td>对 diff 逐条给问题与修复建议，提交前先过一遍</td><td><a href="#ch12">12</a></td></tr>
+              <tr><td>任务完成通知</td><td>长任务跑完发系统通知，切到别的窗口也不漏</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>聊天与数据管理</td><td>历史可搜索 / 导出 / 编辑，一键打包，磁盘占用看得清楚</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>提示词工厂</td><td>把「帮我做个东西」写成结构化需求文档，再交给外部 Coding Agent 执行</td><td><a href="#ch1">1</a></td></tr>
+              <tr><td>局域网遥控</td><td>手机扫码连到本机 8001 端口，带 token 验证，坐在沙发上指挥 AI</td><td><a href="#ch2">2</a></td></tr>
+              <tr><td>多语言界面</td><td>安装时选一次语言，之后整个界面跟随</td><td><a href="#ch16">16</a></td></tr>
+            </table>
+
+            <p><strong>适用场景</strong>：装完之后这些用法开箱可用，不需要写代码。</p>
+            <ul>
+              <li><strong>个人知识管理员</strong> — 阅读笔记、会议纪要、资料片段交给知识库长期存放，一句话召回。</li>
+              <li><strong>写作与文案搭档</strong> — 从提纲到成稿多轮打磨，团队辩论帮你挑出最有说服力的版本。</li>
+              <li><strong>轻量开发助手</strong> — 读代码、改文件、跑命令、出文档 / PPT / 图表。不想让它动手，就只要一份高质量提示词。</li>
+              <li><strong>想法验证场</strong> — 新项目先在白板上摊开：卡片是需求，箭头是依赖，Mermaid 是流程图。</li>
+              <li><strong>自动化秘书</strong> — 每天早上自动摘新闻、每周整理文件、例行走查，到点就跑、结果自动归档。</li>
+              <li><strong>隐私敏感场景</strong> — 聊天历史在本地 SQLite，状态在本地 JSON；接本地模型时内容不出这台机器。</li>
+            </ul>
+
+            <p><strong>技术栈</strong>：前端就是文件，改完刷新即生效。</p>
+            <table class="ink-table">
+              <tr><th>层</th><th>选型</th><th>意味着什么</th></tr>
+              <tr><td>前端</td><td>原生 HTML + CSS + JavaScript（ES Modules，零构建）</td><td>打开任意文件就能改，刷新即见效果</td></tr>
+              <tr><td>后端</td><td>Python 3.13+ · FastAPI · Uvicorn · httpx</td><td>轻量服务，一条命令启动</td></tr>
+              <tr><td>存储</td><td>SQLite（聊天历史）· JSON（状态 / 定时 / 宪法）</td><td>无外部数据库，数据全在你盘上</td></tr>
+              <tr><td>渲染</td><td>Highlight.js · Mermaid.js（CDN）</td><td>代码高亮与流程图开箱即用</td></tr>
+              <tr><td>桌面</td><td>webview2 外壳 + PyInstaller + Inno Setup 安装器</td><td>Windows 双击安装，用起来像个普通应用</td></tr>
+            </table>
+
+            <p><strong>设计原则</strong>：</p>
+            <ul>
+              <li><strong>纯粹黑白灰底色</strong> — 不做蓝紫渐变、不滥用圆角、不靠阴影和毛玻璃，金色只做点缀。</li>
+              <li><strong>本地优先</strong> — 数据全在本地；API Key 只用于调用大模型，聊天、记忆、文件不经过任何第三方服务器。</li>
+              <li><strong>Token 经济</strong> — 智能压缩、分级调用、静默处理，历史对话折成摘要，省额度也不丢要点。</li>
+              <li><strong>永不冻结</strong> — 四层超时防御覆盖流式与工具调用，慢可以等，卡死不行。</li>
+            </ul>
+            <div class="ink-note"><strong>术语提示：</strong>Token 是大模型计费与记忆窗口的「字数单位」——上下文越长，花费越高、越容易遗忘。</div>
+          </div>
+          <div class="lang-en">
+            <p>The landing page argues only the four differences from hosted agents; the full inventory lives here. Everything below ships with the installer — no extra plugins, no subscription.</p>
+            <table class="ink-table">
+              <tr><th>Capability</th><th>In one line</th><th>See</th></tr>
+              <tr><td>Unified multi-model access</td><td>GPT / Claude / Gemini, DeepSeek / Kimi / Qwen / GLM and more, plus custom OpenAI-compatible endpoints and local models (Ollama / LM Studio) — switch brains mid-conversation</td><td><a href="#ch3">3</a></td></tr>
+              <tr><td>Agent Autopilot + Target Mode</td><td>Ordinary requests enter an agent loop automatically: 18 rounds by default, 28 for broad project tasks; Target Mode is the explicit 50-round six-phase loop with enforced TODOLIST</td><td><a href="#ch4">4</a></td></tr>
+              <tr><td>Grind Mode</td><td>Type <code>/grind</code> with a rough idea; three-phase questioning (Receive → Grind → Collect, up to 10 rounds) yields a brief with goals, deliverables and acceptance criteria</td><td><a href="#ch5">5</a></td></tr>
+              <tr><td>34 built-in tools</td><td>File read/write/edit, project-wide code search, Unicode-safe terminal, PPT / Word / Excel, PDF extraction, charts &amp; QR codes, code and document security scans, git info, web search &amp; scraping, image &amp; video generation, browser and desktop automation</td><td><a href="#ch8">8</a></td></tr>
+              <tr><td>External MCP Server</td><td>Connect remote MCP Servers over SSE; remote tools are auto-discovered and listed beside built-ins, called through the same interface</td><td><a href="#ch8">8</a></td></tr>
+              <tr><td>High-risk command approval</td><td>23 categories of risky operations need your confirmation, catastrophic commands are blocked unconditionally, and the popup carries the AI's explanation of what the command does</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>Sandbox security</td><td>Path validation plus rule-based command interception and an isolated data directory — deletion and overwrite get shown to you first</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>Custom skill system</td><td>SKILL.md is plug-and-play; <code>@</code>mention auto-injects its context. Skill directories from other agent ecosystems import as-is</td><td><a href="#ch9">9</a></td></tr>
+              <tr><td>Expert packs</td><td>persona.md + rules.md + knowledge/ + skills/ zipped into one file per expert; inject from the chat dropdown, a team card, or <code>@</code>mention</td><td><a href="#ch9">9</a></td></tr>
+              <tr><td>AI team multi-round debate</td><td>Propose / support / oppose / rebut / decide roles; light models argue, a heavy model calls the final shot, summaries generated to save tokens</td><td><a href="#ch6">6</a></td></tr>
+              <tr><td>Team workflow DAG</td><td>Requirements → Decompose → Code → Review → Summarize; upstream output flows downstream, node status and I/O visible live, artifacts auto-archived, 8 templates included</td><td><a href="#ch10">10</a></td></tr>
+              <tr><td>Scheduled chat tasks</td><td>Fire a chat task on schedule and file results into a dedicated folder — no one has to watch it</td><td><a href="#ch15">15</a></td></tr>
+              <tr><td>Whiteboard logic chain</td><td>Cards + arrows + Mermaid flowcharts + a Git tree view; the board rail can go fullscreen</td><td><a href="#ch7">7</a></td></tr>
+              <tr><td>Long-term memory &amp; knowledge base</td><td>Project knowledge persists and is auto-injected as relevant context, across sessions</td><td><a href="#ch11">11</a></td></tr>
+              <tr><td>Markdown vault</td><td>A local wiki: backlinks and full-text search connect scattered notes</td><td><a href="#ch11">11</a></td></tr>
+              <tr><td>Project understanding</td><td>Give the AI orientation first: structure, rules and conventions written down and injected as system context</td><td><a href="#ch11">11</a></td></tr>
+              <tr><td>Code Review</td><td>Line-by-line issues and fixes on a diff, before it becomes a bug</td><td><a href="#ch12">12</a></td></tr>
+              <tr><td>Task completion notices</td><td>System notification when a long task ends, so you can leave the window</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>Chat &amp; data management</td><td>History is searchable, exportable, editable; one-click packaging and clear disk usage</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>Prompt Factory</td><td>Turn "help me build something" into a structured requirements document, then hand it to an external coding agent</td><td><a href="#ch1">1</a></td></tr>
+              <tr><td>LAN remote control</td><td>Scan a QR code from your phone to reach port 8001 on this machine, token-protected — command the AI from the couch</td><td><a href="#ch2">2</a></td></tr>
+              <tr><td>Multilingual UI</td><td>Pick the language once at install; the whole interface follows</td><td><a href="#ch16">16</a></td></tr>
+            </table>
+
+            <p><strong>Use cases</strong>: all of these work right after installation, no coding required.</p>
+            <ul>
+              <li><strong>Personal knowledge manager</strong> — reading notes, meeting minutes and reference snippets go to the knowledge base; recall in one sentence.</li>
+              <li><strong>Writing &amp; copy partner</strong> — outline to final draft over several rounds, with a team debate picking the most persuasive version.</li>
+              <li><strong>Lightweight dev assistant</strong> — read code, edit files, run commands, produce docs, decks and charts. Prefer it not to act? Just take the prompt.</li>
+              <li><strong>Idea proving ground</strong> — lay a new project out on the whiteboard: cards are requirements, arrows are dependencies, Mermaid is the flow.</li>
+              <li><strong>Automation secretary</strong> — summarize news each morning, tidy files weekly, run routine checks on schedule and archive results.</li>
+              <li><strong>Privacy-sensitive work</strong> — chat history in local SQLite, state in local JSON; with a local model, content never leaves the machine.</li>
+            </ul>
+
+            <p><strong>Tech stack</strong>: the frontend is files — edit and it takes effect on refresh.</p>
+            <table class="ink-table">
+              <tr><th>Layer</th><th>Choice</th><th>What it means</th></tr>
+              <tr><td>Frontend</td><td>Vanilla HTML + CSS + JavaScript (ES Modules, zero build)</td><td>Open any file to edit, refresh to see changes</td></tr>
+              <tr><td>Backend</td><td>Python 3.13+ · FastAPI · Uvicorn · httpx</td><td>Lightweight service, one command to start</td></tr>
+              <tr><td>Storage</td><td>SQLite (chat history) · JSON (state / schedules / constitution)</td><td>No external database, all data on your disk</td></tr>
+              <tr><td>Rendering</td><td>Highlight.js · Mermaid.js (CDN)</td><td>Code highlighting and flowcharts out of the box</td></tr>
+              <tr><td>Desktop</td><td>webview2 shell + PyInstaller + Inno Setup installer</td><td>Windows double-click install, works like any app</td></tr>
+            </table>
+
+            <p><strong>Design principles</strong>:</p>
+            <ul>
+              <li><strong>Pure black-white-gray base</strong> — no blue-purple gradients, no excess rounding, no shadow or frosted glass; gold is only an accent.</li>
+              <li><strong>Local-first</strong> — data stays local; API keys are used only to call models, and chats, memories and files never pass through a third-party server.</li>
+              <li><strong>Token economy</strong> — smart compression, tiered calls, silent processing: old conversation folds into summaries, saving budget without losing the point.</li>
+              <li><strong>Never frozen</strong> — four layers of timeout defense covering streaming and tool calls. Slow is waitable; stuck is not.</li>
+            </ul>
+            <div class="ink-note"><strong>A term worth pinning down:</strong> tokens are the unit an LLM bills and remembers by — the longer the context, the more it costs and the more it forgets.</div>
           </div>
         </div>
       </div>

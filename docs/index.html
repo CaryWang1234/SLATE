@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SLATE · Local AI Collaboration Studio</title>
-  <meta name="description" content="SLATE — A lightweight local AI collaboration tool: multi-model chat, Agent Autopilot, Target Mode autonomous execution, Grind Mode, 34 Unicode-safe tools, external MCP Server support, Expert Packs, AI team debates & 8 DAG workflow templates, Code Review, voice input, upgraded whiteboard with Git tree, full sandbox security. Open source, install and use.">
+  <title>SLATE · Local AI Agent Workbench — Your Keys, Your Machine</title>
+  <meta name="description" content="SLATE is an open-source AI agent workbench that runs on your own computer. Bring your own model keys (OpenAI, Anthropic, Gemini, any OpenAI-compatible endpoint, or local Ollama), keep data on disk, read a local event ledger of every tool call, and stop a run that really stops.">
   <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -19,13 +19,11 @@
         <button class="drawer-close" id="drawer-close" aria-label="Close">✕</button>
       </div>
       <div class="drawer-links">
-        <a href="#features"><span class="drawer-icon">✦</span> Features</a>
-        <a href="#highlights"><span class="drawer-icon">⚡</span> Highlights</a>
-        <a href="#scenes"><span class="drawer-icon">🎯</span> Use Cases</a>
-        <a href="#tools"><span class="drawer-icon">🛠</span> Tools</a>
-        <a href="#stack"><span class="drawer-icon">⚙</span> Tech Stack</a>
+        <a href="#difference"><span class="drawer-icon">✦</span> Differences</a>
+        <a href="#capabilities"><span class="drawer-icon">🎯</span> Capabilities</a>
+        <a href="#limits"><span class="drawer-icon">🛡</span> Honest Limits</a>
         <a href="#start"><span class="drawer-icon">🚀</span> Quick Start</a>
-        <a href="./guide.html"><span class="drawer-icon">📜</span> Guide</a>
+        <a href="./guide.html"><span class="drawer-icon">📜</span> Guide &amp; Full Tool List</a>
       </div>
       <div class="drawer-footer">
         <a class="drawer-action" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ Download Installer</a>
@@ -62,11 +60,9 @@
         <span>SLATE</span>
       </a>
       <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="#highlights">Highlights</a>
-        <a href="#scenes">Use Cases</a>
-        <a href="#tools">Tools</a>
-        <a href="#stack">Tech Stack</a>
+        <a href="#difference">Differences</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#limits">Honest Limits</a>
         <a href="#start">Quick Start</a>
         <a href="./guide.html">Guide</a>
       </div>
@@ -88,25 +84,25 @@
       <div class="hero-copy">
         <div class="hero-mark">
           <img class="hero-logo" src="./icon.png" alt="SLATE Logo">
-          <span>local-first agent studio</span>
+          <span>bring-your-own agent</span>
         </div>
         <h1 class="hero-title">SLATE</h1>
-        <p class="hero-sub">Local AI Collaboration Studio — Turn Sparks into Structured Plans</p>
+        <p class="hero-sub">A local AI agent workbench: your keys, your machine, every step on the record.</p>
         <p class="hero-en">One prompt. A visible plan. Tools that actually move.</p>
         <p class="hero-type" id="hero-type"></p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ Download Installer</a>
-          <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">View Source →</a>
+          <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">Read the Loop →</a>
         </div>
         <div class="hero-badges">
           <span class="badge">MIT License</span>
-          <span class="badge">Python 3.13+</span>
+          <span class="badge">Bring Your Own Key</span>
+          <span class="badge">No Account · No Subscription</span>
+          <span class="badge">No Telemetry</span>
           <span class="badge">Zero npm · Zero Build</span>
-          <span class="badge">Local-First</span>
-          <span class="badge">Dual Theme</span>
         </div>
         <p class="section-note">
-          SLATE is an <strong>AI workbench installed on your own computer</strong>: describe what you need once, then Autopilot breaks down tasks, calls tools, verifies, and delivers results. Your data stays local.
+          Hosted agents sell you a stronger model behind their meter. SLATE assumes you already have good models — and owns the part that keeps breaking instead: <strong>a loop you can audit, a stop that really stops, and capabilities you can add without waiting for someone's release</strong>.
         </p>
       </div>
       <div class="hero-console reveal from-right" aria-label="SLATE workspace preview">
@@ -132,48 +128,20 @@
           </div>
           <div class="console-grid">
             <div class="signal-panel">
-              <small>Git Tree</small>
-              <p>main → 87e9a85</p>
-              <p>staged · clean · pushed</p>
+              <small>Ledger</small>
+              <p>run 87e9a85 · seq 0…41</p>
+              <p>start · finish · cancel</p>
             </div>
             <div class="signal-panel accent">
               <small>Whiteboard</small>
               <p>Git · Flow · Kanban</p>
-              <p>drag cards and viewport</p>
+              <p>same events, drawn as cards</p>
             </div>
           </div>
         </div>
       </div>
     </div>
   </header>
-
-  <!-- ═══ Agent Operating Ribbon ═══ -->
-  <section class="agent-ribbon" aria-label="Agent operating flow">
-    <div class="container ribbon-layout">
-      <div class="ribbon-copy reveal from-left">
-        <div class="section-tag">Operating System</div>
-        <h2>Designed Around How Agents Actually Work</h2>
-        <p>SLATE turns a chat request into a loop you can see: context enters, tools move, evidence comes back, and the next step gets sharper.</p>
-      </div>
-      <div class="ribbon-board reveal from-right">
-        <div class="ribbon-lane">
-          <span>Observe</span>
-          <i></i>
-          <span>Plan</span>
-          <i></i>
-          <span>Act</span>
-          <i></i>
-          <span>Verify</span>
-        </div>
-        <div class="ribbon-cells">
-          <div><b>01</b><span>Project files</span></div>
-          <div><b>02</b><span>MCP tools</span></div>
-          <div><b>03</b><span>Git signals</span></div>
-          <div><b>04</b><span>Whiteboard state</span></div>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <!-- ═══ UI Preview: CSS-simulated three columns ═══ -->
   <section class="preview">
@@ -183,19 +151,19 @@
           <span class="window-dot"></span>
           <span class="window-dot"></span>
           <span class="window-dot gold"></span>
-          <span class="window-title">SLATE — Chat · Whiteboard · Prompt Factory</span>
+          <span class="window-title">SLATE — Chat · Whiteboard · Capabilities</span>
         </div>
         <div class="window-body">
           <div class="pane">
-            <div class="pane-label">Chat</div>
+            <div class="pane-label">Chat — the run, step by step</div>
             <div class="chat-bubble me"><div class="skel w80"></div><div class="skel w60"></div></div>
             <div class="tool-chip">⚡ Target · Round 3/50</div>
             <div class="chat-bubble ai"><div class="skel"></div><div class="skel w80"></div></div>
-            <div class="chat-bubble me"><div class="skel w60"></div></div>
+            <div class="tool-chip">🛠 file_edit · cancelled by you</div>
             <div class="chat-bubble ai"><div class="skel w80"></div><div class="skel w40"></div></div>
           </div>
           <div class="pane">
-            <div class="pane-label">Whiteboard · Logic Chain</div>
+            <div class="pane-label">Whiteboard — the plan, visible</div>
             <div class="board-card"><div class="skel w60"></div><div class="skel"></div></div>
             <div class="board-arrow">↓</div>
             <div class="board-card"><div class="skel w80"></div><div class="skel w60"></div></div>
@@ -203,407 +171,257 @@
             <div class="board-card"><div class="skel w40"></div><div class="skel"></div></div>
           </div>
           <div class="pane">
-            <div class="pane-label">Prompt Factory · Capabilities</div>
-            <div class="harness-bar">⚡ Autonomous · Stop doesn't quit</div>
-            <div class="tool-chip">🛠 file_edit</div>
-            <div class="tool-chip">🧩 @my-skill</div>
-            <div class="tool-chip">🎓 @Creative-Writing-Mentor</div>
-            <div class="tool-chip">🔀 Workflow · Node 3/5</div>
+            <div class="pane-label">Capabilities — yours to wire</div>
+            <div class="harness-bar">⚡ Autopilot · Stop doesn't quit</div>
+            <div class="tool-chip">🛠 34 built-in tools</div>
+            <div class="tool-chip">🧩 @my-skill (SKILL.md)</div>
+            <div class="tool-chip">🔌 mcp__server__tool</div>
             <div class="skel"></div>
             <div class="skel w80"></div>
-            <div class="skel w60"></div>
           </div>
         </div>
       </div>
-      <p class="preview-caption reveal">Three-column workspace: Chat (left) · Whiteboard (center) · Prompt Factory & Capabilities (right) — like a desk: discuss on the left, reason in the middle, build on the right.</p>
+      <p class="preview-caption reveal">What you watch while a task runs: the loop in chat, the plan on the board, the capabilities you wired yourself. Both panels read from one local event ledger.</p>
     </div>
   </section>
 
-  <!-- ═══ Stats Dashboard ═══ -->
-  <section class="stats">
+  <!-- ═══ Evidence Strip ═══ -->
+  <section class="stats" aria-label="Facts you can verify in the source">
     <div class="container">
       <div class="stats-grid">
         <div class="reveal" data-stagger>
-          <div class="stat-num" data-count="34">0</div>
-          <div class="stat-label">Built-in Tools</div>
-          <div class="stat-hint">Files, code search, terminal, PPT / Word / Excel, PDF, charts / QR codes, code &amp; document security scans, git info, web search & scraping — always ready</div>
-        </div>
-        <div class="reveal" data-stagger>
-          <div class="stat-num"><span data-count="10">0</span>+</div>
-          <div class="stat-label">Major Model Providers Supported</div>
-          <div class="stat-hint">Top-tier vendors worldwide + local models</div>
-        </div>
-        <div class="reveal" data-stagger>
-          <div class="stat-num" data-count="50">0</div>
-          <div class="stat-label">Max Autonomous Rounds</div>
-          <div class="stat-hint">Target Mode keeps long tasks running</div>
-        </div>
-        <div class="reveal" data-stagger>
-          <div class="stat-num"><span data-count="4">0</span> layers</div>
-          <div class="stat-label">Anti-Freeze Timeout Defense</div>
-          <div class="stat-hint">Slow is fine. Frozen is not.</div>
+          <div class="stat-num" data-count="0">0</div>
+          <div class="stat-label">Accounts · Subscriptions</div>
+          <div class="stat-hint">You pay the model provider directly, at their price.</div>
         </div>
         <div class="reveal" data-stagger>
           <div class="stat-num" data-count="0">0</div>
-          <div class="stat-label">npm Dependencies · Zero Build</div>
-          <div class="stat-hint">Source is the product — edit and it works</div>
+          <div class="stat-label">Telemetry Beacons</div>
+          <div class="stat-hint">The only routine outbound call is the GitHub Releases update check.</div>
+        </div>
+        <div class="reveal" data-stagger>
+          <div class="stat-num"><span data-count="4">0</span> ways</div>
+          <div class="stat-label">Model Wire Formats</div>
+          <div class="stat-hint">OpenAI Chat &amp; Responses, Anthropic, Gemini — plus any OpenAI-compatible URL and local models.</div>
+        </div>
+        <div class="reveal" data-stagger>
+          <div class="stat-num" data-count="1">0</div>
+          <div class="stat-label">Ledger Behind Every Panel</div>
+          <div class="stat-hint">Tool cards, whiteboard steps and the session summary are one record, three views.</div>
+        </div>
+        <div class="reveal" data-stagger>
+          <div class="stat-num" data-count="34">0</div>
+          <div class="stat-label">Built-in Tools</div>
+          <div class="stat-hint">Full table lives in the guide — this page is about the differences, not the inventory.</div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══ Feature Landscape ═══ -->
-  <section class="section" id="features">
+  <!-- ═══ The Differences ═══ -->
+  <section class="section" id="difference">
     <div class="container">
       <div class="reveal">
-        <div class="section-tag">Features</div>
-        <h2 class="section-title">Feature Landscape</h2>
-        <p class="section-desc">SLATE offers two paths: let it take action — driving built-in tools to complete tasks directly; or let it strategize — generating high-quality prompts for external Coding Agents (Claude Code, Codex, Cursor, etc.) to execute. Both paths work.</p>
+        <div class="section-tag">Differences</div>
+        <h2 class="section-title">Four Things a Hosted Agent Can't Easily Be</h2>
+        <p class="section-desc">Not a feature race — every one of these follows from who owns the runtime. Each one is also checkable in this repository, so treat the claims below as code review, not copy.</p>
       </div>
 
-      <div class="features-grid" data-stagger-group>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🗣️</div>
-          <div class="feature-name">Unified Multi-Model Access</div>
-          <div class="feature-desc">GPT / Claude / Gemini, DeepSeek / Kimi / Qwen / GLM and more — plus custom OpenAI-compatible endpoints and local models (Ollama / LM Studio). Switch anytime in one interface, use different "brains" for different tasks.</div>
-          <div class="feature-plain">One remote control for all AIs — switch to whichever is cheapest or best suited.</div>
+      <article class="diff">
+        <div class="diff-head reveal from-left">
+          <span class="diff-index">01</span>
+          <h3>Your keys never pass through us — because there is no us.</h3>
+          <p>SLATE holds no master credential and routes nothing through a vendor cloud. You paste each provider's key once, into a local file; it goes from your machine straight to the endpoint you chose, per request.</p>
         </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">⚡</div>
-          <div class="feature-name">Agent Autopilot + Target Mode</div>
-          <div class="feature-desc">Ordinary project/action requests automatically enter an Agent loop, so you do not need to keep sending "continue". Autopilot can advance 18 rounds by default, 28 for broad project tasks; Target Mode remains the explicit 50-round six-phase loop with TODOLIST enforcement.</div>
-          <div class="feature-plain">Say what you need once. SLATE keeps observing, acting, verifying, and reporting until there is a real result or a clear blocker.</div>
+        <div class="diff-body">
+          <div class="contrast reveal from-left">
+            <div class="contrast-col them">
+              <span class="contrast-label">Typical hosted agent</span>
+              <p>Usage is metered in credits the vendor sets. Prompts, code and files are indexed on their infrastructure, and the model list is whatever they enabled this month.</p>
+            </div>
+            <div class="contrast-col ours">
+              <span class="contrast-label">SLATE</span>
+              <p>Bring your own key and your own hardware. Switch provider mid-task, cheap models for drafting and a heavy one for the final call, or run a local model that never leaves the room. Nothing is locked; nobody bills you for switching.</p>
+            </div>
+          </div>
+          <div class="code-box reveal from-right">
+            <div class="code-box-bar"><i></i><i></i><i></i></div>
+            <pre><span class="c-muted"># backend/routers/proxy.py</span>
+<span class="c-text">_stream_openai / _stream_responses</span>
+<span class="c-text">_stream_anthropic / _stream_google</span>
+<span class="c-muted"># the key arrives with each request</span>
+<span class="c-muted"># no server-side vault, no account,</span>
+<span class="c-muted"># no login screen in this codebase</span></pre>
+          </div>
         </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🖌️</div>
-          <div class="feature-name">Grind Mode</div>
-          <div class="feature-desc">Type /grind with a rough idea, AI follows a three-phase questioning process (Receive → Grind → Collect, up to 10 rounds) to refine it into a structured task brief with goals, deliverables, and acceptance criteria. The ink panel tracks resolved vs. unknown items in real-time.</div>
-          <div class="feature-plain">Put "I have a vague idea" into the inkstone — what comes out is a clear task specification.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🛠️</div>
-          <div class="feature-name">34 Built-in Tools</div>
-          <div class="feature-desc">File read/write/edit with clipboard, project-wide code search, Unicode-safe terminal, PPT / Word / Excel generation, PDF text & table extraction, SVG charts & QR codes, code & document security scanning, repo stats, read-only git info, regex testing, web search & page scraping, screenshot-to-code, AI image & video generation, browser & desktop automation — @mention in chat to use, model autonomously calls and displays results. File edits preserve UTF-8/BOM/GB18030/GBK/UTF-16 and handle Chinese/emoji safely.</div>
-          <div class="feature-plain">Tools are "AI's hands" — plug in tools and it doesn't just talk, it acts.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🔌</div>
-          <div class="feature-name">External MCP Server</div>
-          <div class="feature-desc">Connect to external MCP Servers via SSE transport to extend tool capabilities. Remote tools are auto-discovered and displayed alongside built-in tools. AI models can call them seamlessly through the same interface.</div>
-          <div class="feature-plain">Like plugging a new peripheral into AI's toolkit — just add the address and it works.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🛡️</div>
-          <div class="feature-name">High-Risk Command Approval</div>
-          <div class="feature-desc">Terminal commands go through dual-layer interception with hardcoded rules: 23 categories of high-risk operations require your confirmation, catastrophic commands are unconditionally blocked, and the approval popup shows AI's explanation of the command's purpose.</div>
-          <div class="feature-plain">Before AI hits "delete," it must first show you what it's deleting and why.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🧩</div>
-          <div class="feature-name">Custom Skill System</div>
-          <div class="feature-desc">SKILL.md is plug-and-play — upload or import to extend capabilities. @mention in chat auto-injects context, no need to re-explain background and rules.</div>
-          <div class="feature-plain">A Skill is a "job description" for AI — one Markdown file teaches it a new capability.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🎓</div>
-          <div class="feature-name">Expert Packs</div>
-          <div class="feature-desc">persona.md + rules.md + knowledge/ + skills/ — five pieces packed into one zip per expert. Inject via chat dropdown, team member cards, or @mention. Import and use instantly, share anytime.</div>
-          <div class="feature-plain">It's like "onboarding" for AI — give it the job description and reference materials, and it works in character.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">👥</div>
-          <div class="feature-name">AI Team Multi-Round Debate</div>
-          <div class="feature-desc">Multi-role propose / support / oppose / rebut / decide. Light models handle discussion, heavy models make final calls. Auto-generated summaries save tokens — collective wisdom without the scary bill.</div>
-          <div class="feature-plain">Let several AIs argue it out first, then give you a consensus. Important decisions shouldn't rely on gut feelings.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🔀</div>
-          <div class="feature-name">Team Workflow DAG</div>
-          <div class="feature-desc">Requirements → Decompose → Code → Review → Summarize — the team follows a predefined DAG pipeline. Upstream output flows to downstream, each node's status and I/O visible in real-time, finished artifacts auto-archived to the knowledge base.</div>
-          <div class="feature-plain">Build an assembly line for the AI team: each station does its job, handoffs flow all the way through, finished products auto-stored.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">⏰</div>
-          <div class="feature-name">Scheduled Chat Tasks</div>
-          <div class="feature-desc">One-time / daily at time / fixed interval — three scheduling modes. Auto-execute preset prompts on schedule, results archived to dedicated sessions. Daily reports, periodic inspections, routine organization — let it handle it.</div>
-          <div class="feature-plain">Set an alarm for AI — it works on its own when the time comes, then files results in a dedicated folder.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🧠</div>
-          <div class="feature-name">Whiteboard Logic Chain</div>
-          <div class="feature-desc">Turn ideas into cards, drag to layout, connect with arrows to mark dependencies and data flow. Switch between freeform board, Git tree, flow, kanban, and outline. The Git tree recognizes branches, commits, worktrees, staged/changed/untracked counts, stash, and unpushed commits with draggable nodes.</div>
-          <div class="feature-plain">A whiteboard covered in sticky notes — turning "I have an idea" into "here's the implementation path."</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">💾</div>
-          <div class="feature-name">Long-Term Memory & Knowledge Base</div>
-          <div class="feature-desc">Auto-distill chat highlights, recall across sessions — AI learns your preferences over time. Local knowledge snippets retrieved and injected on demand, turning your materials into its reference library.</div>
-          <div class="feature-plain">AI no longer has "goldfish memory" — what you discussed last time doesn't need re-explaining.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🔍</div>
-          <div class="feature-name">Code Review</div>
-          <div class="feature-desc">Reads git diff (unstaged / staged / commit range), AI reviews code across four dimensions — quality, security, performance, maintainability — and outputs a structured report with inline line-level comments. Three views: full report, comment list sorted by severity, and dimension cards.</div>
-          <div class="feature-plain">Like having a senior engineer review every commit — catches issues before they become bugs.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🔔</div>
-          <div class="feature-name">Task Completion Notifications</div>
-          <div class="feature-desc">When long tasks finish — Target Mode autonomous execution, team debates, or workflow pipelines — SLATE plays a chime sound and sends a system notification. Both can be toggled independently in Settings. Step away without fear of missing results.</div>
-          <div class="feature-plain">Like a timer for AI tasks — you get notified the moment the work is done.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🔒</div>
-          <div class="feature-name">Full Sandbox Security</div>
-          <div class="feature-desc">Seven-layer defense: path traversal prevention (sensitive system dirs blacklisted), credential file access blocked, output truncation (50K chars), file size limits (5MB), request body cap (20MB), upload filename sanitization, ReDoS timeout protection. All transparent to users — zero friction, maximum safety.</div>
-          <div class="feature-plain">Like a security guard that never sleeps — blocks threats silently, never slows you down.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">📖</div>
-          <div class="feature-name">Better Project Understanding</div>
-          <div class="feature-desc">Three scan levels — brief / balanced / detailed — priority-read key files, auto-generate a project guide & encyclopedia and a rulebook, persisted for instant access. AI reads the project first, then gets to work.</div>
-          <div class="feature-plain">Give AI "orientation training" first: what it is, how it's structured, what rules it follows — all clearly documented.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🗂️</div>
-          <div class="feature-name">Chat & Data Management</div>
-          <div class="feature-desc">Full-text search jumps to sessions, export as Markdown / rename / batch manage, messages editable/deletable. One-click JSON backup of all data, import to restore. Storage usage itemized, database compression and cache cleanup in one click.</div>
-          <div class="feature-plain">Chat history is searchable, exportable, editable. Pack up everything in one click. Disk usage is crystal clear.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🏭</div>
-          <div class="feature-name">Prompt Factory</div>
-          <div class="feature-desc">Constitution summary → context snippets → task description → constraints → delivery requirements — assembled into a deliverable prompt in one click. Structured, complete, ready to feed any Coding Agent.</div>
-          <div class="feature-plain">Turn "help me build something" into a well-organized requirements document, then hand it to AI. Less rework.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">📡</div>
-          <div class="feature-name">LAN Remote Control</div>
-          <div class="feature-desc">Opens port 8001 on launch for LAN access. Phone / tablet browsers automatically get the dedicated <strong>SLATE Mobile UI</strong> — bottom-tab navigation across Chat / Conversations / Memory / Tasks / Settings, full chat &amp; tool-loop capability with bottom-sheet confirmations for high-risk commands and file diffs, desktop zero-regression. Settings page and top-bar 📡 button display the access URL and QR code, and optional LAN password protection prevents other devices from operating SLATE without permission.</div>
-          <div class="feature-plain">Turn SLATE into a "home radio station" — scan a QR code from your phone, command AI from the couch.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">🌍</div>
-          <div class="feature-name">Multilingual UI</div>
-          <div class="feature-desc">Choose Simplified Chinese or English during installation. The entire interface, toasts, and dialogs are fully localized — no in-app language switching needed, it just works in your language from day one.</div>
-          <div class="feature-plain">Pick your language once at install. SLATE speaks it fluently ever after.</div>
-        </div>
-        <div class="feature-card reveal" data-stagger>
-          <div class="feature-icon">📚</div>
-          <div class="feature-name">Markdown Vault</div>
-          <div class="feature-desc">Obsidian-style knowledge library built into the memory modal: folder tree + note management, real-time Markdown edit with live preview, <code>[[wiki-link]]</code> bidirectional linking, full-text search and tag filtering. Your second brain, right inside SLATE.</div>
-          <div class="feature-plain">A personal wiki for your notes — link ideas together, search everything, find connections you didn't see.</div>
-        </div>
-      </div>
-    </div>
-  </section>
+        <p class="diff-evidence reveal">Evidence: <code>backend/routers/proxy.py</code> <code>backend/routers/settings.py</code> <code>frontend/js/store.js</code></p>
+      </article>
 
-  <!-- ═══ Three Highlights ═══ -->
-  <section class="section" id="highlights">
-    <div class="container">
-      <div class="reveal">
-        <div class="section-tag">Highlights</div>
-        <h2 class="section-title">Engineering Details Built for Long Tasks</h2>
-        <p class="section-desc">Most AI tools "chat well" but "can't finish" — long tasks break, forget, or freeze. SLATE's engineering focus is exactly here: making long tasks completable, progress visible, and interruptions recoverable.</p>
-      </div>
+      <article class="diff">
+        <div class="diff-head reveal from-left">
+          <span class="diff-index">02</span>
+          <h3>Every step is a row you can read afterwards.</h3>
+          <p>One loop kernel emits ordered events, and each plan, start, finish and cancel is written to a local ledger. What you see on screen is not a re-rendered console log — it is a projection of stored records.</p>
+        </div>
+        <div class="diff-body">
+          <div class="contrast reveal from-left">
+            <div class="contrast-col them">
+              <span class="contrast-label">Typical hosted agent</span>
+              <p>A spinner, then a final diff. When round fourteen goes the wrong way, the reasoning and the half-finished calls that led there are not retrievable by you.</p>
+            </div>
+            <div class="contrast-col ours">
+              <span class="contrast-label">SLATE</span>
+              <p>Sequence-checked events on disk, so a retry can't double-count a call. Same source feeds the tool cards, the whiteboard step cards and the per-session usage summary — one truth, three views.</p>
+            </div>
+          </div>
+          <div class="code-box reveal from-right">
+            <div class="code-box-bar"><i></i><i></i><i></i></div>
+            <pre><span class="c-muted">-- data/chat_history.db</span>
+<span class="c-text">runs        (run_id, …)</span>
+<span class="c-text">tool_events (run_id, seq, kind, …)</span>
+<span class="c-text">  UNIQUE(run_id, seq)  -- INSERT OR IGNORE</span>
+<span class="c-muted">call.start → call.finish | call.cancel</span>
+<span class="c-muted">digests capped at 2000 chars per event</span></pre>
+          </div>
+        </div>
+        <p class="diff-evidence reveal">Evidence: <code>frontend/js/services/agent_loop.js</code> <code>frontend/js/services/agent_ledger.js</code> <code>backend/routers/events.py</code></p>
+      </article>
 
-      <div class="highlight">
-        <div class="highlight-text reveal from-left">
-          <h3>⚡ Autopilot + Target Mode: Let the Model Finish It</h3>
-          <p>For normal project tasks, Autopilot automatically keeps the Agent loop running so you do not need to feed "continue" step by step. For bigger tasks, Target Mode adds the six-phase loop: Goal → Plan → Execute → Verify → Report → Trace, with TODOLIST enforcement.</p>
-          <div class="highlight-plain">Autopilot is the default "keep going" layer. Target Mode is the stronger hands-free mode when you want a 50-round closed loop.</div>
-          <ul>
-            <li>Autopilot: 18 rounds by default, 28 rounds for broad project-wide tasks</li>
-            <li>50 tool-call rounds by default, long tasks stay connected, model sees current round and remaining budget each turn</li>
-            <li>Exits only on: manual stop / rounds exhausted / TODOLIST done — stop doesn't quit Target Mode</li>
-            <li>Model failures, zero output, repeated calls all auto-intercepted and recovered, loop never breaks</li>
-            <li>Gold progress bar shows round count and checklist progress in real-time, auto-reminds until checklist done</li>
-            <li>Four-layer truncation defense: 6-round anchor continuation + truncation guard + file_append segmented write, long files always complete</li>
-            <li>InkStream: as the model writes tool arguments token by token, a live one-line preview shows which fields are closed and which is still being written — incomplete arguments never reach execution</li>
-            <li>Stop really cancels: one click closes both the model stream and the tool-call stream, and the backend terminates the running subprocess or task</li>
-          </ul>
+      <article class="diff">
+        <div class="diff-head reveal from-left">
+          <span class="diff-index">03</span>
+          <h3>Stop means stop — and a stuck loop notices itself.</h3>
+          <p>Cancelling closes both the model stream and the tool stream; for streaming tools the backend reads a closed stream as the cancellation signal and terminates the running child process. Around it, four layers make sure "slow" never becomes "frozen".</p>
         </div>
-        <div class="code-box reveal from-right">
-          <div class="code-box-bar"><i></i><i></i><i></i></div>
-          <pre><span class="c-muted"># Enable ⚡ then send a task</span>
-<span class="c-prompt">You ▸</span> <span class="c-text">Catalog all APIs in this project and generate documentation</span>
-<span class="c-muted">Autopilot · Round 4/28 · verified changes</span>
-<span class="c-prompt">SLATE ▸</span> <span class="c-text">✓ Final report: generated docs/api.md …</span></pre>
-        </div>
-      </div>
-
-      <div class="highlight">
-        <div class="highlight-text reveal from-right">
-          <h3>🛡️ Four-Layer Anti-Freeze Defense</h3>
-          <p>Long tasks最怕 spinning forever. SLATE deploys four layers of defense, from the connection layer all the way to the UI — if any layer fails, the next one catches it.</p>
-          <div class="highlight-plain">Like a circuit breaker — trips to protect, one-click reset. You'll never stare at a frozen screen.</div>
-          <ul>
-            <li>Streaming idle watchdog: disconnects after 90 seconds of no data</li>
-            <li>Zero-content auto-backoff and retry</li>
-            <li>Request / tool 180-second timeout</li>
-            <li>UI fallback watchdog forces interface recovery</li>
-          </ul>
-        </div>
-        <div class="code-box reveal from-left">
-          <div class="code-box-bar"><i></i><i></i><i></i></div>
-          <pre><span class="c-muted">// frontend/js/services/api.js</span>
+        <div class="diff-body">
+          <div class="contrast reveal from-left">
+            <div class="contrast-col them">
+              <span class="contrast-label">Typical hosted agent</span>
+              <p>"Stop" halts the interface while the job carries on somewhere else — and keeps spending. A loop that spins on the same failing call needs a human to notice.</p>
+            </div>
+            <div class="contrast-col ours">
+              <span class="contrast-label">SLATE</span>
+              <p>90-second stream-idle watchdog, zero-output backoff and retry, 180-second request and tool timeouts, UI watchdog for forced recovery. Identical calls deduplicate: two rounds warn, four rounds exit with a stated reason. Half-written tool arguments are previewed but never executed.</p>
+            </div>
+          </div>
+          <div class="code-box reveal from-right">
+            <div class="code-box-bar"><i></i><i></i><i></i></div>
+            <pre><span class="c-muted">// frontend/js/services/api.js</span>
 <span class="c-text">STREAM_IDLE_TIMEOUT_MS = 90000</span>
 <span class="c-text">STREAM_MAX_RETRIES     = 2</span>
 <span class="c-text">REQUEST_TIMEOUT_MS     = 180000</span>
-<span class="c-muted">// Slow ≠ dead: continuous data = no interference</span></pre>
+<span class="c-muted">// chat.js — stall guard</span>
+<span class="c-text">WARN_ROUNDS = 2 · EXIT_ROUNDS = 4</span>
+<span class="c-muted">// skills.py — closed stream == cancelled</span></pre>
+          </div>
         </div>
-      </div>
+        <p class="diff-evidence reveal">Evidence: <code>backend/routers/skills.py</code> <code>frontend/js/services/inkstream.js</code> <code>frontend/js/components/chat.js</code></p>
+      </article>
 
-      <div class="highlight">
-        <div class="highlight-text reveal from-left">
-          <h3>🧩 Capabilities as Files</h3>
-          <p>34 built-in tools work out of the box. Custom capabilities need just one SKILL.md file — no code, no plugin installation, no restart. Drop it in the data/skills directory and it takes effect.</p>
-          <div class="highlight-plain">Adding new capabilities for AI is like placing a manual on a shelf — no wall demolition, no rewiring.</div>
-          <ul>
-            <li>file_tree / file_edit / terminal / repo_stats …</li>
-            <li>Upload SKILL.md to instantly extend skills</li>
-            <li>@mention in chat input, context auto-injected</li>
-          </ul>
+      <article class="diff">
+        <div class="diff-head reveal from-left">
+          <span class="diff-index">04</span>
+          <h3>Adding a capability is a file drop, not a release.</h3>
+          <p>Thirty-four tools ship ready. Beyond them, one <code>SKILL.md</code> directory in your local skills folder is live on next message — @mention it and its context injects itself.</p>
         </div>
-        <div class="code-box reveal from-right">
-          <div class="code-box-bar"><i></i><i></i><i></i></div>
-          <pre><span class="c-muted"># data/skills/my-skill/SKILL.md</span>
+        <div class="diff-body">
+          <div class="contrast reveal from-left">
+            <div class="contrast-col them">
+              <span class="contrast-label">Typical hosted agent</span>
+              <p>The capability set is whatever the vendor shipped last. Extending it means waiting on a roadmap you don't control, or a plugin API they may deprecate.</p>
+            </div>
+            <div class="contrast-col ours">
+              <span class="contrast-label">SLATE</span>
+              <p>Skill folders drop in and take effect. An MCP client attaches external servers; SLATE also serves MCP itself, so other agents can call it. Existing skill directories from other agent ecosystems import as-is.</p>
+            </div>
+          </div>
+          <div class="code-box reveal from-right">
+            <div class="code-box-bar"><i></i><i></i><i></i></div>
+            <pre><span class="c-muted"># data/skills/my-skill/SKILL.md</span>
 <span class="c-text">---</span>
 <span class="c-text">name: my-skill</span>
-<span class="c-text">description: My custom capability</span>
+<span class="c-text">description: what it teaches SLATE</span>
 <span class="c-text">---</span>
-<span class="c-muted"># Specific instruction content…</span></pre>
+<span class="c-muted"># external tools appear as:</span>
+<span class="c-text">mcp__{serverId}__{toolName}</span></pre>
+          </div>
         </div>
-      </div>
+        <p class="diff-evidence reveal">Evidence: <code>backend/routers/skills.py</code> <code>backend/mcp_client.py</code> <code>backend/routers/mcp.py</code> <code>backend/skills/plugin_adapter.py</code></p>
+      </article>
     </div>
   </section>
 
-  <!-- ═══ Use Cases ═══ -->
-  <section class="section" id="scenes">
+  <!-- ═══ Capabilities ═══ -->
+  <section class="section" id="capabilities">
     <div class="container">
       <div class="reveal">
-        <div class="section-tag">Use Cases</div>
-        <h2 class="section-title">What You Get After Installing SLATE</h2>
-        <p class="section-desc">You don't need to code or understand any jargon. As long as you can describe your needs clearly, these scenarios work right after installation.</p>
+        <div class="section-tag">Capabilities</div>
+        <h2 class="section-title">What Those Four Differences Buy You</h2>
+        <p class="section-desc">The inventory is long and deliberately not here. These five are what a local, auditable, bring-your-own-key runtime makes possible in practice.</p>
       </div>
       <div class="scenes-grid" data-stagger-group>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">📂</div>
-          <h3>Personal Knowledge Manager</h3>
-          <p>Hand off reading notes, meeting minutes, and reference snippets to the knowledge base for long-term storage. Recall with a single sentence. Long-term memory works across sessions — the more you use it, the better it understands your style.</p>
+          <div class="scene-icon">📦</div>
+          <h3>Deliverables, Not Just Text</h3>
+          <p>Runs end in files you can send: <code>.pptx</code>, <code>.docx</code>, <code>.xlsx</code>, extracted PDF text and tables, SVG charts, QR codes, portable single-file web bundles. Editing preserves UTF-8 / BOM / GB18030 and handles Chinese and emoji without corrupting them.</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">📝</div>
-          <h3>Writing & Copy Partner</h3>
-          <p>Multiple rounds of polishing from outline to final draft. AI team debate helps you find the most persuasive version. Prompt Factory keeps the style consistent and reproducible.</p>
+          <div class="scene-icon">🧠</div>
+          <h3>Memory That Stays on Your Disk</h3>
+          <p>Chat history in local SQLite, a local vector knowledge base, an Obsidian-style vault with <code>[[wiki-link]]</code> backlinks, and long-term memory that auto-distills across sessions. None of it is uploaded to be "improved".</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">🧪</div>
-          <h3>Lightweight Dev Assistant</h3>
-          <p>Read code, edit files, run commands, generate docs, PPTs and charts — all done by 34 built-in tools in a sandbox. Don't want it to act? Just get a high-quality prompt for a professional Coding Agent instead.</p>
+          <div class="scene-icon">📡</div>
+          <h3>Reach Beyond the Desk</h3>
+          <p>Turn on LAN access and your phone gets a dedicated mobile UI — same chat, same tool loop, bottom-sheet confirmation for high-risk commands. Browser and desktop automation, plus scheduled and event-driven tasks (file change, git push, webhook).</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">💡</div>
-          <h3>Idea Proving Ground</h3>
-          <p>Lay out new projects and plans on the whiteboard first: cards for requirements, arrows for dependencies, Mermaid for flowcharts. Turn vague inspiration into an executable path.</p>
+          <div class="scene-icon">👥</div>
+          <h3>More Than One Brain</h3>
+          <p>Several models debate: propose, support, oppose, decide, with light models doing the talking and a heavy one making the call. A DAG pipeline runs requirements → decompose → code → review → summarize, and parallel subagents fan out when a task splits.</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">⏳</div>
-          <h3>Automation Secretary</h3>
-          <p>Auto-summarize news every morning, organize files weekly, run routine checks on schedule — scheduled tasks run on time, results auto-archived, no human oversight needed.</p>
-        </div>
-        <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">🔒</div>
-          <h3>Privacy-Sensitive Scenarios</h3>
-          <p>All data stored locally: chat history in local SQLite, state in local JSON. Local model support (Ollama / LM Studio) means content never leaves your computer.</p>
+          <div class="scene-icon">🔍</div>
+          <h3>Read the Source, Skip the Build</h3>
+          <p>Vanilla ES modules, no npm, no bundler — edit a file, refresh, it works. The whole frontend is the product, and every claim on this page has a path you can open.</p>
         </div>
       </div>
+      <p class="section-note reveal">Want the full list? <a href="./guide.html#ch17" style="color: var(--gold); border-bottom: 1px solid var(--gold-soft);">Chapter 17 of the guide</a> carries every capability with a one-line description, all 34 tools, the use cases and the tech stack; the rest of the guide covers each panel, the 8 workflow templates and the settings walkthrough — in Chinese and English.</p>
     </div>
   </section>
 
-  <!-- ═══ Toolbox ═══ -->
-  <section class="section" id="tools">
+  <!-- ═══ Honest Limits ═══ -->
+  <section class="section" id="limits">
     <div class="container">
       <div class="reveal">
-        <div class="section-tag">Built-in Tools</div>
-        <h2 class="section-title">34 Built-in Tools</h2>
-        <p class="section-desc">Tools can be understood as "AI's hands": they connect via a unified interface, and the model autonomously decides when to use them. All tools below are implemented in Python at backend/skills/, ready out of the box.</p>
-        <p class="section-note">Usage is simple: <strong>@tool-name</strong> in chat, or just describe what you need — the model picks the right tool and shows you the results.</p>
+        <div class="section-tag">Honest Limits</div>
+        <h2 class="section-title">The Same Ownership Costs You Something</h2>
+        <p class="section-desc">A comparison page that lists only wins is a brochure. Local, single-user, bring-your-own-key is a trade — here is what SLATE gives up to have it.</p>
       </div>
-      <div class="tools-grid" data-stagger-group>
-        <div class="tool-item reveal" data-stagger><code>file_tree</code><span>Browse project structure, see the big picture first</span></div>
-        <div class="tool-item reveal" data-stagger><code>file_peek</code><span>Read-only file preview</span></div>
-        <div class="tool-item reveal" data-stagger><code>file_create</code><span>Create files from scratch</span></div>
-        <div class="tool-item reveal" data-stagger><code>file_edit</code><span>Diff-preview editing, Unicode-safe for Chinese / emoji</span></div>
-        <div class="tool-item reveal" data-stagger><code>terminal</code><span>Sandboxed commands, hidden Windows windows, Unicode output</span></div>
-        <div class="tool-item reveal" data-stagger><code>html_render</code><span>HTML skeleton generation, quick page start</span></div>
-        <div class="tool-item reveal" data-stagger><code>css_color</code><span>CSS color tuning, no more guessing</span></div>
-        <div class="tool-item reveal" data-stagger><code>doc_write</code><span>Structured document writing</span></div>
-        <div class="tool-item reveal" data-stagger><code>ppt_create</code><span>.pptx presentations, outline to slides</span></div>
-        <div class="tool-item reveal" data-stagger><code>word_create</code><span>.docx Word documents, titles & lists</span></div>
-        <div class="tool-item reveal" data-stagger><code>text_summarize</code><span>Text summarization, long text in seconds</span></div>
-        <div class="tool-item reveal" data-stagger><code>json_tool</code><span>JSON processing, format & validate</span></div>
-        <div class="tool-item reveal" data-stagger><code>regex_test</code><span>Regex testing, write & verify</span></div>
-        <div class="tool-item reveal" data-stagger><code>repo_stats</code><span>Repository stats, codebase at a glance</span></div>
-        <div class="tool-item reveal" data-stagger><code>todo_scan</code><span>TODO scanning, find outstanding debts</span></div>
-        <div class="tool-item reveal" data-stagger><code>web_search</code><span>Web search, real-time info, no key needed</span></div>
-        <div class="tool-item reveal" data-stagger><code>web_fetch</code><span>Page content retrieval, read specific links</span></div>
-        <div class="tool-item reveal" data-stagger><code>chart_create</code><span>SVG charts — bar/line/pie with inline preview</span></div>
-        <div class="tool-item reveal" data-stagger><code>qrcode_create</code><span>QR code generation, text links to scannable SVG</span></div>
-        <div class="tool-item reveal" data-stagger><code>python_api_extract</code><span>Python library API docs, signatures/methods/properties</span></div>
-        <div class="tool-item reveal" data-stagger><code>html_bundle</code><span>Portable web pages, html/css/js bundled as single file</span></div>
-        <div class="tool-item reveal" data-stagger><code>code_scan</code><span>Security scanning — hardcoded keys, SQL injection, XSS</span></div>
-        <div class="tool-item reveal" data-stagger><code>mcp_factory</code><span>Self-producing new tools from descriptions</span></div>
-        <div class="tool-item reveal" data-stagger><code>browser_automation</code><span>Chromium automation — navigate, screenshot, click, type</span></div>
-        <div class="tool-item reveal" data-stagger><code>computer_use</code><span>Desktop automation — mouse, keyboard, screenshot, OCR</span></div>
-        <div class="tool-item reveal" data-stagger><code>screenshot_to_code</code><span>Screenshot to code — AI reads image, generates HTML/CSS</span></div>
-        <div class="tool-item reveal" data-stagger><code>code_search</code><span>Project-wide search by text or regex, scope optional</span></div>
-        <div class="tool-item reveal" data-stagger><code>doc_scan</code><span>Document security scan — PII, credentials, confidential marks</span></div>
-        <div class="tool-item reveal" data-stagger><code>system_info</code><span>System metacognition — date, hardware, battery, network</span></div>
-        <div class="tool-item reveal" data-stagger><code>excel_tool</code><span>Excel/CSV — generate .xlsx, read tables, csv↔xlsx</span></div>
-        <div class="tool-item reveal" data-stagger><code>pdf_tool</code><span>PDF — metadata, text and table extraction</span></div>
-        <div class="tool-item reveal" data-stagger><code>git_tool</code><span>Read-only git — branches, log, diff stats</span></div>
-        <div class="tool-item reveal" data-stagger><code>image_gen</code><span>AI image generation — prompt to local file with preview</span></div>
-        <div class="tool-item reveal" data-stagger><code>video_gen</code><span>AI video generation — short clip via async task polling</span></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ Tech Stack ═══ -->
-  <section class="section" id="stack">
-    <div class="container">
-      <div class="reveal">
-        <div class="section-tag">Tech Stack</div>
-        <h2 class="section-title">Native Tech, Zero Build</h2>
-        <p class="section-desc">Frontend is files — edit and it takes effect. No npm, no bundler, no framework tax. For developers, it's source code you can read line by line. For users, it means fewer dependencies, faster startup, fewer failure points.</p>
-        <p class="section-note">A quick note on a common term: <strong>Tokens</strong> are AI's "word count unit" for billing and memory — the longer the context, the more it costs and the more it forgets. SLATE's smart context compression condenses old conversations into summaries, like "archiving notes" for your chat history — saves tokens without losing key points.</p>
-      </div>
-
-      <table class="stack-table reveal slow">
-        <tr><th>Layer</th><th>Choice</th><th>What It Means</th></tr>
-        <tr><td>Frontend</td><td>Vanilla HTML + CSS + JavaScript (ES Modules, zero build)</td><td>Open any file to edit, refresh to see changes</td></tr>
-        <tr><td>Backend</td><td>Python 3.13+ · FastAPI · Uvicorn · httpx</td><td>Lightweight service, one command to start</td></tr>
-        <tr><td>Storage</td><td>SQLite (chat history) · JSON (state / schedules / constitution)</td><td>No external database, all data on your disk</td></tr>
-        <tr><td>Rendering</td><td>Highlight.js · Mermaid.js (CDN)</td><td>Code highlighting and flowcharts out of the box</td></tr>
-        <tr><td>Desktop</td><td>webview2 shell + PyInstaller + Inno Setup installer</td><td>Windows double-click install, works like any app</td></tr>
-      </table>
-
-      <div class="principles" data-stagger-group>
-        <div class="principle reveal" data-stagger>
-          <h4>Pure Black-White-Gray Base</h4>
-          <p>No blue-purple gradients, no excessive rounding, no shadow/frosted glass. Gold is only an accent — like a stroke of gold lacquer on an inkstone, quiet yet weighty.</p>
+      <div class="scenes-grid limits" data-stagger-group>
+        <div class="scene-card reveal" data-stagger>
+          <h3>No Hosted Workspace</h3>
+          <p>No organisations, no shared review, no server API. It is one person's desktop, and team features would change what it is.</p>
         </div>
-        <div class="principle reveal" data-stagger>
-          <h4>Local-First</h4>
-          <p>All data stored locally. API Keys used only for LLM calls. Your chats, memories, and files never pass through any third-party servers.</p>
+        <div class="scene-card reveal" data-stagger>
+          <h3>Guardrails, Not a Jail</h3>
+          <p>The terminal tool runs a real shell. Twenty-three categories of high-risk commands ask for confirmation first and catastrophic ones are blocked outright — but a denylist is a rail, not a sandbox.</p>
         </div>
-        <div class="principle reveal" data-stagger>
-          <h4>Token Economy</h4>
-          <p>Smart compression, tiered calls, silent processing. Every token spent wisely — spend less, get more done.</p>
+        <div class="scene-card reveal" data-stagger>
+          <h3>Keys in a Local File</h3>
+          <p>Model keys sit in plaintext JSON inside your data directory, not in the OS keychain. Anything that can read that folder can read them.</p>
         </div>
-        <div class="principle reveal" data-stagger>
-          <h4>Never Frozen</h4>
-          <p>Four-layer timeout defense, streaming and tool calls covered end-to-end. Slow is waitable. Infinite spinning is not.</p>
+        <div class="scene-card reveal" data-stagger>
+          <h3>Not Offline</h3>
+          <p>Three CDN scripts (highlight.js, Mermaid, anime.js) load on start. Air-gapped use means mirroring them yourself first.</p>
+        </div>
+        <div class="scene-card reveal" data-stagger>
+          <h3>Windows &amp; macOS First</h3>
+          <p>Installers ship for Windows (WebView2 required) and disk images for macOS. Linux runs from source, with no packaged build.</p>
+        </div>
+        <div class="scene-card reveal" data-stagger>
+          <h3>LAN Is the Whole App</h3>
+          <p>If you turn on remote control, that network can drive everything — terminal included — behind one token and an optional password. Off unless you enable it.</p>
         </div>
       </div>
     </div>
@@ -614,42 +432,42 @@
     <div class="container">
       <div class="reveal">
         <div class="section-tag">Quick Start</div>
-        <h2 class="section-title">Three Steps to Start Grinding</h2>
-        <p class="section-desc">Non-coders only need step one: download the installer, double-click, and use it like any regular software. Those who want to read source code or build on top of it should read all three.</p>
+        <h2 class="section-title">Three Steps, Then Judge for Yourself</h2>
+        <p class="section-desc">Step one is all a non-coder needs. Steps two and three are for anyone who intends to read the loop before trusting it.</p>
       </div>
 
       <div class="start-steps" data-stagger-group>
         <div class="step reveal" data-stagger>
           <div class="step-num">01</div>
-          <h4>Get SLATE</h4>
-          <p>Download the Windows installer from Releases for instant use, or clone the source to explore:</p>
+          <h4>Install or Clone</h4>
+          <p>A per-user Windows installer from Releases — no administrator rights, clean uninstall. Or read the source:</p>
           <code>git clone https://github.com/CaryWang1234/SLATE.git</code>
         </div>
         <div class="step reveal" data-stagger>
           <div class="step-num">02</div>
           <h4>Launch</h4>
-          <p>Running from source requires Python 3.13+. Two commands to start the local service:</p>
+          <p>From source you need Python 3.13+. Two commands start the local service:</p>
           <code>pip install -r requirements.txt<br>start.bat &nbsp;# or ./start.sh</code>
         </div>
         <div class="step reveal" data-stagger>
           <div class="step-num">03</div>
-          <h4>Configure Models</h4>
-          <p>Enter API Keys for your desired models in Settings (apply on each model's website, pay-per-use, very low cost for daily use), then visit:</p>
+          <h4>Paste One Key</h4>
+          <p>Add the key for any model you already have — or point it at a local Ollama / LM Studio endpoint and add none. Then open:</p>
           <code>http://127.0.0.1:8000</code>
         </div>
       </div>
-      <p class="section-note reveal">After installation you get: a dual-themed three-column workspace, all built-in tools, a scheduled task dispatcher, and usage data all stored locally. Clean uninstall, no residue.</p>
+      <p class="section-note reveal">Nothing to sign up for, nothing to migrate. Your history, memory, skills and usage data are files on your own disk from the first run.</p>
     </div>
   </section>
 
   <!-- ═══ CTA ═══ -->
   <section class="cta">
     <div class="container reveal">
-      <h2>Grind inspiration into polished deliverables.</h2>
-      <p>SLATE doesn't chase "bigger and stronger" parameter races. It focuses on one thing: letting AI quietly and reliably get the job done on your desktop. Open source · MIT License · Stars and contributions welcome.</p>
+      <h2>Run it against the agent you already pay for.</h2>
+      <p>Install SLATE, point it at a key you already hold, and give both the same task. The loop, the ledger and the limits are all in the open — MIT licensed, and yours to audit.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">★ Star on GitHub</a>
-        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ Download Latest</a>
+        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ Download Latest</a>
+        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">★ Star on GitHub</a>
       </div>
     </div>
   </section>
@@ -661,9 +479,10 @@
       <p>
         <a href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub</a> ·
         <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">Releases</a> ·
-        <a href="https://github.com/CaryWang1234/SLATE/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://github.com/CaryWang1234/SLATE/issues" target="_blank" rel="noopener">Issues</a> ·
+        <a href="./guide.html">Guide</a>
       </p>
-      <p style="margin-top: 8px;">Released under the MIT License · © 2026 Cary</p>
+      <p style="margin-top: 8px;">SLATE ships no model of its own and is unaffiliated with any provider. · MIT License · © 2026 Cary</p>
     </div>
   </footer>
 
@@ -770,19 +589,10 @@
     // ── Hero typewriter ──
     const typeEl = document.getElementById("hero-type");
     const phrases = [
-      "Turn 'organize project docs' into a real deliverable report",
-      "Grind Mode: a rough idea, ground into a structured task brief",
-      "34 built-in tools — @mention and start working",
-      "Code Review: AI reads git diff, reviews 4 dimensions, inline comments",
-      "Task done? 🔔 Chime + system notification — step away worry-free",
-      "7-layer sandbox security — blocks threats silently, never slows you down",
-      "Expert Packs @mention — AI becomes your specialist instantly",
-      "Three-level project scanning: AI reads first, then acts",
-      "Idea → Card → Logic chain → Executable plan",
-      "Workflow pipeline: Requirements → Decompose → Code → Review → Summarize",
-      "All data backed up in one click, searchable, exportable, recoverable",
-      "Your data always stays on your computer",
-      "Markdown Vault: your second brain with [[wiki-link]] bidirectional linking",
+      "Your keys. Your machine. Nobody's credits.",
+      "Every tool call is a row in a local ledger.",
+      "Stop closes the stream — and kills the process.",
+      "A new capability is a file, not a release.",
     ];
     if (REDUCED) {
       typeEl.textContent = phrases[0];
