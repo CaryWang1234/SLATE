@@ -12,14 +12,14 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260911-001";
-import { get, post, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260911-001";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260911-001";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260911-001";
-import { dlgUserAsk } from "./dialog.js?v=20260911-001";
-import { t } from "./i18n.js?v=20260911-001";
-import { makeId } from "./utils.js?v=20260911-001";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260911-001";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260912-002";
+import { get, post, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260912-002";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260912-002";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260912-002";
+import { dlgUserAsk } from "./dialog.js?v=20260912-002";
+import { t } from "./i18n.js?v=20260912-002";
+import { makeId } from "./utils.js?v=20260912-002";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260912-002";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -1014,6 +1014,13 @@ const TOOL_RE = /◈◈◈\s*(\w+)\s*\r?\n([\s\S]*?)(?:◈◆◆|◆◆)/g;
 // file_create / file_append 走原样围栏协议：内容不经 JSON 转义，根治大内容转义损坏与 file_path 丢失
 const FILE_RAW_TOOLS = new Set(["file_create", "file_append"]);
 
+// 部分模型按 HTML/XML 书写习惯把开标记写成 <tool_name>，收尾仍是 ◈◆◆ 或 </tool_name>。
+// 名称独占一行 + 必须是已注册工具，是防误伤 <div>/<Button> 等正文标签的唯一闸门。
+const TOOL_TAG_NAME = "([a-z][a-z0-9_]{2,})";
+const TOOL_TAG_OPEN = `(?:^|\\r?\\n)[ \\t]*<${TOOL_TAG_NAME}>[ \\t]*\\r?\\n`;
+const TOOL_TAG_RE = `${TOOL_TAG_OPEN}([\\s\\S]*?)(?:◈◆◆|◆◆|<\\/\\1>)`;
+const TOOL_TAG_TAIL_RE = `${TOOL_TAG_OPEN}([\\s\\S]*)$`;
+
 const TOOL_ALIASES = {
   read_file: "project_read_file",
   file_read: "project_read_file",
@@ -1281,28 +1288,82 @@ function salvageTruncatedParams(raw) {
   return params;
 }
 
+function _knownToolName(raw) {
+  const name = normalizeToolName(String(raw || "").trim());
+  return TOOLS[name] ? name : "";
+}
+
+// 标签块 → 调用；不满足白名单/正文形态时返回 null，交给正则当普通正文保留
+function _tagCallFrom(rawName, rawBody, allowOpenJson) {
+  const name = _knownToolName(rawName);
+  if (!name) return null;
+  const body = String(rawBody || "");
+  if (!body.trim()) return null;
+  if (FILE_RAW_TOOLS.has(name)) {
+    const params = parseFileWriteParams(body);
+    if (!params || !params.file_path) return null;
+    // 路径行带尖括号说明那是标签残留（空块的 </file_create> 会被当成路径），不是真调用
+    if (/[<>]/.test(params.file_path)) return null;
+    if (!allowOpenJson && !String(params.content || "").trim()) return null;
+    // 原样围栏正文没有可判定的终点，尾块一律按截断处理
+    if (allowOpenJson) params._truncated = true;
+    return { name, params };
+  }
+  const jsonish = stripJsonFence(body);
+  if (!/^\{/.test(jsonish)) return null;
+  const openEnded = !/\}$/.test(jsonish);
+  if (openEnded && !allowOpenJson) return null;
+  let params;
+  try {
+    // 解得动说明调用本身完整，收尾写成 </tool_name> 之类变体不该算截断
+    params = JSON.parse(jsonish);
+  } catch {
+    params = salvageTruncatedParams(jsonish);
+  }
+  params = normalizeToolParams(name, params);
+  if (openEnded) params._truncated = true;
+  return { name, params };
+}
+
 function detectToolCalls(text) {
-  const calls = [];
-  let match;
+  const found = [];
   let lastEnd = 0;
+  let match;
   const re = new RegExp(TOOL_RE.source, "g");
   while ((match = re.exec(text)) !== null) {
     lastEnd = re.lastIndex;
     const name = normalizeToolName(match[1]);
+    let call;
     if (FILE_RAW_TOOLS.has(name)) {
-      calls.push({ name, params: parseFileWriteParams(match[2]) });
-      continue;
+      call = { name, params: parseFileWriteParams(match[2]) };
+    } else {
+      let params;
+      try {
+        // 闭合块但 JSON 损坏：用 salvage 尽力抢救参数，而不是直接丢弃（否则 file_path 等必丢）
+        params = JSON.parse(stripJsonFence(match[2]) || "{}");
+      } catch {
+        params = salvageTruncatedParams(match[2] || "");
+      }
+      call = { name, params: normalizeToolParams(name, params) };
     }
-    let params;
-    try {
-      params = JSON.parse(stripJsonFence(match[2]) || "{}");
-    } catch {
-      // 闭合块但 JSON 损坏：用 salvage 尽力抢救参数，而不是直接丢弃（否则 file_path 等必丢）
-      params = salvageTruncatedParams(match[2] || "");
-    }
-    params = normalizeToolParams(name, params);
-    calls.push({ name, params });
+    found.push({ at: match.index, end: re.lastIndex, call });
   }
+
+  // 标签式开标记：先把 ◈◈◈ 命中区间打成等长空白（保留换行），同一段不会被两种格式各计一次
+  let masked = text;
+  for (const f of found) {
+    const blank = masked.slice(f.at, f.end).replace(/[^\n]/g, " ");
+    masked = masked.slice(0, f.at) + blank + masked.slice(f.end);
+  }
+  const tagRe = new RegExp(TOOL_TAG_RE, "g");
+  while ((match = tagRe.exec(masked)) !== null) {
+    const call = _tagCallFrom(match[1], match[2]);
+    if (!call) continue;
+    lastEnd = Math.max(lastEnd, tagRe.lastIndex);
+    found.push({ at: match.index, call });
+  }
+  found.sort((a, b) => a.at - b.at);
+  const calls = found.map((f) => f.call);
 
   // 处理末尾被截断的工具调用块（缺少闭合标记 ◈◆◆，通常是输出达到 max_tokens 上限）
   // 不能直接丢弃：file_create 的 content 往往已输出了大部分内容，应尽力抢救。
@@ -1315,16 +1376,22 @@ function detectToolCalls(text) {
     let params;
     if (FILE_RAW_TOOLS.has(name)) {
       params = parseFileWriteParams(rawBody);
+      params._truncated = true; // 原样正文没有可判定的终点，只能按截断处理
     } else {
+      // 反向混排：开标记 ◈◈◈、收尾写成 </tool_name>，JSON 其实完整，不该按截断跳过白跑一轮
+      const body = rawBody.replace(/\s*<\/[a-z][a-z0-9_]*>\s*$/, "");
       try {
-        params = JSON.parse(stripJsonFence(rawBody));
+        params = normalizeToolParams(name, JSON.parse(stripJsonFence(body)));
       } catch {
-        params = salvageTruncatedParams(rawBody);
+        params = normalizeToolParams(name, salvageTruncatedParams(body));
+        params._truncated = true;
       }
-      params = normalizeToolParams(name, params);
     }
-    params._truncated = true;
     calls.push({ name, params });
+  } else {
+    const tagTail = new RegExp(TOOL_TAG_TAIL_RE).exec(rest);
+    const tailCall = tagTail ? _tagCallFrom(tagTail[1], tagTail[2], true) : null;
+    if (tailCall) calls.push(tailCall);
   }
   return calls;
 }
@@ -1389,6 +1456,11 @@ function hasToolMarkup(text) {
 
 function stripToolCalls(text) {
   let stripped = text.replace(TOOL_RE, "");
+  // 标签式调用块：仅当名称命中工具白名单且正文形态合法时才删，<div> 之类正文标签原样保留
+  stripped = stripped.replace(
+    new RegExp(TOOL_TAG_RE, "g"),
+    (full, name, body) => (_tagCallFrom(name, body) ? "" : full)
+  );
   // 先整块摘除已闭合的 invoke（其内部 parameter 一并带走），再清包裹标记，
   // 然后从残留的裸标记处截断（说明这里是被截断的半截调用），最后兜底扫尾
   stripped = stripped
@@ -1407,6 +1479,9 @@ function stripToolCalls(text) {
   // 同时移除末尾未闭合的截断工具块，避免残缺 JSON 残留在消息正则
   return stripped
     .replace(/◈◈◈[ \t]*\w+[ \t]*\r?\n[\s\S]*$/, "")
+    .replace(new RegExp(TOOL_TAG_TAIL_RE), (full, name, body) =>
+      _tagCallFrom(name, body, true) ? "" : full
+    )
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -1512,6 +1587,7 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   for (const rule of AGENT_TOOL_DECISION_RULES) s += `- ${rule}\n`;
   s += "\n";
   s += "**调用格式**：每次调用独占一块，◈◈◈ 与 ◈◆◆ 是固定标记，不可省略；一次回复可多次调用：\n";
+  s += "（开标记必须原样写 ◈◈◈，不要改写成 <tool_name> 之类的标签形式，那样系统解析不到、本轮会直接终止）\n";
   s += "◈◈◈tool_name\n{JSON参数}\n◈◆◆\n\n";
 
   // 具体示例
