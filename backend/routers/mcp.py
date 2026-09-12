@@ -9,11 +9,13 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 import json
 from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
@@ -438,7 +440,7 @@ def _handle_tools_list(req_id: Any) -> dict[str, Any]:
     })
 
 
-def _handle_tools_call(req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
+async def _handle_tools_call(req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
     """处理 tools/call：执行指定工具并返回结果。"""
     tool_name = params.get("name", "")
     arguments = params.get("arguments", {}) or {}
@@ -455,9 +457,10 @@ def _handle_tools_call(req_id: Any, params: dict[str, Any]) -> dict[str, Any]:
     if not hasattr(module, "execute"):
         return _jsonrpc_error(req_id, -32602, f"Tool {tool_name} has no execute function")
 
-    # 执行工具
+    # 执行工具：模块为同步实现，terminal/computer_use/web_search 等耗时可达数十秒，
+    # 必须移出事件循环，否则会挂起整个后端（含聊天流式响应）
     try:
-        result = module.execute(**arguments)
+        result = await run_in_threadpool(module.execute, **arguments)
         return _jsonrpc_result(req_id, {
             "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, indent=2)}],
         })
@@ -481,7 +484,7 @@ _METHOD_HANDLERS = {
 }
 
 
-def _dispatch(body: dict[str, Any]) -> dict[str, Any]:
+async def _dispatch(body: dict[str, Any]) -> dict[str, Any]:
     """分发 JSON-RPC 2.0 请求到对应方法处理器。"""
     jsonrpc = body.get("jsonrpc")
     if jsonrpc != "2.0":
@@ -493,7 +496,11 @@ def _dispatch(body: dict[str, Any]) -> dict[str, Any]:
 
     handler = _METHOD_HANDLERS.get(method)
     if handler:
-        return handler(req_id, params)
+        result = handler(req_id, params)
+        # 处理器可能为协程（tools/call 需在线程池中执行同步工具）
+        if inspect.isawaitable(result):
+            return await result
+        return result
 
     return _jsonrpc_error(req_id, -32601, f"Method not found: {method}")
 
@@ -517,5 +524,5 @@ async def mcp_endpoint(request: Request) -> JSONResponse:
             status_code=400,
         )
 
-    result = _dispatch(body)
+    result = await _dispatch(body)
     return JSONResponse(content=result)
