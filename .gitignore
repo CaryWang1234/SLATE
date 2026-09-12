@@ -16,6 +16,7 @@ repo-doctor.py
 /data/desktop_state.json
 /data/grind_sessions
 /data/outputs
+/data/typing_custom.txt
 /outputs
 /.qoder
 /.diag

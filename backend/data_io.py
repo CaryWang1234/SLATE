@@ -13,12 +13,17 @@ from pathlib import Path
 from typing import Any
 
 
-def atomic_write_json(path: Path, data: Any) -> None:
-    """原子写入 JSON（临时文件 + os.replace），避免中途崩溃损坏原文件。"""
+def atomic_write_text(path: Path, text: str) -> None:
+    """原子写入 UTF-8 文本（临时文件 + os.replace），避免中途崩溃损坏原文件。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.write_text(text, encoding="utf-8", newline="\n")
     os.replace(tmp, path)
+
+
+def atomic_write_json(path: Path, data: Any) -> None:
+    """原子写入 JSON（临时文件 + os.replace），避免中途崩溃损坏原文件。"""
+    atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2))
 
 
 def backup_corrupt(path: Path) -> None:

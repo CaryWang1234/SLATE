@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260911-001">
+  <link rel="stylesheet" href="./css/style.css?v=20260912-002">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -733,6 +733,15 @@
             </div>
             <button id="btn-typing-next" class="send-btn send-btn-sm" type="button">换一句</button>
           </div>
+          <div class="typing-toolbar">
+            <label class="setting-label" for="typing-source">题库</label>
+            <select id="typing-source" class="setting-input typing-source">
+              <option value="mixed">内置 + 自定义</option>
+              <option value="builtin">只用内置</option>
+              <option value="custom">只用自定义</option>
+            </select>
+            <span id="typing-pool" class="typing-pool"></span>
+          </div>
           <div id="typing-target" class="typing-target"></div>
           <input id="typing-input" type="text" class="setting-input" placeholder="在此敲出上方文本…" autocomplete="off" autocapitalize="off" spellcheck="false">
           <div class="typing-stats">
@@ -742,6 +751,16 @@
             <span class="typing-stat"><span class="typing-stat-key">最佳</span><b id="typing-best">0</b></span>
           </div>
           <div id="typing-result" class="typing-result"></div>
+          <details class="typing-custom">
+            <summary>自定义题库</summary>
+            <p class="setting-hint">一行一条，只用英文与符号（6–220 字符）；空行与 # 开头的注释行忽略，重复行只留一条。也可以直接用任意编辑器改这个文件，改完点「重新读取」：</p>
+            <p class="setting-hint"><code id="typing-corpus-path">data/typing_custom.txt</code></p>
+            <textarea id="typing-custom-text" class="setting-input typing-custom-text" rows="8" spellcheck="false" placeholder="# my typing list, one line each&#10;git switch -c feat/typing-corpus&#10;Select-String -Path *.log -Pattern 'Traceback'"></textarea>
+            <div class="typing-custom-actions">
+              <button id="btn-typing-reload" class="send-btn send-btn-sm" type="button">重新读取</button>
+              <button id="btn-typing-save" class="send-btn send-btn-sm" type="button">保存题库</button>
+            </div>
+          </details>
           <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">敲第一个字符开始计时，退格可改错，打完或按回车结束本局并换一句。</div>
         </section>
 
@@ -1332,7 +1351,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260911-001"></script>
+  <script type="module" src="./js/app.js?v=20260912-002"></script>
 
 </body>
 </html>
