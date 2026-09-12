@@ -6,9 +6,9 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define MyAppName "SLATE 砚"
-#define MyAppVersion "0.4.0"
+#define MyAppVersion "0.4.1"
 ; 构建号（yyyyMMddHHmm），每次发布构建时更新
-#define MyAppBuild "202609102037"
+#define MyAppBuild "202609112021"
 #define MyAppPublisher "SLATE"
 #define MyAppURL "https://github.com/CaryWang1234/SLATE"
 #define MyAppExeName "SLATE.exe"
