@@ -2,12 +2,21 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260912-002";
-import { get, streamChat } from "../services/api.js?v=20260912-002";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260912-002";
-import { t } from "../services/i18n.js?v=20260912-002";
-import { iconSvgEl } from "../services/icons.js?v=20260912-002";
-import { makeId } from "../services/utils.js?v=20260912-002";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260913-001";
+import { get, streamChat } from "../services/api.js?v=20260913-001";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260913-001";
+import { t } from "../services/i18n.js?v=20260913-001";
+import { iconSvgEl } from "../services/icons.js?v=20260913-001";
+import { makeId } from "../services/utils.js?v=20260913-001";
+import { reportError } from "../services/error_sink.js?v=20260913-001";
+
+// 逐元素求极值：把整个数组当实参展开时，笔迹点上万会让 V8 抛
+// RangeError: Maximum call stack size exceeded，所以这里一律不展开。
+function maxOf(values, floor = -Infinity) {
+  let m = floor;
+  for (const v of values) if (v > m) m = v;
+  return m;
+}
 
 let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel, whiteboardPanel, boardModesBar, wfStopBtn;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
@@ -910,8 +919,8 @@ function renderGitTreeView(metaEl) {
     layer.appendChild(el);
   });
 
-  const maxX = Math.max(...[...positions.values()].map(p => p.x), 900) + 260;
-  const maxY = Math.max(...[...positions.values()].map(p => p.y), 520) + 150;
+  const maxX = maxOf([...positions.values()].map(p => p.x), 900) + 260;
+  const maxY = maxOf([...positions.values()].map(p => p.y), 520) + 150;
   layer.style.width = `${maxX}px`;
   layer.style.height = `${maxY}px`;
   svg.setAttribute("width", String(maxX));
@@ -1563,7 +1572,11 @@ function setupDrawing() {
   });
   drawCanvas.addEventListener("pointermove", (e) => {
     if (!currentStroke) return;
-    currentStroke.points.push(getBoardPoint(e, drawCanvas));
+    const point = getBoardPoint(e, drawCanvas);
+    const last = currentStroke.points[currentStroke.points.length - 1];
+    // 亚像素抖动不入栈：高频笔/鼠标会灌进大量近似重复点，既拖慢重绘又让笔迹存档无界增长
+    if (last && Math.abs(point.x - last.x) < 0.5 && Math.abs(point.y - last.y) < 0.5) return;
+    currentStroke.points.push(point);
     redrawStrokes();
   });
   const endStroke = (e) => {
@@ -1899,19 +1912,21 @@ function focusBoardContent() {
     boardCanvas.scrollTo({ left: 0, top: 0, behavior: "smooth" });
     return;
   }
-  const xs = [
-    ...cards.map(card => Number(card.x) || 0),
-    ...(state.boardNotes || []).map(note => Number(note.x) || 0),
-    ...strokes.flatMap(stroke => (stroke.points || []).map(p => Number(p.x) || 0)),
-  ];
-  const ys = [
-    ...cards.map(card => Number(card.y) || 0),
-    ...(state.boardNotes || []).map(note => Number(note.y) || 0),
-    ...strokes.flatMap(stroke => (stroke.points || []).map(p => Number(p.y) || 0)),
-  ];
+  // 逐点扫描求左上界：既不再展开实参（笔迹上万点会爆栈），也不复制两份大数组
+  let minX = Infinity;
+  let minY = Infinity;
+  const consider = (rawX, rawY) => {
+    const x = Number(rawX) || 0;
+    const y = Number(rawY) || 0;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+  };
+  cards.forEach(card => consider(card.x, card.y));
+  (state.boardNotes || []).forEach(note => consider(note.x, note.y));
+  strokes.forEach(stroke => (stroke.points || []).forEach(p => consider(p.x, p.y)));
   boardCanvas.scrollTo({
-    left: Math.max(0, Math.min(...xs) - 40),
-    top: Math.max(0, Math.min(...ys) - 40),
+    left: Math.max(0, (Number.isFinite(minX) ? minX : 0) - 40),
+    top: Math.max(0, (Number.isFinite(minY) ? minY : 0) - 40),
     behavior: "smooth",
   });
 }
@@ -2062,6 +2077,7 @@ async function renderMermaid() {
       mermaidRenderArea.innerHTML = svg;
     }
   } catch (e) {
+    reportError(e, "Mermaid 渲染");
     mermaidRenderArea.innerHTML = `<div style="color:#999;font-size:11px;padding:8px;">${t("Mermaid 渲染失败：{msg}", { msg: e.message })}</div>`;
   }
 }
