@@ -6,7 +6,7 @@
 ; ─────────────────────────────────────────────────────────────
 
 #define MyAppName "SLATE 砚"
-#define MyAppVersion "0.4.1"
+#define MyAppVersion "0.4.2"
 ; 构建号（yyyyMMddHHmm），每次发布构建时更新
 #define MyAppBuild "202609112021"
 #define MyAppPublisher "SLATE"

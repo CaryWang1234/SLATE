@@ -218,6 +218,21 @@ SLATE 内置 34 个 MCP 工具，模型在对话中自主决定何时使用。
 - 中文、emoji、全角符号会原样保留；如果旧编码无法表达新字符，工具会安全升级写入编码而不是丢字符
 - Windows 下 `terminal` 会隐藏 PowerShell 子窗口，并对 Python / Node / Git / npm / rg 等原生命令做 Unicode-safe 输出捕获
 
+**Actions 流程说明书：**
+
+上面的工具是「手」，Action 是「步骤约定」——把某件重复任务的必要流程写成一份 yml，模型按它推进，而不是每次重新猜。
+
+- 位置：`data/actions/<id>.yml`，一个文件一份流程，文件名（去掉 `.yml`）就是它的 id
+- 字段：`name`、`description`、`when`（什么时候该套用）、`inputs`（要问用户拿什么）、`steps`（每步 `title` + 可选 `tool` / `detail` / `check`）、`output`、`tags`
+- 智能体态下模型自动看到 Action 目录（最多 20 条，超出只报数量并指向 `actions_list`），确认要用时调 `actions_read` 读完整流程，再按步骤实际执行；对话态没有工具，整段目录都不注入
+- 读到流程不等于做过流程：步骤里标了建议工具的，仍要真调工具完成，模型不会因为「读过 yml」就声称已经执行
+- 写坏的 yml 不会凭空消失：设置 →「工具 / 技能」里会连同「第 N 行：原因」一起列出，工具返回里也会告诉模型哪些暂时不可用
+- 格式用的是极简 YAML 子集（2 空格缩进、块数组、`|` 字面量块），Tab 缩进、锚点、多文档等一律拒收；单文件上限 64 KB
+- 面板可编辑：设置 →「工具 / 技能」→ Actions，点「＋ 新建 Action」或点已有条目进编辑器；边写边校验，报错按「第 N 行：原因」显示，校验没过就保存不了
+- 每次覆盖或删除都会先把原文留底到 `data/actions/.history/`（每份最多 5 版），编辑器里的「历史版本」可查看任意一版或直接回滚
+- 模型也能写：`actions_write` 工具要求它先在 yml 里声明 `author: model`（面板据此打上「模型代写」徽标），且「询问」权限模式下会弹窗给你审批；切到「自动 / 越权」则不弹窗——写坏可以回滚，但格式校验永远会拦住不合格的内容
+- 聊天框输入 `@<id>` 可把整份流程注入这条消息（注入有 6000 字上限，超出部分提示模型用 `actions_read` 读全）
+
 ---
 
 ### 10. 专家包
@@ -561,6 +576,21 @@ SLATE includes 34 built-in MCP tools. The model decides when to use them during 
 - `file_peek` / `file_edit` auto-detect UTF-8, UTF-8 BOM, GB18030, GBK, UTF-16, and other common text encodings
 - Chinese, emoji, and full-width symbols are preserved as-is; if a legacy encoding cannot represent a new character, the tool safely upgrades the write encoding instead of losing text
 - On Windows, `terminal` hides PowerShell windows and captures Unicode-safe output for native commands such as Python / Node / Git / npm / rg
+
+**Action Playbooks:**
+
+The tools above are the hands; an Action is the agreed sequence — write the required flow for a recurring task into one yml file so the model follows it instead of re-guessing every time.
+
+- Location: `data/actions/<id>.yml`, one flow per file; the filename (minus `.yml`) is its id
+- Fields: `name`, `description`, `when` (when it applies), `inputs` (what to ask the user for), `steps` (each with `title` plus optional `tool` / `detail` / `check`), `output`, `tags`
+- In Agent mode the model sees the Action catalog automatically (capped at 20 entries; the remainder is reported as a count pointing to `actions_list`), reads a full flow with `actions_read` before committing to it, then executes the steps. Chat mode has no tools, so the catalog is not injected at all
+- Reading a flow is not the same as running it: steps that name a suggested tool still require the actual call, and the model never claims completion just because it read the yml
+- A broken file does not silently disappear: Settings → "Tools / Skills" lists it together with "line N: reason", and tool results tell the model which Actions are currently unavailable
+- The format is a minimal YAML subset (2-space indent, block arrays, `|` literal blocks); tabs, anchors and multi-document files are rejected. 64 KB per file
+- Editable in the panel: Settings → "Tools / Skills" → Actions, then "+ New Action" or click an entry to open the editor. Validation runs as you type and reports "line N: reason"; a failing draft cannot be saved
+- Every overwrite or delete first copies the previous text to `data/actions/.history/` (up to 5 versions per Action). The editor's "History" button lets you view any version or roll back to it
+- The model can write too: the `actions_write` tool requires it to declare `author: model` inside the yml (the panel badges such files "Model-written"), and in "Ask" permission mode a confirmation dialog shows the exact content first. "Auto" / "Full access" skip the dialog — a bad write is reversible via history, but the format gate never lets an invalid file through
+- Typing `@<id>` in the chat box injects the whole flow into that message, capped at 6000 characters; anything longer is trimmed with a note telling the model to read the rest with `actions_read`
 
 ---
 

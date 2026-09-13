@@ -958,6 +958,40 @@ textarea::-webkit-scrollbar-thumb {
   font-variant-numeric: tabular-nums;
 }
 
+/* 回复方式 / 推理强度：输入框左侧的紧凑下拉，与 .expert-select 同规格 */
+.input-pill-select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 5px;
+  font-size: 11px;
+  font-family: var(--font-main);
+  height: 26px;
+  outline: none;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color var(--transition);
+}
+
+.input-pill-select:hover {
+  color: var(--text);
+}
+
+.input-pill-select:focus {
+  border-color: var(--gold);
+}
+
+/* 当前模型不支持该档位时置灰：仍在原位说明"为什么不能选"，比直接隐藏更好解释 */
+.input-pill-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.input-pill-select:disabled:hover {
+  color: var(--text-secondary);
+}
+
 .chat-input-wrap {
   position: relative;
   display: flex;
@@ -2729,6 +2763,31 @@ textarea::-webkit-scrollbar-thumb {
   border: 1px solid rgba(217, 164, 65, 0.35);
 }
 
+/* 解析失败的 Action 必须留在列表里说明原因，而不是静默消失 */
+.skill-item-broken {
+  cursor: default;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.skill-item-broken:hover {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.skill-item-broken .skill-item-name {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+.skill-item-broken .skill-item-desc {
+  color: var(--danger);
+  white-space: normal;
+}
+
+/* Action / 专家同用中性墨色徽标：与金色系（工具/MCP/技能）区分，表示另一族能力 */
+.skill-kind-action,
 .skill-kind-expert {
   color: var(--text-secondary);
   background: color-mix(in srgb, var(--text) 8%, transparent);
@@ -2739,6 +2798,14 @@ textarea::-webkit-scrollbar-thumb {
   color: #6fbf9a;
   background: rgba(111, 191, 154, 0.12);
   border: 1px solid rgba(111, 191, 154, 0.35);
+}
+
+/* 模型代写的 Action：徽标要跳出来，它等于模型往自己系统提示里加过料 */
+.skill-kind-model {
+  margin-left: 4px;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
 .skill-item-del {
@@ -3052,6 +3119,129 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .skill-result.hidden { display: none; }
+
+/* ── Action 编辑器（P1：面板可编辑 + 留底回滚）─────── */
+
+/* 分区标题右侧的「新建 Action」：靠右放，避免和计数徽标挤在一起 */
+.skill-section-action {
+  margin-left: auto;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 1px 6px;
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
+}
+
+.skill-section-action:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.action-modal-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-code);
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* YAML 是纯文本协议：等宽 + 不自动换行软折，行首缩进不能被吞 */
+.action-editor {
+  width: 100%;
+  min-height: 320px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-input);
+  color: var(--text);
+  padding: 10px 12px;
+  font-family: var(--font-code);
+  font-size: 12px;
+  line-height: 1.6;
+  tab-size: 2;
+  resize: vertical;
+  outline: none;
+}
+
+.action-editor:focus {
+  border-color: var(--border-hover);
+}
+
+.action-validate-msg {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.action-validate-msg.action-ok {
+  color: #6fbf9a;
+}
+
+.action-validate-msg.action-warn {
+  color: var(--gold);
+}
+
+.action-validate-msg.action-err {
+  color: var(--danger);
+}
+
+.action-validate-msg.action-muted {
+  color: var(--text-muted);
+}
+
+.action-history {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+  padding: 8px 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.action-history.hidden { display: none; }
+
+.action-history-tip {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.action-history-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.action-history-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-top: 1px solid var(--border);
+}
+
+.action-history-ts {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 历史版本 / 删除留在左侧，保存推到右侧：动作的破坏性方向一眼可辨 */
+.action-modal-footer .send-btn {
+  margin-left: auto;
+}
 
 /* ── Toast 通知 ───────────────────────── */
 
@@ -4364,6 +4554,240 @@ textarea::-webkit-scrollbar-thumb {
   flex-shrink: 0;
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* 设置页：活跃度热力图（内嵌半隐藏的 2048） */
+.heat-shell {
+  margin-top: 12px;
+  min-height: 232px;
+}
+
+.heat {
+  --heat-cell: 9px;
+  --heat-gap: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.heat.hidden,
+.heat-game.hidden {
+  display: none;
+}
+
+.heat-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.heat-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.heat-total {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.heat-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+}
+
+.heat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.heat-daypad,
+.heat-days {
+  flex: 0 0 22px;
+  width: 22px;
+}
+
+.heat-months,
+.heat-grid {
+  display: grid;
+  grid-template-columns: repeat(53, var(--heat-cell));
+  gap: var(--heat-gap);
+}
+
+.heat-month {
+  font-size: 9px;
+  line-height: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.heat-days {
+  display: grid;
+  grid-template-rows: repeat(7, var(--heat-cell));
+  gap: var(--heat-gap);
+}
+
+.heat-day {
+  font-size: 9px;
+  line-height: var(--heat-cell);
+  color: var(--text-muted);
+}
+
+.heat-cell {
+  width: var(--heat-cell);
+  height: var(--heat-cell);
+  border-radius: 2px;
+  background: var(--bg-alt);
+  box-shadow: inset 0 0 0 1px var(--border);
+  cursor: pointer;
+}
+
+.heat-cell.future {
+  visibility: hidden;
+  cursor: default;
+}
+
+.heat-cell.lv1 { background: color-mix(in srgb, var(--gold) 22%, var(--bg-alt)); box-shadow: none; }
+.heat-cell.lv2 { background: color-mix(in srgb, var(--gold) 45%, var(--bg-alt)); box-shadow: none; }
+.heat-cell.lv3 { background: color-mix(in srgb, var(--gold) 68%, var(--bg-alt)); box-shadow: none; }
+.heat-cell.lv4 { background: var(--gold-strong); box-shadow: none; }
+
+.heat-foot {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.heat-legend-key {
+  margin: 0 2px;
+}
+
+.heat-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--bg-alt);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.heat-swatch.lv1 { background: color-mix(in srgb, var(--gold) 22%, var(--bg-alt)); box-shadow: none; }
+.heat-swatch.lv2 { background: color-mix(in srgb, var(--gold) 45%, var(--bg-alt)); box-shadow: none; }
+.heat-swatch.lv3 { background: color-mix(in srgb, var(--gold) 68%, var(--bg-alt)); box-shadow: none; }
+.heat-swatch.lv4 { background: var(--gold-strong); box-shadow: none; }
+
+/* 2048：与热力图同一块地盘，替换显示 */
+.t2048 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 320px;
+  /* 热力图铺满整行，棋盘只有 320px：居中才不像漏在左边 */
+  margin-inline: auto;
+}
+
+.t2048-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.t2048-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gold-strong);
+  margin-right: auto;
+}
+
+.t2048-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 52px;
+  padding: 3px 8px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.t2048-score-key {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.t2048-score-num {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.t2048-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.t2048-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--text) 5%, var(--bg));
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.t2048-cell.tv2 { background: color-mix(in srgb, var(--text) 9%, var(--bg)); }
+.t2048-cell.tv4 { background: color-mix(in srgb, var(--text) 15%, var(--bg)); }
+.t2048-cell.tv8 { background: color-mix(in srgb, var(--text) 24%, var(--bg)); }
+.t2048-cell.tv16 { background: color-mix(in srgb, var(--text) 34%, var(--bg)); }
+.t2048-cell.tv32 { background: color-mix(in srgb, var(--text) 46%, var(--bg)); }
+.t2048-cell.tv64 { background: color-mix(in srgb, var(--text) 62%, var(--bg)); color: var(--bg); }
+.t2048-cell.tv128 { background: color-mix(in srgb, var(--text) 74%, var(--bg)); color: var(--bg); }
+.t2048-cell.tv256 { background: color-mix(in srgb, var(--text) 84%, var(--bg)); color: var(--bg); }
+.t2048-cell.tv512 { background: color-mix(in srgb, var(--text) 92%, var(--bg)); color: var(--bg); }
+.t2048-cell.tv1024 { background: var(--gold); color: #1A1A1A; font-size: 15px; }
+.t2048-cell.tv2048 { background: var(--gold-strong); color: #FFFFFF; font-size: 15px; }
+.t2048-cell.tv4096, .t2048-cell.tv8192 { background: var(--text); color: var(--bg); font-size: 14px; }
+
+.t2048-cell.pop {
+  animation: t2048-pop 140ms ease-out;
+}
+
+@keyframes t2048-pop {
+  0% { transform: scale(0.82); }
+  60% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+.t2048-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t2048-cell.pop {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .heat-months,
+  .heat-grid {
+    grid-template-columns: repeat(53, minmax(7px, var(--heat-cell)));
+  }
 }
 
 /* ── 密钥管理面板 ─────────────────────── */
@@ -5934,6 +6358,16 @@ img.file-type-icon {
 
 .mode-row:hover {
   background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+/* 对话模式下不可用的模式行（磨墨 / 目标模式）：置灰且不吃 hover，避免看起来还能点 */
+.mode-row:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mode-row:disabled:hover {
+  background: none;
 }
 
 .mode-row.on {

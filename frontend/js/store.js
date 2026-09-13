@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260912-002";
+import { makeId } from "./services/utils.js?v=20260913-007";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -61,6 +61,10 @@ const state = {
 
   // 内置工具 + SKILL.md 技能 + 远程 MCP 工具
   skills: { mcp: {}, skills: {}, remote: {} },
+
+  // Actions（data/actions/*.yml 流程说明书）：内存快照，磁盘才是真源，故不落 localStorage
+  actions: [],
+  actionsBroken: [],
 
   // 项目
   project: null,        // { path, name, config, constitution }
@@ -127,6 +131,13 @@ const state = {
   // 命令权限模式：ask=人工审批（高危命令弹窗询问）auto=自动审批（高危命令自动放行）full=完全访问（跳过高危判定；灾难级命令始终拦截）
   permissionMode: "ask",
 
+  // 回复模式：agent=智能体（可调用工具、多轮自主循环）| chat=对话（单轮直答，不发工具也不注入工具目录）
+  chatMode: "agent",
+
+  // 推理强度：auto=沿用模型默认（不下发字段）| off=关 | low/medium/high=档位递增
+  // 实际下发字段由后端按模型 reasoning 能力映射；能力为 none 的模型一律不下发
+  reasoningEffort: "auto",
+
   // 联网搜索配置：engine=auto（Bing+DDG 合并）/ bing / ddg；renderJs=auto（正文过短自动渲染）/ on / off
   webSearch: { engine: "auto", renderJs: "auto" },
 
@@ -176,7 +187,9 @@ function buildPersistentData() {
     activeExpertId: state.activeExpertId,
     useResponses: state.useResponses,
     onboardingSeen: state.onboardingSeen === true,
-    permissionMode: state.permissionMode,
+    permissionMode: normalizePermissionMode(state.permissionMode),
+    chatMode: normalizeChatMode(state.chatMode),
+    reasoningEffort: normalizeReasoningEffort(state.reasoningEffort),
     webSearch: normalizeWebSearch(state.webSearch),
     imageGen: normalizeGenConfig(state.imageGen),
     videoGen: normalizeGenConfig(state.videoGen),
@@ -189,6 +202,16 @@ function normalizeTheme(value) {
 
 function normalizePermissionMode(value) {
   return ["ask", "auto", "full"].includes(value) ? value : "ask";
+}
+
+// 回复模式取值域：只认 agent / chat，历史脏值一律回落智能体（旧版本行为）
+function normalizeChatMode(value) {
+  return ["agent", "chat"].includes(value) ? value : "agent";
+}
+
+// 推理强度取值域：auto=不下发；off/low/medium/high=后端按模型能力映射成厂商字段
+function normalizeReasoningEffort(value) {
+  return ["auto", "off", "low", "medium", "high"].includes(value) ? value : "auto";
 }
 
 function normalizeWebSearch(value) {
@@ -236,6 +259,8 @@ function getSharedPersistentData(data = buildPersistentData()) {
     useResponses: data.useResponses === true,
     onboardingSeen: data.onboardingSeen === true,
     permissionMode: normalizePermissionMode(data.permissionMode),
+    chatMode: normalizeChatMode(data.chatMode),
+    reasoningEffort: normalizeReasoningEffort(data.reasoningEffort),
     webSearch: normalizeWebSearch(data.webSearch),
     imageGen: normalizeGenConfig(data.imageGen),
     videoGen: normalizeGenConfig(data.videoGen),
@@ -331,6 +356,8 @@ function loadPersistent() {
     state.useResponses = data.useResponses === true;
     state.onboardingSeen = data.onboardingSeen === true;
     state.permissionMode = normalizePermissionMode(data.permissionMode);
+    state.chatMode = normalizeChatMode(data.chatMode);
+    state.reasoningEffort = normalizeReasoningEffort(data.reasoningEffort);
     state.webSearch = normalizeWebSearch(data.webSearch);
     state.imageGen = normalizeGenConfig(data.imageGen);
     state.videoGen = normalizeGenConfig(data.videoGen);
@@ -401,6 +428,12 @@ async function loadSharedPersistent() {
     if (Object.prototype.hasOwnProperty.call(data, "permissionMode")) {
       state.permissionMode = normalizePermissionMode(data.permissionMode);
     }
+    if (Object.prototype.hasOwnProperty.call(data, "chatMode")) {
+      state.chatMode = normalizeChatMode(data.chatMode);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "reasoningEffort")) {
+      state.reasoningEffort = normalizeReasoningEffort(data.reasoningEffort);
+    }
     if (Object.prototype.hasOwnProperty.call(data, "webSearch")) {
       state.webSearch = normalizeWebSearch(data.webSearch);
     }
@@ -422,6 +455,22 @@ function setActiveExpertId(id, detail = null) {
   state.activeExpert = detail || null;
   savePersistent();
   notify("activeExpert", state.activeExpert);
+}
+
+function setChatMode(mode) {
+  const next = normalizeChatMode(mode);
+  if (state.chatMode === next) return;
+  state.chatMode = next;
+  savePersistent();
+  notify("chatMode", state.chatMode);
+}
+
+function setReasoningEffort(level) {
+  const next = normalizeReasoningEffort(level);
+  if (state.reasoningEffort === next) return;
+  state.reasoningEffort = next;
+  savePersistent();
+  notify("reasoningEffort", state.reasoningEffort);
 }
 
 function setTheme(t) {
@@ -612,6 +661,16 @@ function setSkills(data) {
   notify("skills", data);
 }
 
+/**
+ * Action 目录快照（内存态）：由 /api/actions 刷新，供系统提示注入与 actions_list 复用。
+ * 刻意不落 localStorage——data/actions/*.yml 才是真源，缓存一份副本只会与磁盘不一致。
+ */
+function setActions(data) {
+  state.actions = Array.isArray(data?.actions) ? data.actions : [];
+  state.actionsBroken = Array.isArray(data?.broken) ? data.broken : [];
+  notify("actions", { actions: state.actions, broken: state.actionsBroken });
+}
+
 function setProject(data) {
   state.project = data;
   if (data) {
@@ -743,12 +802,13 @@ export {
   API_BASE, state, subscribe, notify,
   setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel,
   setActiveExpertId,
+  setChatMode, setReasoningEffort, normalizeChatMode, normalizeReasoningEffort,
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens,
   getConversationTodos, setConversationTodos,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage,
   setConversations, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,
-  setConstitution, setSkills, setModelRegistry,
+  setConstitution, setSkills, setActions, setModelRegistry,
   setProject, setProjectFileTree,
   setMemories, addMemory, updateMemory, removeMemory,
   setUserProfile, resetUserProfile,

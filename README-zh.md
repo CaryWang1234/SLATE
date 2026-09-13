@@ -39,6 +39,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 - 🗂️ **对话与数据管理** —— 历史全文搜索、会话导出 / 改名 / 批量管理、消息编辑删除，一键备份恢复全部数据，存储用量可视可清理
 - 🛠️ **34 个内置 MCP 工具** —— 文件读写编辑追加、全局代码搜索、Unicode-safe 终端、PPT / Word / Excel / PDF 工具、SVG 图表与二维码、Python API 文档提取、便携网页打包、代码与文档安全扫描、Git 仓库只读信息、联网搜索与网页抓取、MCP 工厂自生产工具、截图转代码、AI 图片与视频生成、浏览器与桌面自动化等
 - 🧩 **自定义 Skill 系统** —— `SKILL.md` 即插即用，聊天中 `@` 提及即注入上下文
+- 📋 **Actions 流程说明书** —— 把「干某件事的必要流程」写成 `data/actions/<id>.yml`，模型自动看到目录、按需读取全文后再照流程推进；设置页可直接编辑，模型也能代写（需审批），每次覆盖都留底可回滚
 - 🎓 **专家包（Expert Pack）** —— 人格 + 规则 + 知识 + 技能五件套，zip 导入导出，对话 / 团队 / @提及三路注入
 - 📖 **Better Project Understanding** —— 简略 / 平衡 / 详细三档扫描项目，自动生成导览·百科与规则手册
 - 🔍 **Code Review** —— 读取 git diff（未暂存 / 已暂存 / 提交范围），AI 从代码质量、安全性、性能、可维护性四维度输出结构化审查报告，支持行级评论
@@ -120,7 +121,9 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 | `screenshot_to_code` | 截图转代码——AI 视觉分析截图内容，生成 HTML/CSS 还原视觉效果 |
 | `image_gen` / `video_gen` | AI 图片生成 / AI 视频生成（OpenAI 兼容端点，需在设置中配置模型与 API Key），返回本地文件与预览链接 |
 
-自定义 Skill：上传或导入 `SKILL.md` 即可扩展新能力；聊天输入框 `@` 提及 MCP 工具、Skill 或专家包，发送时自动注入对应上下文。
+自定义 Skill：上传或导入 `SKILL.md` 即可扩展新能力；聊天输入框 `@` 提及 MCP 工具、Skill、Action 流程或专家包，发送时自动注入对应上下文。
+
+Actions 流程说明书：把重复任务的必要流程写进 `data/actions/<id>.yml`（`name` / `description` / `when` / `inputs` / `steps` / `output`），智能体态下模型自动看到目录，用 `actions_list` 检索、`actions_read` 读全文，再按步骤实际执行——读到流程不等于做过流程。文件用零依赖的 SAY-1 子集解析（2 空格缩进、块数组、`|` 字面量块；Tab 缩进、锚点、多文档等一律拒收并报出所在行号），写坏的文件不会凭空消失，会连同原因列在设置页与工具返回里。设置页可直接编辑（边写边校验，校验不过不给保存），每次覆盖或删除都先把原文留底到 `data/actions/.history/` 并可一键回滚；聊天框 `@<id>` 把整份流程注入本条消息（上限 6000 字），模型也能用 `actions_write` 自己写一份——它必须在 yml 里声明 `author: model`，且在「询问」权限模式下弹窗让你审批原文。
 
 ### 专家包（Expert Pack）
 
@@ -266,6 +269,7 @@ SLATE/
 ├── QODER.md                    # 项目开发规格书
 ├── backend/
 │   ├── main.py                 # FastAPI 入口（静态服务 + 路由注册 + 调度器启动）
+│   ├── slate_yaml.py           # SAY-1 解析器：Action yml 的零依赖子集（拒 Tab/锚点/多文档，报错带行号）
 │   ├── routers/
 │   │   ├── proxy.py            # LLM API 代理（多厂商流式转发 + 分段超时）
 │   │   ├── chat.py             # 对话历史 / 上下文压缩
@@ -274,6 +278,7 @@ SLATE/
 │   │   ├── projects.py         # 项目管理 / Better Project Understanding 扫描 / Code Review
 │   │   ├── experts.py          # 专家包增删改查 / zip 导入导出
 │   │   ├── skills.py           # 技能调用（含 /skills/stream 流式端点，关流即取消）
+│   │   ├── actions.py          # Actions 接口（目录 / 详情 / 试校验 / 写入 / 删除 / .history 留底回滚）
 │   │   ├── events.py           # Agent 调用事件账写入（runs / tool_events）
 │   │   ├── settings.py         # 设置 / 跨设备同步 / 存储空间管理
 │   │   ├── constitution.py     # 项目宪法
@@ -298,7 +303,7 @@ SLATE/
 │   ├── zh/index.html           # 中文版
 │   └── guide.html              # 双语文档（卷轴式教程）
 ├── installer/                  # 安装包产物
-└── data/                       # 运行数据（SQLite / 宪法 / 定时任务 / 自定义 Skill / 专家包 / 磨墨会话）
+└── data/                       # 运行数据（SQLite / 宪法 / 定时任务 / 自定义 Skill / Actions 流程说明书 / 专家包 / 磨墨会话）
 ```
 
 ---

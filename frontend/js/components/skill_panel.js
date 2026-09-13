@@ -1,13 +1,14 @@
 /**
- * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）。
+ * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）
+ * + Actions（data/actions/*.yml 流程说明书：可编辑、试校验、删除、留底回滚）。
  */
 
-import { state, subscribe, setSkills } from "../store.js?v=20260912-002";
-import { get, post, del, upload } from "../services/api.js?v=20260912-002";
-import { guardSkillParams } from "../services/riskguard.js?v=20260912-002";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260912-002";
-import { t } from "../services/i18n.js?v=20260912-002";
-import { setIconText } from "../services/icons.js?v=20260912-002";
+import { state, subscribe, setSkills, setActions } from "../store.js?v=20260913-007";
+import { get, post, put, del, upload } from "../services/api.js?v=20260913-007";
+import { guardSkillParams } from "../services/riskguard.js?v=20260913-007";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260913-007";
+import { t } from "../services/i18n.js?v=20260913-007";
+import { setIconText } from "../services/icons.js?v=20260913-007";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -281,6 +282,415 @@ function renderSkillList() {
   for (const [name, desc] of Object.entries(skills)) {
     skillList.appendChild(createSkillItem(name, desc, "Skill"));
   }
+
+  renderActionsSection();
+}
+
+// ── Actions（data/actions/*.yml，可编辑的流程说明书） ──────
+
+// 与后端 ACTION_ID_RE 同一条规则：id 就是文件名，先在这里拦住，不让垃圾 id 打到后端
+const ACTION_ID_RE = /^[a-z0-9][a-z0-9_-]{0,47}$/;
+
+const ACTION_TEMPLATE = [
+  "name: 我的流程",
+  "description: 一句话说清这份流程要做什么",
+  "when: 用户说到什么场合时套用",
+  "author: user",
+  "inputs:",
+  "  - key: topic",
+  "    label: 主题",
+  "    type: text",
+  "    required: true",
+  "steps:",
+  "  - title: 第一步做什么",
+  "    detail: |-",
+  "      具体怎么做，可以多写几行",
+  "    tool: project_read_file",
+  "    check: 怎么算做完了",
+  "  - title: 第二步做什么",
+  "output:",
+  "  format: markdown",
+  "  destination: message",
+  "tags:",
+  "  - 常用",
+  "",
+].join("\n");
+
+let actionModal, actionModalTitle, actionModalMeta, actionEditor, actionValidateMsg, actionHistory;
+let btnActionSave, btnActionDelete, btnActionHistory;
+let currentActionId = "";        // 编辑器当前对应的 Action（新建时也会赋值，但磁盘上还没有）
+let actionExists = false;        // 决定「删除/历史」这两个入口是否有意义
+let actionValidateTimer = null;
+let actionDraftSeq = 0;          // 校验是异步的：迟到的旧结果不许覆盖新输入
+
+function renderActionsSection() {
+  const list = Array.isArray(state.actions) ? state.actions : [];
+  const broken = Array.isArray(state.actionsBroken) ? state.actionsBroken : [];
+
+  const head = createSectionHeader("Actions · 流程说明书", list.length);
+  const newBtn = document.createElement("button");
+  newBtn.className = "skill-section-action";
+  newBtn.textContent = t("＋ 新建 Action");
+  newBtn.addEventListener("click", handleCreateAction);
+  head.appendChild(newBtn);
+  skillList.appendChild(head);
+
+  if (!list.length && !broken.length) {
+    const empty = document.createElement("div");
+    empty.className = "skill-empty-hint";
+    empty.textContent = t("暂无 Action。点「＋ 新建 Action」写一份流程，或在 data/actions/ 放入 <id>.yml，模型即可读取调用");
+    skillList.appendChild(empty);
+  }
+  for (const action of list) skillList.appendChild(createActionItem(action));
+  for (const item of broken) skillList.appendChild(createBrokenActionItem(item));
+}
+
+function createActionItem(action) {
+  const item = document.createElement("div");
+  item.className = "skill-item";
+
+  const info = document.createElement("div");
+  const nameRow = document.createElement("div");
+  nameRow.className = "skill-item-name";
+  const badge = document.createElement("span");
+  badge.className = "skill-kind-badge skill-kind-action";
+  badge.textContent = "Action";
+  nameRow.appendChild(badge);
+  // 模型代写的流程要显式标出来：它等于模型往自己的系统提示里加过料
+  if (action.author === "model") {
+    const modelBadge = document.createElement("span");
+    modelBadge.className = "skill-kind-badge skill-kind-model";
+    modelBadge.textContent = t("模型代写");
+    nameRow.appendChild(modelBadge);
+  }
+  nameRow.appendChild(document.createTextNode(" " + (action.name || action.id)));
+  const descEl = document.createElement("div");
+  descEl.className = "skill-item-desc";
+  descEl.textContent = [
+    action.description,
+    action.when ? t("适用：{when}", { when: action.when }) : "",
+    t("{n} 步", { n: action.stepCount }),
+  ].filter(Boolean).join(" ｜ ");
+  info.appendChild(nameRow);
+  info.appendChild(descEl);
+  item.appendChild(info);
+
+  item.addEventListener("click", () => openActionEditor(action.id));
+  return item;
+}
+
+/** 解析失败的文件必须显式露出来：否则用户改坏一个 yml 只会看到它凭空消失。 */
+function createBrokenActionItem(entry) {
+  const item = document.createElement("div");
+  item.className = "skill-item skill-item-broken";
+  const info = document.createElement("div");
+  const nameRow = document.createElement("div");
+  nameRow.className = "skill-item-name";
+  const badge = document.createElement("span");
+  badge.className = "skill-kind-badge skill-kind-action";
+  badge.textContent = "Action";
+  nameRow.appendChild(badge);
+  nameRow.appendChild(document.createTextNode(" " + entry.id));
+  const descEl = document.createElement("div");
+  descEl.className = "skill-item-desc";
+  descEl.textContent = entry.error;
+  info.appendChild(nameRow);
+  info.appendChild(descEl);
+  item.appendChild(info);
+  return item;
+}
+
+// ── Action 编辑器 ────────────────────────────
+
+function setActionNote(text, kind) {
+  actionValidateMsg.textContent = text || "";
+  actionValidateMsg.className = `action-validate-msg${kind ? ` action-${kind}` : ""}${text ? "" : " hidden"}`;
+}
+
+function resetActionModalChrome(id, { isNew }) {
+  currentActionId = id;
+  actionExists = !isNew;
+  actionDraftSeq += 1; // 作废上一份草稿在途的校验响应
+  actionModalTitle.textContent = isNew ? t("新建 Action {id}", { id }) : t("编辑 Action {id}", { id });
+  actionHistory.classList.add("hidden");
+  btnActionDelete.classList.toggle("hidden", isNew);
+  btnActionHistory.classList.toggle("hidden", isNew);
+  if (isNew) actionEditor.value = ACTION_TEMPLATE;
+}
+
+async function handleCreateAction() {
+  const raw = await dlgPrompt(t("id 会作为文件名（data/actions/<id>.yml）：小写字母开头，可用数字、_ 和 -，不超过 48 字"), {
+    title: t("新建 Action"),
+    okText: t("创建"),
+    placeholder: "weekly_report",
+  });
+  if (raw === null) return;
+  const id = String(raw).trim();
+  if (!id) return;
+  if (!ACTION_ID_RE.test(id)) {
+    showToast(t("id 不合法：小写字母开头，只允许 a-z0-9_-，不超过 48 字"));
+    return;
+  }
+  if ((Array.isArray(state.actions) ? state.actions : []).some(a => a.id === id)) {
+    showToast(t("Action {id} 已存在，直接点开它编辑", { id }));
+    openActionEditor(id);
+    return;
+  }
+  resetActionModalChrome(id, { isNew: true });
+  actionModalMeta.textContent = `data/actions/${id}.yml · ${t("尚未创建")}`;
+  setActionNote(t("按 SAY-1 子集书写：缩进只用空格（每层 2 格），列表用「- 」块式写法，禁止 Tab 与行内 {}/[]，首行不要写 ---"), "muted");
+  actionModal.classList.remove("hidden");
+  validateActionDraft();
+  actionEditor.focus();
+}
+
+async function openActionEditor(id) {
+  resetActionModalChrome(id, { isNew: false });
+  actionModalMeta.textContent = t("读取中…");
+  setActionNote("");
+  actionEditor.value = "";
+  actionModal.classList.remove("hidden");
+
+  try {
+    const res = await get(`/actions/${encodeURIComponent(id)}`);
+    if (currentActionId !== id) return; // 用户已切到别的条目，不要把上一份的原文灌进来
+    if (res.code !== 0) {
+      actionModalMeta.textContent = t("读取失败: {msg}", { msg: res.message || t("未知错误") });
+      return;
+    }
+    actionEditor.value = res.data?.raw || "";
+    const a = res.data?.action || {};
+    actionModalMeta.textContent = [
+      res.data?.path || `data/actions/${id}.yml`,
+      t("作者: {a}", { a: a.author === "model" ? t("模型代写") : t("用户手写") }),
+      t("流程 {n} 步", { n: a.stepCount ?? (a.steps || []).length }),
+    ].join(" · ");
+    validateActionDraft();
+  } catch (e) {
+    actionModalMeta.textContent = t("请求失败: {msg}", { msg: e.message });
+  }
+}
+
+/**
+ * 试校验当前编辑框内容并把结果写到编辑框下方。
+ * 返回后端 data（{ok, errors, warnings, action}），网络失败返回 null。
+ */
+async function validateActionDraft() {
+  if (!actionModal || actionModal.classList.contains("hidden")) return null;
+  const text = actionEditor.value;
+  const seq = ++actionDraftSeq;
+  if (!text.trim()) {
+    setActionNote(t("内容为空：至少要写 name、description 和一步 steps"), "muted");
+    return null;
+  }
+  try {
+    const res = await post("/actions/validate", { content: text });
+    if (seq !== actionDraftSeq) return null; // 期间用户又打了字，这次结果已过时
+    if (res.code !== 0) {
+      setActionNote(t("校验请求失败: {msg}", { msg: res.message || t("未知错误") }), "err");
+      return null;
+    }
+    const d = res.data || {};
+    if (!d.ok) {
+      setActionNote((d.errors || []).map(e => (e.line ? t("第 {n} 行：{reason}", { n: e.line, reason: e.reason }) : e.reason)).join("\n")
+        || t("校验未通过"), "err");
+      return d;
+    }
+    setActionNote((d.warnings || []).length
+      ? t("格式通过。书写提醒：{msg}", { msg: d.warnings.join("；") })
+      : t("格式通过：{n} 步流程", { n: d.action?.steps?.length ?? 0 }), (d.warnings || []).length ? "warn" : "ok");
+    return d;
+  } catch (e) {
+    if (seq === actionDraftSeq) setActionNote(t("校验请求失败: {msg}", { msg: e.message }), "err");
+    return null;
+  }
+}
+
+async function saveAction() {
+  const id = currentActionId;
+  if (!id) return;
+  const draft = await validateActionDraft();
+  if (!draft?.ok) {
+    showToast(t("校验未通过，未写入"));
+    return;
+  }
+  btnActionSave.disabled = true;
+  btnActionSave.textContent = t("保存中…");
+  try {
+    const res = await put(`/actions/${encodeURIComponent(id)}`, { content: actionEditor.value });
+    if (res.code === 0) {
+      const d = res.data || {};
+      showToast(t("已保存 Action {id}", { id }));
+      actionExists = true;
+      btnActionDelete.classList.remove("hidden");
+      btnActionHistory.classList.remove("hidden");
+      actionModalMeta.textContent = [
+        d.path || `data/actions/${id}.yml`,
+        t("流程 {n} 步", { n: d.stepCount }),
+        d.backedUp ? t("原内容已留底 {ts}", { ts: formatHistoryTs(d.backedUp) }) : "",
+      ].filter(Boolean).join(" · ");
+      setActionNote((d.warnings || []).length
+        ? t("已写入。书写提醒：{msg}", { msg: d.warnings.join("；") })
+        : t("已写入"), (d.warnings || []).length ? "warn" : "ok");
+      refreshActions();
+    } else {
+      setActionNote(t("写入失败: {msg}", { msg: res.message || t("未知错误") }), "err");
+      showToast(t("写入失败: {msg}", { msg: res.message || t("未知错误") }));
+    }
+  } catch (e) {
+    setActionNote(t("写入请求失败: {msg}", { msg: e.message }), "err");
+  } finally {
+    btnActionSave.disabled = false;
+    btnActionSave.textContent = t("保存");
+  }
+}
+
+async function deleteAction() {
+  const id = currentActionId;
+  if (!id) return;
+  const ok = await dlgConfirm(t("确定删除 Action {id}？删除前的内容会留底，可在「历史版本」里回滚。", { id }),
+    { danger: true, okText: t("删除"), title: t("删除 Action") });
+  if (!ok) return;
+  try {
+    const res = await del(`/actions/${encodeURIComponent(id)}`);
+    if (res.code === 0) {
+      showToast(t("已删除 Action {id}", { id }));
+      actionModal.classList.add("hidden");
+      refreshActions();
+    } else {
+      showToast(t("删除失败: {msg}", { msg: res.message || t("未知错误") }));
+    }
+  } catch (e) {
+    showToast(t("删除失败: {msg}", { msg: e.message }));
+  }
+}
+
+/** 留底时间戳定宽，字典序即时序；这里只负责把它读得通。 */
+function formatHistoryTs(ts) {
+  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?:-(\d+))?$/.exec(String(ts || ""));
+  if (!m) return String(ts || "");
+  return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6]}${m[7] ? ` #${m[7]}` : ""}`;
+}
+
+async function renderActionHistory() {
+  actionHistory.textContent = "";
+  const loading = document.createElement("div");
+  loading.className = "action-history-empty";
+  loading.textContent = t("读取中…");
+  actionHistory.appendChild(loading);
+  try {
+    const res = await get(`/actions/${encodeURIComponent(currentActionId)}/history`);
+    const rows = res.code === 0 ? (res.data?.versions || []) : [];
+    actionHistory.textContent = "";
+    if (res.code !== 0) {
+      const err = document.createElement("div");
+      err.className = "action-history-empty";
+      err.textContent = t("读取失败: {msg}", { msg: res.message || t("未知错误") });
+      actionHistory.appendChild(err);
+      return;
+    }
+    const tip = document.createElement("div");
+    tip.className = "action-history-tip";
+    tip.textContent = t("每次覆盖或删除都会留底，每份最多保留 {n} 版。", { n: res.data?.keep || 5 });
+    actionHistory.appendChild(tip);
+    if (!rows.length) {
+      const empty = document.createElement("div");
+      empty.className = "action-history-empty";
+      empty.textContent = t("还没有历史版本");
+      actionHistory.appendChild(empty);
+      return;
+    }
+    for (const v of rows) actionHistory.appendChild(createHistoryRow(v));
+  } catch (e) {
+    actionHistory.textContent = "";
+    const err = document.createElement("div");
+    err.className = "action-history-empty";
+    err.textContent = t("请求失败: {msg}", { msg: e.message });
+    actionHistory.appendChild(err);
+  }
+}
+
+function createHistoryRow(version) {
+  const row = document.createElement("div");
+  row.className = "action-history-row";
+
+  const label = document.createElement("span");
+  label.className = "action-history-ts";
+  label.textContent = `${formatHistoryTs(version.ts)} · ${version.bytes} B`;
+  row.appendChild(label);
+
+  const viewBtn = document.createElement("button");
+  viewBtn.className = "dlg-btn";
+  viewBtn.textContent = t("查看");
+  viewBtn.addEventListener("click", async () => {
+    try {
+      const res = await get(`/actions/${encodeURIComponent(currentActionId)}/history/${encodeURIComponent(version.ts)}`);
+      if (res.code !== 0) { showToast(t("读取失败: {msg}", { msg: res.message })); return; }
+      actionEditor.value = res.data?.content || "";
+      setActionNote(t("正在查看 {ts} 的历史内容（尚未写入）。改完点「保存」即写回磁盘。", { ts: formatHistoryTs(version.ts) }), "muted");
+    } catch (e) {
+      showToast(t("请求失败: {msg}", { msg: e.message }));
+    }
+  });
+  row.appendChild(viewBtn);
+
+  const restoreBtn = document.createElement("button");
+  restoreBtn.className = "dlg-btn dlg-btn-primary";
+  restoreBtn.textContent = t("回滚");
+  restoreBtn.addEventListener("click", async () => {
+    const ok = await dlgConfirm(t("回滚 Action {id} 到 {ts}？当前内容会先留底。", { id: currentActionId, ts: formatHistoryTs(version.ts) }),
+      { okText: t("回滚"), title: t("回滚 Action") });
+    if (!ok) return;
+    try {
+      const res = await post(`/actions/${encodeURIComponent(currentActionId)}/history/restore`, { ts: version.ts });
+      if (res.code !== 0) { showToast(t("回滚失败: {msg}", { msg: res.message || t("未知错误") })); return; }
+      showToast(t("已回滚到 {ts}", { ts: formatHistoryTs(version.ts) }));
+      refreshActions();
+      renderActionHistory();
+      const detail = await get(`/actions/${encodeURIComponent(currentActionId)}`);
+      if (detail.code === 0) actionEditor.value = detail.data?.raw || "";
+    } catch (e) {
+      showToast(t("请求失败: {msg}", { msg: e.message }));
+    }
+  });
+  row.appendChild(restoreBtn);
+  return row;
+}
+
+async function toggleActionHistory() {
+  if (!currentActionId || !actionExists) return;
+  if (!actionHistory.classList.contains("hidden")) {
+    actionHistory.classList.add("hidden");
+    return;
+  }
+  await renderActionHistory();
+  actionHistory.classList.remove("hidden");
+}
+
+function onActionEditorInput() {
+  clearTimeout(actionValidateTimer);
+  actionValidateTimer = setTimeout(validateActionDraft, 500);
+}
+
+function initActionModal() {
+  actionModal = document.getElementById("action-modal");
+  actionModalTitle = document.getElementById("action-modal-title");
+  actionModalMeta = document.getElementById("action-modal-meta");
+  actionEditor = document.getElementById("action-editor");
+  actionValidateMsg = document.getElementById("action-validate-msg");
+  actionHistory = document.getElementById("action-history");
+  btnActionSave = document.getElementById("btn-action-save");
+  btnActionDelete = document.getElementById("btn-action-delete");
+  btnActionHistory = document.getElementById("btn-action-history");
+  if (!actionModal || !actionEditor) return;
+
+  btnActionSave.addEventListener("click", saveAction);
+  btnActionDelete.addEventListener("click", deleteAction);
+  btnActionHistory.addEventListener("click", toggleActionHistory);
+  actionEditor.addEventListener("input", onActionEditorInput);
+  actionModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
+    el.addEventListener("click", () => actionModal.classList.add("hidden"));
+  });
 }
 
 function createSkillItem(name, desc, kind) {
@@ -607,6 +1017,16 @@ async function refreshSkills() {
   }
 }
 
+/** Action 目录刷新：读不到就保持空态。这是可选能力，不该在每次开面板时弹错误提示。 */
+async function refreshActions() {
+  try {
+    const res = await get("/actions");
+    if (res.code === 0) setActions(res.data);
+  } catch (e) {
+    /* 静默：无 Action 与读失败对用户等价，面板已有空态提示 */
+  }
+}
+
 // ── 初始化 ──────────────────────────────────
 
 function initSkillPanel() {
@@ -621,6 +1041,8 @@ function initSkillPanel() {
   btnDiscover = document.getElementById("btn-discover-plugins");
   btnGithubImport = document.getElementById("btn-github-import");
 
+  initActionModal();
+
   btnUpload.addEventListener("click", handleUploadSkill);
   btnImport.addEventListener("click", handleImportSkill);
   if (btnDiscover) btnDiscover.addEventListener("click", handleDiscoverPlugins);
@@ -633,10 +1055,12 @@ function initSkillPanel() {
   });
 
   subscribe("skills", renderSkillList);
+  subscribe("actions", renderSkillList);
 
-  // 加载技能列表
+  // 加载技能列表 + Action 目录
   refreshSkills();
+  refreshActions();
 
 }
 
-export { initSkillPanel, refreshSkills };
+export { initSkillPanel, refreshSkills, refreshActions };

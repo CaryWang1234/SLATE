@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20260912-004";
-import { getToolsSystemPrompt } from "./tools.js?v=20260912-004";
+import { state } from "../store.js?v=20260913-007";
+import { getToolsSystemPrompt } from "./tools.js?v=20260913-007";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -139,6 +139,29 @@ function getExpertSystemPrompt() {
 }
 
 /**
+ * Actions 目录注入：只给"id + 一句话"，正文留给 actions_read 按需取。
+ * 刻意收紧上限：Action 是用户写的流程，多列一条就多占一份上下文预算，
+ * 而模型此刻只需要知道"有没有、叫什么、什么时候用"。
+ */
+const ACTIONS_CATALOG_LIMIT = 20;
+
+function getActionsSystemPrompt() {
+  const list = Array.isArray(state.actions) ? state.actions : [];
+  if (!list.length) return "";
+  const flat = text => String(text || "").replace(/\s+/g, " ").trim();
+  const lines = ["[可用 Actions]（用户事先写好的流程说明书。与用户当前要求不符时不要套用，先按用户说的做）"];
+  for (const a of list.slice(0, ACTIONS_CATALOG_LIMIT)) {
+    const desc = flat(a.description).slice(0, 60);
+    const when = flat(a.when).slice(0, 40);
+    lines.push(`- ${a.id}：${flat(a.name)}${desc ? `——${desc}` : ""}${when ? `（适用：${when}）` : ""}`);
+  }
+  const rest = list.length - ACTIONS_CATALOG_LIMIT;
+  if (rest > 0) lines.push(`- 另有 ${rest} 个 Action 未列出，用 actions_list 查看`);
+  lines.push("决定采用某个 Action 前，先用 actions_read 读完整流程，再按步骤实际执行。");
+  return "\n\n" + lines.join("\n");
+}
+
+/**
  * 组装发往模型的完整系统提示：角色定义 → 项目宪法 → 专家包/记忆/知识 → 工具目录。
  * 上下文估算与实际载荷共用此函数，避免两处口径漂移。
  * opts.withTools === false：对话模式，基底换成不含 Agent 协议与工具纪律的版本，
@@ -168,6 +191,9 @@ function buildSystemContent(modelId, constitution, opts = {}) {
       + "也不要把“我已查看文件”“我已执行命令”“我搜索过”当作既成事实。"
       + "缺少事实依据时直接说明你不知道，并告诉用户怎样提供信息或改用智能体模式。\n";
   } else {
+    // Actions 目录贴着工具说明注入：对话态没有 actions_read，
+    // 只给目录读不到正文，反而诱导模型声称"已按流程执行"。
+    systemContent += getActionsSystemPrompt();
     systemContent += getToolsSystemPrompt({ compact: true });
   }
 

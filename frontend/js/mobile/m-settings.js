@@ -3,10 +3,10 @@
  * 遥控地址 + 二维码 / 模型选择 / 密钥管理 / 主题切换
  */
 
-import { state, setCurrentModel, setModelKey, getModelKey, toggleTheme } from "../store.js?v=20260912-002";
-import { get } from "../services/api.js?v=20260912-002";
-import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20260912-002";
-import { onTab } from "./m-app.js?v=20260912-002";
+import { state, setCurrentModel, setModelKey, getModelKey, toggleTheme } from "../store.js?v=20260913-007";
+import { get } from "../services/api.js?v=20260913-007";
+import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20260913-007";
+import { onTab } from "./m-app.js?v=20260913-007";
 
 function $id(id) { return document.getElementById(id); }
 

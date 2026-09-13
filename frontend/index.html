@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260912-002">
+  <link rel="stylesheet" href="./css/style.css?v=20260913-007">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -132,6 +132,10 @@
               <div class="input-toolbar">
                 <div class="input-toolbar-left">
                   <button id="btn-mode-menu" class="icon-btn" title="模式与功能：磨墨 / 头脑风暴 / 目标模式 / 定时任务 / 提及技能·工具·MCP·文件"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+                  <select id="chat-mode-select" class="input-pill-select" title="回复方式">
+                    <option value="agent">智能体</option>
+                    <option value="chat">对话</option>
+                  </select>
                   <button id="btn-attach-file" class="icon-btn" title="添加附件"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
                   <input type="file" id="file-input" multiple hidden accept=".txt,.md,.csv,.tsv,.json,.py,.js,.html,.css,.yaml,.yml,.xml,.sh,.bat,.docx,.xlsx,.pdf,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg">
                   <select id="expert-select" class="expert-select" title="选择专家包（注入人格与规则）">
@@ -144,6 +148,13 @@
                       <option value="">选择模型</option>
                     </select>
                   </div>
+                  <select id="effort-select" class="input-pill-select" title="推理强度">
+                    <option value="auto">自动</option>
+                    <option value="off">关</option>
+                    <option value="low">低</option>
+                    <option value="medium">中</option>
+                    <option value="high">高</option>
+                  </select>
                 </div>
                 <div class="input-toolbar-right">
                   <button id="btn-voice" class="icon-btn voice-btn" title="语音输入" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
@@ -653,7 +664,7 @@
           <div class="settings-block-head">
             <div>
               <h2>工具 / 技能</h2>
-              <p>查看内置工具，管理 SKILL.md 技能</p>
+              <p>查看内置工具，管理 SKILL.md 技能与 Actions 流程</p>
             </div>
           </div>
           <div id="skill-panel" class="skill-panel">
@@ -804,6 +815,28 @@
       </div>
       <div class="modal-footer">
         <button id="btn-run-skill" class="send-btn">执行</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Action 编辑器（data/actions/<id>.yml，SAY-1 原文）══ -->
+  <div id="action-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="action-modal-title">Action</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="action-modal-meta" class="action-modal-meta"></div>
+        <textarea id="action-editor" class="action-editor" rows="16" spellcheck="false"></textarea>
+        <div id="action-validate-msg" class="action-validate-msg"></div>
+        <div id="action-history" class="action-history hidden"></div>
+      </div>
+      <div class="modal-footer action-modal-footer">
+        <button id="btn-action-history" class="dlg-btn">历史版本</button>
+        <button id="btn-action-delete" class="dlg-btn dlg-btn-danger">删除</button>
+        <button id="btn-action-save" class="send-btn">保存</button>
       </div>
     </div>
   </div>
@@ -1351,7 +1384,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260912-002"></script>
+  <script type="module" src="./js/app.js?v=20260913-007"></script>
 
 </body>
 </html>

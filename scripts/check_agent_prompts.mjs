@@ -142,9 +142,12 @@ const ADAPTER_SRC = readFileSync(new URL("../frontend/js/services/adapter.js", i
 const CATALOGUE = getToolsSystemPrompt({ compact: true });
 assert.ok(CATALOGUE.includes("必须包含工具调用块"), "工具目录基线已变：对话模式分支的判据需同步核对");
 
-const chatBranch = /if \(opts\.withTools === false\) \{([\s\S]*?)\n  \} else \{\s*\n\s*systemContent \+= getToolsSystemPrompt/.exec(ADAPTER_SRC);
+const chatBranch = /if \(opts\.withTools === false\) \{([\s\S]*?)\n  \} else \{/.exec(ADAPTER_SRC);
 assert.ok(chatBranch, "buildSystemContent 必须把「工具目录」与「对话模式声明」做成互斥分支");
 assert.ok(!chatBranch[1].includes("getToolsSystemPrompt"), "对话模式分支不得再拼进工具目录");
+const agentBranch = /\n  \} else \{([\s\S]*?)\n  \}/.exec(ADAPTER_SRC);
+assert.ok(agentBranch?.[1].includes("systemContent += getToolsSystemPrompt"),
+  "智能体分支必须拼进工具目录，否则互斥分支只剩个空壳");
 for (const [re, why] of [
   [/\[对话模式\]/, "缺少模式声明，模型不知道本轮没有工具"],
   [/不要输出 ◈◈◈/, "缺少调用块禁令，模型会伪造 ◈◈◈ 白烧轮次"],

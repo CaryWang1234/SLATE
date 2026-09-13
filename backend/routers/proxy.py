@@ -146,67 +146,144 @@ def _get_stream_client(base_url: str) -> httpx.AsyncClient:
         )
     return _http_clients[key]
 
+# ── 推理强度：UI 档位 → 厂商字段（2026-09 按各家官方文档核对） ────────
+# UI 只有五档：auto（不下发任何字段）/ off / low / medium / high。
+# 能力取值与前端 chat.js 的 REASONING_LEVELS_BY_CAP 必须一致，
+# 由 scripts/check_reasoning_effort.mjs 锁定，改一处就要过守卫。
+REASONING_MAP: dict[str, dict[str, str]] = {
+    # OpenAI：Chat Completions → reasoning_effort；Responses → reasoning.effort（同一批取值）
+    "openai": {"off": "minimal", "low": "low", "medium": "medium", "high": "high"},
+    # Anthropic：新版用 output_config.effort，budget_tokens 已废弃，且没有"关"这一档
+    "anthropic": {"low": "low", "medium": "medium", "high": "high"},
+    # Google：generationConfig.thinking_level
+    "gemini": {"off": "minimal", "low": "low", "medium": "medium", "high": "high"},
+    # 只分开关的 OpenAI 兼容端点（DeepSeek 官方 thinking.type）：低/中/高统一收敛为"开"
+    "binary": {"off": "disabled", "low": "enabled", "medium": "enabled", "high": "enabled"},
+    # 未核实或自定义端点：一律不下发，宁可不生效也不能让上游 400
+    "none": {},
+}
+
+REASONING_LEVELS = ("auto", "off", "low", "medium", "high")
+
+
+def _reasoning_level(body: dict[str, Any]) -> str:
+    """归一化前端传来的档位；取值域外一律按 auto（不下发）。"""
+    level = str(body.get("reasoning_effort") or "auto").strip().lower()
+    return level if level in REASONING_LEVELS else "auto"
+
+
+def _reasoning_capability(model_cfg: dict[str, Any], provider: str) -> str:
+    """模型推理能力：注册表 reasoning 字段优先，自定义模型按端点回落，其余 none。"""
+    cap = str(model_cfg.get("reasoning") or "").strip().lower()
+    if cap in REASONING_MAP:
+        return cap
+    if provider == "anthropic":
+        return "anthropic"
+    if provider == "google":
+        return "gemini"
+    if provider == "openai":
+        # 未登记 id 但打到官方端点的自定义模型：按官方字段下发
+        base_url = str(model_cfg.get("base_url") or "").strip().lower()
+        if base_url.startswith("https://api.openai.com"):
+            return "openai"
+        if base_url.startswith("https://api.deepseek.com"):
+            return "binary"
+    return "none"
+
+
+def _reasoning_value(cap: str, level: str) -> str | None:
+    """按能力取厂商侧取值；auto 或该能力不支持该档时返回 None（即不下发）。"""
+    if level == "auto":
+        return None
+    return REASONING_MAP.get(cap, {}).get(level) or None
+
+
+# 字段名跟着协议走，取值跟着能力走：两者不匹配时宁可不发。
+# 否则一个标了 anthropic 的模型走 OpenAI 兼容通道时，会把 anthropic 的取值塞进
+# reasoning_effort，上游要么 400 要么静默解释成另一回事。
+_CHAT_CAPS = ("openai", "binary")
+
+
+def _reasoning_payload(protocol: str, cap: str, level: str) -> dict[str, Any]:
+    """返回要合并进请求体的字段片段；协议与能力不匹配、或档位为 auto 时返回 {}。"""
+    value = _reasoning_value(cap, level)
+    if not value:
+        return {}
+    if protocol == "chat" and cap in _CHAT_CAPS:
+        # binary 能力（DeepSeek 官方）只有 thinking.type 开关，没有 reasoning_effort
+        return {"thinking": {"type": value}} if cap == "binary" else {"reasoning_effort": value}
+    if protocol == "responses" and cap == "openai":
+        return {"reasoning": {"effort": value}}
+    if protocol == "anthropic" and cap == "anthropic":
+        # budget_tokens 已废弃，新版只认 output_config.effort
+        return {"output_config": {"effort": value}}
+    if protocol == "google" and cap == "gemini":
+        return {"thinking_level": value}
+    return {}
+
+
 # ── 模型注册表（2026-09 时效性校验） ──────────────────────────
 
 MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
     "international": [
         {"id": "gpt-5.6-sol", "name": "GPT-5.6 Sol", "provider": "openai",
-         "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True},
+         "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True, "reasoning": "openai"},
         {"id": "gpt-5.6-terra", "name": "GPT-5.6 Terra", "provider": "openai",
-         "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True},
+         "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True, "reasoning": "openai"},
         {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna", "provider": "openai",
-         "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True},
+         "base_url": "https://api.openai.com/v1", "context_window": 1050000, "supports_responses": True, "reasoning": "openai"},
         {"id": "claude-fable-5-1", "name": "Claude Fable 5.1", "provider": "anthropic",
-         "base_url": "https://api.anthropic.com", "context_window": 1000000},
+         "base_url": "https://api.anthropic.com", "context_window": 1000000, "reasoning": "anthropic"},
         {"id": "claude-fable-5", "name": "Claude Fable 5", "provider": "anthropic",
-         "base_url": "https://api.anthropic.com", "context_window": 1000000},
+         "base_url": "https://api.anthropic.com", "context_window": 1000000, "reasoning": "anthropic"},
         {"id": "claude-opus-5", "name": "Claude Opus 5", "provider": "anthropic",
-         "base_url": "https://api.anthropic.com", "context_window": 1000000},
+         "base_url": "https://api.anthropic.com", "context_window": 1000000, "reasoning": "anthropic"},
         {"id": "claude-sonnet-5", "name": "Claude Sonnet 5", "provider": "anthropic",
-         "base_url": "https://api.anthropic.com", "context_window": 1000000},
+         "base_url": "https://api.anthropic.com", "context_window": 1000000, "reasoning": "anthropic"},
         {"id": "gemini-3.6-flash", "name": "Gemini 3.6 Flash", "provider": "google",
-         "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576},
+         "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576, "reasoning": "gemini"},
         {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "provider": "google",
-         "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576},
+         "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576, "reasoning": "gemini"},
         {"id": "gemini-3.5-flash-lite", "name": "Gemini 3.5 Flash-Lite", "provider": "google",
-         "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576},
+         "base_url": "https://generativelanguage.googleapis.com/v1beta", "context_window": 1048576, "reasoning": "gemini"},
     ],
     "domestic": [
         # 官方仅接受这两个模型名：deepseek-chat 已下线，识图/快速/专家模式已并入其中
         {"id": "deepseek-v4-pro", "name": "DeepSeek-V4-Pro", "provider": "openai",
-         "base_url": "https://api.deepseek.com/v1", "context_window": 1048576},
+         "base_url": "https://api.deepseek.com/v1", "context_window": 1048576, "reasoning": "binary"},
         {"id": "deepseek-flash", "name": "DeepSeek-V4.1-Flash", "provider": "openai",
-         "base_url": "https://api.deepseek.com/v1", "context_window": 1048576},
+         "base_url": "https://api.deepseek.com/v1", "context_window": 1048576, "reasoning": "binary"},
         {"id": "kimi-k3", "name": "Kimi K3", "provider": "openai",
-         "base_url": "https://api.moonshot.cn/v1", "context_window": 1048576},
+         "base_url": "https://api.moonshot.cn/v1", "context_window": 1048576, "reasoning": "none"},
         {"id": "kimi-k2.7-code", "name": "Kimi K2.7 Code", "provider": "openai",
-         "base_url": "https://api.moonshot.cn/v1", "context_window": 262144},
+         "base_url": "https://api.moonshot.cn/v1", "context_window": 262144, "reasoning": "none"},
         {"id": "qwen3.8-max", "name": "Qwen3.8-Max", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "none"},
         {"id": "qwen3.8-flash", "name": "Qwen3.8-Flash", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "none"},
         {"id": "qwen3.7-max", "name": "Qwen3.7-Max", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "none"},
         {"id": "qwen3.7-plus", "name": "Qwen3.7-Plus", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "none"},
+        # 以下端点的推理参数未按官方文档核实，一律标 none（不下发字段）；核实后再改
         {"id": "glm-5.2", "name": "GLM-5.2", "provider": "openai",
-         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576},
+         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576, "reasoning": "none"},
         {"id": "glm-5.3", "name": "GLM-5.3", "provider": "openai",
-         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576},
+         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576, "reasoning": "none"},
         {"id": "glm-5.3-flash", "name": "GLM-5.3-Flash", "provider": "openai",
-         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576},
+         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576, "reasoning": "none"},
         {"id": "doubao-seed-2-1-pro-260628", "name": "Doubao-Seed-2.1-Pro-260628", "provider": "openai",
-         "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144},
+         "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144, "reasoning": "none"},
         {"id": "doubao-seed-2-1-turbo-260628", "name": "Doubao-Seed-2.1-Turbo-260628", "provider": "openai",
-         "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144},
+         "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144, "reasoning": "none"},
         {"id": "MiniMax-M3", "name": "MiniMax M3", "provider": "openai",
-         "base_url": "https://api.minimax.cn/v1", "context_window": 1000000, "supports_responses": True},
+         "base_url": "https://api.minimax.cn/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "none"},
         {"id": "ernie-5.1", "name": "ERNIE 5.1", "provider": "openai",
-         "base_url": "https://qianfan.baidubce.com/v2", "context_window": 131072},
+         "base_url": "https://qianfan.baidubce.com/v2", "context_window": 131072, "reasoning": "none"},
     ],
     "local": [
         {"id": "local", "name": "本地模型 (Ollama/LM Studio)", "provider": "openai",
-         "base_url": "http://localhost:11434/v1", "context_window": 8192},
+         "base_url": "http://localhost:11434/v1", "context_window": 8192, "reasoning": "none"},
     ],
 }
 
@@ -235,7 +312,7 @@ def _find_model(model_id: str, base_url: str | None = None, provider: str | None
     return None
 
 
-def _build_openai_request(body: dict[str, Any]) -> dict[str, Any]:
+def _build_openai_request(body: dict[str, Any], cap: str = "none", level: str = "auto") -> dict[str, Any]:
     """构建 OpenAI 兼容格式的请求体。"""
     payload: dict[str, Any] = {
         "model": body["model"],
@@ -251,10 +328,12 @@ def _build_openai_request(body: dict[str, Any]) -> dict[str, Any]:
         payload["tools"] = body["tools"]
     if body.get("tool_choice"):
         payload["tool_choice"] = body["tool_choice"]
+    # 推理强度：字段名与取值都由协议/能力共同决定，不匹配即不下发
+    payload.update(_reasoning_payload("chat", cap, level))
     return payload
 
 
-def _build_responses_request(body: dict[str, Any]) -> dict[str, Any]:
+def _build_responses_request(body: dict[str, Any], cap: str = "none", level: str = "auto") -> dict[str, Any]:
     """构建 OpenAI Responses API 格式的请求体。
 
     Responses API 是 Chat Completions 的演进版：
@@ -304,6 +383,8 @@ def _build_responses_request(body: dict[str, Any]) -> dict[str, Any]:
         payload["tools"] = converted
     if body.get("tool_choice"):
         payload["tool_choice"] = body["tool_choice"]
+    # 推理强度：只有 openai 能力在 Responses 侧有 reasoning.effort，其余不下发
+    payload.update(_reasoning_payload("responses", cap, level))
     return payload
 
 
@@ -362,7 +443,7 @@ def _to_gemini_parts(content: Any) -> list[dict[str, Any]]:
     return parts or [{"text": ""}]
 
 
-def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
+def _build_anthropic_request(body: dict[str, Any], cap: str = "none", level: str = "auto") -> dict[str, Any]:
     """构建 Anthropic 格式请求体。"""
     messages = body.get("messages", [])
     system_msg = ""
@@ -383,7 +464,12 @@ def _build_anthropic_request(body: dict[str, Any]) -> dict[str, Any]:
     }
     if system_msg:
         payload["system"] = system_msg
-    if "temperature" in body:
+    # 推理强度：output_config.effort（budget_tokens 已废弃）。该字段生效时上游会拒绝
+    # temperature/top_p，因此只有真正下发 effort 才丢弃采样参数，其余保持原样。
+    reasoning_fields = _reasoning_payload("anthropic", cap, level)
+    if reasoning_fields:
+        payload.update(reasoning_fields)
+    elif "temperature" in body:
         payload["temperature"] = body["temperature"]
     return payload
 
@@ -677,10 +763,13 @@ async def _stream_google(url: str, headers: dict[str, str], payload: dict[str, A
                 parts = (cand.get("content") or {}).get("parts") or []
                 for part in parts:
                     text = part.get("text") or ""
-                    if text:
-                        yielded = True
-                        chunk = {"choices": [{"delta": {"content": text}, "index": 0}]}
-                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                    if not text:
+                        continue
+                    yielded = True
+                    # 思考摘要带 thought 标记：走 reasoning 通道，避免把思考当正文显示
+                    delta_key = "reasoning" if part.get("thought") else "content"
+                    chunk = {"choices": [{"delta": {delta_key: text}, "index": 0}]}
+                    yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
                 finish = cand.get("finishReason") or ""
                 if finish == "STOP":
                     chunk = {"choices": [{"delta": {}, "finish_reason": "stop", "index": 0}]}
@@ -730,6 +819,12 @@ async def proxy_chat(request: Request) -> Any:
     provider = model_cfg["provider"]
     base_url = model_cfg["base_url"]
 
+    # 推理强度：一次算出「模型能力 + 用户档位」，供各协议构建器共用
+    reasoning_cap = _reasoning_capability(model_cfg, provider)
+    reasoning_level = _reasoning_level(body)
+    if reasoning_level != "auto" and reasoning_cap == "none":
+        logger.info(f"[{trace_id}] 推理强度不下发（端点能力未知）: model={model_id}, level={reasoning_level}")
+
     # ── Anthropic ──
     if provider == "anthropic":
         headers = {
@@ -738,7 +833,7 @@ async def proxy_chat(request: Request) -> Any:
             "content-type": "application/json",
         }
         url = f"{base_url}/v1/messages"
-        payload = _build_anthropic_request(body)
+        payload = _build_anthropic_request(body, reasoning_cap, reasoning_level)
 
         if is_stream:
             logger.info(f"[{trace_id}] Anthropic 流式请求: {url}")
@@ -781,8 +876,13 @@ async def proxy_chat(request: Request) -> Any:
             role = "user" if msg["role"] in ("user", "tool") else "model"
             contents.append({"role": role, "parts": _to_gemini_parts(msg["content"])})
         payload: dict[str, Any] = {"contents": contents}
+        gen_cfg: dict[str, Any] = {}
         if "temperature" in body:
-            payload["generationConfig"] = {"temperature": body["temperature"]}
+            gen_cfg["temperature"] = body["temperature"]
+        # 推理强度：thinking_level 与 temperature 同层，能力不匹配时只保留原有字段
+        gen_cfg.update(_reasoning_payload("google", reasoning_cap, reasoning_level))
+        if gen_cfg:
+            payload["generationConfig"] = gen_cfg
 
         if is_stream:
             stream_url = f"{base_url}/models/{model_id}:streamGenerateContent?alt=sse&key={api_key}"
@@ -803,9 +903,20 @@ async def proxy_chat(request: Request) -> Any:
             msg = _sse_error_from_exception(exc, trace_id=trace_id, api_name="Google")
             return {"code": -1, "data": None, "message": json.loads(msg[6:].strip()).get("error", {}).get("message", str(exc))}
         text = ""
+        thought_text = ""
         if "candidates" in data and data["candidates"]:
             parts = data["candidates"][0].get("content", {}).get("parts", [])
-            text = "".join(p.get("text", "") for p in parts)
+            for part in parts:
+                part_text = part.get("text", "")
+                if not part_text:
+                    continue
+                if part.get("thought"):
+                    thought_text += part_text
+                else:
+                    text += part_text
+        if not text.strip():
+            # 只有思考摘要时退回用它，宁可不美观也不能整轮丢内容
+            text = thought_text
         if not text.strip():
             return {"code": -1, "data": None, "message": "Google 返回成功，但没有可显示文本。请检查候选项是否被安全策略拦截，或模型返回格式是否变化。"}
         logger.info(f"[{trace_id}] Google 完成: {len(text)} 字符")
@@ -829,7 +940,7 @@ async def proxy_chat(request: Request) -> Any:
 
     if use_responses:
         url = f"{base_url}/responses"
-        payload = _build_responses_request(body)
+        payload = _build_responses_request(body, reasoning_cap, reasoning_level)
 
         if is_stream:
             logger.info(f"[{trace_id}] Responses API 流式请求: {url}")
@@ -863,7 +974,7 @@ async def proxy_chat(request: Request) -> Any:
 
     # 默认：Chat Completions API（curl 直连模式：base_url 即完整端点 URL，不拼接路径）
     url = base_url if provider == "curl" else f"{base_url}/chat/completions"
-    payload = _build_openai_request(body)
+    payload = _build_openai_request(body, reasoning_cap, reasoning_level)
 
     if is_stream:
         logger.info(f"[{trace_id}] OpenAI 兼容流式请求: {url}")

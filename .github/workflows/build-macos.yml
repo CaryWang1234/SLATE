@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (如 0.4.1)'
+        description: '版本号 (如 0.4.2)'
         required: true
-        default: '0.4.1'
+        default: '0.4.2'
 
 jobs:
   build-macos:

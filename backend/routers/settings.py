@@ -56,6 +56,8 @@ async def save_shared_state(req: SharedStateRequest):
         "useResponses",
         "onboardingSeen",
         "permissionMode",
+        "chatMode",
+        "reasoningEffort",
         "webSearch",
         "imageGen",
         "videoGen",

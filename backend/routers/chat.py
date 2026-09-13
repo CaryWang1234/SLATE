@@ -14,7 +14,7 @@ import os
 import sqlite3
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +27,10 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
 DB_PATH = DATA_DIR / "chat_history.db"
 BACKUP_DIR = DATA_DIR / "backups"
+
+# 活跃度热力图回溯窗口：53 周 = 371 天。前端画布周日打头，实际显示 365~371 天，
+# 所以窗口只能 ≥ 画布跨度，别为了「对齐」往小改——改小了最早那几天会静默消失。
+ACTIVITY_WINDOW_DAYS = 371
 
 
 def _get_db() -> sqlite3.Connection:
@@ -136,6 +140,16 @@ async def usage_summary() -> dict[str, Any]:
         "SELECT id, title, total_tokens, message_count FROM conversations "
         "WHERE total_tokens > 0 ORDER BY total_tokens DESC LIMIT 5"
     ).fetchall()
+    # 活跃度热力图：按本地日聚合的用户发言条数，回溯 53 周。
+    # 起点必须是 epoch 数值——created_at 是 REAL，拿日期字符串比较会因
+    # SQLite 的类型序（文本恒大于数值）而一行不剩。
+    start_day = datetime.now().date() - timedelta(days=ACTIVITY_WINDOW_DAYS - 1)
+    start_ts = datetime(start_day.year, start_day.month, start_day.day).timestamp()
+    daily_rows = conn.execute(
+        "SELECT date(created_at, 'unixepoch', 'localtime') AS day, COUNT(*) AS n "
+        "FROM messages WHERE role = 'user' AND created_at >= ? GROUP BY day ORDER BY day",
+        (start_ts,),
+    ).fetchall()
     conn.close()
     return {
         "code": 0,
@@ -146,6 +160,11 @@ async def usage_summary() -> dict[str, Any]:
             "completion_tokens": row["completion_tokens"],
             "message_count": row["message_count"],
             "top": [dict(r) for r in top_rows],
+            "daily": [
+                {"date": r["day"], "count": r["n"]}
+                for r in daily_rows if r["day"]
+            ],
+            "daily_window": ACTIVITY_WINDOW_DAYS,
         },
         "message": "ok",
     }

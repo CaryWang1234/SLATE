@@ -51,6 +51,11 @@ const htmlFiles = frontendFiles.filter(f => f.endsWith(".html"));
 const cssFiles = frontendFiles.filter(f => f.endsWith(".css"));
 const textFrontendFiles = frontendFiles.filter(f => /\.(html|js|css)$/i.test(f));
 
+// 守卫脚本 import 前端模块时也带着 ?v= 串，串不一致就是另一份模块实例，必须同一次 bump
+const guardFiles = existsSync(path.join(root, "scripts"))
+  ? walkFiles("scripts").filter(f => f.endsWith(".mjs"))
+  : [];
+
 if (!frontendFiles.length) fail("frontend", 0, "no frontend files found; run from repo root");
 
 function lineColFromOffset(text, offset) {
@@ -125,7 +130,7 @@ function checkHtmlBalance(file, text) {
 function checkCacheVersions() {
   const versionRe = /\?v=(\d{8}-\d+)/g;
   const versions = new Map();
-  for (const file of [...htmlFiles, ...jsFiles, ...cssFiles]) {
+  for (const file of [...htmlFiles, ...jsFiles, ...cssFiles, ...guardFiles]) {
     const text = readUtf8(file);
     let m;
     while ((m = versionRe.exec(text))) {
@@ -138,7 +143,8 @@ function checkCacheVersions() {
     const detail = [...versions.entries()]
       .map(([v, files]) => `${v}: ${[...new Set(files)].slice(0, 6).join(", ")}`)
       .join("\n  ");
-    fail("frontend", 0, "mixed cache-buster versions found; bump frontend versions consistently", detail);
+    fail("frontend", 0,
+      "mixed cache-buster versions found; bump frontend and scripts/*.mjs import pins together", detail);
   }
 }
 

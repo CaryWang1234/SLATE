@@ -664,6 +664,17 @@ python desktop.py</pre>
               <tr><td>扩展</td><td><code>mcp_factory</code>（动态注册外部工具）</td></tr>
             </table>
             <p><strong>特殊字符与编码：</strong><code>file_peek</code> / <code>file_edit</code> 自动识别 UTF-8、UTF-8 BOM、GB18030、GBK、UTF-16 等常见文本编码；中文、emoji、全角符号会原样保留。Windows 下 <code>terminal</code> 隐藏 PowerShell 子窗口，并对 Python / Node / Git / npm / rg 等原生命令做 Unicode-safe 输出捕获。</p>
+            <p><strong>Actions 流程说明书：</strong>除了内置工具，你还可以把「干某件事的必要流程」写成一份 <code>data/actions/&lt;id&gt;.yml</code>，让模型按你的流程办事。一份 Action 描述「这件事怎么做」，SKILL.md 描述「怎么装一个外部工具」，两者定位不同、互不覆盖。</p>
+            <ul>
+              <li>字段：<code>name</code> · <code>description</code> · <code>when</code> · <code>tags</code> · <code>author</code> · <code>inputs</code> · <code>steps</code> · <code>output</code>，<code>steps[].tool</code> 只是建议，模型可按实际情况换用工具</li>
+              <li>模型侧只注入目录（最多 20 条，只给 id + 名字 + 一句话），要完整流程需用 <code>actions_read</code> 取；目录列表用 <code>actions_list</code></li>
+              <li>「读到流程」不等于「做过流程」：结果摘要与流程单都会提醒模型按步骤实际执行，不要凭说明书编造结论</li>
+              <li>YAML 子集校验（SAY-1）会拒收 Tab 缩进、锚点、多文档、流式 <code>{}</code> / <code>[]</code>、折叠块 <code>&gt;</code>、<code>!!</code> 标签，并报出所在行号；改坏的 yml 在面板里仍然可见并显示原因，不会凭空消失</li>
+              <li>编辑入口：设置 → 技能与工具 → Actions 区块，点「＋ 新建 Action」或点条目进编辑器；边写边校验，报错按行号显示，校验不过保存按钮不会写盘</li>
+              <li>每次覆盖或删除都会先把原文留底到 <code>data/actions/.history/</code>（每份最多 5 版），编辑器里的「历史版本」可查看某一版原文或直接回滚</li>
+              <li>模型可代写：<code>actions_write</code> 要求 yml 里声明 <code>author: model</code>（面板据此显示「模型代写」徽标），「询问」权限模式下会弹出原文让你审批；「自动 / 越权」不弹窗，但格式校验始终生效</li>
+              <li>聊天框 <code>@&lt;id&gt;</code> 提及可把整份流程注入这条消息，注入上限 6000 字，超出部分会提示模型用 <code>actions_read</code> 读全文</li>
+            </ul>
           </div>
           <div class="lang-en">
             <p>The model decides when to use them. Describe your need or call <code>@tool_name</code> explicitly.</p>
@@ -682,6 +693,17 @@ python desktop.py</pre>
               <tr><td>Extension</td><td><code>mcp_factory</code> (register external tools)</td></tr>
             </table>
             <p><strong>Unicode and encoding:</strong> <code>file_peek</code> / <code>file_edit</code> auto-detect UTF-8, UTF-8 BOM, GB18030, GBK, UTF-16, and other common text encodings. Chinese, emoji, and full-width symbols are preserved as-is. On Windows, <code>terminal</code> hides PowerShell windows and captures Unicode-safe output for native commands such as Python / Node / Git / npm / rg.</p>
+            <p><strong>Action Playbooks:</strong> beyond the built-in tools, you can write the required procedure for a task as a <code>data/actions/&lt;id&gt;.yml</code> file and have the model follow it. An Action describes "how this task is done"; a SKILL.md describes "how to install an external tool". The two have different roles and never overwrite each other.</p>
+            <ul>
+              <li>Fields: <code>name</code> · <code>description</code> · <code>when</code> · <code>tags</code> · <code>author</code> · <code>inputs</code> · <code>steps</code> · <code>output</code>. <code>steps[].tool</code> is advisory — the model may pick a different tool when the situation calls for it</li>
+              <li>Only the catalog is injected into the prompt (up to 20 entries: id, name, one-line summary). Use <code>actions_read</code> for the full procedure and <code>actions_list</code> for the catalog</li>
+              <li>Reading a playbook is not the same as following it: both the tool summary and the rendered procedure remind the model to actually execute the steps instead of inventing results</li>
+              <li>The YAML subset validator (SAY-1) rejects Tab indentation, anchors, multi-document files, flow <code>{}</code> / <code>[]</code>, folded <code>&gt;</code> blocks and <code>!!</code> tags, and reports the offending line number. Broken files stay visible in the panel with their reason instead of disappearing</li>
+              <li>Where to edit: Settings → Skills &amp; Tools → the Actions section. "+ New Action" or clicking an entry opens the editor; validation runs as you type with line numbers, and Save refuses a failing draft</li>
+              <li>Every overwrite or delete first copies the previous text to <code>data/actions/.history/</code> (up to 5 versions per Action). The editor's "History" button shows any version or rolls back to it</li>
+              <li>The model can author one too: <code>actions_write</code> requires <code>author: model</code> inside the yml (the panel badges it "Model-written"), and in "Ask" permission mode the exact content is shown for approval first. "Auto" / "Full access" skip the dialog, but the format gate always applies</li>
+              <li>Typing <code>@&lt;id&gt;</code> in the chat box injects the whole flow into that message, capped at 6000 characters; the trimmed remainder is flagged so the model reads the rest with <code>actions_read</code></li>
+            </ul>
           </div>
         </div>
       </div>
@@ -908,6 +930,7 @@ python desktop.py</pre>
               <tr><td>高危命令审批</td><td>23 类高危操作需你确认，灾难性命令无条件阻止，审批弹窗附带 AI 对这条命令用途的解释</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>全沙箱安全</td><td>路径校验 + 高危规则拦截 + 独立数据目录，删除与覆盖前先给看清楚</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>自定义技能体系</td><td>SKILL.md 即插即用，上传或导入后 <code>@</code> 提及自动注入上下文；其他 Agent 生态的技能目录可原样导入</td><td><a href="#ch9">9</a></td></tr>
+              <tr><td>Actions 流程说明书</td><td>把「干某件事的必要流程」写成一份 yml，模型只看到目录、按需读全文再照做；严格子集校验带行号报错，改坏的文件不会凭空消失</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>专家包</td><td>persona.md + rules.md + knowledge/ + skills/ 五个文件打成一个 zip，聊天下拉 / 成员卡 / <code>@</code> 提及三处注入</td><td><a href="#ch9">9</a></td></tr>
               <tr><td>AI 团队多轮辩论</td><td>提案 / 支持 / 反对 / 反驳 / 决策五种角色，轻模型讨论、重模型定稿，纪要自动生成以省 token</td><td><a href="#ch6">6</a></td></tr>
               <tr><td>团队工作流 DAG</td><td>需求 → 拆解 → 编码 → 审查 → 总结，上游输出流向下游，节点状态与输入输出实时可见，成品自动归档，附 8 个模板</td><td><a href="#ch10">10</a></td></tr>
@@ -965,6 +988,7 @@ python desktop.py</pre>
               <tr><td>High-risk command approval</td><td>23 categories of risky operations need your confirmation, catastrophic commands are blocked unconditionally, and the popup carries the AI's explanation of what the command does</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>Sandbox security</td><td>Path validation plus rule-based command interception and an isolated data directory — deletion and overwrite get shown to you first</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>Custom skill system</td><td>SKILL.md is plug-and-play; <code>@</code>mention auto-injects its context. Skill directories from other agent ecosystems import as-is</td><td><a href="#ch9">9</a></td></tr>
+              <tr><td>Action playbooks</td><td>Write "the required procedure for a task" as a yml file; the model sees only the catalog, reads the full flow on demand, then actually follows it. A strict YAML-subset validator reports line numbers and never hides a broken file</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>Expert packs</td><td>persona.md + rules.md + knowledge/ + skills/ zipped into one file per expert; inject from the chat dropdown, a team card, or <code>@</code>mention</td><td><a href="#ch9">9</a></td></tr>
               <tr><td>AI team multi-round debate</td><td>Propose / support / oppose / rebut / decide roles; light models argue, a heavy model calls the final shot, summaries generated to save tokens</td><td><a href="#ch6">6</a></td></tr>
               <tr><td>Team workflow DAG</td><td>Requirements → Decompose → Code → Review → Summarize; upstream output flows downstream, node status and I/O visible live, artifacts auto-archived, 8 templates included</td><td><a href="#ch10">10</a></td></tr>

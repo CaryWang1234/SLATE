@@ -12,14 +12,14 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos } from "../store.js?v=20260912-002";
-import { get, post, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260912-002";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260912-002";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260912-002";
-import { dlgUserAsk } from "./dialog.js?v=20260912-002";
-import { t } from "./i18n.js?v=20260912-002";
-import { makeId } from "./utils.js?v=20260912-002";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260912-002";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions } from "../store.js?v=20260913-007";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260913-007";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260913-007";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260913-007";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260913-007";
+import { t } from "./i18n.js?v=20260913-007";
+import { makeId } from "./utils.js?v=20260913-007";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260913-007";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -37,6 +37,68 @@ function normalizeProjectRelativePath(rawPath) {
     abs: `${projectRoot}/${relative}`,
     fileName: parts[parts.length - 1],
   };
+}
+
+// ── Actions（用户自定义流程说明书，data/actions/*.yml）────────────
+
+const ACTION_ID_RE = /^[a-z0-9][a-z0-9_-]{0,47}$/;
+
+/** Action 目录：优先用 store 里的快照，为空时回落接口（磁盘才是真源）。 */
+async function getActionCatalog() {
+  const cached = Array.isArray(state.actions) ? state.actions : [];
+  if (cached.length) return { actions: cached, broken: state.actionsBroken || [] };
+  const res = await get("/actions");
+  if (res.code !== 0) return { error: res.message || "读取 Action 目录失败" };
+  return {
+    actions: res.data?.actions || [],
+    broken: res.data?.broken || [],
+  };
+}
+
+/** 写入/删除后刷新 store 快照：面板与下一次目录注入都要看到磁盘上的新状态。
+ * 刷新失败不改写已成功的写入结果——面板下次打开本就会自取。 */
+async function refreshActionSnapshot() {
+  try {
+    const res = await get("/actions");
+    if (res.code === 0) setActions(res.data);
+  } catch {
+    /* 忽略：真源是磁盘，快照丢了只是显示滞后 */
+  }
+}
+
+/** 把一份 Action 渲染成给模型看的流程单（结构化字段 → 定长文本）。 */
+function renderAction(payload) {
+  const a = payload?.action || {};
+  const lines = [`[Action ${a.id || ""}] ${a.name || ""}`, a.description || ""];
+  if (a.when) lines.push(`适用时机: ${a.when}`);
+  const inputs = a.inputs || [];
+  if (inputs.length) {
+    lines.push("输入:");
+    for (const i of inputs) {
+      const opts = i.options?.length ? `，可选 ${i.options.join("/")}` : "";
+      lines.push(`  - ${i.key}${i.label ? `（${i.label}）` : ""}: ${i.type}${i.required ? "，必填" : ""}${opts}`);
+    }
+  }
+  const steps = a.steps || [];
+  lines.push(`流程（${steps.length} 步）:`);
+  steps.forEach((s, idx) => {
+    lines.push(`  ${idx + 1}. ${s.title}${s.tool ? ` [建议工具: ${s.tool}]` : ""}`);
+    String(s.detail || "").split("\n").forEach(l => lines.push(`     ${l}`));
+    if (s.check) lines.push(`     验收: ${s.check}`);
+  });
+  const out = a.output || {};
+  if (out.format || out.destination || out.path) {
+    lines.push(`产出: ${out.format || "未指定"}${out.destination ? ` → ${out.destination}` : ""}${out.path ? ` ${out.path}` : ""}`);
+  }
+  if (a.tags?.length) lines.push(`标签: ${a.tags.join(", ")}`);
+  if (Array.isArray(payload?.warnings) && payload.warnings.length) {
+    lines.push(`该文件的书写提醒: ${payload.warnings.join("；")}`);
+  }
+  lines.push("", "以上是用户写下的流程约定，不是已完成的证据：与用户当前要求冲突时以用户要求为准；标注了建议工具的步骤必须实际调用工具并核对结果，不能只在文字里复述步骤。");
+  const text = lines.join("\n");
+  return text.length > 12000
+    ? `${text.slice(0, 12000)}\n…（内容过长已截断，完整原文见 ${payload?.path || "data/actions"}）`
+    : text;
 }
 
 // ── 工具注册 ────────────────────────────────
@@ -401,6 +463,119 @@ const TOOLS = {
         return `工具执行失败: ${res.message}`;
       } catch (e) {
         return `工具调用出错: ${e.message}`;
+      }
+    },
+  },
+
+  actions_list: {
+    name: "Action 目录",
+    description: "列出用户自定义的 Actions（每个是一份「干某件事的必要流程」说明书）。keyword 匹配 id/名称/描述/适用时机/标签，留空则列出全部。只返回摘要（id、名称、描述、适用时机、步骤数），完整流程要用 actions_read 按 id 读取。",
+    params: {
+      keyword: { type: "string", description: "搜索关键词，留空列出全部 Action", required: false },
+    },
+    async execute({ keyword }) {
+      try {
+        const catalog = await getActionCatalog();
+        if (catalog.error) return `Action 目录读取失败: ${catalog.error}`;
+        const kw = String(keyword || "").trim().toLowerCase();
+        const hits = kw
+          ? catalog.actions.filter(a => [a.id, a.name, a.description, a.when, (a.tags || []).join(" ")]
+            .some(x => String(x || "").toLowerCase().includes(kw)))
+          : catalog.actions;
+        const lines = [];
+        if (!hits.length) {
+          lines.push(kw ? `没有匹配「${keyword}」的 Action。可换个关键词，或留空 keyword 列出全部。`
+            : "用户还没有配置任何 Action（data/actions/*.yml 为空）。");
+        } else {
+          lines.push(`共 ${hits.length} 个 Action：`);
+          hits.forEach((a, i) => {
+            lines.push(`${i + 1}. ${a.id}｜${a.name}：${compactDescription(a.description, 120)}`
+              + (a.when ? `（适用：${compactDescription(a.when, 80)}）` : "")
+              + `，${a.stepCount} 步`);
+          });
+          lines.push("用 actions_read 读取完整流程后再决定是否照此执行。");
+        }
+        if (catalog.broken?.length) {
+          lines.push(`以下 ${catalog.broken.length} 个 Action 文件解析失败、暂不可用：`
+            + catalog.broken.map(b => `${b.id}（${b.error}）`).join("、"));
+        }
+        return lines.join("\n");
+      } catch (e) {
+        return `Action 目录读取出错: ${e.message}`;
+      }
+    },
+  },
+
+  actions_read: {
+    name: "读取 Action",
+    description: "按 id 读取一个 Action 的完整流程（输入项、步骤与建议工具、验收点、产出要求）。当用户请求与某个 Action 的适用时机吻合时调用，然后按步骤推进；读到流程不等于做过流程，标了建议工具的步骤仍要实际调用工具完成。",
+    params: {
+      id: { type: "string", description: "Action id（即 yml 文件名，如 weekly_report）", required: true },
+    },
+    async execute({ id }) {
+      try {
+        const clean = String(id || "").trim();
+        if (!ACTION_ID_RE.test(clean)) {
+          return `无效的 Action id: ${id}。id 只能是小写字母开头的 a-z0-9_-，请先用 actions_list 确认。`;
+        }
+        const res = await get(`/actions/${clean}`);
+        if (res.code !== 0) return `读取 Action ${clean} 失败: ${res.message}`;
+        return renderAction(res.data);
+      } catch (e) {
+        return `读取 Action 出错: ${e.message}`;
+      }
+    },
+  },
+
+  actions_write: {
+    name: "写入 Action",
+    description: "创建或整份覆盖一个 Action（data/actions/<id>.yml），把与用户当面确认过的流程固化成以后可复用的说明书。id 是 yml 文件名（小写字母开头的 a-z0-9_-，如 weekly_report）；content 是完整的 SAY-1 YAML 原文（换行写成 \\n），必须含 name/description/steps，并写 author: model 声明由模型代写。格式约束：缩进只用 2 个空格、禁止 Tab，列表用块式写法（- 开头），禁止行内 {}/[]。写入前后端会按行校验，未通过不会落盘；覆盖已有文件前会自动留底（设置 → 技能与工具 里可回滚）。人工审批模式下会弹确认框给用户看原文，用户拒绝即不写入——此时不要反复重试，应把要点讲清楚或改用普通回复。只在用户明确要求「以后都按这套流程」时使用，不要擅自替用户发明流程。",
+    params: {
+      id: { type: "string", description: "Action id（yml 文件名，小写字母开头的 a-z0-9_-）", required: true },
+      content: { type: "string", description: "完整的 SAY-1 YAML 原文", required: true },
+    },
+    async execute({ id, content }) {
+      try {
+        const clean = String(id || "").trim();
+        if (!ACTION_ID_RE.test(clean)) {
+          return `无效的 Action id: ${id}。id 只能是小写字母开头的 a-z0-9_-（不超过 48 字），请修正后重发。`;
+        }
+        const text = String(content || "");
+        if (!text.trim()) return "缺少 content：需给出完整的 SAY-1 YAML 原文，不是 JSON、也不是字段清单。";
+        const check = await post("/actions/validate", { content: text });
+        if (check.code !== 0) return `Action ${clean} 校验请求失败: ${check.message}`;
+        const draft = check.data || {};
+        if (!draft.ok) {
+          const errs = (draft.errors || []).map(e => `第 ${e.line} 行：${e.reason}`).join("；") || "未知原因";
+          return `Action ${clean} 未写入：SAY-1 校验未通过（${errs}）。请按行号修正 content 后重发，或先 actions_read 一个既有 Action 作为格式参照。`;
+        }
+        if (draft.action?.author !== "model") {
+          return `Action ${clean} 未写入：content 里必须写明 author: model（面板要据此标出这份流程由模型代写）。加上后重发即可。`;
+        }
+        const warnings = draft.warnings || [];
+        if (state.permissionMode !== "auto" && state.permissionMode !== "full") {
+          const approved = await dlgConfirm(
+            `模型要把下面这份流程写成 Action「${clean}」（data/actions/${clean}.yml）。\n\n`
+            + `${text.length > 3000 ? `${text.slice(0, 3000)}\n…（原文过长已截断，完整内容写入后可在 设置 → 技能与工具 查看）` : text}\n\n`
+            + (warnings.length ? `书写提醒：${warnings.join("；")}\n` : "")
+            + "确认后会覆盖同名 Action（覆盖前自动留底，可回滚）。",
+            { title: "写入 Action", okText: "允许写入", cancelText: "拒绝" },
+          );
+          if (!approved) {
+            return `用户拒绝了本次 Action 写入（${clean} 未改动）。请不要重复调用本工具，可在回复里说明这份流程的要点，或询问用户想改哪里。`;
+          }
+        }
+        const res = await put(`/actions/${clean}`, { content: text });
+        if (res.code !== 0) return `Action ${clean} 写入失败: ${res.message}`;
+        const d = res.data || {};
+        await refreshActionSnapshot();
+        const lines = [`已${d.created ? "创建" : "更新"} Action ${clean}（${d.stepCount} 步、${d.inputCount} 个输入项），文件 ${d.path}。`];
+        if (d.backedUp) lines.push(`原内容已留底（${d.backedUp}），可在 设置 → 技能与工具 → Actions 的历史里回滚。`);
+        if (warnings.length) lines.push(`书写提醒：${warnings.join("；")}`);
+        lines.push("Action 只是流程约定，本次任务仍要按步骤实际执行并完成验证。");
+        return lines.join("\n");
+      } catch (e) {
+        return `写入 Action 出错: ${e.message}`;
       }
     },
   },
@@ -1048,6 +1223,8 @@ const TOOL_USE_RECIPES = [
   ["生成图片/视频", "image_gen / video_gen（需先在设置中配置模型与 Key）"],
   ["多个互不依赖的子任务并行", "subagent_run agents=[{name,task}] 一次并行派出，task 写清背景与期望产出"],
   ["需要技能但不知名字", "skill_search 搜索 -> skill_run 调用"],
+  ["用户的事像某个既有流程/说过要固化流程", "actions_list keyword=关键词 -> actions_read id=... -> 按步骤实际执行"],
+  ["用户要求把流程固化成以后可复用", "actions_list 查重（有则 actions_read 读原文再覆盖）-> actions_write id=... content=SAY-1 原文（含 author: model）"],
   ["任务缺少关键条件（风格/受众/格式/语言等）", "user_ask question=问题 options=[选项]"],
   ["事实性问答（可查证）", "先 project_files/project_read_file 或 web_search 佐证，再基于事实回答"],
   ["在海量代码中定位关键字/函数/符号", "code_search query=关键词（可 scope 缩小范围）-> project_read_file 精读"],
@@ -1066,7 +1243,8 @@ const SKILL_RUN_QUICK_LIST = [
 
 const CORE_AGENT_TOOLS = [
   "project_info", "project_files", "project_find_file", "project_read_file",
-  "code_search", "skill_search", "skill_run", "file_edit", "file_create", "file_append",
+  "code_search", "skill_search", "skill_run", "actions_list", "actions_read", "actions_write",
+  "file_edit", "file_create", "file_append",
   "todo_manage", "board_read", "board_batch",
 ];
 
@@ -1715,6 +1893,24 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   s += "- 内容从上次写入结束的精确位置接续，绝不重复已有内容\n";
   s += "- 输出被截断时，系统会要求你用 file_append 补齐；每次追加控制在 300 行以内\n";
 
+  // actions_write 专项指导
+  s += "\n[Action 书写规则 / actions_write 工具]\n";
+  s += "Action 是用户写给模型看的流程说明书（data/actions/<id>.yml），会被注入系统提示目录、由 actions_read 读取。只有用户明确要「固化流程 / 以后都这样做」时才写。\n";
+  s += "content 用受限 YAML 子集（SAY-1），违反即整份拒绝落盘并按行号报错：\n";
+  s += "- 缩进只能用空格且每层 2 格，禁止 Tab；列表一律块式写法（单独一行以「- 」开头），禁止行内 {…} / […]\n";
+  s += "- 第一行直接写 name:，不要加 --- 文档分隔符（会被整份拒绝）；注释只能独占一行以 # 开头，值后面跟的 # 会被当成值的一部分\n";
+  s += "- 顶层可用字段：name、description、when、inputs、steps、output、tags、author、version；未知字段会被忽略\n";
+  s += "- 必填 name（≤40 字）与 description（≤120 字）；steps 至少 1 步、最多 24 步\n";
+  s += "- steps 每项：title（必填）+ detail（多行用 | 或 |-）+ tool（建议工具名，仅建议不执行）+ check（验收点）\n";
+  s += "- inputs 每项：key（小写字母开头的 a-z0-9_）+ label + type（text/number/textarea/select）+ required + options（type 为 select 时必填）；最多 8 项\n";
+  s += "- output 是对象：format + destination（message/file/board，写 file 时必须给 path）\n";
+  s += "- 必须写 author: model（标明这份流程由模型代写，面板会据此显示）\n";
+  s += "- 不要把 API Key、密码等明文凭证写进 Action，改成写「从环境变量 X 读取」\n";
+  s += "示例（content 的形态）：\n";
+  s += "name: 周报整理\ndescription: 把本周记录整理成班级周报长图\nwhen: 用户提到周报时\nauthor: model\nsteps:\n  - title: 收集素材\n    detail: |-\n      读取本周的会议记录\n    tool: project_read_file\n    check: 素材条数与本周记录一致\n";
+  s += "- 写之前先 actions_list 查重：已有同主题 Action 就 actions_read 读原文，在其基础上覆盖改进，不要另起一份重复流程\n";
+  s += "- 写入成功不等于任务完成：本次仍要按这份流程实际执行并验证\n";
+
   return s;
 }
 
@@ -1785,6 +1981,13 @@ function setModelToolCapability(modelId, mode) {
   } catch {}
 }
 
+// 本轮实际生效的工具模式：对话态一律 "none"（请求不带 tools、系统提示不带工具目录），
+// 智能体态才按模型能力判定。"none" 不写入能力记忆——那是用户的选择，不是模型的限制，
+// 写进去会让切回智能体后白白丢掉原生工具能力。
+function effectiveToolMode(modelId, provider, chatMode = "agent") {
+  return chatMode === "chat" ? "none" : getModelToolCapability(modelId, provider);
+}
+
 function _example(params) {
   const obj = {};
   for (const [k, v] of Object.entries(params || {})) {
@@ -1801,5 +2004,6 @@ export {
   executeTool, executeToolCalls,
   getToolsSystemPrompt,
   buildOpenAITools, openAICallsToCalls,
-  getModelToolCapability, setModelToolCapability,
+  getModelToolCapability, setModelToolCapability, effectiveToolMode,
+  renderAction,
 };

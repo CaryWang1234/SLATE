@@ -3,16 +3,16 @@
  * 轻量模型初步讨论，重型模型最终决策。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260912-002";
-import { notifyTaskComplete } from "../services/notify.js?v=20260912-002";
-import { streamChat } from "../services/api.js?v=20260912-002";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260912-002";
-import { renderMarkdown } from "../services/markdown.js?v=20260912-002";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260912-002";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260912-002";
-import { getExpertsCached } from "./experts.js?v=20260912-002";
-import { t } from "../services/i18n.js?v=20260912-002";
-import { makeId } from "../services/utils.js?v=20260912-002";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260913-007";
+import { notifyTaskComplete } from "../services/notify.js?v=20260913-007";
+import { streamChat } from "../services/api.js?v=20260913-007";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260913-007";
+import { renderMarkdown } from "../services/markdown.js?v=20260913-007";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260913-007";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260913-007";
+import { getExpertsCached } from "./experts.js?v=20260913-007";
+import { t } from "../services/i18n.js?v=20260913-007";
+import { makeId } from "../services/utils.js?v=20260913-007";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());

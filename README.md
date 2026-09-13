@@ -39,6 +39,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 - 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
 - 🛠️ **34 Built-in MCP Tools** — File read/write/edit/append, project-wide code search, Unicode-safe terminal, PPT/Word/Excel/PDF tools, SVG charts & QR codes, Python API doc extraction, portable web bundling, code & document security scanning, read-only git info, web search & page scraping, MCP Factory for self-production, screenshot-to-code, AI image & video generation, browser & desktop automation
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
+- 📋 **Action Playbooks** — Capture the required flow for a recurring task in `data/actions/<id>.yml`; the model sees the catalog and reads a playbook in full before following it. Editable in Settings, model-writable behind an approval gate, every overwrite backed up for one-click rollback
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
 - 🔍 **Code Review** — Read git diff (staged/unstaged/commit range), AI reviews across code quality, security, performance, and maintainability with structured report and line-level comments
@@ -121,6 +122,8 @@ Built-in tools — 34 in total (`backend/skills/`):
 | `image_gen` / `video_gen` | AI image generation / AI video generation (OpenAI-compatible endpoints, model and API key configured in Settings), returns local file and preview link |
 
 Custom Skills: Upload or import `SKILL.md` to extend capabilities; `@` mention in chat to auto-inject context.
+
+Action Playbooks: Write the required flow for a recurring task into `data/actions/<id>.yml` (`name` / `description` / `when` / `inputs` / `steps` / `output`). In Agent mode the model sees the catalog, searches it with `actions_list`, reads a playbook with `actions_read`, then carries out the steps — reading a flow is never evidence the flow ran. Files parse through SAY-1, a zero-dependency YAML subset (2-space indent, block arrays, `|` literal blocks; tabs, anchors and multi-document files are rejected with the offending line number), and an unparsable file stays visible in Settings and in tool output instead of vanishing. The Settings panel edits them directly (validate-as-you-type, save refuses an invalid draft), every overwrite or delete copies the previous text into `data/actions/.history/` for rollback, `@<id>` in the chat box injects the flow up to a 6000-character cap, and the model can write one itself with `actions_write` — which demands an `author: model` declaration and, in "Ask" permission mode, your approval on the exact content.
 
 ### Expert Packs
 
@@ -266,6 +269,7 @@ SLATE/
 ├── QODER.md                    # Development specification
 ├── backend/
 │   ├── main.py                 # FastAPI entry (static serving + route registration + scheduler)
+│   ├── slate_yaml.py           # SAY-1 parser: the zero-dependency YAML subset for Actions (rejects tabs/anchors/multi-doc, errors carry line numbers)
 │   ├── routers/
 │   │   ├── proxy.py            # LLM API proxy (multi-vendor streaming + segmented timeout)
 │   │   ├── chat.py             # Chat history / context compression
@@ -274,6 +278,7 @@ SLATE/
 │   │   ├── projects.py         # Project management / Better Project Understanding / Code Review
 │   │   ├── experts.py          # Expert pack CRUD / zip import/export
 │   │   ├── skills.py           # Skill invocation (incl. /skills/stream — closing the stream cancels)
+│   │   ├── actions.py          # Actions API (catalog / detail / dry-run validation / write / delete / .history rollback)
 │   │   ├── events.py           # Agent call event ledger writes (runs / tool_events)
 │   │   ├── settings.py         # Settings / cross-device sync / storage management
 │   │   ├── constitution.py     # Project constitution
@@ -299,7 +304,7 @@ SLATE/
 │   ├── zh/index.html           # Chinese version
 │   └── guide.html              # Bilingual tutorial (scroll-style)
 ├── installer/                  # Installer artifacts
-└── data/                       # Runtime data (SQLite / constitution / schedules / custom Skills / expert packs / grind sessions)
+└── data/                       # Runtime data (SQLite / constitution / schedules / custom Skills / Action playbooks / expert packs / grind sessions)
 ```
 
 ---
