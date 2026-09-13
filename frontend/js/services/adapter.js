@@ -3,20 +3,29 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20260912-002";
-import { getToolsSystemPrompt } from "./tools.js?v=20260912-002";
+import { state } from "../store.js?v=20260912-004";
+import { getToolsSystemPrompt } from "./tools.js?v=20260912-004";
 
 // ── System Prompt 模板 ──────────────────────
 
-const SYSTEM_BASE = `你是 SLATE（砚），一个本地 AI 协作调度台助手，既能陪用户发散想法，也能像 Agent 一样直接推进本地项目任务。
+// 提示词按"角色 / 职责 / Agent 协议与工具纪律 / 回答风格"分段拼装：
+// 智能体态拼出的文本与拆分前逐字一致；对话态整段去掉工具相关内容，
+// 否则末尾的 [对话模式] 声明会和"你拥有工具""必须包含工具调用块"互相打架，
+// 模型照样伪造 ◈◈◈ 调用块或谎称已经读过文件、跑过命令。
+const SYSTEM_ROLE = `你是 SLATE（砚），一个本地 AI 协作调度台助手，既能陪用户发散想法，也能像 Agent 一样直接推进本地项目任务。`;
 
-## 核心职责
+const SYSTEM_DUTIES = `## 核心职责
 1. 捕捉零碎想法，帮助发散、连接、命名、追问和重组。
 2. 将模糊需求整理成可执行的目标、约束、风险、验收标准与下一步。
-3. 维护长期记忆、用户画像和知识中心，让灵感能跨对话沉淀与复用。
-4. 当用户要求查看、修改、运行、排查、生成、提交或验证项目内容时，直接使用工具推进，不把任务停留在建议层面。
+3. 维护长期记忆、用户画像和知识中心，让灵感能跨对话沉淀与复用。`;
 
-## Agent 工作协议
+const SYSTEM_DUTIES_AGENT = `${SYSTEM_DUTIES}
+4. 当用户要求查看、修改、运行、排查、生成、提交或验证项目内容时，直接使用工具推进，不把任务停留在建议层面。`;
+
+const SYSTEM_DUTIES_CHAT = `${SYSTEM_DUTIES}
+4. 只依据用户给出的信息与常识回答，缺少事实依据时直说不知道。`;
+
+const SYSTEM_AGENT_PROTOCOL = `## Agent 工作协议
 - 默认倾向使用工具：先看当前任务是否有可用工具能提供事实或执行动作；涉及现状、事实、生成、修改、验证的内容，直接调用对应工具获取依据再继续。纯闲聊、纯观点交流可直接回答。
 - Observe：缺少项目事实时优先读取目录、文件、配置、日志或命令输出；不要臆测仓库现状。
 - Plan：复杂任务用 3-6 个内部步骤收束，不必把完整计划冗长输出给用户；目标/TODOLIST 开启时按清单推进。
@@ -30,21 +39,28 @@ const SYSTEM_BASE = `你是 SLATE（砚），一个本地 AI 协作调度台助�
 - 禁止说“我先看看”“我需要查看”“接下来我会”后停住；这类句子后必须紧跟实际工具调用。
 - 不强行调用与任务无关的工具；等待用户选择、确认、补充隐私信息或许可时不调用工具。
 - 不重复完全相同的失败调用；如果工具失败，换参数、换工具或先读取更多上下文。
-- 不暴露冗长思维过程；给用户看清晰结论、关键依据和下一步即可。
+- 不暴露冗长思维过程；给用户看清晰结论、关键依据和下一步即可。`;
 
-## 回答风格
+const SYSTEM_STYLE = `## 回答风格
 - 中文为主，技术术语保留英文；简洁、聚焦、有启发性。
 - 有实质内容时用 Markdown 结构化；简单问题直接回答，不加多余格式。
 - 主动指出更稳妥的路径，但不要把主动性变成没完没了的反问。`;
 
+const SYSTEM_BASE = `${SYSTEM_ROLE}\n\n${SYSTEM_DUTIES_AGENT}\n\n${SYSTEM_AGENT_PROTOCOL}\n\n${SYSTEM_STYLE}`;
+const SYSTEM_BASE_CHAT = `${SYSTEM_ROLE}\n\n${SYSTEM_DUTIES_CHAT}\n\n${SYSTEM_STYLE}`;
+const REASONING_SUFFIX = `\n\n## 深度推理模式\n先在内部充分分析目标、约束、风险和可验证路径，再给出行动或结论；不要把长推理逐字展示给用户。`;
+
 const SYSTEM_PROMPTS = {
   default: SYSTEM_BASE,
+  defaultChat: SYSTEM_BASE_CHAT,
 
   // 针对推理模型的系统提示
-  reasoning: `${SYSTEM_BASE}\n\n## 深度推理模式\n先在内部充分分析目标、约束、风险和可验证路径，再给出行动或结论；不要把长推理逐字展示给用户。`,
+  reasoning: `${SYSTEM_BASE}${REASONING_SUFFIX}`,
+  reasoningChat: `${SYSTEM_BASE_CHAT}${REASONING_SUFFIX}`,
 
   // 针对轻量模型的精简提示
   lightweight: `你是 SLATE 助手：中文为主，简洁、有启发性。纯闲聊、纯观点交流可直接回答；涉及项目现状、事实、生成、修改、运行、排查、提交或验证的内容，默认先调用对应工具获取依据再回答，按 [可用工具] 的 ◈◈◈ 格式直接调用工具推进。不要只说“我来看看”；等待用户选择/确认时不调用工具。`,
+  lightweightChat: `你是 SLATE 助手：中文为主，简洁、有启发性。本轮没有可调用工具：涉及项目现状、文件内容、命令结果等事实时，直接说明需要用户提供信息或改用智能体模式，不要声称自己已经查看、搜索或执行过。`,
 };
 
 // ── 模型分类 ────────────────────────────────
@@ -53,11 +69,13 @@ const REASONING_MODELS = ["gpt-5.6-sol", "claude-fable-5", "claude-fable-5-1"];
 const LIGHTWEIGHT_MODELS = ["gpt-5.6-luna", "gemini-3.6-flash", "gemini-3.5-flash-lite", "deepseek-flash", "kimi-k2.7-code", "doubao-seed-2-1-turbo-260628"];
 
 /**
- * 根据模型 ID 获取适配的系统提示 */
-function getSystemPrompt(modelId) {
-  if (REASONING_MODELS.includes(modelId)) return SYSTEM_PROMPTS.reasoning;
-  if (LIGHTWEIGHT_MODELS.includes(modelId)) return SYSTEM_PROMPTS.lightweight;
-  return SYSTEM_PROMPTS.default;
+ * 根据模型 ID 与回复方式获取适配的系统提示。
+ * chatMode=true 返回"无工具"基底：智能体协议与工具纪律整段不下发。
+ */
+function getSystemPrompt(modelId, chatMode = false) {
+  if (REASONING_MODELS.includes(modelId)) return chatMode ? SYSTEM_PROMPTS.reasoningChat : SYSTEM_PROMPTS.reasoning;
+  if (LIGHTWEIGHT_MODELS.includes(modelId)) return chatMode ? SYSTEM_PROMPTS.lightweightChat : SYSTEM_PROMPTS.lightweight;
+  return chatMode ? SYSTEM_PROMPTS.defaultChat : SYSTEM_PROMPTS.default;
 }
 
 function getMemorySystemPrompt() {
@@ -123,11 +141,14 @@ function getExpertSystemPrompt() {
 /**
  * 组装发往模型的完整系统提示：角色定义 → 项目宪法 → 专家包/记忆/知识 → 工具目录。
  * 上下文估算与实际载荷共用此函数，避免两处口径漂移。
+ * opts.withTools === false：对话模式，基底换成不含 Agent 协议与工具纪律的版本，
+ * 也不注入工具目录（没有工具可调用时注入只会诱导模型伪造 ◈◈◈ 调用块）。
  */
-function buildSystemContent(modelId, constitution) {
-  let systemContent = getSystemPrompt(modelId);
+function buildSystemContent(modelId, constitution, opts = {}) {
+  const chatMode = opts.withTools === false;
+  let systemContent = getSystemPrompt(modelId, chatMode);
 
-  // 注入项目宪法（项目开发规则，先于上下文注入）
+  // 注入项目宪法（项目开发规则，涉及该项目的代码、方案与建议时必须遵守）
   if (constitution?.rules?.length) {
     systemContent += "\n\n[项目宪法]（涉及该项目的代码、方案与建议时必须遵守）\n";
     constitution.rules.forEach((rule, i) => {
@@ -140,7 +161,15 @@ function buildSystemContent(modelId, constitution) {
   systemContent += getKnowledgeSystemPrompt();
 
   // 注入工具描述（默认使用精简 Agent 版，避免长工具目录稀释关键指令）
-  systemContent += getToolsSystemPrompt({ compact: true });
+  // 对话模式走互斥分支：不注入目录，同时显式声明"本轮没有工具"，
+  // 否则模型会照旧伪造 ◈◈◈ 块，或谎称已经读过文件、已经跑过命令。
+  if (opts.withTools === false) {
+    systemContent += "\n\n[对话模式] 本轮没有任何可调用工具：不要输出 ◈◈◈ 或其它工具调用块，"
+      + "也不要把“我已查看文件”“我已执行命令”“我搜索过”当作既成事实。"
+      + "缺少事实依据时直接说明你不知道，并告诉用户怎样提供信息或改用智能体模式。\n";
+  } else {
+    systemContent += getToolsSystemPrompt({ compact: true });
+  }
 
   return systemContent;
 }
@@ -149,12 +178,16 @@ function buildSystemContent(modelId, constitution) {
  * 构建完整的消息列表（注入系统提示 + 宪法 + 专家/记忆/知识 + 工具）。
  * 顺序：角色定义、项目宪法、专家/记忆/知识上下文、工具说明（贴近对话，降低遗忘）。
  * toolMode：native=序列化原生工具协议（assistant.tool_calls + role:"tool"）；
- *           text=剥离协议（tool 消息降为 user，便于不支持 tools 的端点消费）。
+ *           text=剥离协议（tool 消息降为 user，便于不支持 tools 的端点消费）；
+ *           none=对话模式，既不注入工具目录也不序列化任何工具协议。
  */
 function buildMessages(userMessages, constitution, toolMode = "text") {
   const messages = [];
 
-  messages.push({ role: "system", content: buildSystemContent(userMessages._modelId || "", constitution) });
+  messages.push({
+    role: "system",
+    content: buildSystemContent(userMessages._modelId || "", constitution, { withTools: toolMode !== "none" }),
+  });
 
   const native = toolMode === "native";
   // 历史中已存在的 tool 结果 id（原生协议要求 assistant tool_calls 后必须有匹配的 tool 消息）

@@ -134,4 +134,67 @@ for (const [file, pin] of [
   assert.equal(found[1], pin, `dedup 催办串偏离基线: ${file}`);
 }
 
+// ── 对话模式：系统提示既不能带工具目录，也不能诱导模型伪造调用 ──────
+// adapter.js 依赖 store.js（Node 侧不可 import），按源码级逐字 pin；
+// 工具目录本体从 tools.js 真取，判据跟着它变，不抄一份副本。
+const { getToolsSystemPrompt, effectiveToolMode } = await import("../frontend/js/services/tools.js");
+const ADAPTER_SRC = readFileSync(new URL("../frontend/js/services/adapter.js", import.meta.url), "utf8");
+const CATALOGUE = getToolsSystemPrompt({ compact: true });
+assert.ok(CATALOGUE.includes("必须包含工具调用块"), "工具目录基线已变：对话模式分支的判据需同步核对");
+
+const chatBranch = /if \(opts\.withTools === false\) \{([\s\S]*?)\n  \} else \{\s*\n\s*systemContent \+= getToolsSystemPrompt/.exec(ADAPTER_SRC);
+assert.ok(chatBranch, "buildSystemContent 必须把「工具目录」与「对话模式声明」做成互斥分支");
+assert.ok(!chatBranch[1].includes("getToolsSystemPrompt"), "对话模式分支不得再拼进工具目录");
+for (const [re, why] of [
+  [/\[对话模式\]/, "缺少模式声明，模型不知道本轮没有工具"],
+  [/不要输出 ◈◈◈/, "缺少调用块禁令，模型会伪造 ◈◈◈ 白烧轮次"],
+  [/当作既成事实/, "缺少「不得谎称已读/已执行」约束，对话态会编造事实"],
+]) {
+  assert.match(chatBranch[1], re, `对话模式提示词${why}`);
+}
+assert.match(ADAPTER_SRC, /withTools: toolMode !== "none"/, "buildMessages 必须按 toolMode=none 关掉工具注入");
+
+// adapter.js 顶部这段只是字符串拼装，不碰 state，整段取出来在 Node 里真跑：
+// "对话态基底不能残留工具指令"于是成了行为断言，而不是抄一份文本对着看。
+const promptStart = ADAPTER_SRC.indexOf("const SYSTEM_ROLE = `");
+const promptEnd = ADAPTER_SRC.indexOf("\nfunction getMemorySystemPrompt");
+assert.ok(promptStart > -1 && promptEnd > promptStart, "未找到 adapter.js 提示词拼装区，守卫需同步更新");
+const { getSystemPrompt, LIGHTWEIGHT_MODELS } = new Function(
+  `${ADAPTER_SRC.slice(promptStart, promptEnd)}\nreturn { getSystemPrompt, LIGHTWEIGHT_MODELS };`,
+)();
+
+// 智能体态一字不能少（这段提示词是长期调出来的），对话态一条工具指令都不能留
+const AGENT_MARKERS = ["## Agent 工作协议", "## 工具纪律", "你拥有工具", "必须包含工具调用块", "[可用工具]"];
+const CHAT_FORBIDDEN = [...AGENT_MARKERS, "◈◈◈"];
+for (const modelId of ["", "gpt-5.6-sol", "claude-fable-5", "gpt-5.6-luna", "gemini-3.6-flash", "kimi-k2.7-code"]) {
+  const label = modelId || "默认";
+  const lightweight = LIGHTWEIGHT_MODELS.includes(modelId);
+  const agentPrompt = getSystemPrompt(modelId, false);
+  const chatPrompt = getSystemPrompt(modelId, true);
+  for (const marker of lightweight ? ["[可用工具]", "◈◈◈"] : AGENT_MARKERS) {
+    assert.ok(agentPrompt.includes(marker), `智能体态基底丢了「${marker}」（模型 ${label}）`);
+  }
+  for (const marker of CHAT_FORBIDDEN) {
+    assert.ok(!chatPrompt.includes(marker), `对话态基底残留「${marker}」（模型 ${label}）：会与末尾 [对话模式] 声明冲突`);
+  }
+  if (lightweight) {
+    assert.ok(chatPrompt.includes("简洁、有启发性"), `轻量模型对话态基底偏离（模型 ${label}）`);
+  } else {
+    assert.match(chatPrompt, /## 回答风格/, `对话态基底丢了回答风格段（模型 ${label}）`);
+    assert.ok(chatPrompt.length < agentPrompt.length, `对话态基底没有比智能体态更精简（模型 ${label}）`);
+  }
+  assert.ok(getSystemPrompt(modelId) === agentPrompt, `getSystemPrompt 缺省参数不再是智能体态（模型 ${label}）`);
+}
+assert.match(getSystemPrompt("gpt-5.6-sol", true), /## 深度推理模式/, "推理模型的对话态丢了深度推理段");
+assert.match(
+  ADAPTER_SRC,
+  /const chatMode = opts\.withTools === false;\n\s*let systemContent = getSystemPrompt\(modelId, chatMode\);/,
+  "buildSystemContent 必须把对话态标记传给 getSystemPrompt，否则基底仍带工具指令",
+);
+
+// 对话态一律 none，且不写回能力记忆（那是用户选择，不是模型限制）
+assert.equal(effectiveToolMode("gpt-5.6-sol", "openai", "chat"), "none");
+assert.equal(effectiveToolMode("gpt-5.6-sol", "openai", "agent") === "none", false);
+assert.equal(effectiveToolMode("local", "openai", "chat"), "none");
+
 console.log("agent_common.js 输出与基线逐字全等：通过");
