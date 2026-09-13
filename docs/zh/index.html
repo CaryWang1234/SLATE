@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SLATE（砚）· 本地 AI Agent 工作台 —— 你的密钥，你的机器</title>
-  <meta name="description" content="SLATE（砚）是一个跑在你自己电脑上的开源 AI Agent 工作台：自带模型密钥（OpenAI / Anthropic / Gemini / 任意 OpenAI 兼容端点，或本地 Ollama），数据只落在本机磁盘，每一次工具调用都写进本地事件账本，停止就是真的停止。">
+  <meta name="description" content="SLATE（砚）是一个跑在你自己电脑上的开源 AI Agent 工作台：自带模型密钥（OpenAI / Anthropic / Gemini / 任意 OpenAI 兼容端点，或本地 Ollama），数据只落在本机磁盘，每一次工具调用都写进可读的本地事件账本，停止就是真的停止。">
   <link rel="icon" type="image/png" href="../icon.png">
   <link rel="stylesheet" href="../style.css">
 </head>
@@ -19,15 +19,16 @@
         <button class="drawer-close" id="drawer-close" aria-label="关闭">✕</button>
       </div>
       <div class="drawer-links">
-        <a href="#difference"><span class="drawer-icon">✦</span> 差异点</a>
-        <a href="#capabilities"><span class="drawer-icon">🎯</span> 能力半径</a>
-        <a href="#limits"><span class="drawer-icon">🛡</span> 诚实边界</a>
-        <a href="#start"><span class="drawer-icon">🚀</span> 快速上手</a>
-        <a href="../guide.html"><span class="drawer-icon">📜</span> 使用手册与工具全表</a>
+        <a href="#loop"><span class="drawer-icon">00</span> 循环</a>
+        <a href="#difference"><span class="drawer-icon">01</span> 差异点</a>
+        <a href="#capabilities"><span class="drawer-icon">02</span> 能力半径</a>
+        <a href="#limits"><span class="drawer-icon">03</span> 诚实边界</a>
+        <a href="#start"><span class="drawer-icon">04</span> 快速上手</a>
+        <a href="../guide.html"><span class="drawer-icon">05</span> 使用手册与工具全表</a>
       </div>
       <div class="drawer-footer">
-        <a class="drawer-action" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ 下载安装包</a>
-        <a class="drawer-action ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">★ 去 GitHub 标星</a>
+        <a class="drawer-action" href="https://github.com/CaryWang1234/SLATE/releases/latest" target="_blank" rel="noopener">下载安装包</a>
+        <a class="drawer-action ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">读源码</a>
         <a class="drawer-lang" href="../index.html">中文 / English</a>
       </div>
     </nav>
@@ -35,17 +36,17 @@
 
   <!-- ═══ Mobile Bottom Bar ═══ -->
   <div class="mobile-bottom-bar" id="mobile-bottom-bar">
-    <a class="bottom-btn" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">
-      <span class="bottom-icon">⬇</span>
+    <a class="bottom-btn" href="https://github.com/CaryWang1234/SLATE/releases/latest" target="_blank" rel="noopener">
+      <span class="bottom-icon">↓</span>
       <span class="bottom-label">下载</span>
     </a>
     <a class="bottom-btn primary" href="#start">
-      <span class="bottom-icon">🚀</span>
+      <span class="bottom-icon">→</span>
       <span class="bottom-label">立即上手</span>
     </a>
     <a class="bottom-btn" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">
-      <span class="bottom-icon">★</span>
-      <span class="bottom-label">GitHub</span>
+      <span class="bottom-icon">&lt;/&gt;</span>
+      <span class="bottom-label">源码</span>
     </a>
   </div>
 
@@ -60,6 +61,7 @@
         <span>SLATE（砚）</span>
       </a>
       <div class="nav-links">
+        <a href="#loop">循环</a>
         <a href="#difference">差异点</a>
         <a href="#capabilities">能力半径</a>
         <a href="#limits">诚实边界</a>
@@ -84,104 +86,75 @@
       <div class="hero-copy">
         <div class="hero-mark">
           <img class="hero-logo" src="../icon.png" alt="SLATE Logo">
-          <span>自带密钥的 agent 工作台</span>
+          <span>自带密钥的 agent</span>
         </div>
-        <h1 class="hero-title">SLATE（砚）</h1>
+        <h1 class="hero-title hero-title--cjk">SLATE（砚）</h1>
         <p class="hero-sub">跑在你自己机器上的 AI Agent 工作台：密钥是你的，机器是你的，每一步都留了底。</p>
         <p class="hero-en">一句话交代目标，一张可见计划，一组真正会动手的工具。</p>
         <p class="hero-type" id="hero-type"></p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ 下载安装包</a>
-          <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">先读循环源码 →</a>
+          <a class="btn btn-primary" id="btn-dl" href="https://github.com/CaryWang1234/SLATE/releases/latest" target="_blank" rel="noopener">下载安装包</a>
+          <a class="btn btn-quiet" href="#loop">先看一遍循环 →</a>
         </div>
         <div class="hero-badges">
           <span class="badge">MIT 协议</span>
           <span class="badge">自带密钥</span>
-          <span class="badge">无账号 · 无订阅</span>
-          <span class="badge">零遥测上报</span>
-          <span class="badge">零 npm · 零构建</span>
+          <span class="badge">无账号 · 无遥测</span>
+          <span class="badge">每个安装包旁边都有 sha256</span>
         </div>
+        <div class="hero-install">
+          <code id="clone-cmd">git clone https://github.com/CaryWang1234/SLATE.git</code>
+          <button class="copy-btn" id="copy-clone" type="button" title="复制">复制</button>
+        </div>
+        <p class="hero-shipped">自 <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">2026-08-01</a> 起持续发版。之后的每个 release 都带着自己的安装包和一个公开的 sha256——全部出自一个人的书桌。</p>
         <p class="section-note">
-          托管型 Agent 卖的是「更强的模型 + 它的计量表」。砚默认你已经有好模型了，它去管那些反复出问题的部分：<strong>可回溯的循环、真能停下的停止、不用等别人发版就能加的能力</strong>。
+          托管型 Agent 卖的是「更强的模型 + 它的计量表」。砚默认你已经有好模型了，它去管那些反复出问题的部分：<strong>可审计的循环、真能停下的停止、不用等别人发版就能加的能力</strong>。
         </p>
       </div>
       <div class="hero-console reveal from-right" aria-label="SLATE 工作区预览">
         <div class="console-top">
           <span></span><span></span><span></span>
-          <strong>Autopilot 任务台</strong>
+          <strong>SLATE · 智能体运行</strong>
         </div>
-        <div class="console-body">
-          <div class="mission-card">
-            <div class="mission-kicker">当前任务</div>
-            <h2>重构项目工具链并验证发布路径</h2>
-            <div class="mission-progress"><i style="width: 72%"></i></div>
-            <div class="mission-meta">
-              <span>第 7/28 轮</span>
-              <span>3 个工具运行中</span>
-              <span>本地工作区</span>
-            </div>
-          </div>
-          <div class="agent-stream">
-            <div><b>规划</b><span>扫描仓库、文档、测试</span></div>
-            <div><b>工具</b><span>file_edit · terminal · git_tree</span></div>
-            <div><b>校验</b><span>前端完整性检查通过</span></div>
-          </div>
-          <div class="console-grid">
-            <div class="signal-panel">
-              <small>事件账本</small>
-              <p>run 87e9a85 · seq 0…41</p>
-              <p>开始 · 完成 · 取消</p>
-            </div>
-            <div class="signal-panel accent">
-              <small>白板</small>
-              <p>Git · 流程 · 看板</p>
-              <p>同一批事件，画成卡片</p>
-            </div>
-          </div>
+        <div class="console-shot">
+          <img src="../assets/zh/run.png" alt="砚的一次真实运行：提示词、模型说清的思路、两条标记为已执行的工具调用，以及顶部那条会话 token 用量" loading="eager" decoding="async">
+          <p class="console-caption">真机上的一次真实运行。模型这一环是本地桩，工具执行器、卡片背后的账本和用量条都是出厂那套。</p>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- ═══ UI Preview: CSS-simulated three columns ═══ -->
-  <section class="preview">
+  <!-- ═══ The Loop ═══ -->
+  <section class="section loop" id="loop">
     <div class="container">
-      <div class="window reveal slow" data-stagger-group>
-        <div class="window-bar">
-          <span class="window-dot"></span>
-          <span class="window-dot"></span>
-          <span class="window-dot gold"></span>
-          <span class="window-title">SLATE（砚）— 对话 · 白板 · 能力面板</span>
-        </div>
-        <div class="window-body">
-          <div class="pane">
-            <div class="pane-label">对话 — 循环走到哪一步</div>
-            <div class="chat-bubble me"><div class="skel w80"></div><div class="skel w60"></div></div>
-            <div class="tool-chip">⚡ 目标模式 · 第 3/50 轮</div>
-            <div class="chat-bubble ai"><div class="skel"></div><div class="skel w80"></div></div>
-            <div class="tool-chip">🛠 file_edit · 已被你取消</div>
-            <div class="chat-bubble ai"><div class="skel w80"></div><div class="skel w40"></div></div>
-          </div>
-          <div class="pane">
-            <div class="pane-label">白板 — 计划摊在面上</div>
-            <div class="board-card"><div class="skel w60"></div><div class="skel"></div></div>
-            <div class="board-arrow">↓</div>
-            <div class="board-card"><div class="skel w80"></div><div class="skel w60"></div></div>
-            <div class="board-arrow">↓</div>
-            <div class="board-card"><div class="skel w40"></div><div class="skel"></div></div>
-          </div>
-          <div class="pane">
-            <div class="pane-label">能力 — 接线由你决定</div>
-            <div class="harness-bar">⚡ 自动驾驶 · 停止不退出目标</div>
-            <div class="tool-chip">🛠 34 个内置工具</div>
-            <div class="tool-chip">🧩 @my-skill（SKILL.md）</div>
-            <div class="tool-chip">🔌 mcp__server__tool</div>
-            <div class="skel"></div>
-            <div class="skel w80"></div>
-          </div>
-        </div>
+      <div class="reveal">
+        <div class="section-tag">循环</div>
+        <h2 class="section-title">所谓 Agent 产品，其实都只有一个循环</h2>
+        <p class="section-desc">模型是租来的，循环才是你真正在跑的东西。下面是砚的循环，一步一步拆开，以及盯住每一步的那个常量。</p>
       </div>
-      <p class="preview-caption reveal">任务跑起来时你盯着的三栏：左边是循环进度，中间是计划的白板，右边是你自己接上的能力。前两块读的是同一份本地事件账本。</p>
+
+      <ol class="loop-steps" data-stagger-group>
+        <li class="loop-step reveal" data-stagger>
+          <span class="loop-n">01</span>
+          <h3>任何东西开跑之前，计划先上板</h3>
+          <p>一次调用没走到 <code>call.ready</code> 之前不会被画成步骤——被去重守卫拦下的计划连卡片都不会生成，所以白板不会偏离真正发生了什么。</p>
+        </li>
+        <li class="loop-step reveal" data-stagger>
+          <span class="loop-n">02</span>
+          <h3>参数还在写，就已经能读</h3>
+          <p>只流到一半的工具调用会实时预览，但在闭合标记到达前不可执行；<code>truncated &amp; !closed</code> 直接拒收。23 类命令模式会先要你确认。</p>
+        </li>
+        <li class="loop-step reveal" data-stagger>
+          <span class="loop-n">03</span>
+          <h3>每次调用都留下一行事后可读的记录</h3>
+          <p><code>UNIQUE(run_id, seq)</code> 配 <code>INSERT OR IGNORE</code>，重试只会原样重放，不会把一次调用记成两次。客户端把参数和输出裁到 2000 字符，服务端留 500 字符的摘要。</p>
+        </li>
+        <li class="loop-step reveal" data-stagger>
+          <span class="loop-n">04</span>
+          <h3>停止是一个状态，不是一句请求</h3>
+          <p>取消会同时掐断模型流和工具流；后端把「流已关闭」直接读成取消信号，并杀掉子进程。90s 空闲看门狗、180s 请求上限，空转 2 轮警告、4 轮退出。</p>
+        </li>
+      </ol>
     </div>
   </section>
 
@@ -197,23 +170,64 @@
         <div class="reveal" data-stagger>
           <div class="stat-num" data-count="0">0</div>
           <div class="stat-label">遥测上报点</div>
-          <div class="stat-hint">全仓搜不到埋点代码；例行外发只有 GitHub Releases 的检查更新。</div>
+          <div class="stat-hint">没有自作主张的上报。砚自己打出去的唯一例行请求是 GitHub Releases 的检查更新；CDN 资源在「诚实边界」里列着。</div>
         </div>
         <div class="reveal" data-stagger>
           <div class="stat-num"><span data-count="4">0</span> 种</div>
           <div class="stat-label">模型协议</div>
-          <div class="stat-hint">OpenAI Chat 与 Responses、Anthropic、Gemini 原生，外加任意 OpenAI 兼容端点和本地模型。</div>
+          <div class="stat-hint">OpenAI Chat 与 Responses、Anthropic、Gemini——外加任意 OpenAI 兼容 URL 和本地模型。</div>
         </div>
         <div class="reveal" data-stagger>
           <div class="stat-num" data-count="1">0</div>
-          <div class="stat-label">一份事件账本</div>
-          <div class="stat-hint">工具卡片、白板步骤、会话用量总结——三个视图，同一份记录。</div>
+          <div class="stat-label">每块面板背后的账本</div>
+          <div class="stat-hint">工具卡片、白板步骤、会话总结——一份记录，三个视图。</div>
         </div>
         <div class="reveal" data-stagger>
           <div class="stat-num" data-count="34">0</div>
           <div class="stat-label">内置工具</div>
           <div class="stat-hint">明细表在使用手册里。这一页只讲区别，不铺清单。</div>
         </div>
+      </div>
+
+      <div class="spec reveal">
+        <div class="spec-head">
+          <h3>下面这些数字是仓库里的常量，不是形容词</h3>
+          <p>打开文件，核对取值。往后的版本若改了其中一个，这张表就该跟着改。</p>
+        </div>
+        <dl class="spec-grid">
+          <div class="spec-row">
+            <dt>单次扇出并行的子代理数</dt>
+            <dd><b>5</b><code>frontend/js/services/subagent.js</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>每个目标可研磨的轮数</dt>
+            <dd><b>10</b><code>frontend/js/services/grind.js</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>需先确认的高危命令模式</dt>
+            <dd><b>23</b><code>frontend/js/services/riskguard.js</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>流空闲超时 / 请求上限</dt>
+            <dd><b>90s · 180s</b><code>frontend/js/services/api.js</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>仓库里的自检脚本</dt>
+            <dd><b>16</b><code>scripts/check_*</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>JavaScript 构建步骤</dt>
+            <dd><b>0</b><code>no package.json, no bundler</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>requirements.txt 的锁定行</dt>
+            <dd><b>21</b><code>requirements.txt · includes PyInstaller</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>backend 与 frontend 源码行数</dt>
+            <dd><b>45,556</b><code>69 .py + 59 .js · measured, not a constant</code></dd>
+          </div>
+        </dl>
       </div>
     </div>
   </section>
@@ -241,7 +255,7 @@
             </div>
             <div class="contrast-col ours">
               <span class="contrast-label">砚</span>
-              <p>自带密钥、自带算力。四种协议之间随手切换——草稿用便宜的，定稿用强的；或者接一个从不出房间的本模型。没有锁定，换供应商也不用交切换费。</p>
+              <p>自带密钥、自带算力。任务中途就能换供应商——草稿用便宜的，定稿用强的；或者跑一个从不出房间的本模型。没有锁定，换供应商也没人向你收切换费。</p>
             </div>
           </div>
           <div class="code-box reveal from-right">
@@ -249,8 +263,9 @@
             <pre><span class="c-muted"># backend/routers/proxy.py</span>
 <span class="c-text">_stream_openai / _stream_responses</span>
 <span class="c-text">_stream_anthropic / _stream_google</span>
-<span class="c-muted"># 密钥随请求一起进来，服务端不留档</span>
-<span class="c-muted"># 无账号、无登录、无订阅</span></pre>
+<span class="c-muted"># 密钥随每次请求一起进来</span>
+<span class="c-muted"># 服务端不留档、无账号</span>
+<span class="c-muted"># 这套代码里也没有登录页</span></pre>
           </div>
         </div>
         <p class="diff-evidence reveal">证据： <code>backend/routers/proxy.py</code> <code>backend/routers/settings.py</code> <code>frontend/js/store.js</code></p>
@@ -260,7 +275,7 @@
         <div class="diff-head reveal from-left">
           <span class="diff-index">02</span>
           <h3>每一步，都是事后可读的一行记录。</h3>
-          <p>整套系统只有一套循环内核，它按顺序发出事件：每一次规划、开始、完成、取消都落进本地账本。屏幕上看到的不是滚动的日志，而是这份记录投出来的影。</p>
+          <p>只有一套循环内核，它按顺序发出事件：每一次规划、开始、完成、取消都写进本地账本。你在屏幕上看到的不是重新渲染的日志，而是这份存档记录投出来的影。</p>
         </div>
         <div class="diff-body">
           <div class="contrast reveal from-left">
@@ -270,17 +285,18 @@
             </div>
             <div class="contrast-col ours">
               <span class="contrast-label">砚</span>
-              <p>带序号校验的事件落盘，重试也不会把一次调用记成两次；每条事件带摘要。同一条记录同时喂工具卡片、白板步骤卡和会话总结——一份真相，三个视图。</p>
+              <p>带序号校验的事件落盘，重试也不会把一次调用记成两次。同一条记录同时喂工具卡片、白板步骤卡和会话用量总结——一份真相，三个视图。</p>
             </div>
           </div>
           <div class="code-box reveal from-right">
             <div class="code-box-bar"><i></i><i></i><i></i></div>
             <pre><span class="c-muted">-- data/chat_history.db</span>
-<span class="c-text">runs        (run_id, …)</span>
-<span class="c-text">tool_events (run_id, seq, kind, …)</span>
-<span class="c-text">  UNIQUE(run_id, seq)  -- INSERT OR IGNORE</span>
+<span class="c-text">runs        (run_id, mode, wall_ms, …)</span>
+<span class="c-text">tool_events (run_id, seq, ts, type, tool, …)</span>
+<span class="c-text">  UNIQUE INDEX (run_id, seq)  -- INSERT OR IGNORE</span>
 <span class="c-muted">call.start → call.finish | call.cancel</span>
-<span class="c-muted">单条摘要上限 2000 字符</span></pre>
+<span class="c-muted">客户端把摘要裁到 2000 字符；</span>
+<span class="c-muted">服务端存前 500</span></pre>
           </div>
         </div>
         <p class="diff-evidence reveal">证据： <code>frontend/js/services/agent_loop.js</code> <code>frontend/js/services/agent_ledger.js</code> <code>backend/routers/events.py</code></p>
@@ -300,7 +316,7 @@
             </div>
             <div class="contrast-col ours">
               <span class="contrast-label">砚</span>
-              <p>90 秒无数据即断流、空返回自动退避重试、请求与工具 180 秒超时、界面兜底看门狗。重复调用直接去重：连续 2 轮警告、4 轮止损并给出原因。参数没写完只做预览，绝不进执行。</p>
+              <p>90 秒无数据即断流、空返回自动退避重试、请求与工具 180 秒超时、界面看门狗强制恢复。重复调用直接去重：连续 2 轮警告、4 轮止损并给出原因。参数没写完只做预览，绝不进执行。</p>
             </div>
           </div>
           <div class="code-box reveal from-right">
@@ -321,7 +337,7 @@
         <div class="diff-head reveal from-left">
           <span class="diff-index">04</span>
           <h3>加一项能力是丢一个文件，不是等一次发版。</h3>
-          <p>34 个工具开箱即用。再往上，往本地技能目录扔一个 <code>SKILL.md</code>，下一条消息它就生效——@ 一下，上下文自己注入。</p>
+          <p>34 个工具开箱即用。再往上，往本地技能目录里扔进一个带 <code>SKILL.md</code> 的文件夹，下一条消息它就生效——@ 一下，上下文自己注入。</p>
         </div>
         <div class="diff-body">
           <div class="contrast reveal from-left">
@@ -360,32 +376,32 @@
       </div>
       <div class="scenes-grid" data-stagger-group>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">📦</div>
+          <div class="scene-icon">output</div>
           <h3>交付物不止文字</h3>
           <p>一轮任务结束在能发出去的文件上：<code>.pptx</code>、<code>.docx</code>、<code>.xlsx</code>、PDF 正文与表格提取、SVG 图表、二维码、单文件网页包。改文件时 UTF-8 / BOM / GB18030 都保住，中文和 emoji 不会被写坏。</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">🧠</div>
+          <div class="scene-icon">memory</div>
           <h3>记忆留在自己盘上</h3>
-          <p>聊天历史进本地 SQLite，本地向量知识库，Obsidian 式笔记库带 <code>[[双链]]</code>，长期记忆跨会话自动沉淀。没有一份内容被上传去「优化体验」。</p>
+          <p>聊天历史进本地 SQLite，本地向量知识库，Obsidian 式笔记库带 <code>[[wiki-link]]</code> 反向链接，长期记忆跨会话自动沉淀。没有一份内容被上传去「优化体验」。</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">📡</div>
+          <div class="scene-icon">remote</div>
           <h3>离开工位也管得到</h3>
           <p>开启局域网后，手机浏览器直接拿到一套专用移动版界面——同样的对话与工具循环，高危命令用底部抽屉确认。外加浏览器与桌面自动化，以及定时任务和事件驱动任务（文件变更 / git push / webhook）。</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">👥</div>
+          <div class="scene-icon">council</div>
           <h3>不止一个脑子</h3>
-          <p>几个模型先把方案辩一遍：提案、支持、反对、反驳、定夺，轻模型负责讨论、重模型负责拍板。DAG 流水线跑需求 → 拆解 → 编码 → 评审 → 归档，任务能拆时并行子代理同时开工。</p>
+          <p>几个模型先把方案辩一遍：提案、支持、反对、定夺，轻模型负责讨论、重模型负责拍板。DAG 流水线跑需求 → 拆解 → 编码 → 评审 → 总结，任务能拆时并行子代理同时开工。</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">🔍</div>
+          <div class="scene-icon">source</div>
           <h3>源码可读，也不用构建</h3>
           <p>原生 ES Module，零 npm、零打包，改完文件刷新即生效。整个前端就是交付物，这一页的每句话都能落到一个具体路径上。</p>
         </div>
       </div>
-      <p class="section-note reveal">想要全量清单？<a href="../guide.html#ch17" style="color: var(--gold); border-bottom: 1px solid var(--gold-soft);">使用手册第 17 章</a>收着每项能力的一句话说明、34 个内置工具、适用场景与技术栈；其余章节讲每个面板的用法、8 套工作流模板和设置详解（中英双语同页切换）。</p>
+      <p class="section-note reveal">想要全量清单？<a href="../guide.html#ch17">使用手册第 17 章</a>收着每项能力的一句话说明、34 个内置工具、适用场景与技术栈；其余章节讲每个面板的用法、8 套工作流模板和设置详解——中英双语同页切换。</p>
     </div>
   </section>
 
@@ -408,11 +424,11 @@
         </div>
         <div class="scene-card reveal" data-stagger>
           <h3>密钥就在本地文件里</h3>
-          <p>明文 JSON 躺在数据目录里，还没接系统钥匙串。能读那个目录的程序，就能读到它们。</p>
+          <p>模型密钥以明文 JSON 躺在数据目录里，没接系统钥匙串。能读那个目录的程序，就能读到它们。</p>
         </div>
         <div class="scene-card reveal" data-stagger>
           <h3>不算离线运行</h3>
-          <p>启动会加载 3 个 CDN 脚本（highlight.js、Mermaid、anime.js）。内网隔离环境得先把它们镜像到本地。</p>
+          <p>启动会从 CDN 加载 4 个资源：highlight.js 脚本与它的样式表、Mermaid、anime.js。内网隔离环境得先把它们镜像到本地。</p>
         </div>
         <div class="scene-card reveal" data-stagger>
           <h3>优先 Windows 与 macOS</h3>
@@ -465,8 +481,8 @@
       <h2>拿它跟你已经在付费的那个 Agent 比一次。</h2>
       <p>装好砚，填一个你手里就有的密钥，给两边同一道题。循环、账本和边界都摊在开源里——MIT 协议，欢迎逐行审计。</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ 下载最新版</a>
-        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">★ 去 GitHub 标星</a>
+        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases/latest" target="_blank" rel="noopener">下载安装包</a>
+        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">读源码</a>
       </div>
     </div>
   </section>
@@ -612,6 +628,44 @@
         }
       };
       setTimeout(step, 600);
+    }
+
+    // ── 复制 clone 命令 ──
+    const cloneCmd = document.getElementById("clone-cmd");
+    const copyBtn = document.getElementById("copy-clone");
+    if (cloneCmd && copyBtn) {
+      const flash = (label) => {
+        copyBtn.textContent = label;
+        copyBtn.classList.add("done");
+        setTimeout(() => { copyBtn.textContent = "复制"; copyBtn.classList.remove("done"); }, 1800);
+      };
+      const legacy = () => {
+        const range = document.createRange();
+        range.selectNodeContents(cloneCmd);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        let ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        sel.removeAllRanges();
+        if (ok) flash("已复制");
+      };
+      copyBtn.addEventListener("click", () => {
+        const text = cloneCmd.textContent.trim();
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(() => flash("已复制"), legacy);
+        } else {
+          legacy();
+        }
+      });
+    }
+
+    // ── 把下载按钮改写成这位访客真正能跑的那个安装包 ──
+    const dlBtn = document.getElementById("btn-dl");
+    if (dlBtn) {
+      const raw = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+      const os = /win/i.test(raw) ? "Windows" : /mac|iphone|ipad/i.test(raw) ? "macOS" : "";
+      if (os) dlBtn.textContent = "下载 " + os + " 版";
     }
 
     // ── Hero 网格视差 + 滚动进度 + 导航阴影（合并为一个 rAF 循环） ──

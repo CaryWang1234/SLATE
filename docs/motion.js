@@ -24,7 +24,8 @@
   var mark = q(".hero-mark");
   var actions = q(".hero-actions");
   var badges = qa(".hero-badges .badge");
-  var prehide = [mark].concat(letters, [q(".hero-sub"), q(".hero-en"), actions], badges).filter(Boolean);
+  var footnotes = qa(".hero-install, .hero-shipped");
+  var prehide = [mark].concat(letters, [q(".hero-sub"), q(".hero-en"), actions], badges, footnotes).filter(Boolean);
 
   if (prehide.length) anime.set(prehide, { opacity: 0 });
   if (letters.length) anime.set(letters, { translateY: 42, rotate: -6 });
@@ -49,6 +50,12 @@
       targets: badges, opacity: [0, 1], translateY: [14, 0], scale: [0.92, 1],
       duration: 470, delay: anime.stagger(66), easing: "easeOutBack",
     }, "-=380");
+  }
+  if (footnotes.length) {
+    tl.add({
+      targets: footnotes, opacity: [0, 1], translateY: [12, 0],
+      duration: 460, delay: anime.stagger(90),
+    }, "-=300");
   }
 
   // ── Scroll accents: the index stamps down, then the evidence paths light up ──

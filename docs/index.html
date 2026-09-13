@@ -19,15 +19,16 @@
         <button class="drawer-close" id="drawer-close" aria-label="Close">✕</button>
       </div>
       <div class="drawer-links">
-        <a href="#difference"><span class="drawer-icon">✦</span> Differences</a>
-        <a href="#capabilities"><span class="drawer-icon">🎯</span> Capabilities</a>
-        <a href="#limits"><span class="drawer-icon">🛡</span> Honest Limits</a>
-        <a href="#start"><span class="drawer-icon">🚀</span> Quick Start</a>
-        <a href="./guide.html"><span class="drawer-icon">📜</span> Guide &amp; Full Tool List</a>
+        <a href="#loop"><span class="drawer-icon">00</span> The Loop</a>
+        <a href="#difference"><span class="drawer-icon">01</span> Differences</a>
+        <a href="#capabilities"><span class="drawer-icon">02</span> Capabilities</a>
+        <a href="#limits"><span class="drawer-icon">03</span> Honest Limits</a>
+        <a href="#start"><span class="drawer-icon">04</span> Quick Start</a>
+        <a href="./guide.html"><span class="drawer-icon">05</span> Guide &amp; Full Tool List</a>
       </div>
       <div class="drawer-footer">
-        <a class="drawer-action" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ Download Installer</a>
-        <a class="drawer-action ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">★ Star on GitHub</a>
+        <a class="drawer-action" href="https://github.com/CaryWang1234/SLATE/releases/latest" target="_blank" rel="noopener">Download the installer</a>
+        <a class="drawer-action ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">Read the source</a>
         <a class="drawer-lang" href="./zh/index.html">中文 / English</a>
       </div>
     </nav>
@@ -35,17 +36,17 @@
 
   <!-- ═══ Mobile Bottom Bar ═══ -->
   <div class="mobile-bottom-bar" id="mobile-bottom-bar">
-    <a class="bottom-btn" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">
-      <span class="bottom-icon">⬇</span>
+    <a class="bottom-btn" href="https://github.com/CaryWang1234/SLATE/releases/latest" target="_blank" rel="noopener">
+      <span class="bottom-icon">↓</span>
       <span class="bottom-label">Download</span>
     </a>
     <a class="bottom-btn primary" href="#start">
-      <span class="bottom-icon">🚀</span>
+      <span class="bottom-icon">→</span>
       <span class="bottom-label">Get Started</span>
     </a>
     <a class="bottom-btn" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">
-      <span class="bottom-icon">★</span>
-      <span class="bottom-label">GitHub</span>
+      <span class="bottom-icon">&lt;/&gt;</span>
+      <span class="bottom-label">Source</span>
     </a>
   </div>
 
@@ -60,6 +61,7 @@
         <span>SLATE</span>
       </a>
       <div class="nav-links">
+        <a href="#loop">The Loop</a>
         <a href="#difference">Differences</a>
         <a href="#capabilities">Capabilities</a>
         <a href="#limits">Honest Limits</a>
@@ -91,16 +93,20 @@
         <p class="hero-en">One prompt. A visible plan. Tools that actually move.</p>
         <p class="hero-type" id="hero-type"></p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ Download Installer</a>
-          <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">Read the Loop →</a>
+          <a class="btn btn-primary" id="btn-dl" href="https://github.com/CaryWang1234/SLATE/releases/latest" target="_blank" rel="noopener">Download the installer</a>
+          <a class="btn btn-quiet" href="#loop">See the loop first →</a>
         </div>
         <div class="hero-badges">
           <span class="badge">MIT License</span>
           <span class="badge">Bring Your Own Key</span>
-          <span class="badge">No Account · No Subscription</span>
-          <span class="badge">No Telemetry</span>
-          <span class="badge">Zero npm · Zero Build</span>
+          <span class="badge">No Account · No Telemetry</span>
+          <span class="badge">sha256 beside every installer</span>
         </div>
+        <div class="hero-install">
+          <code id="clone-cmd">git clone https://github.com/CaryWang1234/SLATE.git</code>
+          <button class="copy-btn" id="copy-clone" type="button" title="Copy">Copy</button>
+        </div>
+        <p class="hero-shipped">Shipping since <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">2026-08-01</a>. Every release since has been tagged with its installer and a published sha256 — all of it from one person's desk.</p>
         <p class="section-note">
           Hosted agents sell you a stronger model behind their meter. SLATE assumes you already have good models — and owns the part that keeps breaking instead: <strong>a loop you can audit, a stop that really stops, and capabilities you can add without waiting for someone's release</strong>.
         </p>
@@ -108,80 +114,47 @@
       <div class="hero-console reveal from-right" aria-label="SLATE workspace preview">
         <div class="console-top">
           <span></span><span></span><span></span>
-          <strong>Autopilot Mission Deck</strong>
+          <strong>SLATE · Agent run</strong>
         </div>
-        <div class="console-body">
-          <div class="mission-card">
-            <div class="mission-kicker">CURRENT RUN</div>
-            <h2>Refactor project tools and verify the release path</h2>
-            <div class="mission-progress"><i style="width: 72%"></i></div>
-            <div class="mission-meta">
-              <span>Round 7/28</span>
-              <span>3 tools active</span>
-              <span>local workspace</span>
-            </div>
-          </div>
-          <div class="agent-stream">
-            <div><b>plan</b><span>scan repo, docs, tests</span></div>
-            <div><b>tool</b><span>file_edit · terminal · git_tree</span></div>
-            <div><b>check</b><span>frontend integrity passed</span></div>
-          </div>
-          <div class="console-grid">
-            <div class="signal-panel">
-              <small>Ledger</small>
-              <p>run 87e9a85 · seq 0…41</p>
-              <p>start · finish · cancel</p>
-            </div>
-            <div class="signal-panel accent">
-              <small>Whiteboard</small>
-              <p>Git · Flow · Kanban</p>
-              <p>same events, drawn as cards</p>
-            </div>
-          </div>
+        <div class="console-shot">
+          <img src="./assets/en/run.png" alt="SLATE mid-task: the prompt, the model's stated approach, two tool calls marked Executed, and the session token meter along the top" loading="eager" decoding="async">
+          <p class="console-caption">A real run on a real machine. The model is a local stub; the tool executor, the ledger behind those cards and the token meter are the shipping app.</p>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- ═══ UI Preview: CSS-simulated three columns ═══ -->
-  <section class="preview">
+  <!-- ═══ The Loop ═══ -->
+  <section class="section loop" id="loop">
     <div class="container">
-      <div class="window reveal slow" data-stagger-group>
-        <div class="window-bar">
-          <span class="window-dot"></span>
-          <span class="window-dot"></span>
-          <span class="window-dot gold"></span>
-          <span class="window-title">SLATE — Chat · Whiteboard · Capabilities</span>
-        </div>
-        <div class="window-body">
-          <div class="pane">
-            <div class="pane-label">Chat — the run, step by step</div>
-            <div class="chat-bubble me"><div class="skel w80"></div><div class="skel w60"></div></div>
-            <div class="tool-chip">⚡ Target · Round 3/50</div>
-            <div class="chat-bubble ai"><div class="skel"></div><div class="skel w80"></div></div>
-            <div class="tool-chip">🛠 file_edit · cancelled by you</div>
-            <div class="chat-bubble ai"><div class="skel w80"></div><div class="skel w40"></div></div>
-          </div>
-          <div class="pane">
-            <div class="pane-label">Whiteboard — the plan, visible</div>
-            <div class="board-card"><div class="skel w60"></div><div class="skel"></div></div>
-            <div class="board-arrow">↓</div>
-            <div class="board-card"><div class="skel w80"></div><div class="skel w60"></div></div>
-            <div class="board-arrow">↓</div>
-            <div class="board-card"><div class="skel w40"></div><div class="skel"></div></div>
-          </div>
-          <div class="pane">
-            <div class="pane-label">Capabilities — yours to wire</div>
-            <div class="harness-bar">⚡ Autopilot · Stop doesn't quit</div>
-            <div class="tool-chip">🛠 34 built-in tools</div>
-            <div class="tool-chip">🧩 @my-skill (SKILL.md)</div>
-            <div class="tool-chip">🔌 mcp__server__tool</div>
-            <div class="skel"></div>
-            <div class="skel w80"></div>
-          </div>
-        </div>
+      <div class="reveal">
+        <div class="section-tag">The Loop</div>
+        <h2 class="section-title">Every Agent Product Is Really One Loop</h2>
+        <p class="section-desc">The model is rented; the loop is what you actually run. Here is SLATE's, move by move, with the constant that enforces each one.</p>
       </div>
-      <p class="preview-caption reveal">What you watch while a task runs: the loop in chat, the plan on the board, the capabilities you wired yourself. Both panels read from one local event ledger.</p>
+
+      <ol class="loop-steps" data-stagger-group>
+        <li class="loop-step reveal" data-stagger>
+          <span class="loop-n">01</span>
+          <h3>The plan goes on the board before anything runs</h3>
+          <p>A call is not drawn as a step until it reached <code>call.ready</code> — a plan the dedupe guard rejected leaves no card, so the board cannot drift from what really happened.</p>
+        </li>
+        <li class="loop-step reveal" data-stagger>
+          <span class="loop-n">02</span>
+          <h3>Arguments are readable while still being written</h3>
+          <p>Half-streamed tool calls are previewed live but stay unexecutable until the closing marker arrives; <code>truncated &amp; !closed</code> is refused outright. 23 command patterns ask for confirmation first.</p>
+        </li>
+        <li class="loop-step reveal" data-stagger>
+          <span class="loop-n">03</span>
+          <h3>Each call becomes a row you can read afterwards</h3>
+          <p><code>UNIQUE(run_id, seq)</code> with <code>INSERT OR IGNORE</code>, so a retry replays as a no-op instead of double-counting. The client clips arguments and output to 2000 characters, the server keeps a 500-character digest.</p>
+        </li>
+        <li class="loop-step reveal" data-stagger>
+          <span class="loop-n">04</span>
+          <h3>Stop is a state, not a suggestion</h3>
+          <p>Cancelling closes the model stream and the tool stream; the backend reads the closed stream as the cancel signal and kills the child process. 90s idle watchdog, 180s request ceiling, 2 stall rounds warn and 4 exit.</p>
+        </li>
+      </ol>
     </div>
   </section>
 
@@ -197,7 +170,7 @@
         <div class="reveal" data-stagger>
           <div class="stat-num" data-count="0">0</div>
           <div class="stat-label">Telemetry Beacons</div>
-          <div class="stat-hint">The only routine outbound call is the GitHub Releases update check.</div>
+          <div class="stat-hint">Nothing phones home on its own. The one call SLATE makes for itself is the GitHub Releases update check; the CDN assets are listed under Honest Limits.</div>
         </div>
         <div class="reveal" data-stagger>
           <div class="stat-num"><span data-count="4">0</span> ways</div>
@@ -214,6 +187,47 @@
           <div class="stat-label">Built-in Tools</div>
           <div class="stat-hint">Full table lives in the guide — this page is about the differences, not the inventory.</div>
         </div>
+      </div>
+
+      <div class="spec reveal">
+        <div class="spec-head">
+          <h3>The numbers below are constants in the repository, not adjectives</h3>
+          <p>Open the file, check the value. If a future release changes one, this table should change with it.</p>
+        </div>
+        <dl class="spec-grid">
+          <div class="spec-row">
+            <dt>Parallel subagents per fan-out</dt>
+            <dd><b>5</b><code>frontend/js/services/subagent.js</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>Grinding rounds per goal</dt>
+            <dd><b>10</b><code>frontend/js/services/grind.js</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>High-risk command patterns that ask first</dt>
+            <dd><b>23</b><code>frontend/js/services/riskguard.js</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>Stream idle timeout / request ceiling</dt>
+            <dd><b>90s · 180s</b><code>frontend/js/services/api.js</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>Self-check scripts in the repo</dt>
+            <dd><b>16</b><code>scripts/check_*</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>JavaScript build steps</dt>
+            <dd><b>0</b><code>no package.json, no bundler</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>Pinned lines in requirements.txt</dt>
+            <dd><b>21</b><code>requirements.txt · includes PyInstaller</code></dd>
+          </div>
+          <div class="spec-row">
+            <dt>Source lines, backend and frontend</dt>
+            <dd><b>45,556</b><code>69 .py + 59 .js · measured, not a constant</code></dd>
+          </div>
+        </dl>
       </div>
     </div>
   </section>
@@ -277,11 +291,12 @@
           <div class="code-box reveal from-right">
             <div class="code-box-bar"><i></i><i></i><i></i></div>
             <pre><span class="c-muted">-- data/chat_history.db</span>
-<span class="c-text">runs        (run_id, …)</span>
-<span class="c-text">tool_events (run_id, seq, kind, …)</span>
-<span class="c-text">  UNIQUE(run_id, seq)  -- INSERT OR IGNORE</span>
+<span class="c-text">runs        (run_id, mode, wall_ms, …)</span>
+<span class="c-text">tool_events (run_id, seq, ts, type, tool, …)</span>
+<span class="c-text">  UNIQUE INDEX (run_id, seq)  -- INSERT OR IGNORE</span>
 <span class="c-muted">call.start → call.finish | call.cancel</span>
-<span class="c-muted">digests capped at 2000 chars per event</span></pre>
+<span class="c-muted">client clips a digest to 2000 chars;</span>
+<span class="c-muted">the server stores the first 500</span></pre>
           </div>
         </div>
         <p class="diff-evidence reveal">Evidence: <code>frontend/js/services/agent_loop.js</code> <code>frontend/js/services/agent_ledger.js</code> <code>backend/routers/events.py</code></p>
@@ -361,32 +376,32 @@
       </div>
       <div class="scenes-grid" data-stagger-group>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">📦</div>
+          <div class="scene-icon">output</div>
           <h3>Deliverables, Not Just Text</h3>
           <p>Runs end in files you can send: <code>.pptx</code>, <code>.docx</code>, <code>.xlsx</code>, extracted PDF text and tables, SVG charts, QR codes, portable single-file web bundles. Editing preserves UTF-8 / BOM / GB18030 and handles Chinese and emoji without corrupting them.</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">🧠</div>
+          <div class="scene-icon">memory</div>
           <h3>Memory That Stays on Your Disk</h3>
           <p>Chat history in local SQLite, a local vector knowledge base, an Obsidian-style vault with <code>[[wiki-link]]</code> backlinks, and long-term memory that auto-distills across sessions. None of it is uploaded to be "improved".</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">📡</div>
+          <div class="scene-icon">remote</div>
           <h3>Reach Beyond the Desk</h3>
           <p>Turn on LAN access and your phone gets a dedicated mobile UI — same chat, same tool loop, bottom-sheet confirmation for high-risk commands. Browser and desktop automation, plus scheduled and event-driven tasks (file change, git push, webhook).</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">👥</div>
+          <div class="scene-icon">council</div>
           <h3>More Than One Brain</h3>
           <p>Several models debate: propose, support, oppose, decide, with light models doing the talking and a heavy one making the call. A DAG pipeline runs requirements → decompose → code → review → summarize, and parallel subagents fan out when a task splits.</p>
         </div>
         <div class="scene-card reveal" data-stagger>
-          <div class="scene-icon">🔍</div>
+          <div class="scene-icon">source</div>
           <h3>Read the Source, Skip the Build</h3>
           <p>Vanilla ES modules, no npm, no bundler — edit a file, refresh, it works. The whole frontend is the product, and every claim on this page has a path you can open.</p>
         </div>
       </div>
-      <p class="section-note reveal">Want the full list? <a href="./guide.html#ch17" style="color: var(--gold); border-bottom: 1px solid var(--gold-soft);">Chapter 17 of the guide</a> carries every capability with a one-line description, all 34 tools, the use cases and the tech stack; the rest of the guide covers each panel, the 8 workflow templates and the settings walkthrough — in Chinese and English.</p>
+      <p class="section-note reveal">Want the full list? <a href="./guide.html#ch17">Chapter 17 of the guide</a> carries every capability with a one-line description, all 34 tools, the use cases and the tech stack; the rest of the guide covers each panel, the 8 workflow templates and the settings walkthrough — in Chinese and English.</p>
     </div>
   </section>
 
@@ -413,7 +428,7 @@
         </div>
         <div class="scene-card reveal" data-stagger>
           <h3>Not Offline</h3>
-          <p>Three CDN scripts (highlight.js, Mermaid, anime.js) load on start. Air-gapped use means mirroring them yourself first.</p>
+          <p>Four CDN assets load on start: highlight.js and its stylesheet, Mermaid, anime.js. Air-gapped use means mirroring them yourself first.</p>
         </div>
         <div class="scene-card reveal" data-stagger>
           <h3>Windows &amp; macOS First</h3>
@@ -466,8 +481,8 @@
       <h2>Run it against the agent you already pay for.</h2>
       <p>Install SLATE, point it at a key you already hold, and give both the same task. The loop, the ledger and the limits are all in the open — MIT licensed, and yours to audit.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">⬇ Download Latest</a>
-        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">★ Star on GitHub</a>
+        <a class="btn btn-primary" href="https://github.com/CaryWang1234/SLATE/releases/latest" target="_blank" rel="noopener">Download the installer</a>
+        <a class="btn btn-ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">Read the source</a>
       </div>
     </div>
   </section>
@@ -613,6 +628,44 @@
         }
       };
       setTimeout(step, 600);
+    }
+
+    // ── Copy the clone command ──
+    const cloneCmd = document.getElementById("clone-cmd");
+    const copyBtn = document.getElementById("copy-clone");
+    if (cloneCmd && copyBtn) {
+      const flash = (label) => {
+        copyBtn.textContent = label;
+        copyBtn.classList.add("done");
+        setTimeout(() => { copyBtn.textContent = "Copy"; copyBtn.classList.remove("done"); }, 1800);
+      };
+      const legacy = () => {
+        const range = document.createRange();
+        range.selectNodeContents(cloneCmd);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        let ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        sel.removeAllRanges();
+        if (ok) flash("Copied");
+      };
+      copyBtn.addEventListener("click", () => {
+        const text = cloneCmd.textContent.trim();
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(() => flash("Copied"), legacy);
+        } else {
+          legacy();
+        }
+      });
+    }
+
+    // ── Name the installer this visitor can actually run ──
+    const dlBtn = document.getElementById("btn-dl");
+    if (dlBtn) {
+      const raw = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+      const os = /win/i.test(raw) ? "Windows" : /mac|iphone|ipad/i.test(raw) ? "macOS" : "";
+      if (os) dlBtn.textContent = "Download for " + os;
     }
 
     // ── Hero grid parallax + scroll progress + nav shadow (merged into one rAF loop) ──

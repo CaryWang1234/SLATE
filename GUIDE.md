@@ -56,7 +56,7 @@ python desktop.py
 
 #### 首次配置
 
-1. 点击左下角 **设置** ⚙
+1. 点击顶栏的 **设置** 页签
 2. 在「模型」栏添加你的 API Key（支持 OpenAI / Claude / Gemini / DeepSeek / 自定义端点）
 3. 选择默认模型，即可开始对话
 
@@ -415,7 +415,7 @@ After starting from source, visit `http://127.0.0.1:8000`.
 
 #### First-Time Setup
 
-1. Click **Settings** ⚙ (bottom-left)
+1. Click the **Settings** tab in the top bar
 2. Add your API Key in the Models section (OpenAI / Claude / Gemini / DeepSeek / custom endpoints)
 3. Select a default model and start chatting
 
