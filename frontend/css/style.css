@@ -4563,11 +4563,11 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .heat {
-  --heat-cell: 9px;
+  --heat-cell: 11px;
   --heat-gap: 3px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .heat.hidden,
@@ -4579,7 +4579,8 @@ textarea::-webkit-scrollbar-thumb {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
 }
 
 .heat-title {
@@ -4593,10 +4594,58 @@ textarea::-webkit-scrollbar-thumb {
   color: var(--text-muted);
 }
 
+/* 指标条：连续天数 / 峰值日 / 活跃日均，居中排在画布上方 */
+.heat-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.heat-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 88px;
+  padding: 5px 12px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.heat-stat-num {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--gold-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.heat-stat-label {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .heat-scroll {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 2px;
+}
+
+/* 画布：比容器窄时整块居中（min-width 撑满 + 行居中），比容器宽时退化成
+   可横向滚动的 max-content——用 flex 的 align-items 居中在这里是错的，
+   内容一旦比容器宽，溢出到左侧的部分会滚不到 */
+.heat-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  margin-inline: auto;
 }
 
 .heat-row {
@@ -4640,15 +4689,24 @@ textarea::-webkit-scrollbar-thumb {
 .heat-cell {
   width: var(--heat-cell);
   height: var(--heat-cell);
-  border-radius: 2px;
+  border-radius: max(1px, calc(var(--heat-cell) * 0.14));
   background: var(--bg-alt);
   box-shadow: inset 0 0 0 1px var(--border);
   cursor: pointer;
+  transition: transform 90ms ease, box-shadow 90ms ease;
 }
 
 .heat-cell.future {
   visibility: hidden;
   cursor: default;
+}
+
+/* 53 列 × 7 行里挑一格，光靠原生 title 很难确认鼠标停在哪天，抬起来就好认了 */
+.heat-cell:not(.future):hover {
+  position: relative;
+  z-index: 2;
+  transform: scale(1.28);
+  box-shadow: 0 0 0 1.5px var(--gold-strong);
 }
 
 .heat-cell.lv1 { background: color-mix(in srgb, var(--gold) 22%, var(--bg-alt)); box-shadow: none; }
@@ -4659,7 +4717,8 @@ textarea::-webkit-scrollbar-thumb {
 .heat-foot {
   display: flex;
   align-items: center;
-  gap: 3px;
+  justify-content: center;
+  gap: 4px;
   font-size: 10px;
   color: var(--text-muted);
 }
@@ -4669,8 +4728,8 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .heat-swatch {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 2px;
   background: var(--bg-alt);
   box-shadow: inset 0 0 0 1px var(--border);
@@ -4680,6 +4739,15 @@ textarea::-webkit-scrollbar-thumb {
 .heat-swatch.lv2 { background: color-mix(in srgb, var(--gold) 45%, var(--bg-alt)); box-shadow: none; }
 .heat-swatch.lv3 { background: color-mix(in srgb, var(--gold) 68%, var(--bg-alt)); box-shadow: none; }
 .heat-swatch.lv4 { background: var(--gold-strong); box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .heat-cell {
+    transition: none;
+  }
+  .heat-cell:not(.future):hover {
+    transform: none;
+  }
+}
 
 /* 2048：与热力图同一块地盘，替换显示 */
 .t2048 {

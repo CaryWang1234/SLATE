@@ -7,18 +7,18 @@
 
 import {
   state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe,
-} from "../store.js?v=20260913-007";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260913-007";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260913-007";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260913-007";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction } from "../services/agent_common.js?v=20260913-007";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260913-007";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260913-007";
-import { toolLabel } from "../services/tool_meta.js?v=20260913-007";
-import { renderMarkdown } from "../services/markdown.js?v=20260913-007";
-import { mToast, t } from "./m-ui.js?v=20260913-007";
-import { mHandleStructured } from "./m-auth.js?v=20260913-007";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260913-007";
+} from "../store.js?v=20260913-008";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260913-008";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260913-008";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260913-008";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction } from "../services/agent_common.js?v=20260913-008";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260913-008";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260913-008";
+import { toolLabel } from "../services/tool_meta.js?v=20260913-008";
+import { renderMarkdown } from "../services/markdown.js?v=20260913-008";
+import { mToast, t } from "./m-ui.js?v=20260913-008";
+import { mHandleStructured } from "./m-auth.js?v=20260913-008";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260913-008";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;

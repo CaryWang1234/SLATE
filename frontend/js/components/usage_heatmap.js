@@ -7,14 +7,21 @@
  * 格子按 GitHub 口径排：一列一周，周日打头，53 列刚好对上后端的 371 天。
  * 53 列在窄的设置栏里铺不开，所以格子边长由 syncCellSize 量容器宽度回算成
  * --heat-cell（见 CSS 里 .heat-grid 的 repeat(53, var(--heat-cell))），而不是靠
- * 1fr 缩放——1fr 会把格子压成长条，宽度不够时照样撑出横向滚动条。
+ * 1fr 缩放——1fr 会把格子压成长条，宽度不够时照样撑出横向滚动条。上限 20px：
+ * 到顶之后画布比容器窄，靠 .heat-canvas 的 max-content + min-width:100% +
+ * margin-inline:auto 把整块居中（别改用 flex 的 align-items:center 居中——
+ * 内容一旦比容器宽，溢出到左侧的半截就再也滚不到了）。
+ *
+ * 汇总行只报日期区间：周日打头的固定 53 列里非 future 格只有 365+今天星期数天，
+ * 报「近 53 周」是虚的。下面的指标条（最长/当前连续、单日最高、活跃日均）
+ * 同样只在这段可见区间里算，future 格不能混进来截断连续天数。
  *
  * 半隐藏的 2048：双击任一格子，棋盘就地替掉热力图（见 game_2048.js）。
  * 不留可见入口，也不写提示文案——这是彩蛋，不是功能按钮。
  */
 
-import { t } from "../services/i18n.js?v=20260913-007";
-import { mount2048 } from "./game_2048.js?v=20260913-007";
+import { t } from "../services/i18n.js?v=20260913-008";
+import { mount2048 } from "./game_2048.js?v=20260913-008";
 
 const WEEKS = 53;
 const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
@@ -63,7 +70,30 @@ export function buildGrid(daily, today = new Date()) {
       cells.push({ date, count, week: w, dow: d, future });
     }
   }
-  return { cells, weeks: WEEKS, total, max, activeDays, startDate: fmtDate(firstSunday), endDate: fmtDate(end) };
+  // 指标只认可见区间：future 格恒为 0，混进来会把末尾的连续天数直接截断
+  const visible = cells.filter(c => !c.future);
+  let longestStreak = 0, run = 0;
+  for (const c of visible) {
+    run = c.count > 0 ? run + 1 : 0;
+    if (run > longestStreak) longestStreak = run;
+  }
+  let currentStreak = 0;
+  for (let i = visible.length - 1; i >= 0; i--) {
+    if (visible[i].count > 0) currentStreak += 1;
+    // 今天往往还没过完：它没消息不该把还在延续的连续记录断掉，跳过继续往前数
+    else if (i !== visible.length - 1) break;
+  }
+  let bestDay = null;
+  for (const c of visible) {
+    if (c.count > 0 && (!bestDay || c.count > bestDay.count)) bestDay = { date: c.date, count: c.count };
+  }
+  return {
+    cells, weeks: WEEKS, total, max, activeDays,
+    longestStreak, currentStreak, bestDay,
+    visibleDays: visible.length,
+    avgPerActiveDay: activeDays ? Math.round(total / activeDays) : 0,
+    startDate: fmtDate(firstSunday), endDate: fmtDate(end),
+  };
 }
 
 /** 换月的第一列出月份标签；整列都在未来的列不标 */
@@ -97,6 +127,29 @@ function cellTitle(cell) {
     : t("{date} · 未使用", { date: cell.date });
 }
 
+/** 指标条：口头报一句「最近挺稳」不如把连续天数和峰值日摆出来 */
+function renderStats(grid) {
+  const row = div("heat-stats");
+  const chip = (value, labelKey, title) => {
+    const box = div("heat-stat");
+    box.append(div("heat-stat-num", String(value)));
+    box.append(div("heat-stat-label", t(labelKey)));
+    if (title) box.title = title;
+    return box;
+  };
+  row.append(chip(grid.longestStreak, "最长连续（天）", t("窗口内连续每天都发消息的最长天数")));
+  row.append(chip(grid.currentStreak, "当前连续（天）", t("到今天为止连续有消息的天数；今天还没发则从昨天往前数")));
+  row.append(chip(
+    grid.bestDay ? grid.bestDay.count : 0,
+    "单日最高（条）",
+    grid.bestDay
+      ? t("最活跃的一天：{date}，发送 {n} 条消息", { date: grid.bestDay.date, n: grid.bestDay.count })
+      : t("窗口内单日发送消息最多的一天")
+  ));
+  row.append(chip(grid.avgPerActiveDay, "活跃日均（条）", t("总消息数 ÷ 有消息的天数")));
+  return row;
+}
+
 /** 画热力图；game 视图与热力图视图共用同一块地盘，切换靠 data-view */
 export function renderActivityHeatmap(host, daily) {
   const grid = buildGrid(daily);
@@ -115,7 +168,12 @@ export function renderActivityHeatmap(host, daily) {
   })));
   heat.append(head);
 
+  heat.append(renderStats(grid));
+
   const scroll = div("heat-scroll");
+  // 画布比容器窄时整块居中（min-width:100% 撑满 + 行居中），比容器宽时退化成
+  // max-content 的横向滚动区，见 CSS 里 .heat-canvas
+  const canvas = div("heat-canvas");
 
   const monthsRow = div("heat-row");
   monthsRow.append(div("heat-daypad"));
@@ -126,7 +184,7 @@ export function renderActivityHeatmap(host, daily) {
     months.append(cell);
   }
   monthsRow.append(months);
-  scroll.append(monthsRow);
+  canvas.append(monthsRow);
 
   const bodyRow = div("heat-row");
   const days = div("heat-days");
@@ -144,7 +202,8 @@ export function renderActivityHeatmap(host, daily) {
   }
   gridEl.addEventListener("dblclick", () => openGame(shell));
   bodyRow.append(gridEl);
-  scroll.append(bodyRow);
+  canvas.append(bodyRow);
+  scroll.append(canvas);
   heat.append(scroll);
 
   const foot = div("heat-foot");
@@ -168,16 +227,30 @@ export function renderActivityHeatmap(host, daily) {
 const LABEL_W = 22;
 const ROW_GAP = 6;
 const CELL_GAP = 3;
+const WIDE_GAP = 4;
+const MIN_CELL = 5;
+const MAX_CELL = 20;
 
 let resizeObs = null;
 
-/** 53 列固定尺寸放不下就白瞎出滚动条：按可用宽度回算格子边长 */
+/** 格子大了缝还留 3px 会显得糊成一坨，跨过 15px 就把缝放到 4px */
+function gapFor(cell) {
+  return cell >= 15 ? WIDE_GAP : CELL_GAP;
+}
+
+/** 53 列固定尺寸放不下就白瞎出滚动条：按可用宽度回算出最大的格子边长 */
 function syncCellSize(heat, scroll, days) {
   const apply = () => {
     const avail = scroll.clientWidth - (days.clientWidth || LABEL_W) - ROW_GAP;
     if (avail <= 0) return;
-    const cell = Math.max(5, Math.min(13, Math.floor((avail - CELL_GAP * (WEEKS - 1)) / WEEKS)));
+    // 缝随边长变，所以从大到小试：第一个装得下的就是最大可行解
+    let cell = MIN_CELL, gap = CELL_GAP;
+    for (let c = MAX_CELL; c >= MIN_CELL; c--) {
+      const g = gapFor(c);
+      if (WEEKS * c + g * (WEEKS - 1) <= avail) { cell = c; gap = g; break; }
+    }
     heat.style.setProperty("--heat-cell", `${cell}px`);
+    heat.style.setProperty("--heat-gap", `${gap}px`);
   };
   apply();
   if (typeof ResizeObserver !== "function") return;

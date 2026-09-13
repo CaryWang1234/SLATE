@@ -17,11 +17,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   emptyBoard, moveLine, move, spawn, isOver, maxTile,
-} from "../frontend/js/components/game_2048.js?v=20260913-007";
+} from "../frontend/js/components/game_2048.js?v=20260913-008";
 import {
   WEEKS, buildGrid, monthLabels, levelFor,
-} from "../frontend/js/components/usage_heatmap.js?v=20260913-007";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260913-007";
+} from "../frontend/js/components/usage_heatmap.js?v=20260913-008";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260913-008";
 
 const BACKEND_WINDOW_DAYS = 371;  // backend/routers/chat.py: ACTIVITY_WINDOW_DAYS
 
@@ -188,6 +188,47 @@ for (let n = 0; n <= 40; n++) {
   prevLevel = lv;
 }
 
+// ── 6b. 指标条：连续天数 / 峰值日 / 活跃日均，只在可见区间里算 ──
+// future 格恒为 0，一旦把它们算进连续统计，末尾的连续记录总会被自己那列截断。
+{
+  const vis = grid.cells.filter(c => !c.future);
+  assert.ok(vis.length < grid.cells.length, "末列必须有 future 格，否则下面几条测不出东西");
+  const day = n => vis[vis.length - 1 - n].date;   // 从今天往前数第 n 天（day(0) 是今天）
+
+  // 今天 + 前两天连成一条 3 天链
+  const g3 = buildGrid([
+    { date: day(0), count: 4 },
+    { date: day(1), count: 2 },
+    { date: day(2), count: 6 },
+  ], today);
+  assert.equal(g3.longestStreak, 3, "连着的三天要算成 3 天");
+  assert.equal(g3.currentStreak, 3, "今天有消息 → 当前连续算到今天");
+  assert.deepEqual(g3.bestDay, { date: day(2), count: 6 }, "峰值日取单日最大，并列时留最早的");
+  assert.equal(g3.avgPerActiveDay, 4, "(4+2+6)/3 取整");
+  assert.equal(g3.visibleDays, vis.length, "可见天数就是非 future 格数");
+
+  // 今天还没过完：今天空着不该把还在延续的连续记录断掉
+  const gGrace = buildGrid([{ date: day(1), count: 1 }, { date: day(2), count: 1 }], today);
+  assert.equal(gGrace.currentStreak, 2, "今天空、前两天有 → 从昨天往前数仍是 2");
+  assert.equal(gGrace.longestStreak, 2);
+
+  const gGap = buildGrid([{ date: day(1), count: 1 }, { date: day(3), count: 9 }], today);
+  assert.equal(gGap.currentStreak, 1, "昨天有、前天没有 → 当前连续 1");
+  assert.equal(gGap.longestStreak, 1, "中间断一天就不算连续");
+  assert.equal(gGap.bestDay.count, 9);
+
+  const gStale = buildGrid([{ date: day(10), count: 5 }], today);
+  assert.equal(gStale.currentStreak, 0, "十天前才发过 → 当前连续归零");
+  assert.equal(gStale.longestStreak, 1, "孤立的一天仍是最长连续 1 天");
+
+  const gEmpty = buildGrid([], today);
+  assert.equal(gEmpty.longestStreak, 0);
+  assert.equal(gEmpty.currentStreak, 0);
+  assert.equal(gEmpty.bestDay, null, "一条都没有时峰值日必须是 null，界面才好回落到 0");
+  assert.equal(gEmpty.avgPerActiveDay, 0, "活跃天为 0 时不能算出 NaN");
+  assert.ok(Number.isFinite(gEmpty.avgPerActiveDay), "活跃天为 0 时不能算出 Infinity");
+}
+
 // ── 7. 月份标签：按列递增、不在首列、一个月只标一次 ──
 {
   const labels = monthLabels(grid);
@@ -204,6 +245,9 @@ for (let n = 0; n <= 40; n++) {
 for (const key of [
   "活跃度", "{start} 至 {end}：发送 {n} 条消息 · {d} 天活跃", "{date} · 发送 {n} 条消息", "{date} · 未使用",
   "周一", "周三", "周五", "少", "多",
+  "最长连续（天）", "当前连续（天）", "单日最高（条）", "活跃日均（条）",
+  "窗口内连续每天都发消息的最长天数", "到今天为止连续有消息的天数；今天还没发则从昨天往前数",
+  "窗口内单日发送消息最多的一天", "最活跃的一天：{date}，发送 {n} 条消息", "总消息数 ÷ 有消息的天数",
   "分数", "最高分", "新游戏", "返回热力图",
   "方向键或 WASD 移动方块，合出 2048", "合出 2048 了！可以接着往上刷", "无步可走，点「新游戏」再来一局",
 ]) {
@@ -215,11 +259,31 @@ for (const m of ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月",
 
 // ── 9. 结构与文案：Node 侧没 DOM，直接读源码钉住两条走查里真炸过的 ──
 {
-  const src = readFileSync(new URL("../frontend/js/components/usage_heatmap.js?v=20260913-007", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../frontend/js/components/usage_heatmap.js?v=20260913-008", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../frontend/css/style.css", import.meta.url), "utf8");
   assert.match(src, /shell\.append\(gameHost\)/, "棋盘宿主得并进 .heat-shell");
   assert.doesNotMatch(src, /heat\.append\(gameHost\)/, "棋盘宿主挂进 .heat 会被 .heat.hidden 一起藏掉，双击永远打不开");
   assert.match(src, /t\("\{start\} 至 \{end\}：发送/, "汇总行得报日期区间");
   assert.doesNotMatch(src, /近 \{weeks\} 周/, "周数是虚的：周日打头的画布够不满 53 整周");
+
+  // 居中：行要包进 .heat-canvas，且必须走 max-content + min-width 那条路
+  assert.match(src, /div\("heat-canvas"\)/, "两行日历得包进 .heat-canvas 才能整块居中");
+  assert.match(src, /canvas\.append\(monthsRow\)/, "月份行要并进画布，否则月份和格子会各居各的");
+  assert.match(src, /canvas\.append\(bodyRow\)/, "格子行要并进画布");
+  assert.match(css, /\.heat-canvas\s*\{[^}]*min-width:\s*100%/, ".heat-canvas 需要 min-width:100% 才能在画布窄于容器时居中");
+  assert.match(css, /\.heat-canvas\s*\{[^}]*margin-inline:\s*auto/, ".heat-canvas 需要 margin-inline:auto 居中");
+  assert.doesNotMatch(css, /\.heat-canvas\s*\{[^}]*overflow/, ".heat-canvas 上加 overflow 会把居中算成右侧贴边");
+
+  // 放大：格子边长上限从 13px 提到 20px，缝随边长一起长
+  assert.doesNotMatch(src, /Math\.min\(13,/, "格子边长上限不能还是 13px");
+  assert.match(src, /const MAX_CELL = 20;/, "放大的上限就写在这里");
+  assert.match(src, /const MIN_CELL = 5;/, "上限抬了但下限别动，窄屏仍要能挤进 53 列");
+  assert.match(src, /gapFor\(cell\)/, "格子放大后缝要跟着宽一点");
+  assert.match(src, /--heat-gap/, "缝由 JS 回算，得写回 CSS 变量");
+
+  // 指标条：渲染入口与四张卡都在
+  assert.match(src, /heat-stats/, "指标条要渲染出来");
+  assert.match(src, /heat-stat-num/);
 }
 
 console.log("热力图排布与 2048 合并契约：通过");
