@@ -6,20 +6,20 @@
  */
 
 import {
-  state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens,
-} from "../store.js?v=20260913-009";
-import { fmtTokens } from "../services/usage.js?v=20260913-009";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260913-009";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260913-009";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260913-009";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260913-009";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260913-009";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260913-009";
-import { toolLabel } from "../services/tool_meta.js?v=20260913-009";
-import { renderMarkdown } from "../services/markdown.js?v=20260913-009";
-import { mToast, t } from "./m-ui.js?v=20260913-009";
-import { mHandleStructured } from "./m-auth.js?v=20260913-009";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260913-009";
+  state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf,
+} from "../store.js?v=20260919-001";
+import { fmtTokens } from "../services/usage.js?v=20260919-001";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260919-001";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260919-001";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260919-001";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260919-001";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260919-001";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260919-001";
+import { toolLabel } from "../services/tool_meta.js?v=20260919-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260919-001";
+import { mToast, t } from "./m-ui.js?v=20260919-001";
+import { mHandleStructured } from "./m-auth.js?v=20260919-001";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260919-001";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -273,6 +273,8 @@ async function mStreamAssistant({ wrap, modelId, apiKey, baseUrl, params, signal
       base_url: baseUrl,
       temperature: params?.temperature ?? 0.7,
       max_tokens: params?.max_tokens ?? getOutputMaxTokens(),
+      // 与桌面同源：档位存在 store 里（desktop_state.json），手机遥控时不该回落到 auto
+      reasoning_effort: state.reasoningEffort || "auto",
       stream: true,
       signal,
       meta,
@@ -474,7 +476,8 @@ async function mRunToolLoop(wrap, modelId, apiKey, baseUrl, params, signal) {
 async function mCheckCompress(modelId, apiKey, baseUrl) {
   try {
     const msgs = state.messages.map(m => ({ role: m.role, content: m.content }));
-    const res = await post("/chat/compress", { messages: msgs, keep_recent_rounds: 2, max_tokens: 64000 });
+    // 与桌面同一个预算口径：手机和桌面看的是同一个"什么时候压缩"
+    const res = await post("/chat/compress", { messages: msgs, keep_recent_rounds: 2, max_tokens: contextBudgetOf(modelId) });
     if (res.code !== 0 || !res.data?.need_compress) return;
     const { compress_prompt, keep_messages, compress_count } = res.data;
     let summary = "";

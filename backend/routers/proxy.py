@@ -148,22 +148,59 @@ def _get_stream_client(base_url: str) -> httpx.AsyncClient:
 
 # ── 推理强度：UI 档位 → 厂商字段（2026-09 按各家官方文档核对） ────────
 # UI 只有五档：auto（不下发任何字段）/ off / low / medium / high。
+# 能力名描述的是「上游认哪种字段与取值形状」，不是厂商名：同一家厂商的不同代模型
+# 会落到不同能力上（GLM-5.2 认 reasoning_effort，GLM-5.3 只认 max|high|low）。
 # 能力取值与前端 chat.js 的 REASONING_LEVELS_BY_CAP 必须一致，
 # 由 scripts/check_reasoning_effort.mjs 锁定，改一处就要过守卫。
 REASONING_MAP: dict[str, dict[str, str]] = {
     # OpenAI：Chat Completions → reasoning_effort；Responses → reasoning.effort（同一批取值）
     "openai": {"off": "minimal", "low": "low", "medium": "medium", "high": "high"},
+    # 认 OpenAI 词表且支持关闭的兼容端点：智谱 GLM-5.2、火山豆包、Ollama、llama.cpp
+    # 这些家的 off 档写法是 none，不是 OpenAI 的 minimal
+    "effort": {"off": "none", "low": "low", "medium": "medium", "high": "high"},
+    # 强制思考、没有"关"这一档的家：Kimi K2.7-code/K3（low|high|max）、GLM-5.3*（max|high|low）
+    # 中档在这两家的词表里不存在，收敛到各自的高档
+    "effort_forced": {"low": "low", "medium": "high", "high": "max"},
     # Anthropic：新版用 output_config.effort，budget_tokens 已废弃，且没有"关"这一档
     "anthropic": {"low": "low", "medium": "medium", "high": "high"},
     # Google：generationConfig.thinking_level
     "gemini": {"off": "minimal", "low": "low", "medium": "medium", "high": "high"},
     # 只分开关的 OpenAI 兼容端点（DeepSeek 官方 thinking.type）：低/中/高统一收敛为"开"
     "binary": {"off": "disabled", "low": "enabled", "medium": "enabled", "high": "enabled"},
+    # MiniMax 的开关枚举是 disabled|adaptive，没有 enabled；M2.x 关不掉但不会报错
+    "adaptive": {"off": "disabled", "low": "adaptive", "medium": "adaptive", "high": "adaptive"},
+    # 通义/文心系：布尔开关 enable_thinking，没有强弱档，低/中/高收敛为"开"
+    "toggle": {"off": "off", "low": "on", "medium": "on", "high": "on"},
     # 未核实或自定义端点：一律不下发，宁可不生效也不能让上游 400
     "none": {},
 }
 
+# 这三个能力共用 reasoning_effort / reasoning.effort 词表，只是取值域不同
+_EFFORT_CAPS = ("openai", "effort", "effort_forced")
+# thinking 对象下只有 type 一个开关的家
+_THINKING_CAPS = ("binary", "adaptive")
+# enable_thinking=true 时 DashScope 对 max_tokens 的硬上限
+TOGGLE_MAX_TOKENS = 32768
+
 REASONING_LEVELS = ("auto", "off", "low", "medium", "high")
+
+# 自定义模型（注册表没登记 id）按端点域名回落能力。逐条与前端
+# chat.js 的 REASONING_CAP_BY_HOST 同源，守卫按字符串集合比对两侧，改一边就红。
+# 只收录官方文档写明该字段的域名；猜不准的宁可留空（= none）。
+REASONING_HOST_CAPS: tuple[tuple[str, str], ...] = (
+    ("https://api.openai.com", "openai"),
+    ("https://api.deepseek.com", "binary"),
+    ("https://api.moonshot.cn", "effort_forced"),
+    ("https://api.kimi.com", "effort_forced"),
+    ("https://dashscope.aliyuncs.com", "toggle"),
+    ("https://open.bigmodel.cn", "effort"),
+    ("https://ark.cn-beijing.volces.com", "effort"),
+    ("https://api.minimax.cn", "adaptive"),
+    ("https://api.minimax.io", "adaptive"),
+    ("https://qianfan.baidubce.com", "toggle"),
+    ("http://localhost:11434", "effort"),
+    ("http://127.0.0.1:11434", "effort"),
+)
 
 
 def _reasoning_level(body: dict[str, Any]) -> str:
@@ -181,13 +218,11 @@ def _reasoning_capability(model_cfg: dict[str, Any], provider: str) -> str:
         return "anthropic"
     if provider == "google":
         return "gemini"
-    if provider == "openai":
-        # 未登记 id 但打到官方端点的自定义模型：按官方字段下发
-        base_url = str(model_cfg.get("base_url") or "").strip().lower()
-        if base_url.startswith("https://api.openai.com"):
-            return "openai"
-        if base_url.startswith("https://api.deepseek.com"):
-            return "binary"
+    # 未登记 id 的自定义模型：只有端点域名能说明它认什么字段
+    base_url = str(model_cfg.get("base_url") or "").strip().lower()
+    for prefix, host_cap in REASONING_HOST_CAPS:
+        if base_url.startswith(prefix):
+            return host_cap
     return "none"
 
 
@@ -201,7 +236,6 @@ def _reasoning_value(cap: str, level: str) -> str | None:
 # 字段名跟着协议走，取值跟着能力走：两者不匹配时宁可不发。
 # 否则一个标了 anthropic 的模型走 OpenAI 兼容通道时，会把 anthropic 的取值塞进
 # reasoning_effort，上游要么 400 要么静默解释成另一回事。
-_CHAT_CAPS = ("openai", "binary")
 
 
 def _reasoning_payload(protocol: str, cap: str, level: str) -> dict[str, Any]:
@@ -209,10 +243,17 @@ def _reasoning_payload(protocol: str, cap: str, level: str) -> dict[str, Any]:
     value = _reasoning_value(cap, level)
     if not value:
         return {}
-    if protocol == "chat" and cap in _CHAT_CAPS:
-        # binary 能力（DeepSeek 官方）只有 thinking.type 开关，没有 reasoning_effort
-        return {"thinking": {"type": value}} if cap == "binary" else {"reasoning_effort": value}
-    if protocol == "responses" and cap == "openai":
+    if protocol == "chat":
+        if cap in _EFFORT_CAPS:
+            return {"reasoning_effort": value}
+        if cap in _THINKING_CAPS:
+            # 这一类只有 thinking.type 开关，没有 reasoning_effort
+            return {"thinking": {"type": value}}
+        if cap == "toggle":
+            return {"enable_thinking": value == "on"}
+        return {}
+    if protocol == "responses" and cap in _EFFORT_CAPS:
+        # Responses API 用嵌套 reasoning.effort，取值域与 Chat 侧同一批词表
         return {"reasoning": {"effort": value}}
     if protocol == "anthropic" and cap == "anthropic":
         # budget_tokens 已废弃，新版只认 output_config.effort
@@ -220,6 +261,51 @@ def _reasoning_payload(protocol: str, cap: str, level: str) -> dict[str, Any]:
     if protocol == "google" and cap == "gemini":
         return {"thinking_level": value}
     return {}
+
+
+# 我们可能往请求体里加的推理强度字段。上游若明确抱怨其中某一个，就按它说的去掉重发。
+_REASONING_FIELDS = ("reasoning_effort", "thinking", "thinking_level", "reasoning", "output_config", "enable_thinking")
+
+
+def _without_reasoning(payload: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """剥掉本次注入的推理强度字段（含 generationConfig 内层），返回 (新体, 被剥掉的字段)。"""
+    dropped = [k for k in _REASONING_FIELDS if k in payload]
+    clean = {k: v for k, v in payload.items() if k not in _REASONING_FIELDS}
+    gen = clean.get("generationConfig")
+    if isinstance(gen, dict) and any(k in gen for k in _REASONING_FIELDS):
+        dropped.append("generationConfig")
+        clean["generationConfig"] = {k: v for k, v in gen.items() if k not in _REASONING_FIELDS}
+    return clean, dropped
+
+
+def _rejects_reasoning_field(payload: dict[str, Any], error_text: str) -> bool:
+    """只有"上游点名抱怨了我们注入的那个字段"才值得重发一次。
+
+    裸 400、鉴权失败、限流都不该被当成字段问题——那样会把真实错误掩盖成一次无谓重发。
+    """
+    low = (error_text or "").lower()
+    if not low:
+        return False
+    return any(key in low for key in payload if key in _REASONING_FIELDS)
+
+
+async def _post_json(client: httpx.AsyncClient, url: str, headers: dict[str, str],
+                     payload: dict[str, Any], *, trace_id: str, api_name: str):
+    """非流式 POST，带同一套字段降级：与 _stream_openai 的理由一致——
+
+    思考强度是锦上添花，赌错上游字段不该让那条模型整条链路报错，
+    所以只在上游点名抱怨我们注入的那个字段时剥掉重发一次。
+    """
+    resp = await client.post(url, json=payload, headers=headers)
+    data, error = await _json_or_error(resp, trace_id=trace_id, api_name=api_name)
+    if not error or not _rejects_reasoning_field(payload, str(error.get("message") or "")):
+        return data, error
+    clean, dropped = _without_reasoning(payload)
+    if not dropped:
+        return data, error
+    logger.warning(f"[{trace_id}] {api_name} 上游拒绝推理强度字段 {dropped}，去掉该字段重发一次")
+    resp = await client.post(url, json=clean, headers=headers)
+    return await _json_or_error(resp, trace_id=trace_id, api_name=api_name)
 
 
 # ── 模型注册表（2026-09 时效性校验） ──────────────────────────
@@ -254,36 +340,41 @@ MODEL_REGISTRY: dict[str, list[dict[str, Any]]] = {
         {"id": "deepseek-flash", "name": "DeepSeek-V4.1-Flash", "provider": "openai",
          "base_url": "https://api.deepseek.com/v1", "context_window": 1048576, "reasoning": "binary"},
         {"id": "kimi-k3", "name": "Kimi K3", "provider": "openai",
-         "base_url": "https://api.moonshot.cn/v1", "context_window": 1048576, "reasoning": "none"},
+         "base_url": "https://api.moonshot.cn/v1", "context_window": 1048576, "reasoning": "effort_forced"},
+        # K2.7 Code 强制思考：thinking.type 只认 enabled，传 disabled 直接报错 → 没有可下发的档位
         {"id": "kimi-k2.7-code", "name": "Kimi K2.7 Code", "provider": "openai",
          "base_url": "https://api.moonshot.cn/v1", "context_window": 262144, "reasoning": "none"},
         {"id": "qwen3.8-max", "name": "Qwen3.8-Max", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "none"},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "toggle"},
         {"id": "qwen3.8-flash", "name": "Qwen3.8-Flash", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "none"},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "toggle"},
         {"id": "qwen3.7-max", "name": "Qwen3.7-Max", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "none"},
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "toggle"},
         {"id": "qwen3.7-plus", "name": "Qwen3.7-Plus", "provider": "openai",
-         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "none"},
-        # 以下端点的推理参数未按官方文档核实，一律标 none（不下发字段）；核实后再改
+         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "toggle"},
+        # GLM-5.2 起支持 reasoning_effort（max|xhigh|high|medium|low|minimal|none）；
+        # 5.3 系列强制思考且词表收窄为 max|high|low，没有 off 档
         {"id": "glm-5.2", "name": "GLM-5.2", "provider": "openai",
-         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576, "reasoning": "none"},
+         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576, "reasoning": "effort"},
         {"id": "glm-5.3", "name": "GLM-5.3", "provider": "openai",
-         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576, "reasoning": "none"},
+         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576, "reasoning": "effort_forced"},
         {"id": "glm-5.3-flash", "name": "GLM-5.3-Flash", "provider": "openai",
-         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576, "reasoning": "none"},
+         "base_url": "https://open.bigmodel.cn/api/paas/v4", "context_window": 1048576, "reasoning": "effort_forced"},
         {"id": "doubao-seed-2-1-pro-260628", "name": "Doubao-Seed-2.1-Pro-260628", "provider": "openai",
-         "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144, "reasoning": "none"},
+         "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144, "reasoning": "effort"},
         {"id": "doubao-seed-2-1-turbo-260628", "name": "Doubao-Seed-2.1-Turbo-260628", "provider": "openai",
-         "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144, "reasoning": "none"},
+         "base_url": "https://ark.cn-beijing.volces.com/api/v3", "context_window": 262144, "reasoning": "effort"},
+        # MiniMax 的枚举是 disabled|adaptive（没有 enabled），且只有开关没有强弱档
         {"id": "MiniMax-M3", "name": "MiniMax M3", "provider": "openai",
-         "base_url": "https://api.minimax.cn/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "none"},
+         "base_url": "https://api.minimax.cn/v1", "context_window": 1000000, "supports_responses": True, "reasoning": "adaptive"},
         {"id": "ernie-5.1", "name": "ERNIE 5.1", "provider": "openai",
-         "base_url": "https://qianfan.baidubce.com/v2", "context_window": 131072, "reasoning": "none"},
+         "base_url": "https://qianfan.baidubce.com/v2", "context_window": 131072, "reasoning": "toggle"},
     ],
     "local": [
+        # Ollama 的 OpenAI 兼容层官方写明支持 reasoning_effort（none|low|medium|high|max）；
+        # 指向 LM Studio 时它按未知字段忽略，最坏是档位不生效而不是报错
         {"id": "local", "name": "本地模型 (Ollama/LM Studio)", "provider": "openai",
-         "base_url": "http://localhost:11434/v1", "context_window": 8192, "reasoning": "none"},
+         "base_url": "http://localhost:11434/v1", "context_window": 8192, "reasoning": "effort"},
     ],
 }
 
@@ -330,6 +421,11 @@ def _build_openai_request(body: dict[str, Any], cap: str = "none", level: str = 
         payload["tool_choice"] = body["tool_choice"]
     # 推理强度：字段名与取值都由协议/能力共同决定，不匹配即不下发
     payload.update(_reasoning_payload("chat", cap, level))
+    # DashScope 开思考后 max_tokens 上限收紧到 32768，越界是整条 400 而不是截断输出，
+    # 所以「不限量输出」在这类模型上要给一个能用的上限，而不是把请求打死。
+    if cap == "toggle" and _reasoning_value(cap, level) == "on":
+        if isinstance(payload.get("max_tokens"), int) and payload["max_tokens"] > TOGGLE_MAX_TOKENS:
+            payload["max_tokens"] = TOGGLE_MAX_TOKENS
     return payload
 
 
@@ -475,15 +571,42 @@ def _build_anthropic_request(body: dict[str, Any], cap: str = "none", level: str
 
 
 async def _stream_openai(url: str, headers: dict[str, str], payload: dict[str, Any], trace_id: str = ""):
-    """流式转发 OpenAI 兼容 API（共享客户端连接池）。
-    标准化 reasoning 字段：delta.reasoning_content / delta.reasoning → delta.reasoning
+    """流式转发；上游点名拒绝我们注入的推理强度字段时，去掉那个字段重发一次。
+
+    没有这层降级，「给更多模型开思考强度」就等于赌每家端点都认这个字段——
+    赌错的代价是那条模型整条链路不可用，而不是档位不生效。
     """
     client = _get_stream_client(url.rsplit("/", 2)[0])  # 提取 base_url
+    sink: dict[str, str] = {"text": ""}
+    async for chunk in _stream_openai_attempt(client, url, headers, payload, trace_id, sink, True):
+        yield chunk
+    if not sink["text"]:
+        return
+    clean, dropped = _without_reasoning(payload)
+    if not dropped:
+        yield sink["text"]
+        yield "data: [DONE]\n\n"
+        return
+    logger.warning(f"[{trace_id}] 上游拒绝推理强度字段 {dropped}，去掉该字段重发一次")
+    async for chunk in _stream_openai_attempt(client, url, headers, clean, trace_id, {"text": ""}, False):
+        yield chunk
+
+
+async def _stream_openai_attempt(client, url: str, headers: dict[str, str], payload: dict[str, Any],
+                                 trace_id: str, sink: dict[str, str], can_retry: bool):
+    """OpenAI 兼容流式转发的一次尝试（共享客户端连接池）。
+    标准化 reasoning 字段：delta.reasoning_content / delta.reasoning → delta.reasoning
+    上游 400 且抱怨的是我们加的推理强度字段时，把错误交给 sink，由上层去掉字段重发。
+    """
     yielded = False
     try:
         async with client.stream("POST", url, json=payload, headers=headers) as resp:
             if resp.status_code >= 400:
-                yield await _sse_error_from_response(resp, trace_id=trace_id, api_name="Chat Completions")
+                err = await _sse_error_from_response(resp, trace_id=trace_id, api_name="Chat Completions")
+                if can_retry and _rejects_reasoning_field(payload, err):
+                    sink["text"] = err
+                    return
+                yield err
                 yield "data: [DONE]\n\n"
                 return
             async for line in resp.aiter_lines():
@@ -844,8 +967,7 @@ async def proxy_chat(request: Request) -> Any:
 
         client = _get_client(base_url)
         try:
-            resp = await client.post(url, json=payload, headers=headers)
-            data, error = await _json_or_error(resp, trace_id=trace_id, api_name="Anthropic")
+            data, error = await _post_json(client, url, headers, payload, trace_id=trace_id, api_name="Anthropic")
             if error:
                 return error
         except httpx.HTTPError as exc:
@@ -895,8 +1017,7 @@ async def proxy_chat(request: Request) -> Any:
         url = f"{base_url}/models/{model_id}:generateContent?key={api_key}"
         client = _get_client(base_url)
         try:
-            resp = await client.post(url, json=payload, headers=headers)
-            data, error = await _json_or_error(resp, trace_id=trace_id, api_name="Google")
+            data, error = await _post_json(client, url, headers, payload, trace_id=trace_id, api_name="Google")
             if error:
                 return error
         except httpx.HTTPError as exc:
@@ -951,8 +1072,7 @@ async def proxy_chat(request: Request) -> Any:
 
         client = _get_client(base_url)
         try:
-            resp = await client.post(url, json=payload, headers=headers)
-            data, error = await _json_or_error(resp, trace_id=trace_id, api_name="Responses API")
+            data, error = await _post_json(client, url, headers, payload, trace_id=trace_id, api_name="Responses API")
             if error:
                 return error
         except httpx.HTTPError as exc:
@@ -985,8 +1105,7 @@ async def proxy_chat(request: Request) -> Any:
 
     client = _get_client(base_url)
     try:
-        resp = await client.post(url, json=payload, headers=headers)
-        data, error = await _json_or_error(resp, trace_id=trace_id, api_name="Chat Completions")
+        data, error = await _post_json(client, url, headers, payload, trace_id=trace_id, api_name="Chat Completions")
         if error:
             return error
     except httpx.HTTPError as exc:

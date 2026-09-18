@@ -3,7 +3,7 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260913-009";
+import { makeId } from "./services/utils.js?v=20260919-001";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -25,6 +25,10 @@ const state = {
 
   // 自定义模型（用户手动添加的）
   customModels: [],
+
+  // 每模型的上下文预算（modelId → token 数；缺省或 0 = 自动）
+  // 预算决定两件事：上下文条算到哪儿算满、自动压缩在第几轮触发。两者必须同一个数。
+  modelContextCaps: {},
 
   // 用量统计（当前对话）
   usage: {
@@ -178,6 +182,7 @@ function buildPersistentData() {
     conversationUsage: state.conversationUsage,
     conversationTodos: state.conversationTodos,
     maxTokens: state.maxTokens,
+    modelContextCaps: state.modelContextCaps,
     autoReview: state.autoReview,
     outputSettings: state.outputSettings,
     fileOutput: state.fileOutput,
@@ -189,7 +194,7 @@ function buildPersistentData() {
     onboardingSeen: state.onboardingSeen === true,
     permissionMode: normalizePermissionMode(state.permissionMode),
     chatMode: normalizeChatMode(state.chatMode),
-    reasoningEffort: normalizeReasoningEffort(state.reasoningEffort),
+    reasoningEffort: state.reasoningEffort,
     webSearch: normalizeWebSearch(state.webSearch),
     imageGen: normalizeGenConfig(state.imageGen),
     videoGen: normalizeGenConfig(state.videoGen),
@@ -213,6 +218,64 @@ function normalizeChatMode(value) {
 function normalizeReasoningEffort(value) {
   return ["auto", "off", "low", "medium", "high"].includes(value) ? value : "auto";
 }
+
+// ── 模型能力 → 可选推理强度档位 ──────────────────────────────
+// 桌面输入框与移动端设置页共用这一张表，两边各写一份迟早出现"移动端能选到无效档"。
+// 能力取值与后端 backend/routers/proxy.py 的 REASONING_MAP 一一对应：
+//   openai / effort / effort_forced = reasoning_effort（三家词表不同，见后端注释）
+//   anthropic = output_config.effort / gemini = thinking_level
+//   binary / adaptive = 只有 thinking.type 开关 / toggle = 布尔 enable_thinking
+//   none = 一律不下发
+const REASONING_LEVELS_BY_CAP = {
+  openai: ["auto", "off", "low", "medium", "high"],
+  effort: ["auto", "off", "low", "medium", "high"], // GLM-5.2 / 豆包 / Ollama：off 写作 none
+  effort_forced: ["auto", "low", "medium", "high"], // Kimi K3 / GLM-5.3 强制思考，没有"关"
+  anthropic: ["auto", "low", "medium", "high"], // 新版只有 effort 档位，没有"关"
+  gemini: ["auto", "off", "low", "medium", "high"],
+  binary: ["auto", "off", "low", "medium", "high"], // 低/中/高在后端收敛为"开"
+  adaptive: ["auto", "off", "low", "medium", "high"], // MiniMax 同上，开档名为 adaptive
+  toggle: ["auto", "off", "low", "medium", "high"], // 通义/文心只有开关
+  none: ["auto"],
+};
+
+// 端点域名 → 能力。与后端 REASONING_HOST_CAPS 同源（守卫逐条比对字符串集合），
+// 前端多了它只是把档位选择器打开，真正下发什么仍由后端决定。
+const REASONING_CAP_BY_HOST = [
+  ["https://api.openai.com", "openai"],
+  ["https://api.deepseek.com", "binary"],
+  ["https://api.moonshot.cn", "effort_forced"],
+  ["https://api.kimi.com", "effort_forced"],
+  ["https://dashscope.aliyuncs.com", "toggle"],
+  ["https://open.bigmodel.cn", "effort"],
+  ["https://ark.cn-beijing.volces.com", "effort"],
+  ["https://api.minimax.cn", "adaptive"],
+  ["https://api.minimax.io", "adaptive"],
+  ["https://qianfan.baidubce.com", "toggle"],
+  ["http://localhost:11434", "effort"],
+  ["http://127.0.0.1:11434", "effort"],
+];
+
+// 注册表自带 reasoning 字段；自定义模型按 provider + 端点回落，未知端点一律 none（宁可不发，不可发错）
+// 该回落规则与后端 _reasoning_capability 同源，由 scripts/check_reasoning_effort.mjs 锁定
+function reasoningCapabilityOf(model) {
+  if (!model) return "none";
+  if (REASONING_LEVELS_BY_CAP[model.reasoning]) return model.reasoning;
+  if (model.provider === "anthropic") return "anthropic";
+  if (model.provider === "google") return "gemini";
+  const url = String(model.base_url || "").trim().toLowerCase();
+  for (const [prefix, cap] of REASONING_CAP_BY_HOST) {
+    if (url.startsWith(prefix)) return cap;
+  }
+  return "none";
+}
+
+/** 该模型可选的推理强度档位；能力未知时只剩 auto。 */
+function reasoningLevelsOf(model) {
+  return REASONING_LEVELS_BY_CAP[reasoningCapabilityOf(model)] || REASONING_LEVELS_BY_CAP.none;
+}
+
+// 上游只有开/关两值的能力：低、中、高会被收敛成同一个值，UI 要如实说明而不是让用户以为没生效
+const REASONING_COLLAPSED_CAPS = new Set(["binary", "adaptive", "toggle"]);
 
 function normalizeWebSearch(value) {
   const v = value && typeof value === "object" ? value : {};
@@ -249,6 +312,7 @@ function getSharedPersistentData(data = buildPersistentData()) {
     customModels: data.customModels || [],
     currentModelId: data.currentModelId || null,
     maxTokens: data.maxTokens || 64000,
+    modelContextCaps: normalizeContextCaps(data.modelContextCaps),
     autoReview: data.autoReview || {},
     outputSettings: data.outputSettings || {},
     fileOutput: data.fileOutput || {},
@@ -326,6 +390,7 @@ function loadPersistent() {
     state.conversationUsage = data.conversationUsage || {};
     state.conversationTodos = data.conversationTodos || {};
     state.maxTokens = Math.max(1000, parseInt(data.maxTokens) || 64000);
+    state.modelContextCaps = normalizeContextCaps(data.modelContextCaps);
     state.autoReview = {
       ...state.autoReview,
       ...(data.autoReview || {}),
@@ -390,6 +455,9 @@ async function loadSharedPersistent() {
     }
     if (Object.prototype.hasOwnProperty.call(data, "maxTokens")) {
       state.maxTokens = Math.max(1000, parseInt(data.maxTokens) || 64000);
+    }
+    if (data.modelContextCaps && typeof data.modelContextCaps === "object") {
+      state.modelContextCaps = normalizeContextCaps(data.modelContextCaps);
     }
     state.autoReview = {
       ...state.autoReview,
@@ -506,6 +574,77 @@ function getModelKey(modelId) {
 
 function hasModelKey(modelId) {
   return !!state.modelKeys[modelId];
+}
+
+// ── 每模型上下文预算 ───────────────────────────────────
+// 滑杆只给这几档（0 = 自动）：让"这个模型我能开多大上下文"不必先去查厂商文档。
+// 自动档沿用模型标称窗口；窗口未知时回落 64K，也就是本功能之前的硬编码值。
+const CONTEXT_CAP_STOPS = [0, 100000, 200000, 400000, 600000, 800000, 1000000];
+const CONTEXT_CAP_FALLBACK = 64000;
+
+function normalizeContextCap(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  // 吸附到最近档位：手输 150000 这类值不会造出滑杆表达不了的第四种状态
+  return CONTEXT_CAP_STOPS.reduce((best, stop) => (stop && Math.abs(stop - n) < Math.abs(best - n) ? stop : best), 0);
+}
+
+function normalizeContextCaps(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [modelId, value] of Object.entries(raw)) {
+    const cap = normalizeContextCap(value);
+    if (cap > 0 && typeof modelId === "string" && modelId) out[modelId] = cap;
+  }
+  return out;
+}
+
+function getModelDefinition(modelId) {
+  if (!modelId) return null;
+  for (const group of Object.values(state.modelRegistry || {})) {
+    const hit = (group || []).find(m => m?.id === modelId);
+    if (hit) return hit;
+  }
+  return state.customModels.find(m => m?.id === modelId) || null;
+}
+
+function getContextCap(modelId) {
+  return normalizeContextCap(state.modelContextCaps?.[modelId] ?? 0);
+}
+
+function setModelContextCap(modelId, tokens) {
+  if (!modelId) return;
+  const cap = normalizeContextCap(tokens);
+  if (cap > 0) state.modelContextCaps[modelId] = cap;
+  else delete state.modelContextCaps[modelId];
+  savePersistent();
+  notify("modelContextCaps", state.modelContextCaps);
+}
+
+// 生效预算：这一条同时喂给上下文条与自动压缩阈值，两边不再是两个数。
+// 自动档沿用全局「上下文 Token 上限」（今天压缩阈值就是它，只是以前上下文条没跟着它走）。
+// 再按模型标称窗口封顶：滑杆能选到 1M，不代表 32K 的本地模型真能吃下 1M。
+function contextBudgetOf(modelId) {
+  const cap = getContextCap(modelId) || (parseInt(state.maxTokens, 10) > 0 ? parseInt(state.maxTokens, 10) : CONTEXT_CAP_FALLBACK);
+  const declared = declaredContextWindow(modelId);
+  return declared > 0 ? Math.min(cap, declared) : cap;
+}
+
+// 模型标称窗口：只做展示（预算小于它时，界面要告诉用户模型本身能吃多少）
+function declaredContextWindow(modelId) {
+  return parseInt(getModelDefinition(modelId)?.context_window, 10) || 0;
+}
+
+// 预算是否来自用户显式设置（用于界面区分"自动"与"手动"）
+function isContextCapManual(modelId) {
+  return getContextCap(modelId) > 0;
+}
+
+function fmtContextTokens(n) {
+  const v = parseInt(n, 10) || 0;
+  if (!v) return "0";
+  if (v >= 1000000) return `${(v / 1000000).toFixed(v % 1000000 ? 1 : 0)}M`;
+  return `${Math.round(v / 1000)}K`;
 }
 
 function addCustomModel(model) {
@@ -801,8 +940,10 @@ function setModelRegistry(registry) {
 export {
   API_BASE, state, subscribe, notify,
   setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel,
+  CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, isContextCapManual, fmtContextTokens,
   setActiveExpertId,
   setChatMode, setReasoningEffort, normalizeChatMode, normalizeReasoningEffort,
+  REASONING_LEVELS_BY_CAP, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS, getModelDefinition,
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens,
   getConversationTodos, setConversationTodos,
   loadSharedPersistent,

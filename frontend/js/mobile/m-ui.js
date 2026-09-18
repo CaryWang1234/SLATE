@@ -4,8 +4,8 @@
  * 所有组件挂载到 #m-sheet-root / #m-toast-root
  */
 
-import { t } from "../services/i18n.js?v=20260913-009";
-import { iconSvg } from "../services/icons.js?v=20260913-009";
+import { t } from "../services/i18n.js?v=20260919-001";
+import { iconSvg } from "../services/icons.js?v=20260919-001";
 
 // ── Toast ─────────────────────────────────
 

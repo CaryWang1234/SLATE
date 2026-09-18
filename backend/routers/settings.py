@@ -46,6 +46,7 @@ async def save_shared_state(req: SharedStateRequest):
         "customModels",
         "currentModelId",
         "maxTokens",
+        "modelContextCaps",
         "autoReview",
         "outputSettings",
         "fileOutput",

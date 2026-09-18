@@ -10,7 +10,7 @@
  * 不进后端设置项，免得为一局小游戏做三处联动。
  */
 
-import { t } from "../services/i18n.js?v=20260913-009";
+import { t } from "../services/i18n.js?v=20260919-001";
 
 const BEST_KEY = "slate_2048_best";
 const SIZE = 4;

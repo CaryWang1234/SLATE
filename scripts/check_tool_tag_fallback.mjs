@@ -13,8 +13,8 @@
 import assert from "node:assert/strict";
 import {
   TOOLS, detectToolCalls, detectAllCalls, hasToolMarkup, hasTruncatedTail, stripToolCalls,
-} from "../frontend/js/services/tools.js?v=20260913-009";
-import { isTruncatedUnexecutable } from "../frontend/js/services/agent_common.js?v=20260913-009";
+} from "../frontend/js/services/tools.js?v=20260919-001";
+import { isTruncatedUnexecutable } from "../frontend/js/services/agent_common.js?v=20260919-001";
 
 // ── 1. 用户实测原样：<skill_run> 开标记 + ◈◆◆ 收尾 ──
 const reported = `\`verify-pack\` 输出必须落盘分列才可靠，直接用 PowerShell 对象化处理。

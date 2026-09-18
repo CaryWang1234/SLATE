@@ -4375,7 +4375,21 @@ textarea::-webkit-scrollbar-thumb {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: -1px -4px;
+  transition: background var(--transition);
 }
+
+.usage-ctx:hover { background: var(--bg-alt); }
+
+.usage-ctx:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.usage-ctx:active { background: var(--border); }
 
 .usage-ctx-track {
   width: 64px;
@@ -5002,7 +5016,8 @@ textarea::-webkit-scrollbar-thumb {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -5095,7 +5110,8 @@ textarea::-webkit-scrollbar-thumb {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
 }
@@ -5137,6 +5153,81 @@ textarea::-webkit-scrollbar-thumb {
   width: 180px;
   font-size: 12px;
   padding: 5px 8px;
+}
+
+/* ── 每模型上下文预算滑杆（设置页模型行） ─── */
+/* 一行放不下三样东西：滑杆独占第二行，宽度跟模型名对齐 */
+.ctx-cap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 100%;
+}
+
+.ctx-cap-name {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ctx-cap-slider {
+  flex: 1;
+  min-width: 110px;
+  max-width: 260px;
+  height: 18px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ctx-cap-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.ctx-cap-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  background: var(--bg);
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+}
+
+.ctx-cap-slider::-moz-range-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.ctx-cap-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--bg);
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+}
+
+.ctx-cap-slider:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.ctx-cap-value {
+  flex-shrink: 0;
+  min-width: 78px;
+  font-size: 11px;
+  text-align: right;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ctx-cap-slider.is-auto + .ctx-cap-value {
+  color: var(--text-muted);
 }
 
 .key-mgmt-save {
@@ -6568,6 +6659,61 @@ img.file-type-icon {
   background: var(--bg-alt);
   border: 1px dashed var(--gold);
   border-radius: var(--radius);
+}
+
+/* Autopilot 中断续跑条：未确认完成就退出时挂在输入框上方。
+   存在的意义是把"活没干完"从一句谎报的"任务完成"变成一个可点的动作。 */
+.resume-hint.hidden {
+  display: none;
+}
+
+.resume-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
+  margin: 0 16px 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold);
+  border-radius: var(--radius);
+}
+
+.resume-hint-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--gold);
+}
+
+.resume-hint-reason {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.resume-hint-btn {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--gold);
+  background: transparent;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.resume-hint-btn:hover,
+.resume-hint-btn:focus-visible {
+  color: var(--bg);
+  background: var(--gold);
+  outline: none;
 }
 
 /* ── TODOLIST 任务清单面板（目标六阶段闭环） ─── */
@@ -9860,6 +10006,12 @@ html[data-ui="codex"] .cx-quick-label {
 
 /* 目标模式状态条：与输入框同宽铺满底栏 */
 html[data-ui="codex"] .harness-status {
+  width: calc(100% - 24px);
+  box-sizing: border-box;
+  margin: 0 auto 8px;
+}
+
+html[data-ui="codex"] .resume-hint {
   width: calc(100% - 24px);
   box-sizing: border-box;
   margin: 0 auto 8px;

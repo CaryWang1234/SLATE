@@ -3,10 +3,10 @@
  * 遥控地址 + 二维码 / 模型选择 / 密钥管理 / 主题切换
  */
 
-import { state, setCurrentModel, setModelKey, getModelKey, toggleTheme } from "../store.js?v=20260913-009";
-import { get } from "../services/api.js?v=20260913-009";
-import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20260913-009";
-import { onTab } from "./m-app.js?v=20260913-009";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, toggleTheme, contextBudgetOf, fmtContextTokens, setReasoningEffort, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS } from "../store.js?v=20260919-001";
+import { get } from "../services/api.js?v=20260919-001";
+import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20260919-001";
+import { onTab } from "./m-app.js?v=20260919-001";
 
 function $id(id) { return document.getElementById(id); }
 
@@ -139,7 +139,8 @@ function renderModelSection() {
       const active = state.currentModel?.id === m.id;
       const row = mkRow({
         title: m.name || m.id,
-        sub: active ? t("当前使用") : (m.context_window ? `${Math.round(m.context_window / 1024)}K 上下文` : ""),
+        // 显示的是生效预算（桌面滑杆决定），不是模型标称窗口：手机上要看得见同一个数
+        sub: active ? t("当前使用") : `${fmtContextTokens(contextBudgetOf(m.id))} 上下文`,
       });
       row.classList.toggle("active", active);
       const check = document.createElement("div");
@@ -162,6 +163,54 @@ function renderModelSection() {
     }
   }
   box.appendChild(card.parentElement);
+  renderEffortSection(box);
+}
+
+// ── 推理强度（与桌面输入框那个选择器同一个状态，双向同步） ──────────
+const EFFORT_LABELS = {
+  auto: () => t("自动"),
+  off: () => t("关"),
+  low: () => t("低"),
+  medium: () => t("中"),
+  high: () => t("高"),
+};
+
+// 推理强度区块：档位表与能力判定都来自 store，与桌面输入框同一份
+function renderEffortSection(box) {
+  const cap = reasoningCapabilityOf(state.currentModel);
+  const levels = reasoningLevelsOf(state.currentModel);
+  const { group, card } = mkGroup(t("推理强度"));
+  if (levels.length <= 1) {
+    card.appendChild(mkRow({
+      title: t("当前模型不支持推理强度设置"),
+      sub: t("端点能力未核实，SLATE 不会向它下发该字段"),
+    }));
+    box.appendChild(group);
+    return;
+  }
+  for (const lvl of levels) {
+    const active = (state.reasoningEffort || "auto") === lvl;
+    const row = mkRow({ title: EFFORT_LABELS[lvl]() + (lvl === "auto" ? t("（不下发）") : "") });
+    row.classList.toggle("active", active);
+    const check = document.createElement("div");
+    check.className = "m-check";
+    check.textContent = active ? "✓" : "";
+    row.appendChild(check);
+    row.addEventListener("click", () => {
+      setReasoningEffort(lvl);
+      mToast(t("推理强度：{level}", { level: EFFORT_LABELS[lvl]() }));
+      renderEffortSection(box);
+    });
+    card.appendChild(row);
+  }
+  if (REASONING_COLLAPSED_CAPS.has(cap)) {
+    const hint = document.createElement("div");
+    hint.className = "m-setting-row-sub";
+    hint.style.cssText = "padding:6px 12px 10px;";
+    hint.textContent = t("该端点只分开关，低/中/高都会按「开」下发");
+    card.appendChild(hint);
+  }
+  box.appendChild(group);
 }
 
 // ── 密钥管理 ──────────────────────────────
@@ -229,6 +278,13 @@ function renderAll() {
 
 export function initMSettings() {
   onTab("settings", renderAll);
+  // 模型/档位还可能被别的路径改掉（桌面同一账号里切模型、共享状态回灌）：
+  // 只靠点行时的局部重绘会让"可选档位"停留在上一个模型上，等于给用户一个上游不认的值。
+  subscribe("model", () => {
+    if (!$id("m-settings-model")?.childElementCount) return;
+    renderModelSection();
+    renderKeySection();
+  });
   renderAll();
 }
 

@@ -7,9 +7,9 @@
  * 可信的是占比与趋势，不是与上游账单的逐位一致。
  */
 
-import { state, estimateTokens } from "../store.js?v=20260913-009";
-import { buildSystemContent } from "./adapter.js?v=20260913-009";
-import { getToolsSystemPrompt } from "./tools.js?v=20260913-009";
+import { state, estimateTokens, contextBudgetOf } from "../store.js?v=20260919-001";
+import { buildSystemContent } from "./adapter.js?v=20260919-001";
+import { getToolsSystemPrompt } from "./tools.js?v=20260919-001";
 
 // 每条消息的角色与分隔符开销（OpenAI 风格 chatml 的近似值）
 const MSG_OVERHEAD = 4;
@@ -95,7 +95,9 @@ export function measureContext(messages = state.messages) {
   buckets.sort((a, b) => b.tokens - a.tokens);
   const result = {
     total: buckets.reduce((sum, b) => sum + b.tokens, 0),
-    limit: state.currentModel?.context_window || 0,
+    // 上限取「上下文预算」而不是模型标称窗口：条子要提前预告自动压缩会在哪儿发生，
+    // 拿 1M 窗口当分母时，64K 就压缩的对话永远显示 6%，等于没有提示。
+    limit: contextBudgetOf(state.currentModel?.id),
     buckets,
   };
   // chat_context 工具读本快照，保证与用量条同一个数字（tools.js 不能反向 import 本模块）

@@ -17,11 +17,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   emptyBoard, moveLine, move, spawn, isOver, maxTile,
-} from "../frontend/js/components/game_2048.js?v=20260913-009";
+} from "../frontend/js/components/game_2048.js?v=20260919-001";
 import {
   WEEKS, buildGrid, monthLabels, levelFor,
-} from "../frontend/js/components/usage_heatmap.js?v=20260913-009";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260913-009";
+} from "../frontend/js/components/usage_heatmap.js?v=20260919-001";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260919-001";
 
 const BACKEND_WINDOW_DAYS = 371;  // backend/routers/chat.py: ACTIVITY_WINDOW_DAYS
 
@@ -259,7 +259,7 @@ for (const m of ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月",
 
 // ── 9. 结构与文案：Node 侧没 DOM，直接读源码钉住两条走查里真炸过的 ──
 {
-  const src = readFileSync(new URL("../frontend/js/components/usage_heatmap.js?v=20260913-009", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../frontend/js/components/usage_heatmap.js?v=20260919-001", import.meta.url), "utf8");
   const css = readFileSync(new URL("../frontend/css/style.css", import.meta.url), "utf8");
   assert.match(src, /shell\.append\(gameHost\)/, "棋盘宿主得并进 .heat-shell");
   assert.doesNotMatch(src, /heat\.append\(gameHost\)/, "棋盘宿主挂进 .heat 会被 .heat.hidden 一起藏掉，双击永远打不开");

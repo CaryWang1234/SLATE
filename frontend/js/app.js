@@ -2,32 +2,32 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme } from "./store.js?v=20260913-009";
-import { initI18n, t } from "./services/i18n.js?v=20260913-009";
-import { iconSvgEl } from "./services/icons.js?v=20260913-009";
-import { get, post, put } from "./services/api.js?v=20260913-009";
-import { dlgConfirm } from "./services/dialog.js?v=20260913-009";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260913-009";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260913-009";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260913-009";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260913-009";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260913-009";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260913-009";
-import { initTeamPanel } from "./components/team.js?v=20260913-009";
-import { initProjectBar } from "./components/project_bar.js?v=20260913-009";
-import { initSessionSummary } from "./components/session_summary.js?v=20260913-009";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260913-009";
-import { initTypingGame } from "./components/typing_game.js?v=20260913-009";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260913-009";
-import { initMemoryPanel } from "./components/memory.js?v=20260913-009";
-import { initExpertsPanel } from "./components/experts.js?v=20260913-009";
-import { initSchedule } from "./components/schedule.js?v=20260913-009";
-import { initRiskGuard } from "./services/riskguard.js?v=20260913-009";
-import { initUnderstandPanel } from "./components/understand.js?v=20260913-009";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260913-009";
-import { setProject, setProjectFileTree } from "./store.js?v=20260913-009";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260913-009";
-import { installErrorSink } from "./services/error_sink.js?v=20260913-009";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, fmtContextTokens } from "./store.js?v=20260919-001";
+import { initI18n, t } from "./services/i18n.js?v=20260919-001";
+import { iconSvgEl } from "./services/icons.js?v=20260919-001";
+import { get, post, put } from "./services/api.js?v=20260919-001";
+import { dlgConfirm } from "./services/dialog.js?v=20260919-001";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260919-001";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260919-001";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260919-001";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260919-001";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260919-001";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260919-001";
+import { initTeamPanel } from "./components/team.js?v=20260919-001";
+import { initProjectBar } from "./components/project_bar.js?v=20260919-001";
+import { initSessionSummary } from "./components/session_summary.js?v=20260919-001";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260919-001";
+import { initTypingGame } from "./components/typing_game.js?v=20260919-001";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260919-001";
+import { initMemoryPanel } from "./components/memory.js?v=20260919-001";
+import { initExpertsPanel } from "./components/experts.js?v=20260919-001";
+import { initSchedule } from "./components/schedule.js?v=20260919-001";
+import { initRiskGuard } from "./services/riskguard.js?v=20260919-001";
+import { initUnderstandPanel } from "./components/understand.js?v=20260919-001";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260919-001";
+import { setProject, setProjectFileTree } from "./store.js?v=20260919-001";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260919-001";
+import { installErrorSink } from "./services/error_sink.js?v=20260919-001";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -345,6 +345,58 @@ function saveCustomModel() {
 
 // ── 密钥管理面板（设置弹窗内）──────────────
 
+// ── 每模型上下文预算滑杆 ───────────────────────────────
+// 一档 = 这个模型在 SLATE 里能用多少上下文：同时决定自动压缩阈值与上下文条的分母。
+// 0 档「自动」沿用全局「上下文 Token 上限」，所以不动滑杆的行为与改动前完全一致。
+function buildContextCapControl(model) {
+  const wrap = document.createElement("div");
+  wrap.className = "ctx-cap";
+
+  const name = document.createElement("span");
+  name.className = "ctx-cap-name";
+  name.textContent = t("最大上下文");
+
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.className = "ctx-cap-slider";
+  slider.min = "0";
+  slider.max = String(CONTEXT_CAP_STOPS.length - 1);
+  slider.step = "1";
+  slider.value = String(Math.max(0, CONTEXT_CAP_STOPS.indexOf(getContextCap(model.id))));
+  slider.dataset.modelCtx = model.id; // 走查与设置页定位用：控件必须能对应到具体模型
+  slider.setAttribute("aria-label", `${t("最大上下文")} · ${model.name}`);
+
+  const readout = document.createElement("span");
+  readout.className = "ctx-cap-value";
+
+  const paint = (stop) => {
+    const declared = declaredContextWindow(model.id);
+    const eff = stop ? Math.min(stop, declared || stop) : contextBudgetOf(model.id);
+    const clamped = !!stop && declared > 0 && stop > declared;
+    readout.textContent = stop
+      ? (clamped ? `${fmtContextTokens(stop)} → ${fmtContextTokens(eff)}` : fmtContextTokens(stop))
+      : `${t("自动")} · ${fmtContextTokens(eff)}`;
+    readout.title = clamped
+      ? t("超出模型标称窗口，已按 {w} 封顶", { w: fmtContextTokens(declared) })
+      : t("自动压缩阈值与上下文条都按 {b} 计算", { b: fmtContextTokens(eff) });
+    slider.classList.toggle("is-auto", !stop);
+  };
+
+  paint(getContextCap(model.id));
+  // 拖动只刷新读数，松手/键盘落定才写设置：免得每过一个中间值都持久化一次
+  slider.addEventListener("input", () => paint(CONTEXT_CAP_STOPS[Number(slider.value)] || 0));
+  slider.addEventListener("change", () => {
+    const stop = CONTEXT_CAP_STOPS[Number(slider.value)] || 0;
+    setModelContextCap(model.id, stop);
+    paint(stop);
+  });
+
+  wrap.appendChild(name);
+  wrap.appendChild(slider);
+  wrap.appendChild(readout);
+  return wrap;
+}
+
 function renderCustomModelManagement() {
   const container = document.getElementById("custom-model-list");
   if (!container) return;
@@ -404,6 +456,7 @@ function renderCustomModelManagement() {
     actions.appendChild(deleteBtn);
     row.appendChild(info);
     row.appendChild(actions);
+    row.appendChild(buildContextCapControl(model));
     container.appendChild(row);
   }
 }
@@ -460,6 +513,7 @@ function renderKeyManagement() {
 
     row.appendChild(info);
     row.appendChild(inputWrap);
+    row.appendChild(buildContextCapControl(m));
     container.appendChild(row);
   }
   if (!allModels.length) {
@@ -510,6 +564,20 @@ function openSettings(options = {}) {
         .find(el => el.dataset.modelKey === options.focusModelId);
       input?.focus();
       input?.scrollIntoView({ block: "center" });
+    });
+  } else if (options.focusCtxModelId) {
+    // 从用量条点进来：定位到这个模型的上下文滑杆；模型没有独立滑杆时退到全局上限
+    requestAnimationFrame(() => {
+      const slider = [...document.querySelectorAll("[data-model-ctx]")]
+        .find(el => el.dataset.modelCtx === options.focusCtxModelId);
+      if (slider) {
+        slider.closest(".key-mgmt-row, .custom-model-row")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        slider.focus();
+        return;
+      }
+      document.getElementById("setting-max-tokens")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   } else if (options.focusConstitution) {
     requestAnimationFrame(() => {
@@ -1039,7 +1107,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260913-009").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260919-001").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1583,7 +1651,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260913-009");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260919-001");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1823,7 +1891,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260913-009");
+        const { openProject } = await import("./services/project.js?v=20260919-001");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }
@@ -1842,4 +1910,4 @@ async function init() {
 
 document.addEventListener("DOMContentLoaded", init);
 
-export { toast };
+export { toast, openSettings };

@@ -353,6 +353,8 @@ SLATE 内置 34 个 MCP 工具，模型在对话中自主决定何时使用。
 | 设置 | 说明 |
 |------|------|
 | 模型管理 | 添加/删除 API Key，配置自定义端点，可选启用 Responses API |
+| 推理强度 | 按模型能力下发思考档位（自动/关/低/中/高），上游不认的档位自动置灰 |
+| 上下文预算 | 模型行上的滑杆（自动/100K/200K/400K/600K/800K/1M），同时决定自动压缩阈值与用量条分母 |
 | 输出控制 | 最大 Token 数、流式输出开关 |
 | 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 |
 | 安全模式 | 高危命令审批策略 |
@@ -712,6 +714,8 @@ Let AI automatically execute tasks on schedule or by events.
 | Setting | Description |
 |---------|-------------|
 | Model Management | Add/remove API keys, configure custom endpoints, optionally enable Responses API |
+| Reasoning Effort | Per-model capability levels (auto/off/low/medium/high); unsupported levels are greyed out |
+| Context Budget | Per-model slider (auto/100K/200K/400K/600K/800K/1M) driving both the auto-compress threshold and the usage bar |
 | Output Control | Max tokens, streaming toggle |
 | Auto-Advance | Autopilot / short-reply review / long-stall review |
 | Safety Mode | High-risk command approval policy |

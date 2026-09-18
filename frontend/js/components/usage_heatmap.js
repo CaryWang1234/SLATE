@@ -20,8 +20,8 @@
  * 不留可见入口，也不写提示文案——这是彩蛋，不是功能按钮。
  */
 
-import { t } from "../services/i18n.js?v=20260913-009";
-import { mount2048 } from "./game_2048.js?v=20260913-009";
+import { t } from "../services/i18n.js?v=20260919-001";
+import { mount2048 } from "./game_2048.js?v=20260919-001";
 
 const WEEKS = 53;
 const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];

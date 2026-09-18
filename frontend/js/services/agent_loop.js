@@ -15,9 +15,9 @@
  * 约定：policy 返回的模型可见字符串不被 t() 包裹（t() 只包用户可见文本）。
  */
 
-import { state, addMessage } from "../store.js?v=20260913-009";
-import { stripToolCalls } from "./tools.js?v=20260913-009";
-import { _pendingToolMsgs } from "./agent_common.js?v=20260913-009";
+import { state, addMessage } from "../store.js?v=20260919-001";
+import { stripToolCalls } from "./tools.js?v=20260919-001";
+import { _pendingToolMsgs } from "./agent_common.js?v=20260919-001";
 
 export function createAgentLoop({ policy = {}, view = {}, io }) {
   const reasonOf = (key) => policy.exitReasons?.[key] ?? "";
@@ -30,6 +30,9 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
       round: 0, lastMsg: null, calls: [], results: [], cards: null, turn: null,
       prevCallsSig: "", dupRounds: 0, stallStreak: 0,
       nudged: false, successfulTool: false, exitReason: "",
+      // exitKind 由 policy 在决定退出时标注："done"=走完完成通道，"stopped"=其余一切。
+      // 上层据此区分"干完了"和"停下了"，不再把后者报成前者。
+      exitKind: "",
       extra: policy.beginRun ? policy.beginRun(opts) : {},
     };
     const switched = () => genConvId !== null && state.currentConversationId !== genConvId;
@@ -66,7 +69,12 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
         if (switched()) { run.exitReason = reasonOf("switched"); break; }
 
         const lastMsg = state.messages[state.messages.length - 1];
-        if (!lastMsg || lastMsg.role !== "assistant") break;
+        if (!lastMsg || lastMsg.role !== "assistant") {
+          // 队尾不是待处理的回复（异常收尾、被外部改写）：如实留痕，
+          // 否则 finish() 会把它当成"轮数用尽"报给上层
+          run.exitReason = reasonOf("noReply");
+          break;
+        }
         run.lastMsg = lastMsg;
         _pendingToolMsgs.add(lastMsg);
         runEvent("round.started");
