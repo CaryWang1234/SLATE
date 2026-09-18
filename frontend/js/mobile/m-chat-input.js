@@ -3,11 +3,11 @@
  * textarea 自适应高度 / Enter 发送（Shift+Enter 换行）/ @ 提及浮层（技能/工具/项目文件）
  */
 
-import { state } from "../store.js?v=20260913-008";
-import { TOOLS } from "../services/tools.js?v=20260913-008";
-import { t } from "./m-ui.js?v=20260913-008";
-import { mSendMessage, isGenerating } from "./m-chat.js?v=20260913-008";
-import { getCurrentTab } from "./m-app.js?v=20260913-008";
+import { state } from "../store.js?v=20260913-009";
+import { TOOLS } from "../services/tools.js?v=20260913-009";
+import { t } from "./m-ui.js?v=20260913-009";
+import { mSendMessage, isGenerating } from "./m-chat.js?v=20260913-009";
+import { getCurrentTab } from "./m-app.js?v=20260913-009";
 
 let _candidates = [];
 let _index = 0;

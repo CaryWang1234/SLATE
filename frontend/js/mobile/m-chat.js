@@ -6,19 +6,20 @@
  */
 
 import {
-  state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe,
-} from "../store.js?v=20260913-008";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260913-008";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260913-008";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260913-008";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction } from "../services/agent_common.js?v=20260913-008";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260913-008";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260913-008";
-import { toolLabel } from "../services/tool_meta.js?v=20260913-008";
-import { renderMarkdown } from "../services/markdown.js?v=20260913-008";
-import { mToast, t } from "./m-ui.js?v=20260913-008";
-import { mHandleStructured } from "./m-auth.js?v=20260913-008";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260913-008";
+  state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens,
+} from "../store.js?v=20260913-009";
+import { fmtTokens } from "../services/usage.js?v=20260913-009";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260913-009";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260913-009";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260913-009";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260913-009";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260913-009";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260913-009";
+import { toolLabel } from "../services/tool_meta.js?v=20260913-009";
+import { renderMarkdown } from "../services/markdown.js?v=20260913-009";
+import { mToast, t } from "./m-ui.js?v=20260913-009";
+import { mHandleStructured } from "./m-auth.js?v=20260913-009";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260913-009";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -657,6 +658,14 @@ export function mRenderAllMessages() {
     if (msg.hidden) continue;
     const wrap = document.createElement("div");
     wrap.className = `m-msg ${msg.role === "user" ? "m-msg-user" : "m-msg-assistant"}`;
+    if (isHistorySummary(msg)) {
+      // 压缩摘要不该长得像模型刚说的一句话：折叠，展开才铺全文
+      const body = String(msg.content || "").replace(/^\s*\[历史摘要\]\s*:?\s*/, "");
+      wrap.className = "m-msg m-msg-system";
+      wrap.innerHTML = `<details class="m-summary-fold"><summary>${escapeHtml(t("更早的对话已压缩为摘要"))} · ≈ ${escapeHtml(fmtTokens(estimateTokens(body)))} tokens</summary><div class="m-summary-body">${escapeHtml(body)}</div></details>`;
+      el.appendChild(wrap);
+      continue;
+    }
     if (msg.role === "user") {
       wrap.innerHTML = `<div class="m-bubble">${escapeHtml(String(msg.content || "")).replace(/\n/g, "<br>")}</div>`;
     } else {

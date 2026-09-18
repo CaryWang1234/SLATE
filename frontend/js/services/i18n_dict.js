@@ -651,6 +651,7 @@ export const EN_DICT = {
   "上下文压缩检查失败:": "Context compression check failed:",
   "上下文已压缩：{n} 条消息 → 摘要": "Context compressed: {n} messages → summary",
   "上下文已压缩：{n} 条消息已摘要": "Context compressed: {n} messages summarized",
+  "更早的对话已压缩为摘要": "Earlier conversation compressed into a summary",
   "墨稿已成：可送入目标模式 / 投到白板 / 存为模板": "Brief ready: send to Target Mode / post to Whiteboard / save as template",
   "墨迹 · 已成稿": "Ink · brief ready",
   "墨迹 · 收墨中": "Ink · wrapping up",

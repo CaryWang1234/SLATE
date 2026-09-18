@@ -9,10 +9,10 @@
  * 用桩件驱动真 kernel（不复制实现），在 Node 侧跑，不依赖浏览器。
  */
 import assert from "node:assert/strict";
-import { state, addMessage } from "../frontend/js/store.js?v=20260913-008";
-import { _pendingToolMsgs } from "../frontend/js/services/agent_common.js?v=20260913-008";
-import { createAgentLoop } from "../frontend/js/services/agent_loop.js?v=20260913-008";
-import { projectChat, projectSteps } from "../frontend/js/services/agent_ledger.js?v=20260913-008";
+import { state, addMessage } from "../frontend/js/store.js?v=20260913-009";
+import { _pendingToolMsgs } from "../frontend/js/services/agent_common.js?v=20260913-009";
+import { createAgentLoop } from "../frontend/js/services/agent_loop.js?v=20260913-009";
+import { projectChat, projectSteps } from "../frontend/js/services/agent_ledger.js?v=20260913-009";
 
 const c1 = [{ name: "read", params: { p: 1 } }];
 const c2 = [{ name: "write", params: { p: 2 } }];

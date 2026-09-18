@@ -7,6 +7,15 @@
 // 渲染时对这些消息不合成"历史恢复"卡片，避免把未执行的调用伪装成成功执行。
 const _pendingToolMsgs = new Set();
 
+// 上下文压缩写回的摘要消息前缀。这个字符串就是发往模型的载荷本身，
+// 渲染层只据它把摘要折起来，不许因为显示而改格式。
+const HISTORY_SUMMARY_PREFIX = "[历史摘要]:";
+
+function isHistorySummary(msg) {
+  return !!msg && msg.role === "system" && typeof msg.content === "string"
+    && msg.content.trimStart().startsWith(HISTORY_SUMMARY_PREFIX);
+}
+
 function toolCallSignature(call) {
   return `${call?.name || ""}:${JSON.stringify(call?.params || {})}`;
 }
@@ -89,6 +98,7 @@ function buildToolFollowupInstruction({ harnessOn = false, autopilotOn = false, 
 
 export {
   _pendingToolMsgs, toolCallSignature, dedupeToolCalls, isTruncatedUnexecutable,
+  HISTORY_SUMMARY_PREFIX, isHistorySummary,
   DESKTOP_TOOL_RESULT_STATUS, MOBILE_TOOL_RESULT_STATUS, formatToolResultForModel,
   DESKTOP_FAILED_LINE, MOBILE_FAILED_LINE, buildToolFollowupInstruction,
 };

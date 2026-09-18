@@ -183,6 +183,35 @@ textarea {
   justify-content: flex-start;
 }
 
+/* 压缩摘要折叠条 */
+.m-msg-system { justify-content: center; }
+
+.m-summary-fold {
+  width: 100%;
+  border: 1px dashed var(--border);
+  border-radius: var(--m-radius-sm);
+  background: var(--bg-alt);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.m-summary-fold > summary {
+  padding: 7px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.m-summary-fold > summary::-webkit-details-marker { display: none; }
+
+.m-summary-body {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  max-height: 45vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
 .m-bubble {
   max-width: 82%;
   padding: 10px 14px;

@@ -574,6 +574,48 @@ textarea::-webkit-scrollbar-thumb {
   padding: 4px 8px;
 }
 
+/* 压缩摘要折叠条：一行收纳，展开才铺全文 */
+.msg-history-summary {
+  width: min(680px, 100%);
+}
+
+.msg-history-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition), background-color var(--transition);
+}
+
+.msg-history-summary-head:hover { border-color: var(--gold); }
+.msg-history-summary-head:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.msg-history-summary-icon { flex: none; opacity: 0.75; }
+.msg-history-summary-label { flex: none; }
+.msg-history-summary-meta { flex: none; opacity: 0.65; font-variant-numeric: tabular-nums; }
+.msg-history-summary-toggle { margin-left: auto; flex: none; color: var(--gold-strong); }
+
+.msg-history-summary-body {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.65;
+  max-height: 320px;
+  overflow: auto;
+}
+
 .msg-model-label {
   font-size: 10px;
   color: var(--text-muted);
