@@ -72,6 +72,11 @@ SLATE 支持同时接入多个模型，在对话界面顶部下拉框随时切�
 - 支持本地模型（Ollama / LM Studio 的 OpenAI 兼容端点）
 - 每条回复显示模型名称与 Token 用量
 
+**左侧「任务」列表：**
+- 排序可切换：最近更新 / 按项目 / 按状态 / 创建时间 / 按用量；偏好跨设备同步，经典布局与 Codex 历史栏共用同一份
+- 每条会话按当下处境给出独立标志：**需要操作**（上一场被停止或还有下一步）、**出错**、**进行中**（呼吸动画，只在这一场真的在生成时出现）、**已完成未查看**（点进会话即清除）
+- 标志记的是"上一场怎么结束的"：若在别处（如手机遥控）继续过这条会话，旧标志自动作废
+
 **快捷键：**
 - `Enter` 发送消息
 - `Shift + Enter` 换行
@@ -447,6 +452,11 @@ SLATE supports multiple models simultaneously — switch anytime from the top dr
 - Different conversations can use different models
 - Supports local models (Ollama / LM Studio via OpenAI-compatible endpoints)
 - Each reply shows model name and token usage
+
+**Task list on the left:**
+- Sort is yours to pick: recent / by project / by status / created / by usage. The preference syncs across devices, and the classic sidebar and the Codex history rail share the same one
+- Each conversation carries a mark matching where it stands: **needs action** (you stopped it, or a next step remains), **error** (request failed / stream cut), **running** (breathing animation, only while this run is actually generating), **done but unread** (cleared the moment you open it)
+- The mark records how the last run ended: if the conversation was continued elsewhere (e.g. phone remote), the stale mark retires itself
 
 **Shortcuts:**
 - `Enter` to send
