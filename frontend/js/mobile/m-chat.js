@@ -6,20 +6,20 @@
  */
 
 import {
-  state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf,
-} from "../store.js?v=20260919-002";
-import { fmtTokens } from "../services/usage.js?v=20260919-002";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260919-002";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260919-002";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260919-002";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260919-002";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260919-002";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260919-002";
-import { toolLabel } from "../services/tool_meta.js?v=20260919-002";
-import { renderMarkdown } from "../services/markdown.js?v=20260919-002";
-import { mToast, t } from "./m-ui.js?v=20260919-002";
-import { mHandleStructured } from "./m-auth.js?v=20260919-002";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260919-002";
+  state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit,
+} from "../store.js?v=20260921-001";
+import { fmtTokens } from "../services/usage.js?v=20260921-001";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260921-001";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260921-001";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260921-001";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260921-001";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260921-001";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260921-001";
+import { toolLabel } from "../services/tool_meta.js?v=20260921-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260921-001";
+import { mToast, t } from "./m-ui.js?v=20260921-001";
+import { mHandleStructured } from "./m-auth.js?v=20260921-001";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260921-001";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -336,6 +336,11 @@ async function mContinueTruncated(wrap, content, modelId, apiKey, baseUrl, param
 
 // 移动侧策略：只保留去重催办与结果回灌，无目标模式/自主推进的空轮决策
 const mobilePolicy = {
+  beginRun() {
+    // 收口请求只属于发起它的那一场运行：新运行开头作废，否则上一条的收尾会把这一条停掉
+    takeLoopExit();
+    return {};
+  },
   openRun(run) {
     return openLedgerRun({ conversationId: run.genConvId || "", mode: "mobile", budget: run.maxRounds });
   },
@@ -351,10 +356,17 @@ const mobilePolicy = {
       },
     };
   },
-  emptyRound() {
+  emptyRound(run) {
+    // 模型调过收口工具后给出的最终汇报：退出原因要如实写，别报成普通收尾
+    if (run?.extra?.loopExit) {
+      return { action: "break", exitReason: `模型已调 ${run.extra.loopExit.mode === "target" ? "exit_target_mode" : "exit_autopilot"} 收口` };
+    }
     return { action: "break" }; // 模型收尾，无工具调用
   },
   async postExec(run) {
+    // 收口工具在移动侧同样要取走：留在 store 里会把下一场运行一开场就停掉
+    const exit = takeLoopExit();
+    if (exit) run.extra.loopExit = exit;
     // 结构化结果（file_edit/file_create 未自动落盘）→ 底部 diff sheet 确认
     for (let i = 0; i < run.results.length; i++) {
       const result = run.results[i];

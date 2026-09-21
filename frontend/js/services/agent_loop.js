@@ -11,13 +11,15 @@
  * 事件账本同样在 kernel 里落：policy.openRun(run) 返回一个 ledger（agent_ledger.js 的实例，
  * mode 这类平台标签由 policy 决定），kernel 在轮次与调用的各节点 emit。
  * 于是聊天工具卡片与白板步骤卡是同一份账的投影，三端不必各落一遍。
+ * io.execute 的 ctx 另带 ledger 与 callIdFor(i)：派生型工具（subagent_run）据此把
+ * "谁派生了谁"记进同一份账，星图才画得出真边。
  *
  * 约定：policy 返回的模型可见字符串不被 t() 包裹（t() 只包用户可见文本）。
  */
 
-import { state, addMessage } from "../store.js?v=20260919-002";
-import { stripToolCalls } from "./tools.js?v=20260919-002";
-import { _pendingToolMsgs } from "./agent_common.js?v=20260919-002";
+import { state, addMessage } from "../store.js?v=20260921-001";
+import { stripToolCalls } from "./tools.js?v=20260921-001";
+import { _pendingToolMsgs } from "./agent_common.js?v=20260921-001";
 
 export function createAgentLoop({ policy = {}, view = {}, io }) {
   const reasonOf = (key) => policy.exitReasons?.[key] ?? "";
@@ -140,6 +142,10 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
             const progress = view.execProgress?.(run.bubble) ?? null;
             run.results = await io.execute(run.calls, {
               signal,
+              // 账本 callId 交给执行器透传：派生型工具（subagent_run）据此把 spawn 边
+              // 挂到自己的那一行上，星图才认得出谁派生了谁
+              callIdFor: (i) => (ledger ? ledger.callId(run.round, i) : ""),
+              ledger,
               onCallStart: (call, i) => {
                 if (ledger) startedAt.set(ledger.callId(run.round, i), Date.now());
                 callEvent(i, "call.started");

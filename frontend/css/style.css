@@ -1040,6 +1040,176 @@ textarea::-webkit-scrollbar-thumb {
   color: var(--text-secondary);
 }
 
+/* 推理强度：点开后是一根滑杆，档位为主、墨色小字为辅。
+   明暗两套主题都只由 --ink（透明度）表达浓淡，避免深色下"越浓越看不见"。 */
+.effort-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.effort-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 7px;
+  font-size: 11px;
+  font-family: var(--font-main);
+  height: 26px;
+  outline: none;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color var(--transition), color var(--transition);
+}
+
+.effort-pill:hover {
+  color: var(--text);
+}
+
+.effort-pill:focus,
+.effort-pill[aria-expanded="true"] {
+  border-color: var(--gold);
+  color: var(--text);
+}
+
+.effort-pill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.effort-pill:disabled:hover {
+  color: var(--text-secondary);
+}
+
+/* 墨点： pills 上那一点浓淡，与弹窗里小字用同一个 --ink */
+.effort-pill-shade {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: var(--ink, 0.6);
+}
+
+.effort-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: 264px;
+  padding: 10px 12px 7px;
+  background: var(--bg);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 60;
+}
+
+.effort-pop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.effort-pop-readout {
+  font-size: 11px;
+  color: var(--gold-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.effort-slider {
+  width: 100%;
+  height: 18px;
+  margin: 8px 0 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.effort-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.effort-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  background: var(--bg);
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+}
+
+.effort-slider::-moz-range-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.effort-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--bg);
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+}
+
+.effort-slider:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* 刻度绝对定位在滑杆行程上：左右各留半个滑块宽，小字才对准滑块停下的位置 */
+.effort-ticks {
+  position: relative;
+  height: 27px;
+  margin: 2px 6px 0;
+}
+
+.effort-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.effort-tick b {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.effort-tick i {
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  opacity: var(--ink, 0.6);
+}
+
+.effort-tick.is-on b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.effort-pop-hint {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 .chat-input-wrap {
   position: relative;
   display: flex;
@@ -10101,3 +10271,182 @@ html[data-ui="codex"] .msg-assistant {
   border: none;
   border-radius: 12px 12px 12px 4px;
 }
+
+/* ── 黑板 · 工作流视图（components/board_workflow.js + services/star_map.js）──
+   控制条 / 流程卡片墙 / 活层 / 团队星图。颜色一律走变量，深浅两套主题不用各写一遍；
+   面板本身是 --bg-alt，卡片底用 --bg，靠这一层色差把"卡浮在板上"读出来。 */
+
+.bw-root { display: flex; flex-direction: column; gap: 14px; }
+
+.bw-runbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.bw-phase { font-size: 12px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+.bw-phase.is-running { color: var(--gold-strong); }
+.bw-phase.is-done { color: var(--text); }
+.bw-phase.is-stopped { color: var(--danger); }
+
+.bw-timer { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bw-runbar-spacer { flex: 1 1 auto; }
+
+.bw-btn {
+  height: 24px; padding: 0 9px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg-alt); color: var(--text-secondary);
+  font-size: 12px; cursor: pointer;
+  transition: border-color var(--transition), color var(--transition), background var(--transition);
+}
+.bw-btn:hover:not(:disabled) { border-color: var(--border-hover); color: var(--text); }
+.bw-btn:disabled { opacity: .45; cursor: not-allowed; }
+.bw-btn-primary { background: var(--accent-bg); border-color: var(--accent-bg); color: var(--accent-fg); }
+.bw-btn-primary:hover:not(:disabled) { border-color: var(--border-hover); color: var(--accent-fg); }
+.bw-btn-stop:not(:disabled) { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }
+.bw-btn-toggle.is-on { background: var(--gold-dim); border-color: color-mix(in srgb, var(--gold) 45%, transparent); color: var(--gold-strong); }
+[data-theme="dark"] .bw-phase.is-running,
+[data-theme="dark"] .bw-btn-toggle.is-on { color: var(--gold); }
+
+.bw-select {
+  height: 24px; padding: 0 6px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg-input); color: var(--text-secondary);
+  font-size: 12px; font-family: inherit; cursor: pointer;
+}
+.bw-select:disabled { opacity: .45; cursor: not-allowed; }
+
+.bw-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bw-toolbar strong { font-size: 13px; color: var(--text); margin-right: auto; }
+
+.bw-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  align-items: start;
+}
+
+.bw-card {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 11px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg);
+}
+.bw-card:hover { border-color: var(--border-hover); }
+.bw-card.is-pinned { border-left: 3px solid var(--gold); }
+.bw-card-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.bw-card-head strong {
+  font-size: 13px; color: var(--text); font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bw-card-badge { display: inline-flex; flex: 0 0 auto; color: var(--text-muted); }
+.bw-card-badge .svg-icon { width: 13px; height: 13px; }
+.bw-card.is-pinned .bw-card-badge { color: var(--gold); }
+.bw-card-desc {
+  margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-secondary);
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.bw-card-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.bw-chip {
+  padding: 1px 6px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--bg-alt); color: var(--text-muted); font-size: 11px; white-space: nowrap;
+}
+.bw-chip.is-model { color: var(--gold-strong); background: var(--gold-dim); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+[data-theme="dark"] .bw-chip.is-model { color: var(--gold); }
+.bw-chip.is-dest { color: var(--text-secondary); }
+.bw-chip.is-tag { font-family: var(--font-code); }
+
+.bw-card-steps {
+  display: flex; flex-direction: column; gap: 4px;
+  margin: 2px 0 0; padding: 6px 0 0 18px;
+  border-top: 1px dashed var(--border);
+}
+.bw-card-steps.hidden { display: none; }
+.bw-card-steps li { font-size: 12px; color: var(--text-secondary); }
+.bw-step-title { color: var(--text); }
+.bw-step-tool { margin-left: 6px; font-style: normal; font-family: var(--font-code); font-size: 11px; color: var(--text-muted); }
+.bw-step-detail { display: block; margin-top: 2px; font-size: 11px; line-height: 1.45; color: var(--text-muted); }
+.bw-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+
+.bw-hint { margin: 0; font-size: 12px; color: var(--text-muted); }
+.bw-hint-sub { margin-top: 2px; opacity: .85; }
+.bw-hint-warn { color: var(--danger); }
+
+.bw-live { display: flex; flex-direction: column; gap: 6px; }
+.bw-live h4 { margin: 0; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.bw-live-list {
+  display: flex; flex-direction: column; gap: 3px;
+  margin: 0; padding: 0; list-style: none;
+  max-height: 190px; overflow: auto;
+}
+.bw-live-step {
+  display: flex; align-items: center; gap: 7px;
+  padding: 3px 6px; border: 1px solid transparent; border-radius: var(--radius);
+  background: var(--bg); font-size: 12px; color: var(--text-secondary);
+}
+.bw-live-step strong { font-weight: 600; color: var(--text); }
+.bw-live-step em { font-style: normal; font-family: var(--font-code); font-size: 11px; color: var(--text-muted); }
+.bw-live-dot { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); }
+.bw-live-step.is-running .bw-live-dot { background: var(--gold); animation: bw-pulse 1.2s ease-in-out infinite; }
+.bw-live-step.is-error .bw-live-dot,
+.bw-live-step.is-failed .bw-live-dot { background: var(--danger); }
+.bw-live-step.is-done .bw-live-dot { background: color-mix(in srgb, var(--text-secondary) 55%, transparent); }
+.bw-live-step.is-cancelled { opacity: .6; }
+.bw-live-empty { font-size: 12px; color: var(--text-muted); padding: 3px 6px; }
+.wf-live-status { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+.wf-live-elapsed { min-width: 34px; font-size: 11px; color: var(--text-faint); text-align: right; font-variant-numeric: tabular-nums; }
+
+@keyframes bw-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+.bw-star { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.bw-star-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.bw-star-body { display: flex; flex-direction: column; gap: 8px; }
+.bw-star-stage { width: 100%; }
+.bw-star-detail { font-size: 12px; }
+.bw-star-detail h5 { margin: 0 0 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); }
+
+.star-map { display: block; width: 100%; max-width: 460px; height: auto; margin: 0 auto; }
+.star-empty { font-size: 12px; fill: var(--text-muted); }
+.star-hub { cursor: pointer; }
+.star-hub-dot { fill: var(--bg); stroke: var(--border-hover); stroke-width: 1; }
+.star-hub-label { font-size: 11px; fill: var(--text-secondary); }
+.star-hub-topic { font-size: 10px; fill: var(--text-muted); }
+.star-edge { stroke: color-mix(in srgb, var(--text-secondary) 35%, transparent); fill: none; transition: opacity var(--transition); }
+.star-edges { pointer-events: none; }
+.star-leaf { stroke: var(--bg); stroke-width: 1; }
+.star-edge.is-dim { opacity: .12; }
+.star-member { cursor: pointer; transition: opacity var(--transition); }
+.star-member-dot { stroke: var(--bg); stroke-width: 1.5; }
+.star-member-name { font-size: 10px; fill: var(--text-secondary); }
+.star-spoke { stroke: var(--text-faint); stroke-width: 1; }
+.star-leaf-tool { fill: var(--text-muted); }
+.star-leaf-sub { fill: var(--gold); }
+.star-map.star-focused .star-member:not(.is-focus) { opacity: .35; }
+
+.bw-turns {
+  display: flex; flex-direction: column; gap: 3px;
+  margin: 0; padding: 0; list-style: none;
+  max-height: 170px; overflow: auto;
+}
+.bw-turns li {
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 3px 6px; border-left: 2px solid var(--border);
+  background: var(--bg);
+}
+.bw-turn-round { flex: 0 0 auto; font-size: 11px; color: var(--text-faint); }
+.bw-turns strong { font-size: 12px; color: var(--text); white-space: nowrap; }
+.bw-turn-text {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 12px; color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 视图专属控件在全屏头部里也要能收起来（.hidden 在本仓库没有全局定义） */
+.board-view-collapse-btn.hidden { display: none; }
+
+/* 动效关闭时不闪点：活层的状态靠文字与颜色，不靠脉动 */
+@media (prefers-reduced-motion: reduce) {
+  .bw-live-step.is-running .bw-live-dot { animation: none; }
+}
+

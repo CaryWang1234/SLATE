@@ -26,7 +26,7 @@ globalThis.fetch = async (url, init) => {
   return { ok: true, status: 200, statusText: "OK", json: async () => ({ code: 0, data: null, message: "ok" }) };
 };
 
-const { openRun, projectChat, projectSteps } = await import("../frontend/js/services/agent_ledger.js?v=20260919-002");
+const { openRun, projectChat, projectSteps } = await import("../frontend/js/services/agent_ledger.js?v=20260921-001");
 
 const lastBody = () => JSON.parse(posts[posts.length - 1].init.body);
 const types = (ledger) => ledger.events.map(e => `${e.type}${e.callId ? ":" + e.callId : ""}`);
@@ -65,10 +65,20 @@ const types = (ledger) => ledger.events.map(e => `${e.type}${e.callId ? ":" + e.
   for (const e of body.events) {
     assert.deepEqual(
       Object.keys(e).sort(),
-      ["callId", "data", "messageId", "seq", "tool", "ts", "type"],
+      ["callId", "data", "messageId", "parentCallId", "seq", "tool", "ts", "type"],
       `事件上行键须与 append_events 读取的键一致：${e.type}`,
     );
   }
+  // parentCallId 是星图 spawn 边的唯一载体：主调用为空，派生出来的行必须非空
+  assert.equal(body.events.find(e => e.type === "call.ready").parentCallId, "", "顶层调用不该有父");
+  const spawned = ledger.emit("subagent.started", {
+    callId: "r0c0s0", parentCallId: "r0c0", tool: "调研子代理", round: 0, data: { task: "看目录" },
+  });
+  assert.equal(spawned.parentCallId, "r0c0", "emit 须把 parentCallId 留在事件上");
+  ledger.flush();
+  assert.equal(lastBody().events.find(e => e.type === "subagent.started").parentCallId, "r0c0",
+    "上行必须带 parentCallId，否则后端的叶子查询取不到这一行");
+  assert.equal(projectSteps(ledger).length, 1, "subagent.* 不得长成第二张步骤卡");
   const seqs = body.events.map(e => e.seq);
   assert.deepEqual(seqs, [...seqs].sort((a, b) => a - b), "seq 须单调");
   assert.equal(new Set(seqs).size, seqs.length, "seq 不得重复");

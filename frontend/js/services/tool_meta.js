@@ -9,8 +9,8 @@
  * （git / node / curl…）挑对应品牌图标，命令行 / 文件 / 工具三类行共用这套识别链。
  */
 
-import { TOOLS } from "./tools.js?v=20260919-002";
-import { t } from "./i18n.js?v=20260919-002";
+import { TOOLS } from "./tools.js?v=20260921-001";
+import { t } from "./i18n.js?v=20260921-001";
 
 const SUMMARY_MAX = 60;
 
@@ -55,6 +55,8 @@ const TOOL_LABELS = {
   mcp_factory: "工具工厂",
   screenshot_to_code: "截图转码",
   user_ask: "询问用户",
+  exit_target_mode: "退出目标模式",
+  exit_autopilot: "退出自主推进",
   skill_search: "技能搜索",
   subagent_run: "并行子代理",
   system_info: "系统信息",
@@ -141,6 +143,8 @@ const TOOL_ICONS = {
   mcp_factory: "factory",
   screenshot_to_code: "image",
   user_ask: "message-circle",
+  exit_target_mode: "check",
+  exit_autopilot: "check",
   skill_search: "search",
   subagent_run: "bot",
   system_info: "info",

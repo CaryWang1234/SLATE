@@ -12,14 +12,14 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions } from "../store.js?v=20260919-002";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260919-002";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260919-002";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260919-002";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260919-002";
-import { t } from "./i18n.js?v=20260919-002";
-import { makeId } from "./utils.js?v=20260919-002";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260919-002";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit } from "../store.js?v=20260921-001";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260921-001";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260921-001";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260921-001";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260921-001";
+import { t } from "./i18n.js?v=20260921-001";
+import { makeId } from "./utils.js?v=20260921-001";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260921-001";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -102,6 +102,16 @@ function renderAction(payload) {
 }
 
 // ── 工具注册 ────────────────────────────────
+
+// 模型显式收口：只登记一次请求，真正停循环由工具循环在轮末取走（chat.js desktopPolicy）。
+// 不在这里 abort：那会掐断工具结果回灌，用户只看得到半截汇报。
+function exitAgentLoop(mode, summary) {
+  if (mode === "target") setHarnessEnabled(false);
+  requestLoopExit({ mode, reason: summary });
+  const closed = mode === "target" ? "目标模式开关已关闭，后续消息不再自动推进。" : "";
+  return `已登记收口，本次自主循环将在你给出最终汇报后停止。${closed}`
+    + "下一条回复不要再调用工具：直接写明交付了什么、每项用什么方式验证、验证结果是什么。";
+}
 
 const TOOLS = {
 
@@ -586,7 +596,7 @@ const TOOLS = {
     params: {
       agents: { type: "array", description: "子代理定义数组 [{name: 名称, task: 自包含任务描述}]，required: true" },
     },
-    async execute({ agents }) {
+    async execute({ agents }, callCtx = {}) {
       if (!Array.isArray(agents) || agents.length === 0 || !agents.some(a => a && String(a.task || "").trim())) {
         return "参数错误：agents 必须是非空数组，每项包含 {name, task}，且至少一项 task 非空。请修正后重发调用。";
       }
@@ -596,6 +606,9 @@ const TOOLS = {
           strip: stripToolCalls,
           exec: executeTool,
           toolsPrompt: getToolsSystemPrompt({ compact: true }),
+          // 事件账本 + 父调用 id：子代理的 started/finished 落在这一行账本上，星图据此画 spawn 边
+          ledger: callCtx.ledger || null,
+          parentCallId: callCtx.ledgerCallId || "",
         }, getSubAgentSignal());
 
         const statusText = { done: "完成", failed: "失败", stopped: "已停止", max_rounds: "轮次用尽" };
@@ -1180,6 +1193,27 @@ const TOOLS = {
           : "\n请继续统筹推进未完成事项（能并行的多项一起处理），每完成一批立即调用 todo_manage 批量更新状态，保持清单实时准确。");
     },
   },
+  exit_target_mode: {
+    name: "退出目标模式",
+    description: "目标模式（六阶段自主闭环）的显式收口：关闭目标模式开关并结束本次自主循环。只有当全部交付物都已产出、且每一项都用工具实测验证通过时才调用；任务还有未完成或未验证的部分时绝对不要调用，继续推进才是正解。调用后下一条回复直接把 summary 展开成最终汇报，不要再调用工具。",
+    params: {
+      summary: { type: "string", description: "一句话收口摘要：交付了什么 + 用什么方式验证 + 验证结果", required: true },
+    },
+    async execute({ summary }) {
+      return exitAgentLoop("target", summary);
+    },
+  },
+
+  exit_autopilot: {
+    name: "退出自主推进",
+    description: "Autopilot 自主推进的显式收口：结束本次自动续跑，把主动权交回用户（不改动目标模式开关）。仅在任务确实完成并已用工具验证后调用；没做完不要调用，也不要靠轮数耗尽或反复复述计划来结束循环。调用后下一条回复直接把 summary 展开成最终汇报，不要再调用工具。",
+    params: {
+      summary: { type: "string", description: "一句话收口摘要：交付了什么 + 用什么方式验证 + 验证结果", required: true },
+    },
+    async execute({ summary }) {
+      return exitAgentLoop("autopilot", summary);
+    },
+  },
 };
 
 // ── 工具调用检测 ──────────────────────────────
@@ -1246,6 +1280,8 @@ const CORE_AGENT_TOOLS = [
   "code_search", "skill_search", "skill_run", "actions_list", "actions_read", "actions_write",
   "file_edit", "file_create", "file_append",
   "todo_manage", "board_read", "board_batch",
+  // 收口工具必须在精简目录里可见：弱端点只看得到核心集，缺了它们就只能靠轮数耗尽退出
+  "exit_target_mode", "exit_autopilot",
 ];
 
 const AGENT_TOOL_DECISION_RULES = [
@@ -1258,6 +1294,7 @@ const AGENT_TOOL_DECISION_RULES = [
   "桌面/浏览器操作：优先 browser_automation；必须操作系统 UI 时再 computer_use。",
   "复杂多步任务：用 todo_manage 维护状态；完成一批就更新，不等最后。",
   "可视化梳理：用 board_batch 一次性组织卡片和依赖。",
+  "干完了就停：自主推进（Autopilot / 目标模式）下，全部交付已验证后必须调 exit_autopilot / exit_target_mode 收口；没做完继续动手，不要靠停发工具或复述计划来结束循环。",
 ];
 
 function compactDescription(text, limit = 260) {
@@ -1737,6 +1774,10 @@ async function executeToolCalls(calls, ctx = {}) {
       result = await executeTool(call.name, call.params, {
         signal: ctx.signal,
         callId: call.id,
+        // 账本一侧的 callId（kernel 注入）与账本本身：subagent_run 靠它们画 spawn 边。
+        // 与 callId 分开传，因为 call.id 还承担"原生调用/文本调用"的分流判据，不能改写。
+        ledgerCallId: ctx.callIdFor?.(i) || call.id || "",
+        ledger: ctx.ledger || null,
         onEvent: ctx.onEvent ? (env => ctx.onEvent(env, call, i)) : null,
       });
     } finally {
@@ -1759,7 +1800,8 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   s += "3. 同一回复可批量调用互不依赖的读取/扫描工具；有依赖的等工具结果后再继续。\n";
   s += "4. 工具失败后换参数、换工具或读取更多上下文；不要重复完全相同的失败调用。\n";
   s += "5. 等待用户选择、确认、补充隐私信息或许可时，不调用工具；但任务缺少用户必须提供的关键条件（如生成风格、目标受众、输出格式、尺寸、语言）且无法合理假设时，调用 user_ask 以选择题形式询问，拿到回答后继续。\n";
-  s += "6. 工具/技能纪律：优先用工具佐证再回答——事实性、现状性问题默认查项目文件或联网搜索；仅当回答不依赖外部事实（纯闲聊、纯观点、无需佐证的概念解释）时才直接回答。不确定技能是否存在时，先 skill_search 搜索确认，再决定是否 skill_run；搜索到的技能与任务无关时，绝不强行使用。\n\n";
+  s += "6. 工具/技能纪律：优先用工具佐证再回答——事实性、现状性问题默认查项目文件或联网搜索；仅当回答不依赖外部事实（纯闲聊、纯观点、无需佐证的概念解释）时才直接回答。不确定技能是否存在时，先 skill_search 搜索确认，再决定是否 skill_run；搜索到的技能与任务无关时，绝不强行使用。\n";
+  s += "7. 收口纪律：任务全部交付且逐项验证通过后，必须显式收口——目标模式调 exit_target_mode、Autopilot 调 exit_autopilot，然后在下一条回复里给出最终汇报。干完了就停，不要继续多读多改来\"再确认一遍\"；反过来，任务没做完时不要靠停发工具、只说\"已完成\"或反复复述计划来结束循环。\n\n";
   s += "**工具选择速查**\n";
   for (const [scene, route] of TOOL_USE_RECIPES) s += `- ${scene}: ${route}\n`;
   for (const rule of AGENT_TOOL_DECISION_RULES) s += `- ${rule}\n`;

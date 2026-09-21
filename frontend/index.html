@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260919-002">
+  <link rel="stylesheet" href="./css/style.css?v=20260921-001">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -148,13 +148,21 @@
                       <option value="">选择模型</option>
                     </select>
                   </div>
-                  <select id="effort-select" class="input-pill-select" title="推理强度">
-                    <option value="auto">自动</option>
-                    <option value="off">关</option>
-                    <option value="low">低</option>
-                    <option value="medium">中</option>
-                    <option value="high">高</option>
-                  </select>
+                  <div class="effort-picker" id="effort-picker">
+                    <button id="btn-effort" class="effort-pill" type="button" title="推理强度" aria-haspopup="dialog" aria-expanded="false" aria-controls="effort-pop">
+                      <i class="effort-pill-shade" id="effort-pill-shade"></i>
+                      <span class="effort-pill-label" id="effort-pill-label">自动</span>
+                    </button>
+                    <div id="effort-pop" class="effort-pop hidden" role="dialog" aria-label="推理强度">
+                      <div class="effort-pop-head">
+                        <strong>推理强度</strong>
+                        <span class="effort-pop-readout" id="effort-pop-readout"></span>
+                      </div>
+                      <input type="range" id="effort-slider" class="effort-slider" min="0" max="4" step="1" value="0" aria-label="推理强度">
+                      <div class="effort-ticks" id="effort-ticks"></div>
+                      <div class="effort-pop-hint" id="effort-pop-hint"></div>
+                    </div>
+                  </div>
                 </div>
                 <div class="input-toolbar-right">
                   <button id="btn-voice" class="icon-btn voice-btn" title="语音输入" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
@@ -235,6 +243,7 @@
           <button class="board-view-btn" data-view="flow" title="流程视图">流程</button>
           <button class="board-view-btn" data-view="kanban" title="看板视图">看板</button>
           <button class="board-view-btn" data-view="outline" title="纲要视图">纲要</button>
+          <button class="board-view-btn" data-view="workflow" title="工作流视图">工作流</button>
         </div>
         <div class="panel-actions">
           <button id="btn-add-card" class="icon-btn" title="添加卡片">+</button>
@@ -1385,7 +1394,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260919-002"></script>
+  <script type="module" src="./js/app.js?v=20260921-001"></script>
 
 </body>
 </html>

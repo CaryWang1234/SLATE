@@ -6,9 +6,9 @@
  * tools 相关函数经 deps 注入，避免与 tools.js 循环导入。
  */
 
-import { state, getModelKey } from "../store.js?v=20260919-002";
-import { streamChat } from "./api.js?v=20260919-002";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260919-002";
+import { state, getModelKey } from "../store.js?v=20260921-001";
+import { streamChat } from "./api.js?v=20260921-001";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260921-001";
 
 export const SUBAGENT_MAX_PARALLEL = 5;     // 单次派出的并行上限
 export const SUBAGENT_MAX_ROUNDS = 8;       // 每个子代理的工具轮次预算
@@ -26,6 +26,9 @@ const SUBAGENT_SYSTEM_PREFIX = `你是主代理派出的子代理，负责独立
 // ── 进度事件总线（chat.js 订阅渲染实时面板）──────────────────
 // 事件：{type:"start", specs, total} / {type:"text", index, text}
 //      {type:"progress", index, round, toolCalls} / {type:"end", index, status, summary}
+// 契约：emit(类型, 载荷) —— 类型与载荷分两参传，总线在这里合成上面那种单个事件对象。
+// 曾经声明成 emit(event) 而调用点全按 (type, payload) 传，监听方拿到的是字符串、
+// event.type 恒 undefined，整块实时面板静默不渲染（见 chat.js 的 subagentEvents.on）。
 
 const listeners = new Set();
 
@@ -34,7 +37,8 @@ export const subagentEvents = {
     listeners.add(fn);
     return () => listeners.delete(fn);
   },
-  emit(event) {
+  emit(type, payload = {}) {
+    const event = { type: String(type || ""), ...(payload || {}) };
     for (const fn of listeners) {
       try { fn(event); } catch { /* 渲染失败不影响执行 */ }
     }
@@ -64,9 +68,40 @@ function normalizeSpecs(specs) {
     .filter(s => s.task);
 }
 
+/**
+ * 事件账本上的 spawn 边：一次 subagent_run 的账本行（parentCallId）派生出 N 个子代理行（childId）。
+ * 只发 subagent.*，不发 call.*——白板步骤卡按 call. 前缀投影，
+ * 把子代理也记成步骤卡会让"一次工具调用"在板上长出 N 张卡。
+ * 缺 ledger 或缺 parentCallId（不经 kernel 的调用路径，如团队面板直跑工具）时整句静默：
+ * 挂不上父调用的边是假边，宁缺勿造。
+ */
+const NOOP_SPAWN = { childId: "", started() {}, finished() {} };
+
+function spawnHandle(ledger, parentCallId, index, label) {
+  if (!ledger || !parentCallId) return NOOP_SPAWN;
+  const childId = `${parentCallId}s${index}`;
+  const emit = (type, data) => {
+    try {
+      ledger.emit(type, { callId: childId, parentCallId, tool: label, data });
+    } catch { /* 账本失败绝不影响子代理执行 */ }
+  };
+  return {
+    childId,
+    started: (task) => emit("subagent.started", { task: previewHead(task, 120) }),
+    finished: (result) => emit("subagent.finished", {
+      status: result.status, rounds: result.rounds, toolCalls: result.toolCalls,
+    }),
+  };
+}
+
 function previewTail(text, max = 60) {
   const s = String(text || "").replace(/\s+/g, " ").trim();
   return s.length > max ? s.slice(-max) : s;
+}
+
+function previewHead(text, max = 120) {
+  const s = String(text || "").replace(/\s+/g, " ").trim();
+  return s.length > max ? s.slice(0, max) + "…" : s;
 }
 
 /** 单个子代理：独立迷你工具循环。任何异常都不外抛，转为 failed/stopped 结果。 */
@@ -75,6 +110,9 @@ async function runOneSubAgent(spec, index, deps, signal) {
   const modelId = state.currentModel?.id || "gpt-5.6-terra";
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
+
+  const spawn = spawnHandle(deps.ledger || null, deps.parentCallId || "", index, spec.name);
+  spawn.started(spec.task);
 
   const messages = [
     { role: "system", content: SUBAGENT_SYSTEM_PREFIX + toolsPrompt },
@@ -86,8 +124,10 @@ async function runOneSubAgent(spec, index, deps, signal) {
   let lastOutput = "";
 
   const finish = (status, output) => {
+    const result = { name: spec.name, task: spec.task, status, output, toolCalls, rounds };
+    spawn.finished(result);
     subagentEvents.emit("end", { index, status, summary: previewTail(output, 80) });
-    return { name: spec.name, task: spec.task, status, output, toolCalls, rounds };
+    return result;
   };
 
   try {
@@ -155,7 +195,9 @@ async function runOneSubAgent(spec, index, deps, signal) {
 /**
  * 并行执行多个子代理。
  * @param {Array<{name?, task}>} specs 子代理定义
- * @param {{detect, strip, exec, toolsPrompt}} deps 由 tools.js 注入的工具函数
+ * @param {{detect, strip, exec, toolsPrompt, ledger?, parentCallId?}} deps
+ *        由 tools.js 注入的工具函数；ledger + parentCallId 来自事件账本，
+ *        只在这一对都在时给每个子代理记一行 spawn 边（星图用）
  * @param {AbortSignal|null} signal 主循环的中断信号
  * @returns {{results: Array, skipped: number}}
  */

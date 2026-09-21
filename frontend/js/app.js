@@ -2,32 +2,32 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, fmtContextTokens } from "./store.js?v=20260919-002";
-import { initI18n, t } from "./services/i18n.js?v=20260919-002";
-import { iconSvgEl } from "./services/icons.js?v=20260919-002";
-import { get, post, put } from "./services/api.js?v=20260919-002";
-import { dlgConfirm } from "./services/dialog.js?v=20260919-002";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260919-002";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260919-002";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260919-002";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260919-002";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260919-002";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260919-002";
-import { initTeamPanel } from "./components/team.js?v=20260919-002";
-import { initProjectBar } from "./components/project_bar.js?v=20260919-002";
-import { initSessionSummary } from "./components/session_summary.js?v=20260919-002";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260919-002";
-import { initTypingGame } from "./components/typing_game.js?v=20260919-002";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260919-002";
-import { initMemoryPanel } from "./components/memory.js?v=20260919-002";
-import { initExpertsPanel } from "./components/experts.js?v=20260919-002";
-import { initSchedule } from "./components/schedule.js?v=20260919-002";
-import { initRiskGuard } from "./services/riskguard.js?v=20260919-002";
-import { initUnderstandPanel } from "./components/understand.js?v=20260919-002";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260919-002";
-import { setProject, setProjectFileTree } from "./store.js?v=20260919-002";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260919-002";
-import { installErrorSink } from "./services/error_sink.js?v=20260919-002";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, fmtContextTokens } from "./store.js?v=20260921-001";
+import { initI18n, t } from "./services/i18n.js?v=20260921-001";
+import { iconSvgEl } from "./services/icons.js?v=20260921-001";
+import { get, post, put } from "./services/api.js?v=20260921-001";
+import { dlgConfirm } from "./services/dialog.js?v=20260921-001";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260921-001";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260921-001";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260921-001";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260921-001";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260921-001";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260921-001";
+import { initTeamPanel } from "./components/team.js?v=20260921-001";
+import { initProjectBar } from "./components/project_bar.js?v=20260921-001";
+import { initSessionSummary } from "./components/session_summary.js?v=20260921-001";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260921-001";
+import { initTypingGame } from "./components/typing_game.js?v=20260921-001";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260921-001";
+import { initMemoryPanel } from "./components/memory.js?v=20260921-001";
+import { initExpertsPanel } from "./components/experts.js?v=20260921-001";
+import { initSchedule } from "./components/schedule.js?v=20260921-001";
+import { initRiskGuard } from "./services/riskguard.js?v=20260921-001";
+import { initUnderstandPanel } from "./components/understand.js?v=20260921-001";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260921-001";
+import { setProject, setProjectFileTree } from "./store.js?v=20260921-001";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260921-001";
+import { installErrorSink } from "./services/error_sink.js?v=20260921-001";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -1107,7 +1107,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260919-002").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260921-001").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1247,6 +1247,13 @@ function ensureTeamMode() {
 
 function afterModeToggle() {
   updateDockActive();
+}
+
+// 黑板工作流视图的「去团队」用同一份导航口径：切到对话面板再进团队模式，
+// 不另写一套面板切换（自己点 .tab-btn 会在 Codex 侧栏布局下失灵）
+function openTeamConversation() {
+  switchPanel("chat");
+  ensureTeamMode();
 }
 
 function cxChatAction(sourceId) {
@@ -1651,7 +1658,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260919-002");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260921-001");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1899,7 +1906,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260919-002");
+        const { openProject } = await import("./services/project.js?v=20260921-001");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }
@@ -1918,4 +1925,4 @@ async function init() {
 
 document.addEventListener("DOMContentLoaded", init);
 
-export { toast, openSettings };
+export { toast, openSettings, openTeamConversation };

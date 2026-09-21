@@ -3,12 +3,16 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260919-002";
+import { makeId } from "./services/utils.js?v=20260921-001";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
   : "http://127.0.0.1:8000";
 const API_BASE = `${API_ORIGIN}/api`;
+
+// 目标模式的轮数上限：一次真实交付常要"读→改→跑→再跑验证"好几轮，50 经常在验证之前就用完。
+// 放宽同时要把话说在前头：上限是止损线，不是预算——干完活该由模型自己调 exit_target_mode 收口。
+export const HARNESS_MAX_ROUNDS = 80;
 
 const state = {
   // 主题
@@ -107,7 +111,7 @@ const state = {
   // 目标自主执行：模型自主多轮调用工具直至任务完成
   harness: {
     enabled: false,
-    maxRounds: 50,
+    maxRounds: HARNESS_MAX_ROUNDS,
   },
 
   // 任务完成通知：音效 + 系统通知
@@ -407,8 +411,9 @@ function loadPersistent() {
       ...state.harness,
       ...(data.harness || {}),
     };
-    // 旧版本持久化的 maxRounds=20 统一提升到 50 轮上限
-    if ((state.harness.maxRounds || 0) < 50) state.harness.maxRounds = 50;
+    // 旧版本持久化的 maxRounds=20/50 统一提到当前上限：上限只放宽不收紧，
+    // 收到低于上限的值就等于把"多给的预算"又悄悄拿走了
+    if ((state.harness.maxRounds || 0) < HARNESS_MAX_ROUNDS) state.harness.maxRounds = HARNESS_MAX_ROUNDS;
     state.notifications = {
       ...state.notifications,
       ...(data.notifications || {}),
@@ -475,7 +480,7 @@ async function loadSharedPersistent() {
       ...state.harness,
       ...(data.harness || {}),
     };
-    if ((state.harness.maxRounds || 0) < 50) state.harness.maxRounds = 50;
+    if ((state.harness.maxRounds || 0) < HARNESS_MAX_ROUNDS) state.harness.maxRounds = HARNESS_MAX_ROUNDS;
     state.notifications = {
       ...state.notifications,
       ...(data.notifications || {}),
@@ -539,6 +544,34 @@ function setReasoningEffort(level) {
   state.reasoningEffort = next;
   savePersistent();
   notify("reasoningEffort", state.reasoningEffort);
+}
+
+// 目标模式开关的唯一写入口：菜单里的手动切换与 exit_target_mode 都走这里。
+// 各写各的 → 工具关了模式，「＋」菜单的开关和待机条还停在"已开启"。
+function setHarnessEnabled(on) {
+  state.harness = state.harness || { enabled: false, maxRounds: HARNESS_MAX_ROUNDS };
+  const next = on === true;
+  if (state.harness.enabled === next) return false;
+  state.harness.enabled = next;
+  savePersistent();
+  notify("harness", state.harness.enabled);
+  return true;
+}
+
+// ── 模型显式收口 ─────────────────────────────────────────
+// exit_target_mode / exit_autopilot 把请求写在这里，工具循环在轮末取走一次并作废。
+// 刻意不进 buildPersistentData：它只属于当前这一场运行，换会话或重启都不该带着走。
+let loopExit = null;
+
+function requestLoopExit({ mode = "", reason = "" } = {}) {
+  loopExit = { mode, reason: String(reason || "").trim() };
+  return loopExit;
+}
+
+function takeLoopExit() {
+  const v = loopExit;
+  loopExit = null;
+  return v;
 }
 
 function setTheme(t) {
@@ -943,6 +976,7 @@ export {
   CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, isContextCapManual, fmtContextTokens,
   setActiveExpertId,
   setChatMode, setReasoningEffort, normalizeChatMode, normalizeReasoningEffort,
+  setHarnessEnabled, requestLoopExit, takeLoopExit,
   REASONING_LEVELS_BY_CAP, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS, getModelDefinition,
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens,
   getConversationTodos, setConversationTodos,

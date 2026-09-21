@@ -1,4 +1,5 @@
-"""事件账本写入语义守卫：幂等重放、runs upsert 只补不覆盖、并发无 database is locked。
+"""事件账本写入语义守卫：幂等重放、runs upsert 只补不覆盖、并发无 database is locked、
+团队会话（星图数据源）的落库与读图形状。
 
 绕过 HTTP 直接 await 路由函数（FastAPI 路由就是普通 async 函数），
 在临时 SLATE_DATA_DIR 上跑，不碰开发库。运行：python scripts/check_events_ledger.py
@@ -19,7 +20,7 @@ os.environ["SLATE_DATA_DIR"] = _TMP  # 必须在 import backend 之前
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.routers.events import append_events  # noqa: E402
+from backend.routers.events import append_events, append_team, latest_team, read_team  # noqa: E402
 from backend.routers.chat import DB_PATH  # noqa: E402
 
 
@@ -106,6 +107,80 @@ async def main() -> None:
     ])
     assert all(r["code"] == 0 and r["data"]["accepted"] == 40 for r in results), results
     assert len({r["run_id"] for r in _rows() if r["run_id"].startswith("run_c")}) == 4
+
+    # ── 6. 团队会话：名册去重/hue 收范围、发言幂等、只补不覆盖 ──
+    roster = [
+        {"id": "m_a", "name": "分析师", "role": "analyst", "modelId": "deepseek-flash", "hue": 40},
+        {"id": "m_d", "name": "决策者", "role": "decider", "modelId": "gpt-5.6-sol", "hue": 720},
+        {"id": "m_a", "name": "重复的名册项", "role": "member", "hue": 1},
+        {"id": "", "name": "无 id 不上图", "role": "member", "hue": 2},
+    ]
+    session = {
+        "id": "ts_1", "conversationId": "convT", "topic": "要不要换构建工具",
+        "createdAtMs": 1_700_000_100_000, "status": "running", "members": roster,
+    }
+    turns = [
+        {"seq": 1, "round": 1, "memberId": "m_a", "memberName": "分析师", "role": "analyst",
+         "action": "propose", "runId": "run_t1", "text": "先说成本", "ts": 1_700_000_101_000},
+        {"seq": 2, "round": 1, "memberId": "m_d", "memberName": "决策者", "role": "decider",
+         "action": "rebut", "targetMemberId": "m_a", "runId": "run_t2", "text": "反驳", "ts": 1_700_000_102_000},
+        # @ 到一个不在名册的名字：不得凭空造一颗星，也不得画一条边
+        {"seq": 3, "round": 2, "memberId": "m_a", "memberName": "分析师", "role": "analyst",
+         "action": "supplement", "targetMemberId": "ghost", "runId": "run_t1", "text": "补一句", "ts": 1_700_000_103_000},
+    ]
+    first_team = await append_team({"session": session, "turns": turns})
+    assert first_team["code"] == 0 and first_team["data"]["accepted"] == 3, first_team
+    replay_team = await append_team({"session": session, "turns": turns})
+    assert replay_team["data"]["accepted"] == 0, f"同一 (session,seq) 重放必须 no-op: {replay_team}"
+    assert (await append_team({"session": {"id": ""}, "turns": []}))["code"] == 1, "缺 session.id 必须拒"
+    # 稀疏收尾批：只补终态，名册与议题不得被抹平
+    await append_team({
+        "session": {"id": "ts_1", "status": "decided", "rounds": 2, "endedAtMs": 1_700_000_109_000,
+                    "verdictText": "不换", "summaryMarkdown": "## 结论", "members": []},
+        "turns": [],
+    })
+    graph = (await latest_team("convT"))["data"]
+    assert graph["session"]["id"] == "ts_1" and graph["session"]["status"] == "decided", graph["session"]
+    assert graph["session"]["topic"] == "要不要换构建工具", "空字段不得覆盖已落的名册与议题"
+    members = {m["id"]: m for m in graph["members"]}
+    assert set(members) == {"m_a", "m_d"}, graph["members"]
+    assert members["m_a"]["name"] == "分析师", "同 id 后到的名册项不得覆盖先到的"
+    assert 0 <= members["m_d"]["hue"] < 360, members["m_d"]
+    assert members["m_a"]["turns"] == 2 and members["m_d"]["turns"] == 1, "发言数按名册算"
+    assert graph["edges"] == [{"from": "m_d", "to": "m_a", "kind": "reply", "weight": 1}], graph["edges"]
+    assert len(graph["turns"]) == 3
+
+    # ── 7. 星图叶子：一次调用只数一遍，spawn 边按 parent 非空认 ──
+    async def _member_run(run_id: str, tools: list[str], spawns: list[tuple[str, str]]) -> None:
+        events, seq = [], 0
+        for i, tool in enumerate(tools):
+            call_id = f"r0c{i}"
+            seq += 1
+            events.append(_ev(seq, "call.ready", callId=call_id, tool=tool))
+        for i, (parent, label) in enumerate(spawns):
+            seq += 1
+            events.append(_ev(seq, "subagent.started", callId=f"{parent}s{i}", parentCallId=parent, tool=label))
+            seq += 1
+            # finished 也发一遍：读图若误用 finished，同一子代理会被数两遍
+            events.append(_ev(seq, "subagent.finished", callId=f"{parent}s{i}", parentCallId=parent, tool=label))
+        await append_events({"run": {"runId": run_id, "conversationId": "convT", "mode": "team"}, "events": events})
+
+    await _member_run("run_t1", ["terminal", "code_search"], [("r0c0", "调研子代理")])
+    await _member_run("run_t2", ["web_search"], [])
+    graph = (await latest_team("convT"))["data"]
+    leaves = {(l["memberId"], l["kind"], l["label"]): l["count"] for l in graph["leaves"]}
+    assert leaves == {
+        ("m_a", "tool", "terminal"): 1,
+        ("m_a", "tool", "code_search"): 1,
+        ("m_a", "subagent", "调研子代理"): 1,
+        ("m_d", "tool", "web_search"): 1,
+    }, leaves
+    # 按 id 直读与按对话取最近一场必须给同一张图
+    assert (await read_team("ts_1"))["data"]["edges"] == graph["edges"]
+    # 对话之间不得串台
+    assert (await latest_team("conv-other"))["data"] is None, "另一场对话不该看到这张图"
+    # 不传 conversationId：退化成"最近一场"，仍要能出图（团队面板可以在没有会话时空开）
+    assert (await latest_team(""))["data"]["session"]["id"] == "ts_1"
 
     print("events.py 账本写入语义：通过")
 

@@ -45,7 +45,7 @@ globalThis.fetch = async (url, opts) => {
   return { ok: true, status: 200, json: async () => ({ code: 0 }), catch: () => {} };
 };
 
-const sink = await import("../frontend/js/services/error_sink.js?v=20260919-002");
+const sink = await import("../frontend/js/services/error_sink.js?v=20260921-001");
 
 sink.installErrorSink();
 assert.deepEqual(Object.keys(globalThis.__listeners || []).sort(), ["error", "unhandledrejection"], "两个全局兜底都要装上");

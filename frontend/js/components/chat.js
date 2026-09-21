@@ -1,31 +1,32 @@
 /**
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输入 */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, setChatMode, setReasoningEffort, addBoardCard, estimateTokens, contextBudgetOf, declaredContextWindow, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS } from "../store.js?v=20260919-002";
-import { measureContext } from "../services/context_meter.js?v=20260919-002";
-import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260919-002";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260919-002";
-import { TOOLS, detectToolCalls, detectDsmlCalls, detectAllCalls, hasToolMarkup, hasDsmlMarkup, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt, buildOpenAITools, openAICallsToCalls, setModelToolCapability, effectiveToolMode, renderAction } from "../services/tools.js?v=20260919-002";
-import { renderMarkdown } from "../services/markdown.js?v=20260919-002";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260919-002";
-import { getExpertsCached } from "./experts.js?v=20260919-002";
-import { syncToolStepCards, clearToolStepCards } from "./whiteboard.js?v=20260919-002";
-import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260919-002";
-import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260919-002";
-import { fileTypeIcon } from "../services/file_icons.js?v=20260919-002";
-import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260919-002";
-import * as grindSvc from "../services/grind.js?v=20260919-002";
-import { t } from "../services/i18n.js?v=20260919-002";
-import { iconSvg, iconSvgEl, iconText, setIconText } from "../services/icons.js?v=20260919-002";
-import { notifyTaskComplete } from "../services/notify.js?v=20260919-002";
-import { subagentEvents, setSubAgentSignal } from "../services/subagent.js?v=20260919-002";
-import { cxEmptyIn } from "../services/cx_motion.js?v=20260919-002";
-import { createInkstream } from "../services/inkstream.js?v=20260919-002";
-import { _pendingToolMsgs, dedupeToolCalls, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260919-002";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260919-002";
-import { openRun as openLedgerRun, projectChat, projectSteps } from "../services/agent_ledger.js?v=20260919-002";
-import { reportError } from "../services/error_sink.js?v=20260919-002";
-import { toolLabel } from "../services/tool_meta.js?v=20260919-002";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, setChatMode, setReasoningEffort, addBoardCard, estimateTokens, contextBudgetOf, declaredContextWindow, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS, HARNESS_MAX_ROUNDS, setHarnessEnabled, takeLoopExit } from "../store.js?v=20260921-001";
+import { measureContext } from "../services/context_meter.js?v=20260921-001";
+import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260921-001";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260921-001";
+import { TOOLS, detectToolCalls, detectDsmlCalls, detectAllCalls, hasToolMarkup, hasDsmlMarkup, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt, buildOpenAITools, openAICallsToCalls, setModelToolCapability, effectiveToolMode, renderAction } from "../services/tools.js?v=20260921-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260921-001";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260921-001";
+import { getExpertsCached } from "./experts.js?v=20260921-001";
+import { syncToolStepCards, clearToolStepCards } from "./whiteboard.js?v=20260921-001";
+import { setWorkflowRunApi } from "./board_workflow.js?v=20260921-001";
+import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260921-001";
+import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260921-001";
+import { fileTypeIcon } from "../services/file_icons.js?v=20260921-001";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260921-001";
+import * as grindSvc from "../services/grind.js?v=20260921-001";
+import { t } from "../services/i18n.js?v=20260921-001";
+import { iconSvg, iconSvgEl, iconText, setIconText } from "../services/icons.js?v=20260921-001";
+import { notifyTaskComplete } from "../services/notify.js?v=20260921-001";
+import { subagentEvents, setSubAgentSignal } from "../services/subagent.js?v=20260921-001";
+import { cxEmptyIn } from "../services/cx_motion.js?v=20260921-001";
+import { createInkstream } from "../services/inkstream.js?v=20260921-001";
+import { _pendingToolMsgs, dedupeToolCalls, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260921-001";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260921-001";
+import { openRun as openLedgerRun, projectChat, projectSteps } from "../services/agent_ledger.js?v=20260921-001";
+import { reportError } from "../services/error_sink.js?v=20260921-001";
+import { toolLabel } from "../services/tool_meta.js?v=20260921-001";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar;
 let filePreviewArea, btnAttachFile, fileInput;
@@ -75,8 +76,10 @@ function autoScroll(force = false) {
 // 开启后：发送时注入六阶段指令，大任务强制建议TODOLIST，工具循环轮数上限提升到 maxRounds
 let harnessStatusEl = null;
 let resumeHintEl = null;
-const AGENT_AUTOPILOT_DEFAULT_ROUNDS = 18;
-const AGENT_AUTOPILOT_BROAD_ROUNDS = 28;
+// Autopilot 的轮数只是止损线：真正的退出是模型调 exit_autopilot 收口。
+// 放宽是因为验证环节（跑一次测试/读一次产物）常在 18 轮附近才排到，卡在收尾前。
+const AGENT_AUTOPILOT_DEFAULT_ROUNDS = 24;
+const AGENT_AUTOPILOT_BROAD_ROUNDS = 40;
 
 const HARNESS_PREFIX = `[目标模式 · Agent Loop]
 请自主完成以下任务，不要向我反复确认，按 Observe → Plan → Act → Verify → Report 推进：
@@ -86,6 +89,8 @@ const HARNESS_PREFIX = `[目标模式 · Agent Loop]
 4. 执行：按清单推进，能合并的一批一起完成；每完成一项或一批立即 todo_manage(action=update)。
 5. 验证：修改或生成后必须读取、运行命令、检查输出或执行测试；失败则继续修复。
 6. 汇报：全部 done 或 blocked 后再收尾，逐条核对结果、验证方式和剩余风险。
+收口：验证全部通过后调用 exit_target_mode（summary 写清交付了什么、怎么验证、结果如何）显式结束本次循环，然后下一条回复给出最终汇报。干完了就停，不要为"再确认一遍"继续动手；没做完则继续推进，不要靠停发工具或只说"已完成"来结束。
+
 注意：系统会在每轮工具结果开头标注 [目标模式 · x/N 轮]。接近轮数上限时优先完成验证和收尾，不要空转。
 
 任务：`;
@@ -198,51 +203,122 @@ function syncChatModeControls() {
 // 档位回显：记住上一次同步时生效的模型，用来区分"开机带回一个旧档位"和"用户刚切了模型"
 let effortControlModel = "";
 const EFFORT_LEVEL_LABELS = { off: "关", low: "低", medium: "中", high: "高" };
+const EFFORT_LABELS = { auto: "自动", off: "关", low: "低", medium: "中", high: "高" };
+// 墨色：把"想多少"翻成砚台里的浓淡——清墨几乎不落墨，焦墨一次研透。
+// --ink 只驱动透明度，深浅在明暗两套主题下都是"越浓越醒目"，不必各配一套颜色。
+const EFFORT_SHADE = { auto: "随墨", off: "清墨", low: "淡墨", medium: "浓墨", high: "焦墨" };
+const EFFORT_INK = { auto: 0.6, off: 0.28, low: 0.46, medium: 0.74, high: 1 };
+// 滑杆刻度跟着模型能力走：index → level，弹窗与 sync 都只认这一份
+let effortLevels = [];
+let effortPopOpen = false;
 
 // 静默把用户的档位改掉必须让他看见；toast 在 app.js，动态引入避免与 app.js 形成静态环
 async function echoEffortFallback(model, dropped) {
-  const { toast } = await import("../app.js?v=20260919-002");
+  const { toast } = await import("../app.js?v=20260921-001");
   toast(t("{model} 不支持「{level}」推理强度，已回落自动", {
     model: model.name || model.id,
     level: t(EFFORT_LEVEL_LABELS[dropped] || dropped),
   }));
 }
 
+function effortLevel() {
+  return effortLevels.includes(state.reasoningEffort) ? state.reasoningEffort : "auto";
+}
+
+function setEffortPop(open) {
+  const pop = document.getElementById("effort-pop");
+  const btn = document.getElementById("btn-effort");
+  if (!pop || !btn) return;
+  effortPopOpen = Boolean(open) && !btn.disabled;
+  pop.classList.toggle("hidden", !effortPopOpen);
+  btn.setAttribute("aria-expanded", effortPopOpen ? "true" : "false");
+  if (effortPopOpen) paintEffortPop(effortLevel());
+}
+
+// 墨色小字 + 档名：档位是主信息，墨色是同一件事的第二种读法
+function renderEffortTicks(allowed, current) {
+  const ticks = document.getElementById("effort-ticks");
+  if (!ticks) return;
+  const sig = allowed.join("|");
+  if (ticks.dataset.sig !== sig) {
+    ticks.dataset.sig = sig;
+    ticks.textContent = "";
+    allowed.forEach((level, i) => {
+      const cell = document.createElement("span");
+      cell.className = "effort-tick";
+      cell.dataset.level = level;
+      cell.style.left = allowed.length > 1 ? `${(i / (allowed.length - 1)) * 100}%` : "0%";
+      const name = document.createElement("b");
+      name.textContent = t(EFFORT_LABELS[level] || level);
+      const shade = document.createElement("i");
+      shade.textContent = t(EFFORT_SHADE[level] || level);
+      shade.style.setProperty("--ink", String(EFFORT_INK[level] ?? 0.6));
+      cell.append(name, shade);
+      ticks.appendChild(cell);
+    });
+  }
+  for (const cell of ticks.children) cell.classList.toggle("is-on", cell.dataset.level === current);
+}
+
+function paintEffortPop(level) {
+  const slider = document.getElementById("effort-slider");
+  const readout = document.getElementById("effort-pop-readout");
+  const hint = document.getElementById("effort-pop-hint");
+  const cap = reasoningCapabilityOf(state.currentModel);
+  if (slider) {
+    slider.max = String(Math.max(0, effortLevels.length - 1));
+    slider.value = String(Math.max(0, effortLevels.indexOf(level)));
+  }
+  renderEffortTicks(effortLevels, level);
+  if (readout) readout.textContent = `${t(EFFORT_LABELS[level] || level)} · ${t(EFFORT_SHADE[level] || level)}`;
+  if (hint) {
+    hint.textContent = REASONING_COLLAPSED_CAPS.has(cap)
+      ? t("该端点只分开关，低/中/高都会按「开」下发")
+      : t("拖动落定即生效，小字是该档对应的墨色");
+  }
+}
+
 function syncEffortControl() {
-  const sel = document.getElementById("effort-select");
-  if (!sel) return;
+  const btn = document.getElementById("btn-effort");
+  const label = document.getElementById("effort-pill-label");
+  const shade = document.getElementById("effort-pill-shade");
+  if (!btn || !label || !shade) return;
   const cap = reasoningCapabilityOf(state.currentModel);
   const allowed = reasoningLevelsOf(state.currentModel);
   const unsupported = cap === "none";
+  effortLevels = allowed;
   // 只在"用户刚切了模型"时回声一次回落：开机就带回落到 auto 的档位不该每次启动都弹条
   const currentId = state.currentModel?.id || "";
   const justSwitched = !!effortControlModel && !!currentId && effortControlModel !== currentId;
   effortControlModel = currentId;
-  for (const opt of sel.options) {
-    opt.disabled = !allowed.includes(opt.value);
-  }
-  sel.disabled = unsupported;
   if (!allowed.includes(state.reasoningEffort)) {
     // 注册表尚未返回时 currentModel 为 null，能力只是"未知"而不是"不支持"：
     // 此处若回落会把用户存的档位打回 auto 并落盘，等 model 订阅到达后再同步。
     if (state.currentModel) {
       const dropped = state.reasoningEffort;
       setReasoningEffort("auto");
-      sel.title = t("当前模型不支持该档位，已回落自动");
+      btn.title = t("当前模型不支持该档位，已回落自动");
       if (justSwitched) {
         // 静默回落等于"我偷偷改了你的设置"，切模型这一刻要明说
         echoEffortFallback(state.currentModel, dropped);
       }
     }
   } else if (unsupported) {
-    sel.title = t("当前模型不支持推理强度设置");
+    btn.title = t("当前模型不支持推理强度设置");
   } else if (REASONING_COLLAPSED_CAPS.has(cap)) {
     // 只分开关的家：让用户知道「中」和「高」在上游是同一个值，而不是我们没生效
-    sel.title = t("该端点只分开关，低/中/高都会按「开」下发");
+    btn.title = t("该端点只分开关，低/中/高都会按「开」下发");
   } else {
-    sel.title = t("推理强度");
+    btn.title = t("推理强度");
   }
-  if (sel.value !== state.reasoningEffort) sel.value = state.reasoningEffort;
+  const level = effortLevel();
+  label.textContent = t(EFFORT_LABELS[level] || level);
+  shade.style.setProperty("--ink", String(EFFORT_INK[level] ?? 0.6));
+  btn.disabled = unsupported;
+  btn.classList.toggle("is-na", unsupported);
+  if (unsupported) setEffortPop(false);
+  // 刻度始终按当前能力重画：置灰的滑杆留着上一个模型的五档，DOM 就在说谎
+  paintEffortPop(level);
 }
 
 function initInputModeSelectors() {
@@ -250,15 +326,38 @@ function initInputModeSelectors() {
   modeSel?.addEventListener("change", () => {
     setChatMode(modeSel.value);
   });
-  const effortSel = document.getElementById("effort-select");
-  effortSel?.addEventListener("change", () => {
-    setReasoningEffort(effortSel.value);
+  const effortBtn = document.getElementById("btn-effort");
+  const effortSlider = document.getElementById("effort-slider");
+  effortBtn?.addEventListener("click", () => setEffortPop(!effortPopOpen));
+  // 拖动只刷新读数与刻度，松手/键盘落定才写设置：与上下文预算滑杆同一套节奏
+  effortSlider?.addEventListener("input", () => {
+    paintEffortPop(effortLevels[Number(effortSlider.value)] || "auto");
+  });
+  effortSlider?.addEventListener("change", () => {
+    const level = effortLevels[Number(effortSlider.value)] || "auto";
+    if (level !== state.reasoningEffort) setReasoningEffort(level);
     syncEffortControl();
+  });
+  document.addEventListener("pointerdown", (e) => {
+    if (effortPopOpen && !e.target?.closest?.("#effort-picker")) setEffortPop(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && effortPopOpen) {
+      setEffortPop(false);
+      effortBtn?.focus();
+    }
   });
   subscribe("chatMode", syncChatModeControls);
   subscribe("model", () => {
     syncEffortControl();
     syncChatModeControls();
+  });
+  // 档位还可能被黑板工作流条、手机遥控那侧改掉：只订阅 model 会让胶囊停在旧值
+  subscribe("reasoningEffort", syncEffortControl);
+  // 目标模式开关也可能被 exit_target_mode 关掉：不订阅就会留下"菜单里还亮着、实际已关"的假开关
+  subscribe("harness", () => {
+    syncModeMenu();
+    showHarnessIdle();
   });
   syncChatModeControls();
   syncEffortControl();
@@ -1757,7 +1856,8 @@ function buildAgentRuntimeContext(content, harnessOn) {
     "- 修改或生成后必须验证：重新读取、运行检查/测试/构建，或解释无法验证的具体原因。",
     "- 工具失败时换参数或换工具，不重复完全相同的调用。",
     "- 只有任务完成、验证完成或明确受阻时才给最终汇报。",
-    "- 收口协议：全部交付且已验证时，回复首行写【任务完成】并逐项附验证方式与结果；没写这个标记会被当作仍在推进并自动续跑，所以别用它汇报半成品。",
+    "- 收口协议：全部交付且已验证时，先调用 exit_autopilot（summary 写清交付了什么、怎么验证、结果如何），再在回复首行写【任务完成】并逐项附验证方式与结果；既不调工具也不写这个标记，会被当作仍在推进并自动续跑，所以别用它汇报半成品。",
+    "- 干完了就停：验证通过就收口，不要为\"再确认一遍\"继续读文件、继续改；没做完则继续发起下一批工具调用。",
     "- 如果一轮回复结束时还没完成，请继续发起下一批工具调用；系统会自动把工具结果喂回给你。",
   ];
   if (cls.needsPlan && !harnessOn) {
@@ -2799,7 +2899,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     if (signal?.aborted || !stuck) break;
     const contPrompt = buildContinuePrompt(content);
     try {
-      const { toast } = await import("../app.js?v=20260919-002");
+      const { toast } = await import("../app.js?v=20260921-001");
       toast(t("输出达到长度上限，自动续写中（{x}/{n}）…", { x: round, n: MAX_CONTINUE_ROUNDS }));
     } catch {}
 
@@ -2842,7 +2942,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
   // 轮数耗尽仍未闭合：提示用户，后续由工具循环的截断守卫接管（拒执行并要求拆分重试）
   if (!signal?.aborted && hasTruncatedTail(content)) {
     try {
-      const { toast } = await import("../app.js?v=20260919-002");
+      const { toast } = await import("../app.js?v=20260921-001");
       toast("输出仍不完整，已要求模型拆分重试", 3200);
     } catch {}
   }
@@ -2898,7 +2998,7 @@ async function streamWithNativeFallback({ history, model, provider, api_key, bas
         toolMode = "text";
         setModelToolCapability(model, "text");
         try {
-          const { toast } = await import("../app.js?v=20260919-002");
+          const { toast } = await import("../app.js?v=20260921-001");
           toast(t("该模型不支持原生工具调用，已自动切换为文本格式"), 3200);
         } catch {}
         continue;
@@ -2919,7 +3019,9 @@ const SETTLE_PROBE_MAX = 2;
 const desktopPolicy = {
   exitReasons: DESKTOP_EXIT_REASONS,
   beginRun(opts) {
-    // 目标循环仅三种退出：手动停止 / 轮数用完 / TODO 全部了结；模型侧异常不再中断循环
+    // 目标循环的退出通道：手动停止 / 模型调收口工具 / 轮数用完 / 清单了结。
+    // 上一场遗留的收口请求在这里作废，否则新任务会被上一条的收尾指令直接停掉。
+    takeLoopExit();
     const harnessOn = state.harness?.enabled === true;
     return {
       harnessOn,
@@ -2929,7 +3031,7 @@ const desktopPolicy = {
       // 收尾校验配额：模型每次"想收工"最多拦两次要证据，其余尊重判断放行。
       // 有界是刻意的——自证只是把"用户手动发继续"换成"系统自动问一句"，不能变成无限续跑。
       settleProbes: 0,
-      // 连续"只描述计划、未发起工具调用"的轮数：先强警告，再强制停止，避免 50 轮空转烧额度
+      // 连续"只描述计划、未发起工具调用"的轮数：先强警告，再强制停止，避免长循环空转烧额度
       STALL_WARN_ROUNDS: 2,
       STALL_EXIT_ROUNDS: 4,
     };
@@ -2948,6 +3050,12 @@ const desktopPolicy = {
     hideResumeHint();
   },
   markActivity() { markActivity(); },
+  postExec(run) {
+    // 收口工具已经执行完（结果会照常回灌），这里只把请求搬到本场 run 上。
+    // 不在 execute 里直接停：那会让模型连"我做完了什么"都还没说出口就被掐断。
+    const exit = takeLoopExit();
+    if (exit) run.extra.loopExit = exit;
+  },
   dedupRound(run) {
     const { round, maxRounds, dupRounds, extra } = run;
     // 目标模式下仅拦截重复调用并催其换思路，不直接退出。
@@ -3171,6 +3279,17 @@ const desktopPolicy = {
   async endTurn(run) {
     const { extra, turn } = run;
     const { modelId, apiKey, baseUrl, params } = run.opts;
+    // 模型调过收口工具：这一轮就是它的最终汇报，说完即停——不再自动续跑、也不再催办
+    if (extra.loopExit) {
+      clearAutoAdvanceHints(turn.message);
+      run.exitKind = "done";
+      return {
+        action: "break",
+        exitReason: extra.loopExit.mode === "target"
+          ? `模型已调 exit_target_mode 收口${extra.loopExit.reason ? `：${extra.loopExit.reason}` : ""}`
+          : `模型已调 exit_autopilot 收口${extra.loopExit.reason ? `：${extra.loopExit.reason}` : ""}`,
+      };
+    }
     if (extra.harnessOn && getTodoLoopState().closed && !hasToolMarkup(turn.content) && turn.content.trim()) {
       clearAutoAdvanceHints(turn.message);
       run.exitKind = "done";
@@ -3184,6 +3303,12 @@ const desktopPolicy = {
     const { extra } = run;
     // 账本已补发取消事件，这里再投一次，停止/异常/轮数耗尽时不留悬空黄卡
     projectBoard(run);
+    boardRunInfo = {
+      runId: run.ledger?.runId || "",
+      exitReason: run.exitReason || "",
+      exitKind: run.exitKind || "stopped",
+      wallMs: Math.max(0, Date.now() - (run.ledger?.startedAtMs || Date.now())),
+    };
     // 清理未执行的工具标记并解除渲染抑制，防止残留标记被渲染成伪造的"历史恢复"卡片
     cleanupStaleToolMarkers();
     if (extra.autopilotOn && !run.exitReason && !(run.signal?.aborted)) {
@@ -3214,7 +3339,54 @@ const desktopPolicy = {
 // 账 → 白板：一次 run 的步骤链投影，幂等可重复调用
 function projectBoard(run) {
   if (!run.ledger) return;
+  boardRunLedger = run.ledger;   // 黑板工作流视图读的就是这一份账，不另存一份状态
+  boardRunConvId = run.genConvId || state.currentConversationId || "";
   syncToolStepCards(projectSteps(run.ledger), run.ledger.runId);
+}
+
+// ── 黑板工作流视图的现场读取 ────────────────────────────
+// 视图每秒 pull 一次（不 push、不 notify）：账本仍是唯一真源，这里只是给只读入口。
+let boardRunLedger = null;   // 当前/最近一次 run 的账本
+let boardRunConvId = "";     // 这份账属于哪场对话：换了对话就不能再拿它充数
+let boardRunInfo = null;     // 上一场的收尾：{runId, exitReason, exitKind, wallMs}
+
+function boardWorkflowSnapshot() {
+  const busy = Boolean(isGenerating);
+  // 账本跟着对话作废：不然切到没跑过的对话，"当前运行"还在播上一场的步骤
+  const mine = !boardRunConvId || boardRunConvId === (state.currentConversationId || "");
+  const ledger = mine ? boardRunLedger : null;
+  return {
+    busy,
+    conversationId: state.currentConversationId || "",
+    round: ledger ? Math.max(1, ledger.roundSeen + 1) : 0,
+    startedAtMs: busy ? (ledger?.startedAtMs || 0) : 0,
+    steps: ledger ? projectSteps(ledger) : [],
+    finished: !busy && ledger ? {
+      runId: ledger.runId,
+      exitReason: boardRunInfo?.exitReason || "",
+      exitKind: boardRunInfo?.exitKind || "stopped",
+      wallMs: boardRunInfo?.wallMs || 0,
+    } : null,
+  };
+}
+
+function registerBoardWorkflow() {
+  setWorkflowRunApi({
+    snapshot: boardWorkflowSnapshot,
+    conversationId: () => state.currentConversationId || "",
+    canResume: () => !isGenerating
+      && Boolean(resumeHintEl) && !resumeHintEl.classList.contains("hidden"),
+    runAction: (id, name) => {
+      // 复用 @提及 注入这一条既有链路：Action 的正文由 resolveMentions 取，视图不另造执行器
+      sendMessage({ text: `@${id} 请按这份流程执行「${name || id}」`, files: [] });
+    },
+    stop: () => stopGeneration(),
+    resume: () => {
+      hideResumeHint();
+      sendMessage({ text: "继续", files: [] });
+    },
+    toggleAutopilot: () => { toggleHarness(); },
+  });
 }
 
 // 桌面侧视图：气泡重锚定、正文回显、进度条、砚流进度、白板步骤卡
@@ -3440,7 +3612,7 @@ async function sendMessage(queuedPayload = null) {
   if (isGenerating) {
     if (queuedPayload) inputQueue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260919-002");
+      const { toast } = await import("../app.js?v=20260921-001");
       toast(t("已加入输入队列（{n}）", { n: inputQueue.length }));
     }
     updateSendState();
@@ -3467,7 +3639,7 @@ async function sendMessage(queuedPayload = null) {
   const grindActive = grindSession && ["grinding", "collecting"].includes(grindSession.state);
   const isFreshConv = !state.currentConversationId || state.messages.length === 0;
   if (!queuedPayload && !grindActive && isFreshConv && isAbstractTask(text)) {
-    const { dlgConfirm } = await import("../services/dialog.js?v=20260919-002");
+    const { dlgConfirm } = await import("../services/dialog.js?v=20260921-001");
     const confirmed = await dlgConfirm(
       t("检测到抽象任务「{text}」，建议先进入磨墨模式细化需求后再执行。是否切换？", { text: text.slice(0, 30) }),
       { title: t("磨墨建议"), okText: t("进入磨墨"), cancelText: t("直接发送") }
@@ -3711,12 +3883,12 @@ async function sendMessage(queuedPayload = null) {
 
   // 工具调用循环：环境任务默认进入 Autopilot，避免用户反复说“继续”；目标是显式强模式。
   const toolRounds = harnessOn
-    ? Math.max(10, Math.min(50, state.harness?.maxRounds || 50))
+    ? Math.max(10, Math.min(HARNESS_MAX_ROUNDS, state.harness?.maxRounds || HARNESS_MAX_ROUNDS))
     : (autopilotOn
       ? (agentTask.broad ? AGENT_AUTOPILOT_BROAD_ROUNDS : AGENT_AUTOPILOT_DEFAULT_ROUNDS)
       : 5);
   if (harnessOn) {
-    setHarnessProgress(t("自主执行已启动 · 最多 {n} 轮 · 仅手动停止 / 轮数用完 / 清单了结才退出", { n: toolRounds }));
+    setHarnessProgress(t("自主执行已启动 · 最多 {n} 轮 · 仅手动停止 / 轮数用完 / 模型调 exit_target_mode 收口才退出", { n: toolRounds }));
   } else if (autopilotOn) {
     setHarnessProgress(t("Autopilot 自主推进已启动 · 最多 {n} 轮", { n: toolRounds }));
   }
@@ -3739,7 +3911,7 @@ async function sendMessage(queuedPayload = null) {
   } catch (err) {
     console.error("发送失败", err);
     if (!isAbortError(err)) reportError(err, "发送链路");
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输出 · 目标模式保持开启" : "已停止输出") : t("发送失败: {msg}", { msg: err.message }));
   } finally {
   isGenerating = false;
@@ -3793,7 +3965,7 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
 
 
     // 通知用户
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     toast(t("上下文已压缩：{n} 条消息已摘要", { n: compress_count }));
   } catch (e) {
     console.warn("上下文压缩检查失败", e);
@@ -3808,11 +3980,11 @@ function toggleBrainstormMode() {
 }
 
 async function toggleHarness() {
-  state.harness = state.harness || { enabled: false, maxRounds: 50 };
-  state.harness.enabled = !state.harness.enabled;
-  savePersistent();
-  const { toast } = await import("../app.js?v=20260919-002");
-  toast(state.harness.enabled ? "目标模式已开启：目标→计划→执行→验证→汇报→追溯，六阶段自主闭环，大任务自动建议 TODOLIST" : "目标模式已关闭");
+  // 开关只经 store 的唯一写入口：exit_target_mode 走的是同一个 setter，
+  // 两边各写 state.harness 就会出现"工具关了、菜单还亮着"
+  const on = setHarnessEnabled(!(state.harness?.enabled === true));
+  const { toast } = await import("../app.js?v=20260921-001");
+  toast(on ? "目标模式已开启：目标→计划→执行→验证→汇报→追溯，六阶段自主闭环，大任务自动建议 TODOLIST" : "目标模式已关闭");
   showHarnessIdle();
   syncModeMenu();
 }
@@ -3885,7 +4057,7 @@ async function handleGrindReply(content, msgEl) {
     renderGrindPanel();
     updateSendState();
     appendDraftActions(msgEl, draft);
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     toast("墨稿已成：可送入目标模式 / 投到白板 / 存为模板");
     return;
   }
@@ -3997,20 +4169,20 @@ function appendDraftActions(msgEl, draft) {
     state.harness.enabled = true;
     syncModeMenu();
     savePersistent();
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     toast("墨稿已送入目标模式，自主执行中…");
     await sendMessage({ text: grindSvc.draftToHarnessTask(draft), files: [] });
   }));
 
   bar.appendChild(mkBtn("投到白板", "作为白板卡片保存", async () => {
     addBoardCard(grindSvc.draftToBoardCard(draft));
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     toast("已投到白板");
   }));
 
   bar.appendChild(mkBtn("存为模板", "存入知识库作为可复用任务书模板", async () => {
     const ok = await grindSvc.saveDraftAsTemplate(draft);
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     toast(ok ? "已存为磨墨模板（知识中心可见）" : "保存失败");
   }));
 
@@ -4020,7 +4192,7 @@ function appendDraftActions(msgEl, draft) {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260919-002").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260921-001").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -4044,7 +4216,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -4078,7 +4250,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(t("上下文已压缩：{n} 条消息已摘要", { n: res.data.compress_count || 0 }));
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -4486,7 +4658,7 @@ function renderUsageBar() {
 
 // 用量条上的上下文段点一下就该到"这个模型的预算"：设置页里逐个滑杆找太费事
 async function openContextSettings() {
-  const { openSettings } = await import("../app.js?v=20260919-002");
+  const { openSettings } = await import("../app.js?v=20260921-001");
   hideUsagePopup();
   openSettings({ focusCtxModelId: state.currentModel?.id || "" });
 }
@@ -4623,7 +4795,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260919-002");
+      const { toast } = await import("../app.js?v=20260921-001");
       toast(t("文件过大，已跳过: {name}", { name: file.name }));
       continue;
     }
@@ -4639,11 +4811,11 @@ async function handleFiles(fileList) {
         if (res.code === 0 && res.data?.content) {
           pendingFiles.push({ name: file.name, size: file.size, content: res.data.content, type: "text" });
         } else {
-          const { toast } = await import("../app.js?v=20260919-002");
+          const { toast } = await import("../app.js?v=20260921-001");
           toast(res.message || t("解析失败: {name}", { name: file.name }));
         }
       } catch (e) {
-        const { toast } = await import("../app.js?v=20260919-002");
+        const { toast } = await import("../app.js?v=20260921-001");
         toast(t("解析失败: {name}（{msg}）", { name: file.name, msg: e.message }));
       }
       continue;
@@ -4684,7 +4856,7 @@ async function handleFiles(fileList) {
   */
 async function regenerateMessage(msg, msgEl) {
   if (isGenerating) {
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     toast("正在生成中，请稍候");
     return;
   }
@@ -4705,7 +4877,7 @@ async function regenerateMessage(msg, msgEl) {
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     toast("请先在设置中配置该模型的 API Key");
     return;
   }
@@ -4715,7 +4887,7 @@ async function regenerateMessage(msg, msgEl) {
     .filter(m => !m.hidden && m.role !== "system")
     .map(mapAdapterMessage);
   if (!history.some(m => m.role === "user")) {
-    const { toast } = await import("../app.js?v=20260919-002");
+    const { toast } = await import("../app.js?v=20260921-001");
     toast("没有可重新生成的上下文");
     return;
   }
@@ -4818,6 +4990,8 @@ async function regenerateMessage(msg, msgEl) {
 
 function initChat() {
   chatScroll = document.getElementById("chat-messages");
+  // 黑板工作流视图的控制按钮指向这里的运行现场（视图不 import chat.js，避免成环）
+  registerBoardWorkflow();
   chatInput = document.getElementById("chat-input");
   btnSend = document.getElementById("btn-send");
   btnNewChat = document.getElementById("btn-new-chat");
@@ -4855,7 +5029,7 @@ function initChat() {
     markActivity(); // 防止重复触发
     try { activeGenerationController?.abort(); } catch {}
     try {
-      const { toast } = await import("../app.js?v=20260919-002");
+      const { toast } = await import("../app.js?v=20260921-001");
       toast("连接长时间无响应，已自动中断，可重试");
     } catch {}
   }, 15000);
@@ -4888,7 +5062,7 @@ function initChat() {
   document.getElementById("row-schedule")?.addEventListener("click", async () => {
     closeModeMenu();
     try {
-      const mod = await import("./schedule.js?v=20260919-002");
+      const mod = await import("./schedule.js?v=20260921-001");
       mod.openScheduleModal?.();
     } catch (e) {
       console.warn("定时任务模块加载失败", e);
@@ -4953,18 +5127,18 @@ function initChat() {
     const id = expertSelect.value;
     if (!id) {
       setActiveExpertId("");
-      const { toast } = await import("../app.js?v=20260919-002");
+      const { toast } = await import("../app.js?v=20260921-001");
       toast("已退出专家模式");
       return;
     }
     try {
-      const { getExpert } = await import("../services/experts.js?v=20260919-002");
+      const { getExpert } = await import("../services/experts.js?v=20260921-001");
       const detail = await getExpert(id, { force: true });
       setActiveExpertId(id, detail);
-      const { toast } = await import("../app.js?v=20260919-002");
+      const { toast } = await import("../app.js?v=20260921-001");
       toast(t("已启用专家包：{name}", { name: detail.name || id }));
     } catch (e) {
-      const { toast } = await import("../app.js?v=20260919-002");
+      const { toast } = await import("../app.js?v=20260921-001");
       toast(t("专家包加载失败: {msg}", { msg: e.message }));
       expertSelect.value = state.activeExpertId || "";
     }
@@ -5124,7 +5298,7 @@ function startVoice(btn) {
   };
   _voiceRecognition.onerror = (e) => {
     if (e.error !== "aborted" && e.error !== "no-speech") {
-      try { import("../app.js?v=20260919-002").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
+      try { import("../app.js?v=20260921-001").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
     }
     stopVoice();
   };

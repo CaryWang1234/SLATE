@@ -12,8 +12,8 @@
  * 加字节数，落库的是 digest。账本失败绝不影响聊天——上行一律 fire-and-forget，异常只 warn。
  */
 
-import { post } from "./api.js?v=20260919-002";
-import { toolLabel, toolArgsSummary } from "./tool_meta.js?v=20260919-002";
+import { post } from "./api.js?v=20260921-001";
+import { toolLabel, toolArgsSummary } from "./tool_meta.js?v=20260921-001";
 
 const DIGEST_MAX = 2000;
 const MAX_PENDING = 500;
@@ -48,6 +48,9 @@ function toWire(event) {
     ts: event.ts,
     type: event.type,
     callId: event.callId || "",
+    // 父调用非空 = 这一行是别人派生出来的（子代理），星图据此画 spawn 边。
+    // 服务端 events.py 一直在收这列，此前只是前端从没填过。
+    parentCallId: event.parentCallId || "",
     tool: event.tool || "",
     messageId: event.messageId || "",
     data,
@@ -69,9 +72,9 @@ export function openRun({ conversationId = "", mode = "", budget = 0 } = {}) {
     callId(round, index) {
       return `r${round}c${index}`;
     },
-    emit(type, { callId = "", tool = "", messageId = "", round, data } = {}) {
+    emit(type, { callId = "", parentCallId = "", tool = "", messageId = "", round, data } = {}) {
       if (closed) return null;
-      const event = { seq: ++seq, ts: Date.now(), type, callId, tool, messageId, round, data: data || {} };
+      const event = { seq: ++seq, ts: Date.now(), type, callId, parentCallId, tool, messageId, round, data: data || {} };
       events.push(event);
       pending.push(event);
       if (typeof round === "number") ledger.roundSeen = round;

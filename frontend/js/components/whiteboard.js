@@ -2,13 +2,14 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260919-002";
-import { get, streamChat } from "../services/api.js?v=20260919-002";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260919-002";
-import { t } from "../services/i18n.js?v=20260919-002";
-import { iconSvgEl } from "../services/icons.js?v=20260919-002";
-import { makeId } from "../services/utils.js?v=20260919-002";
-import { reportError } from "../services/error_sink.js?v=20260919-002";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260921-001";
+import { get, streamChat } from "../services/api.js?v=20260921-001";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260921-001";
+import { t } from "../services/i18n.js?v=20260921-001";
+import { iconSvgEl } from "../services/icons.js?v=20260921-001";
+import { makeId } from "../services/utils.js?v=20260921-001";
+import { reportError } from "../services/error_sink.js?v=20260921-001";
+import { renderWorkflowView, startWorkflowTick, stopWorkflowTick, initBoardWorkflow } from "./board_workflow.js?v=20260921-001";
 
 // 逐元素求极值：把整个数组当实参展开时，笔迹点上万会让 V8 抛
 // RangeError: Maximum call stack size exceeded，所以这里一律不展开。
@@ -72,6 +73,7 @@ const BOARD_VIEW_LABELS = {
   flow: "流程",
   kanban: "看板",
   outline: "纲要",
+  workflow: "工作流",
 };
 
 const COLOR_META = {
@@ -514,6 +516,8 @@ function renderBoardView() {
   const stepToggle = document.createElement("button");
   stepToggle.type = "button";
   stepToggle.className = "board-view-collapse-btn" + (showToolSteps ? " active" : "");
+  // 工作流视图呈现的是 Action 与运行现场，画布步骤卡在这里没有对应物，不摆一个空开关
+  stepToggle.classList.toggle("hidden", currentBoardView === "workflow");
   stepToggle.textContent = t("显示工具步骤");
   stepToggle.title = showToolSteps ? t("隐藏工具步骤") : t("显示工具步骤");
   stepToggle.addEventListener("click", () => {
@@ -545,6 +549,11 @@ function renderBoardView() {
   mountBoardViewControls(modesSlot, stopSlot);
   if (currentBoardView === "git") {
     renderGitTreeView(meta);
+    return;
+  }
+  // 工作流视图不依赖黑板卡片（它呈现 Action 与运行现场），必须排在"卡片为空"早退之前
+  if (currentBoardView === "workflow") {
+    renderWorkflowView(boardViewPanel, meta);
     return;
   }
   if (!cards.length) {
@@ -1217,6 +1226,9 @@ function setBoardView(view, options = {}) {
   document.querySelectorAll(".board-view-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === currentBoardView);
   });
+  // 工作流视图每秒只 patch 自己的活层；离开或收起就立刻停表，不在背后空转
+  if (currentBoardView === "workflow" && !boardViewCollapsed) startWorkflowTick();
+  else stopWorkflowTick();
   if (showCanvas) {
     renderAllCards();
     renderNotes();
@@ -2310,6 +2322,7 @@ function initWhiteboard() {
   setupDrawing();
   setupTextNotes();
   setupBoardShortcuts();
+  initBoardWorkflow();   // 工作流视图要跟着模型/模式/档位订阅重算可选档位
   strokes = Array.isArray(state.boardStrokes) ? [...state.boardStrokes] : [];
   resizeDrawCanvas();
   if (window.ResizeObserver && boardCanvas) {

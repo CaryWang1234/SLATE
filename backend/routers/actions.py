@@ -197,6 +197,9 @@ def _describe(clean_id: str, spec: dict[str, Any]) -> dict[str, Any]:
         "author": spec["author"],
         "stepCount": len(spec["steps"]),
         "inputCount": len(spec["inputs"]),
+        # 黑板工作流视图要靠这一格判断"跑完会不会往黑板回写"，故摘要里带上落点；
+        # 步骤正文仍只在 /actions/{id} 详情里给，摘要膨胀会撑大系统提示的目录注入。
+        "outputDestination": spec["output"]["destination"],
     }
 
 

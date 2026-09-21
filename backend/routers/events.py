@@ -26,6 +26,54 @@ router = APIRouter(prefix="/events", tags=["events"])
 
 MAX_EVENTS_PER_REQUEST = 500
 MAX_PAYLOAD_CHARS = 8000
+MAX_TURN_DIGEST = 400
+MAX_TEAM_TURNS = 400
+
+# 星图的角色标签词表；角度与配色由前端 star_map.js 决定，后端只如实存标签
+TEAM_ROLES = ("decider", "analyst", "creative", "member")
+
+
+def _team_ddl(conn) -> None:
+    """团队会话两张表（幂等）。
+
+    team_sessions 存成员名册快照（含冻结色相），team_turns 存每一次发言。
+    星图的边从这两张表派生，而不是从 localStorage 派生——关掉页面不该丢历史。
+    """
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_sessions (
+            session_id TEXT PRIMARY KEY,
+            conversation_id TEXT DEFAULT '',
+            topic TEXT DEFAULT '',
+            created_at_ms INTEGER DEFAULT 0,
+            ended_at_ms INTEGER DEFAULT 0,
+            status TEXT DEFAULT '',
+            rounds INTEGER DEFAULT 0,
+            verdict_text TEXT DEFAULT '',
+            summary_markdown TEXT DEFAULT '',
+            members_json TEXT DEFAULT '[]'
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_turns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            seq INTEGER NOT NULL,
+            round INTEGER DEFAULT 0,
+            member_id TEXT DEFAULT '',
+            member_name TEXT DEFAULT '',
+            role TEXT DEFAULT '',
+            model_id TEXT DEFAULT '',
+            expert_id TEXT DEFAULT '',
+            action TEXT DEFAULT '',
+            target_member_id TEXT DEFAULT '',
+            run_id TEXT DEFAULT '',
+            text_digest TEXT DEFAULT '',
+            ts INTEGER DEFAULT 0,
+            UNIQUE(session_id, seq)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_team_turns_session ON team_turns(session_id, seq)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_team_sessions_conv ON team_sessions(conversation_id, created_at_ms)")
 
 
 def _append_ledger_ddl(conn) -> None:
@@ -186,3 +234,244 @@ async def append_events(body: dict[str, Any]) -> dict[str, Any]:
         },
         "message": "ok",
     }
+
+
+# ── 团队会话：星图的真数据 ──────────────────────────────
+
+def _member_snapshot(raw: Any) -> list[dict[str, Any]]:
+    """名册只留图要用的字段，hue 由前端算好后冻结在这里（同一成员永远同色）。"""
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict):
+            continue
+        mid = str(item.get("id") or "")[:64]
+        if not mid or mid in seen:
+            continue
+        seen.add(mid)
+        out.append({
+            "id": mid,
+            "name": str(item.get("name") or mid)[:40],
+            "role": str(item.get("role") or "member")[:16],
+            "modelId": str(item.get("modelId") or "")[:64],
+            "expertId": str(item.get("expertId") or "")[:64],
+            "hue": _as_int(item.get("hue")) % 360,
+        })
+    return out[:20]
+
+
+def _upsert_team_session(conn, session: dict[str, Any]) -> None:
+    conn.execute(
+        "INSERT INTO team_sessions (session_id, conversation_id, topic, created_at_ms, ended_at_ms, "
+        "status, rounds, verdict_text, summary_markdown, members_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(session_id) DO UPDATE SET "
+        "conversation_id = COALESCE(NULLIF(excluded.conversation_id, ''), team_sessions.conversation_id), "
+        "topic = CASE WHEN excluded.topic != '' THEN excluded.topic ELSE team_sessions.topic END, "
+        "created_at_ms = CASE WHEN excluded.created_at_ms > 0 THEN excluded.created_at_ms ELSE team_sessions.created_at_ms END, "
+        "ended_at_ms = CASE WHEN excluded.ended_at_ms > 0 THEN excluded.ended_at_ms ELSE team_sessions.ended_at_ms END, "
+        "status = COALESCE(NULLIF(excluded.status, ''), team_sessions.status), "
+        "rounds = CASE WHEN excluded.rounds > 0 THEN excluded.rounds ELSE team_sessions.rounds END, "
+        "verdict_text = CASE WHEN excluded.verdict_text != '' THEN excluded.verdict_text ELSE team_sessions.verdict_text END, "
+        "summary_markdown = CASE WHEN excluded.summary_markdown != '' THEN excluded.summary_markdown ELSE team_sessions.summary_markdown END, "
+        "members_json = CASE WHEN excluded.members_json != '[]' THEN excluded.members_json ELSE team_sessions.members_json END",
+        (
+            str(session.get("id") or "")[:64],
+            str(session.get("conversationId") or "")[:64],
+            str(session.get("topic") or "")[:200],
+            _as_int(session.get("createdAtMs")),
+            _as_int(session.get("endedAtMs")),
+            str(session.get("status") or "")[:16],
+            _as_int(session.get("rounds")),
+            str(session.get("verdictText") or "")[:4000],
+            str(session.get("summaryMarkdown") or "")[:8000],
+            json.dumps(_member_snapshot(session.get("members")), ensure_ascii=False),
+        ),
+    )
+
+
+@router.post("/team/append")
+async def append_team(body: dict[str, Any]) -> dict[str, Any]:
+    """写入/追加一场团队讨论。同一 (session_id, seq) 重放即 no-op，前端可放心重试。"""
+    session = body.get("session") if isinstance(body.get("session"), dict) else {}
+    session_id = str(session.get("id") or "")
+    if not session_id:
+        return {"code": 1, "data": None, "message": "缺少 session.id"}
+    turns = body.get("turns") if isinstance(body.get("turns"), list) else []
+    conn = _get_db()
+    conn.isolation_level = None
+    inserted = 0
+    try:
+        _team_ddl(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            _upsert_team_session(conn, session)
+            for turn in turns[:MAX_TEAM_TURNS]:
+                if not isinstance(turn, dict) or turn.get("seq") is None:
+                    continue
+                cur = conn.execute(
+                    "INSERT OR IGNORE INTO team_turns (session_id, seq, round, member_id, member_name, role, "
+                    "model_id, expert_id, action, target_member_id, run_id, text_digest, ts) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        session_id[:64],
+                        _as_int(turn.get("seq")),
+                        _as_int(turn.get("round")),
+                        str(turn.get("memberId") or "")[:64],
+                        str(turn.get("memberName") or "")[:40],
+                        str(turn.get("role") or "")[:16],
+                        str(turn.get("modelId") or "")[:64],
+                        str(turn.get("expertId") or "")[:64],
+                        str(turn.get("action") or "")[:24],
+                        str(turn.get("targetMemberId") or "")[:64],
+                        str(turn.get("runId") or "")[:64],
+                        str(turn.get("text") or "")[:MAX_TURN_DIGEST],
+                        _as_int(turn.get("ts")) or int(time.time() * 1000),
+                    ),
+                )
+                inserted += cur.rowcount
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
+    return {
+        "code": 0,
+        "data": {"sessionId": session_id, "accepted": inserted},
+        "message": "ok",
+    }
+
+
+def _json_members(raw: Any) -> list[dict[str, Any]]:
+    try:
+        parsed = json.loads(raw or "[]")
+    except (TypeError, ValueError):
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def _team_graph(conn, session_row) -> dict[str, Any]:
+    """把两张表 + 账本合成星图形状：members / edges(reply) / leaves(spawn) / turns。
+
+    工具与子代理这一侧来自 runs→tool_events：一次成员发言开一个 run，
+    run 里的 call.ready 就是这位成员动过的手，parent_call_id 非空的行是它派生的子代理。
+    """
+    session_id = str(session_row["session_id"])
+    members = _json_members(session_row["members_json"])
+    member_ids = {m.get("id") for m in members}
+    turns = [
+        {
+            "seq": r["seq"],
+            "round": r["round"],
+            "memberId": r["member_id"],
+            "memberName": r["member_name"],
+            "role": r["role"],
+            "action": r["action"],
+            "targetMemberId": r["target_member_id"],
+            "runId": r["run_id"],
+            "digest": r["text_digest"],
+            "ts": r["ts"],
+        }
+        for r in conn.execute(
+            "SELECT seq, round, member_id, member_name, role, action, target_member_id, run_id, text_digest, ts "
+            "FROM team_turns WHERE session_id = ? ORDER BY seq ASC LIMIT ?",
+            (session_id, MAX_TEAM_TURNS),
+        ).fetchall()
+    ]
+
+    # reply 边：只承认名册里的成员之间，@ 到一个不存在的名字不该凭空造一颗星
+    edge_weights: dict[tuple[str, str], int] = {}
+    for turn in turns:
+        src, dst = turn["memberId"], turn["targetMemberId"]
+        if not src or src not in member_ids or dst not in member_ids or src == dst:
+            continue
+        key = (src, dst)
+        edge_weights[key] = edge_weights.get(key, 0) + 1
+    edges = [{"from": a, "to": b, "kind": "reply", "weight": w} for (a, b), w in edge_weights.items()]
+
+    run_to_member = {t["runId"]: t["memberId"] for t in turns if t["runId"] and t["memberId"] in member_ids}
+    leaves: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+    def _collect(sql: str, kind: str) -> None:
+        """按"每调用只发一次"的事件型取叶子：call.ready 每个调用一条，
+        subagent.started 每个子代理一条——用 finished 会一个调用数出三遍。"""
+        if not run_to_member:
+            return
+        placeholders = ",".join("?" * len(run_to_member))
+        for row in conn.execute(sql.format(placeholders=placeholders), tuple(run_to_member)).fetchall():
+            mid = run_to_member.get(row["run_id"]) or ""
+            tool = str(row["tool"] or "") or ("subagent" if kind == "subagent" else "")
+            if not mid or not tool:
+                continue
+            key = (mid, tool, kind)
+            rec = leaves.get(key)
+            if rec:
+                rec["count"] += 1
+            else:
+                leaves[key] = {"id": f"{mid}:{tool}:{kind}", "memberId": mid, "label": tool, "kind": kind, "count": 1}
+
+    _collect(
+        "SELECT run_id, call_id, tool FROM tool_events "
+        "WHERE type = 'call.ready' AND parent_call_id = '' AND run_id IN ({placeholders})",
+        "tool",
+    )
+    _collect(
+        "SELECT run_id, call_id, tool FROM tool_events "
+        "WHERE type = 'subagent.started' AND parent_call_id <> '' AND run_id IN ({placeholders})",
+        "subagent",
+    )
+
+    turns_by_member: dict[str, int] = {}
+    for turn in turns:
+        if turn["memberId"] in member_ids:
+            turns_by_member[turn["memberId"]] = turns_by_member.get(turn["memberId"], 0) + 1
+    members = [{**m, "turns": turns_by_member.get(m.get("id"), 0)} for m in members]
+    return {
+        "session": {
+            "id": session_id,
+            "conversationId": session_row["conversation_id"],
+            "topic": session_row["topic"],
+            "status": session_row["status"],
+            "createdAtMs": session_row["created_at_ms"],
+            "endedAtMs": session_row["ended_at_ms"],
+            "rounds": session_row["rounds"],
+            "verdict": session_row["verdict_text"],
+        },
+        "members": members,
+        "edges": edges,
+        "leaves": list(leaves.values()),
+        "turns": turns,
+    }
+
+
+@router.get("/team/latest")
+async def latest_team(conversationId: str = "") -> dict[str, Any]:
+    """这场对话最近一次团队讨论的星图数据。声明在 /{session_id} 之前，否则 latest 会被当成 id。"""
+    conn = _get_db()
+    try:
+        _team_ddl(conn)
+        sql = "SELECT * FROM team_sessions"
+        args: tuple[Any, ...] = ()
+        if conversationId:
+            sql += " WHERE conversation_id = ?"
+            args = (conversationId,)
+        sql += " ORDER BY created_at_ms DESC LIMIT 1"
+        row = conn.execute(sql, args).fetchone()
+        if row is None:
+            return {"code": 0, "data": None, "message": "尚无团队记录"}
+        return {"code": 0, "data": _team_graph(conn, row), "message": "ok"}
+    finally:
+        conn.close()
+
+
+@router.get("/team/{session_id}")
+async def read_team(session_id: str) -> dict[str, Any]:
+    conn = _get_db()
+    try:
+        _team_ddl(conn)
+        row = conn.execute("SELECT * FROM team_sessions WHERE session_id = ?", (session_id[:64],)).fetchone()
+        if row is None:
+            return {"code": 1, "data": None, "message": "找不到这场团队讨论"}
+        return {"code": 0, "data": _team_graph(conn, row), "message": "ok"}
+    finally:
+        conn.close()

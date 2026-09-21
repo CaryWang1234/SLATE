@@ -5,6 +5,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as common from "../frontend/js/services/agent_common.js";
+// 版本串必须与 tools.js 里的 import 说明符同形：写成 store.js（无 ?v=）会载入第二个 store 实例，
+// 工具改的是那一份 state，守卫读的是这一份 → 永远假红/假绿
+import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20260921-001";
 
 const NEXT_OK = "Next: use this result to continue the task. Do not repeat the same tool call unless new parameters are needed.";
 const NEXT_FAIL = "Next: fix the parameters or choose a different tool. Do not repeat the identical failing call.";
@@ -37,6 +40,7 @@ const DESKTOP_HARNESS = `
 - 若刚完成文件修改/生成，优先验证：读取文件、运行检查/测试/构建或说明无法验证原因。
 - 若已完成并验证，回复首行写【任务完成】，再逐项列出交付内容与验证方式；不写该标记视为仍在推进。
 - 目标模式下：如有 TODOLIST，完成一批就 todo_manage(action=update)，全部 done/blocked 后再收尾。
+- 干完了就停：验证全部通过后调用 exit_target_mode 收口（summary 写交付+验证方式+结果），然后下一条回复给出最终汇报；未到验证阶段就不要调用它。
 - 有 2 个工具失败：请换参数、换工具或先读取更多上下文，不要重复完全相同的失败调用。`;
 
 const DESKTOP_AUTOPILOT = `
@@ -46,7 +50,8 @@ const DESKTOP_AUTOPILOT = `
 - 若目标仍未完成，继续调用最小必要工具推进。
 - 若刚完成文件修改/生成，优先验证：读取文件、运行检查/测试/构建或说明无法验证原因。
 - 若已完成并验证，回复首行写【任务完成】，再逐项列出交付内容与验证方式；不写该标记视为仍在推进。
-- Autopilot 模式下：不要等用户说“继续”；任务未完成就继续观察、修改或验证。`;
+- Autopilot 模式下：不要等用户说“继续”；任务未完成就继续观察、修改或验证。
+- 干完了就停：全部交付并逐项验证通过后，调用 exit_autopilot 收口，然后下一条回复给出最终汇报；不要用停发工具或只说“已完成”来结束循环。`;
 
 const MOBILE_FAILED = `
 \n[Agent Loop 指令]
@@ -97,19 +102,26 @@ for (const [c, r] of cases) {
 assert.ok(common.formatToolResultForModel(cases[1][0], cases[1][1]).includes(DESKTOP_PREVIEW));
 assert.ok(common.formatToolResultForModel(cases[1][0], cases[1][1], common.MOBILE_TOOL_RESULT_STATUS).includes(MOBILE_WRITTEN));
 
-// 轮次催办指令
+// 轮次催办指令（三端各自一条基线，偏离即失败）
 assert.equal(
   common.buildToolFollowupInstruction({ harnessOn: true, autopilotOn: false, round: 3, maxRounds: 20, results: [bad, ok, bad] }),
   DESKTOP_HARNESS,
+  "目标模式催办串偏离基线（收口纪律/轮次/失败提示）",
 );
 assert.equal(
   common.buildToolFollowupInstruction({ harnessOn: false, autopilotOn: true, round: 7, maxRounds: 8, results: [] }),
   DESKTOP_AUTOPILOT,
+  "Autopilot 催办串偏离基线（收口纪律/轮次提示）",
 );
 assert.equal(
   common.buildToolFollowupInstruction({ round: 0, maxRounds: 8, results: [bad], failedLine: common.MOBILE_FAILED_LINE, prefix: "\n" }),
   MOBILE_FAILED,
+  "移动端催办串偏离基线",
 );
+// 收口纪律要按模式指名各自的收口工具：说"停下"而不说"调哪个"，模型无从显式退出
+assert.ok(DESKTOP_HARNESS.includes("exit_target_mode") && DESKTOP_AUTOPILOT.includes("exit_autopilot"),
+  "两条催办串必须各自点名收口工具");
+assert.ok(!MOBILE_FAILED.includes("exit_"), "移动端催办串不该点名 exit_*：模型可见的收口口径三端一致才有意义");
 
 // 截断守卫：file_create/file_append 的残缺前缀仍可执行，其余拒绝
 assert.equal(common.isTruncatedUnexecutable({ name: "file_edit", params: { _truncated: true } }), true);
@@ -137,7 +149,7 @@ for (const [file, pin] of [
 // ── 对话模式：系统提示既不能带工具目录，也不能诱导模型伪造调用 ──────
 // adapter.js 依赖 store.js（Node 侧不可 import），按源码级逐字 pin；
 // 工具目录本体从 tools.js 真取，判据跟着它变，不抄一份副本。
-const { getToolsSystemPrompt, effectiveToolMode } = await import("../frontend/js/services/tools.js");
+const { getToolsSystemPrompt, effectiveToolMode, TOOLS } = await import("../frontend/js/services/tools.js");
 const ADAPTER_SRC = readFileSync(new URL("../frontend/js/services/adapter.js", import.meta.url), "utf8");
 const CATALOGUE = getToolsSystemPrompt({ compact: true });
 assert.ok(CATALOGUE.includes("必须包含工具调用块"), "工具目录基线已变：对话模式分支的判据需同步核对");
@@ -199,5 +211,66 @@ assert.match(
 assert.equal(effectiveToolMode("gpt-5.6-sol", "openai", "chat"), "none");
 assert.equal(effectiveToolMode("gpt-5.6-sol", "openai", "agent") === "none", false);
 assert.equal(effectiveToolMode("local", "openai", "chat"), "none");
+
+// ── 收口工具契约：exit_target_mode / exit_autopilot ─────────────
+// 注册表从 tools.js 真取、开关从 store 单例真改，判据跟着行为走而不是抄文本
+{
+  for (const name of ["exit_target_mode", "exit_autopilot"]) {
+    const def = TOOLS[name];
+    assert.ok(def, `收口工具 ${name} 未注册`);
+    assert.deepEqual(Object.keys(def.params), ["summary"], `${name} 只该收一个 summary 参数`);
+    assert.equal(def.params.summary.required, true, `${name}.summary 必须必填：没有交付摘要就无从判断该不该收口`);
+    assert.match(def.description, /不要再调用工具/, `${name} 描述要交代收口后的下一步，否则模型会继续发调用`);
+    assert.ok(CATALOGUE.includes(name), `精简工具目录缺 ${name}：只看核心集的端点根本没有收口通道`);
+    assert.ok(getToolsSystemPrompt().includes(name), `工具目录正文缺 ${name}`);
+  }
+  assert.match(TOOLS.exit_target_mode.description, /绝对不要调用/, "exit_target_mode 必须写明未验证不得调用");
+  assert.match(TOOLS.exit_autopilot.description, /不改动目标模式开关/, "exit_autopilot 越权：描述要声明它不碰目标模式开关");
+  assert.match(getToolsSystemPrompt(), /收口纪律/, "工具纪律里必须显式要求干完就收口");
+
+  const prior = { ...(state.harness || {}) };
+  state.harness = { enabled: false, maxRounds: HARNESS_MAX_ROUNDS };
+  assert.equal(setHarnessEnabled(true), true, "目标模式开关应可开启（收口行为判据的前提）");
+  const targetMsg = await TOOLS.exit_target_mode.execute({ summary: "  改完并跑过测试  " });
+  assert.equal(state.harness.enabled, false, "exit_target_mode 必须关掉目标模式开关：否则「＋」菜单与待机条还停在开着");
+  assert.match(targetMsg, /目标模式开关已关闭/, "exit_target_mode 的回执要如实告知开关已关");
+  assert.deepEqual(takeLoopExit(), { mode: "target", reason: "改完并跑过测试" }, "收口请求要带 mode 与去空白的 reason");
+  assert.equal(takeLoopExit(), null, "收口请求只能取走一次：留着会下一场一开场就被停掉");
+
+  setHarnessEnabled(true);
+  takeLoopExit();
+  const autoMsg = await TOOLS.exit_autopilot.execute({ summary: "已完成并验证" });
+  assert.equal(state.harness.enabled, true, "exit_autopilot 不得改动目标模式开关：那是用户的选择");
+  assert.ok(!autoMsg.includes("目标模式开关已关闭"), "exit_autopilot 回执不该声称关了目标模式");
+  assert.deepEqual(takeLoopExit(), { mode: "autopilot", reason: "已完成并验证" });
+  takeLoopExit();
+  state.harness = prior;
+}
+
+// 轮数放宽与循环接线：kernel 无需改动，靠 policy 的 postExec 搬运 + endTurn/emptyRound 收口
+{
+  const storeSrc = readFileSync(new URL("../frontend/js/store.js", import.meta.url), "utf8");
+  const chatSrc = readFileSync(new URL("../frontend/js/components/chat.js", import.meta.url), "utf8");
+  const mchatSrc = readFileSync(new URL("../frontend/js/mobile/m-chat.js", import.meta.url), "utf8");
+  assert.equal(HARNESS_MAX_ROUNDS, 80, "目标模式轮数上限偏离基线");
+  assert.match(chatSrc, /const AGENT_AUTOPILOT_DEFAULT_ROUNDS = 24;/, "Autopilot 默认轮数偏离基线");
+  assert.match(chatSrc, /const AGENT_AUTOPILOT_BROAD_ROUNDS = 40;/, "Autopilot 大任务轮数偏离基线");
+  assert.match(chatSrc, /Math\.max\(10, Math\.min\(HARNESS_MAX_ROUNDS, state\.harness\?\.maxRounds \|\| HARNESS_MAX_ROUNDS\)\)/,
+    "目标模式的轮数必须由 store 的同一个上限算出，不能各写一个数");
+  const migration = storeSrc.match(/if \(\(state\.harness\.maxRounds \|\| 0\) < HARNESS_MAX_ROUNDS\) state\.harness\.maxRounds = HARNESS_MAX_ROUNDS;/g) || [];
+  assert.equal(migration.length, 2, "两条装载路径都要把旧的窄上限抬到当前上限，否则老用户的设置会一直压着轮数");
+
+  // 一开场作废遗留请求：不作废会让下一场运行刚发出去就停
+  for (const [src, label] of [[chatSrc, "desktopPolicy"], [mchatSrc, "mobilePolicy"]]) {
+    assert.match(src, /beginRun[\s\S]{0,200}?takeLoopExit\(\);/, `${label} 开头要作废上一场遗留的收口请求`);
+    assert.match(src, /const exit = takeLoopExit\(\);\n\s*if \(exit\) run\.extra\.loopExit = exit;/,
+      `${label} 要在轮末把收口请求搬到本场 run 上（不在 execute 里直接停，那会掐断最终汇报）`);
+  }
+  assert.match(chatSrc, /if \(extra\.loopExit\) \{[\s\S]{0,260}?run\.exitKind = "done";[\s\S]{0,260}?action: "break",/,
+    "desktopPolicy 必须在模型汇报后以 done 通道收口，而不是报成中断");
+  assert.match(mchatSrc, /if \(run\?\.extra\?\.loopExit\) \{[\s\S]{0,200}?action: "break", exitReason: `模型已调/,
+    "mobilePolicy 的退出原因要如实写收口，不能报成普通收尾");
+  assert.match(chatSrc, /subscribe\("harness"/, "开关能被工具关掉：不订阅就会留下假开关");
+}
 
 console.log("agent_common.js 输出与基线逐字全等：通过");

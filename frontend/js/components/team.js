@@ -1,18 +1,25 @@
 /**
  * SLATE AI 团队组件：多模型协作讨论
  * 轻量模型初步讨论，重型模型最终决策。
+ *
+ * 除本机 localStorage 历史外，一次讨论还按"每次发言 = 一行 team_turns + 一个事件账本 run"
+ * 落到后端（/events/team/append），黑板工作流视图的团队星图读的就是这份。
+ * 落库全程 fire-and-forget：讨论本身不依赖后端，写失败只 warn，
+ * 历史仍在，只是这场讨论画不进星图（列表里标"仅本机记录"）。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260919-002";
-import { notifyTaskComplete } from "../services/notify.js?v=20260919-002";
-import { streamChat } from "../services/api.js?v=20260919-002";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260919-002";
-import { renderMarkdown } from "../services/markdown.js?v=20260919-002";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260919-002";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260919-002";
-import { getExpertsCached } from "./experts.js?v=20260919-002";
-import { t } from "../services/i18n.js?v=20260919-002";
-import { makeId } from "../services/utils.js?v=20260919-002";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260921-001";
+import { notifyTaskComplete } from "../services/notify.js?v=20260921-001";
+import { streamChat, post } from "../services/api.js?v=20260921-001";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260921-001";
+import { openRun as openLedgerRun } from "../services/agent_ledger.js?v=20260921-001";
+import { memberHue } from "../services/star_map.js?v=20260921-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260921-001";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260921-001";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260921-001";
+import { getExpertsCached } from "./experts.js?v=20260921-001";
+import { t } from "../services/i18n.js?v=20260921-001";
+import { makeId } from "../services/utils.js?v=20260921-001";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -331,6 +338,110 @@ function makeSessionId() {
   return makeId();
 }
 
+// ── 团队会话落库（星图的数据源）────────────────────────
+
+/** 名册快照：只留星图要用的字段，hue 由 id 算出（纯函数 ⇒ 同一成员任何一场讨论同色） */
+function teamRosterSnapshot(members) {
+  return (members || [])
+    .map(m => ({
+      id: String(m?.id || ""),
+      name: String(m?.name || "").slice(0, 40),
+      role: m?.role || "member",
+      modelId: m?.modelId || "",
+      expertId: m?.expertId || "",
+      hue: memberHue(m?.id),
+    }))
+    .filter(m => m.id);
+}
+
+function createTeamRemote({ topic, members }) {
+  return {
+    id: makeSessionId(),
+    conversationId: state.currentConversationId || "",
+    topic,
+    createdAtMs: Date.now(),
+    roster: teamRosterSnapshot(members),
+    seq: 0,
+    speakers: [],
+    // ok=至少写成功过一次；failed=尝试过且全失败；null=还没试
+    syncState: null,
+    inflight: new Set(),
+  };
+}
+
+function teamSessionRow(ctx, extra = {}) {
+  return {
+    id: ctx.id,
+    conversationId: ctx.conversationId,
+    topic: ctx.topic,
+    createdAtMs: ctx.createdAtMs,
+    status: extra.status || "running",
+    members: ctx.roster,
+    ...(extra.final ? {
+      endedAtMs: Date.now(),
+      rounds: extra.rounds || 0,
+      verdictText: extra.verdictText || "",
+      summaryMarkdown: extra.summaryMarkdown || "",
+    } : {}),
+  };
+}
+
+function postTeam(ctx, payload) {
+  const req = post("/events/team/append", payload)
+    .then(() => { ctx.syncState = "ok"; })
+    .catch((err) => {
+      console.warn("[SLATE] 团队会话落库失败:", err?.message || err);
+      if (ctx.syncState !== "ok") ctx.syncState = "failed";
+    })
+    .finally(() => { ctx.inflight.delete(req); });
+  ctx.inflight.add(req);
+  return req;
+}
+
+/** @ 到的名字解析成成员 id：先认本场已发言的人（回的是那段话的作者），再退到名册同名 */
+function resolveTargetMemberId(ctx, targetName, selfId) {
+  const name = String(targetName || "").trim();
+  if (!name) return "";
+  for (let i = ctx.speakers.length - 1; i >= 0; i--) {
+    if (ctx.speakers[i].name === name && ctx.speakers[i].id !== selfId) return ctx.speakers[i].id;
+  }
+  const inRoster = ctx.roster.find(m => m.name === name && m.id !== selfId);
+  return inRoster?.id || "";
+}
+
+/** 一次发言落库：名册随行 upsert（只补不覆盖），发言按 (session_id, seq) 幂等 */
+function recordTeamTurn(ctx, rec, runId = "") {
+  if (!ctx) return;
+  const memberId = String(rec.member?.id || "");
+  const turn = {
+    seq: ++ctx.seq,
+    round: typeof rec.round === "number" ? rec.round : 0,
+    memberId,
+    memberName: rec.member?.name || "",
+    role: rec.member?.role || "member",
+    modelId: rec.member?.modelId || "",
+    expertId: rec.member?.expertId || "",
+    action: rec.action || "propose",
+    targetMemberId: resolveTargetMemberId(ctx, rec.target, memberId),
+    runId,
+    text: String(rec.text || ""),
+    ts: Date.now(),
+  };
+  ctx.speakers.push({ id: memberId, name: rec.member?.name || "" });
+  postTeam(ctx, { session: teamSessionRow(ctx), turns: [turn] });
+}
+
+/** 收尾：补终态与总结。返回 Promise，供本地历史落库前把在飞的写入等干。 */
+function finishTeamRemote(ctx, { status, rounds, verdictText, summaryMarkdown }) {
+  if (!ctx) return Promise.resolve();
+  postTeam(ctx, {
+    session: teamSessionRow(ctx, { status, final: true, rounds, verdictText, summaryMarkdown }),
+    turns: [],
+  });
+  return Promise.allSettled([...ctx.inflight]);
+}
+
+
 function resetTeamUsage() {
   currentTeamUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0, messageCount: 0 };
   renderTeamUsage();
@@ -399,6 +510,14 @@ function renderTeamHistory() {
     const time = session.createdAt ? new Date(session.createdAt).toLocaleString() : "";
     const turnCount = session.entries?.length ?? session.responses?.length ?? 0;
     meta.textContent = time + t(" · {n} 条发言 · ~{tok} tok", { n: turnCount, tok: fmtTok(session.usage?.totalTokens || 0) });
+    // 落库失败的历史只在明确失败时标注：老记录没这个字段，不该被说成"没同步"
+    if (session.remote === false) {
+      const badge = document.createElement("span");
+      badge.className = "team-history-badge";
+      badge.textContent = t("仅本机记录");
+      badge.title = t("这场讨论未能写入后端，星图里看不到");
+      meta.appendChild(badge);
+    }
     item.appendChild(meta);
 
     item.addEventListener("click", () => loadTeamSession(session.id));
@@ -683,6 +802,8 @@ async function startDiscussion() {
 
   const entries = [];
   let verdict = null;
+  // 本场讨论的后端落库上下文（星图数据源）；与 localStorage 历史各走各的
+  const teamRemote = createTeamRemote({ topic, members: teamMembers });
 
   // 预加载成员绑定的专家包
   const expertDetails = new Map();
@@ -743,9 +864,33 @@ async function startDiscussion() {
 
       // 处理工具调用
       const toolCalls = detectToolCalls(fullText);
+      let runId = "";
       if (toolCalls.length > 0) {
         fullText = stripToolCalls(fullText);
-        const results = await executeToolCalls(toolCalls, { signal: discussAbortController?.signal });
+        // 这次发言动过的工具记进一个 mode:"team" 的账本 run（发言行带 run_id）：
+        // 星图的叶子就是从这份账里数出来的，没有这份账这位成员的手就不可见
+        const ledger = openLedgerRun({ conversationId: teamRemote.conversationId, mode: "team", budget: 1 });
+        runId = ledger.runId;
+        const results = await executeToolCalls(toolCalls, {
+          signal: discussAbortController?.signal,
+          ledger,
+          callIdFor: (i) => ledger.callId(0, i),
+          onCallStart: (call, i) => {
+            const callId = ledger.callId(0, i);
+            ledger.emit("call.planned", { callId, tool: call.name, round: 0, data: { args: call.params } });
+            ledger.emit("call.ready", { callId, tool: call.name, round: 0 });
+            ledger.emit("call.started", { callId, tool: call.name, round: 0 });
+          },
+          onCallEnd: (call, i, result) => {
+            ledger.emit("call.finished", {
+              callId: ledger.callId(0, i),
+              tool: call.name,
+              round: 0,
+              data: { status: result === undefined ? "failed" : result.success === false ? "error" : "done" },
+            });
+          },
+        });
+        ledger.finish({ status: discussAbortController?.signal.aborted ? "cancelled" : "completed" });
         for (const r of results) {
           const toolEl = document.createElement("div");
           toolEl.className = "team-tool-result";
@@ -762,13 +907,14 @@ async function startDiscussion() {
 
       const rec = { round, member: { ...member }, action, target: parsed.target, text: parsed.content || fullText };
       entries.push(rec);
+      recordTeamTurn(teamRemote, rec, runId);
       if (action === "verdict") verdict = rec;
     }
 
     // 轮次用尽仍无决策：决策者强制拍板
     if (!verdict && isLastRound) {
       if (discussAbortController?.signal.aborted) break;
-      verdict = await forceVerdict(topic, boardContext, entries);
+      verdict = await forceVerdict(topic, boardContext, entries, teamRemote);
     }
   }
 
@@ -777,10 +923,20 @@ async function startDiscussion() {
     btnStopDiscuss.disabled = true;
   }
   const stoppedManually = !!discussAbortController?.signal.aborted;
+  const roundsPlayed = entries.reduce((acc, e) => (
+    typeof e.round === "number" && e.round > acc ? e.round : acc
+  ), 0);
+  const summaryMarkdown = stoppedManually ? "" : renderDebateSummary(topic, entries, verdict);
+  // 收尾先把在飞的落库等干，本地历史才知道这场讨论该不该标"仅本机记录"
+  await finishTeamRemote(teamRemote, {
+    status: stoppedManually ? "stopped" : verdict ? "decided" : "exhausted",
+    rounds: roundsPlayed,
+    verdictText: verdict?.text || "",
+    summaryMarkdown,
+  });
   if (!stoppedManually) {
-    const summaryMarkdown = renderDebateSummary(topic, entries, verdict);
     persistTeamSession({
-      id: makeSessionId(),
+      id: teamRemote.id,
       topic,
       createdAt: Date.now(),
       members: teamMembers.map(m => ({ ...m })),
@@ -788,6 +944,7 @@ async function startDiscussion() {
       verdictText: verdict?.text || "",
       summaryMarkdown,
       usage: { ...currentTeamUsage },
+      remote: teamRemote.syncState === "ok",
     });
   }
 
@@ -813,7 +970,7 @@ function stopDiscussion() {
   teamOutput.appendChild(stopEl);
 }
 
-async function forceVerdict(topic, boardContext, entries) {
+async function forceVerdict(topic, boardContext, entries, teamRemote = null) {
   const decider = teamMembers.find(m => m.role === "decider") || teamMembers[0];
   const apiKey = decider ? getModelKey(decider.modelId) : "";
   if (!decider || !apiKey) return null;
@@ -854,6 +1011,8 @@ async function forceVerdict(topic, boardContext, entries) {
 
   const rec = { round: "最终决策", member: { ...decider }, action: "verdict", target: parsed.target, text: parsed.content || fullText };
   entries.push(rec);
+  // 强制拍板这一行不跑工具（上面只 strip 不 exec），所以没有 run_id，只有发言与边
+  recordTeamTurn(teamRemote, rec, "");
   return rec;
 }
 
@@ -1267,7 +1426,7 @@ function initTeamPanel() {
 
   btnAddMember.addEventListener("click", () => {
     teamMembers.push({
-      id: `member-${Date.now()}`,
+      id: makeId("m"),
       name: t("成员{n}", { n: teamMembers.length + 1 }),
       modelId: "gpt-5.6-terra",
       persona: "你是团队成员。简洁发表观点（1-3句）。",

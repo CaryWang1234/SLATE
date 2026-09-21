@@ -86,9 +86,11 @@ function buildToolFollowupInstruction({ harnessOn = false, autopilotOn = false, 
   ];
   if (autopilotOn && !harnessOn) {
     lines.push("- Autopilot 模式下：不要等用户说“继续”；任务未完成就继续观察、修改或验证。");
+    lines.push("- 干完了就停：全部交付并逐项验证通过后，调用 exit_autopilot 收口，然后下一条回复给出最终汇报；不要用停发工具或只说“已完成”来结束循环。");
   }
   if (harnessOn) {
     lines.push("- 目标模式下：如有 TODOLIST，完成一批就 todo_manage(action=update)，全部 done/blocked 后再收尾。");
+    lines.push("- 干完了就停：验证全部通过后调用 exit_target_mode 收口（summary 写交付+验证方式+结果），然后下一条回复给出最终汇报；未到验证阶段就不要调用它。");
   }
   if (failed.length) {
     lines.push(failedLine(failed.length));

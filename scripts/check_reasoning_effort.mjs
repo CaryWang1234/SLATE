@@ -13,7 +13,8 @@
  * ③自定义模型的端点域名回落表前后端逐条一致，并把每一条真跑进后端；
  * ④各构建函数的真实输出：该发的发对字段，不该发的一个字段都不许出现；
  * ⑤字段降级兜底（流式 + 四条非流式）在位——覆盖面越广，越不能让猜错字段变成整条链路报错。
- * ①②③⑤在 Node 侧读源码正则核对，③④用 python -c 真跑构建函数断言输出。
+ * ⑥桌面「思考强度」滑杆弹窗的刻度来源、墨色小字标签与"落定才写盘"的时机。
+ * ①②③⑤⑥在 Node 侧读源码正则核对，③④用 python -c 真跑构建函数断言输出。
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -28,6 +29,8 @@ const CHAT = readFileSync(join(ROOT, "frontend/js/components/chat.js"), "utf8");
 const MCHAT = readFileSync(join(ROOT, "frontend/js/mobile/m-chat.js"), "utf8");
 const MSET = readFileSync(join(ROOT, "frontend/js/mobile/m-settings.js"), "utf8");
 const DICT = readFileSync(join(ROOT, "frontend/js/services/i18n_dict.js"), "utf8");
+const HTML = readFileSync(join(ROOT, "frontend/index.html"), "utf8");
+const CSS = readFileSync(join(ROOT, "frontend/css/style.css"), "utf8");
 
 // ── 1. 后端 REASONING_MAP：能力 → 档位 → 厂商取值 ────────────────
 const mapBlock = /REASONING_MAP: dict\[str, dict\[str, str\]\] = \{([\s\S]*?)\n\}/.exec(PY);
@@ -185,6 +188,45 @@ for (const key of ["推理强度：{level}", "该端点只分开关，低/中/�
   "端点能力未核实，SLATE 不会向它下发该字段", "{model} 不支持「{level}」推理强度，已回落自动"]) {
   assert.ok(DICT.includes(`"${key}"`), `i18n 缺少词条 ${key}，英文界面会露出中文`);
 }
+
+// ── 5b-2. 桌面滑杆弹窗：档位、墨色小字与写盘时机必须同源 ──────────
+// 思考强度做成滑杆弹窗后，"哪几档能选"来自 store 的能力表，"每一档叫什么墨色"是
+// 新增的第二套标签。两套标签一旦漂移（改了档位表没改墨色表），弹窗就会露出
+// undefined 或让"淡墨"对应到比"浓墨"更浓的透明度——用户看得见的错。
+for (const id of ["effort-picker", "btn-effort", "effort-pop", "effort-slider", "effort-ticks"]) {
+  assert.ok(HTML.includes(`id="${id}"`), `index.html 缺少 #${id}，思考强度滑杆弹窗的接线断了`);
+}
+assert.doesNotMatch(HTML, /id="effort-select"/,
+  "旧的推理强度 <select> 必须删净：两套控件并存会各写各的，用户不知道哪套生效");
+assert.match(CHAT, /const EFFORT_SHADE = \{([^}]*)\}/, "墨色标签表必须与档位标签同处声明，别散到 UI 里");
+const SHADE_BLOCK = /const EFFORT_SHADE = \{([^}]*)\}/.exec(CHAT)[1];
+const INK_BLOCK = /const EFFORT_INK = \{([^}]*)\}/.exec(CHAT)[1];
+for (const lvl of ["auto", "off", "low", "medium", "high"]) {
+  assert.ok(new RegExp(`\\b${lvl}:`).test(SHADE_BLOCK), `墨色表缺档位 ${lvl}，弹窗小字会露出空值`);
+  assert.ok(new RegExp(`\\b${lvl}:\\s*[\\d.]+`).test(INK_BLOCK), `浓淡表缺档位 ${lvl}`);
+}
+for (const [, , shade] of SHADE_BLOCK.matchAll(/(\w+):\s*"([^"]+)"/g)) {
+  assert.ok(DICT.includes(`"${shade}"`), `墨色「${shade}」没有英文词条，英文界面会露中文`);
+}
+const inkOf = (lvl) => Number(new RegExp(`\\b${lvl}:\\s*([\\d.]+)`).exec(INK_BLOCK)[1]);
+assert.ok(inkOf("off") < inkOf("low") && inkOf("low") < inkOf("medium") && inkOf("medium") < inkOf("high"),
+  "浓淡必须单调递增，否则「淡墨」比「浓墨」还黑，小字就是在骗人");
+assert.ok(inkOf("off") > 0 && inkOf("high") <= 1, "浓淡取值要在 0..1 之间：它是透明度不是色值");
+// 刻度只能来自能力表：硬编码五档就会给"强制思考"的端点画出它没有的「关」
+assert.match(CHAT, /effortLevels = allowed/, "滑杆刻度必须取 store 的可选档位");
+assert.match(CHAT, /cell\.style\.left = allowed\.length > 1/,
+  "刻度要按档位数量定位：端点只有四档时，等分五格的刻度会错位");
+// 拖动过程只刷新读数，落定才写设置并落盘——与上下文预算滑杆同一套节奏
+assert.match(CHAT, /addEventListener\("input", \(\) => \{\s*\n\s*paintEffortPop\(/,
+  "input 只该重画读数，别每过一个中间值就持久化一次");
+assert.match(CHAT, /addEventListener\("change", \(\) => \{[\s\S]{0,220}setReasoningEffort\(level\)/,
+  "滑杆松手没写回 store，选了等于没选");
+// 弹窗是开关式的：进不去（能力不支持）就别留一个能点开空弹窗的按钮
+assert.match(CHAT, /if \(unsupported\) setEffortPop\(false\)/,
+  "模型不支持推理强度时弹窗必须一起关掉，否则空滑杆还能点开");
+assert.match(CHAT, /btn\.setAttribute\("aria-expanded"/, "弹窗没有 aria-expanded，读屏器不知道开合");
+assert.match(CSS, /\.effort-tick i\s*\{[^}]*opacity:\s*var\(--ink/,
+  "墨色小字必须走 --ink，写死颜色就没法跟着主题翻转浓淡");
 
 // ── 5c. 落盘链路：共享状态读的每个字段，都得有人真的产出它 ─────────
 // savePersistent() 把 buildPersistentData() 的结果交给 getSharedPersistentData(data)。
