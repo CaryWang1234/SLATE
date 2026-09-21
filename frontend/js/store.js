@@ -3,7 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260921-001";
+import { makeId } from "./services/utils.js?v=20260921-003";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260921-003";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -50,6 +51,14 @@ const state = {
 
   // 每个对话的 TODOLIST（convId → items），目标六阶段闭环的任务清单
   conversationTodos: {},
+
+  // 侧栏任务徽标（convId → {kind: done|needs|error, at, seen}）：记的是"上一场怎么结束的"。
+  // 刻意只存本机 —— "已完成未查看"说的是这块屏幕有没有看过，跨设备同步只会把另一台
+  // 机器的阅读进度盖过来。进行中没有这一项：它由实时生成权判定，落库就会留下僵尸态。
+  taskFlags: {},
+
+  // 侧栏任务列表的排序偏好（recent|project|status|created|usage，见 services/task_list.js）
+  taskListSort: "recent",
 
   // 模型列表
   modelRegistry: {},
@@ -185,6 +194,8 @@ function buildPersistentData() {
     lastProjectPath: state.project?.path || null,
     conversationUsage: state.conversationUsage,
     conversationTodos: state.conversationTodos,
+    taskFlags: state.taskFlags,
+    taskListSort: normalizeTaskListSort(state.taskListSort),
     maxTokens: state.maxTokens,
     modelContextCaps: state.modelContextCaps,
     autoReview: state.autoReview,
@@ -329,6 +340,8 @@ function getSharedPersistentData(data = buildPersistentData()) {
     permissionMode: normalizePermissionMode(data.permissionMode),
     chatMode: normalizeChatMode(data.chatMode),
     reasoningEffort: normalizeReasoningEffort(data.reasoningEffort),
+    // 排序偏好同步；taskFlags 不同步（未读是本机概念），所以这里刻意没有它
+    taskListSort: normalizeTaskListSort(data.taskListSort),
     webSearch: normalizeWebSearch(data.webSearch),
     imageGen: normalizeGenConfig(data.imageGen),
     videoGen: normalizeGenConfig(data.videoGen),
@@ -393,6 +406,8 @@ function loadPersistent() {
     state._lastProjectPath = data.lastProjectPath || null;
     state.conversationUsage = data.conversationUsage || {};
     state.conversationTodos = data.conversationTodos || {};
+    state.taskFlags = normalizeTaskFlags(data.taskFlags);
+    state.taskListSort = normalizeTaskListSort(data.taskListSort);
     state.maxTokens = Math.max(1000, parseInt(data.maxTokens) || 64000);
     state.modelContextCaps = normalizeContextCaps(data.modelContextCaps);
     state.autoReview = {
@@ -506,6 +521,9 @@ async function loadSharedPersistent() {
     }
     if (Object.prototype.hasOwnProperty.call(data, "reasoningEffort")) {
       state.reasoningEffort = normalizeReasoningEffort(data.reasoningEffort);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "taskListSort")) {
+      state.taskListSort = normalizeTaskListSort(data.taskListSort);
     }
     if (Object.prototype.hasOwnProperty.call(data, "webSearch")) {
       state.webSearch = normalizeWebSearch(data.webSearch);
@@ -759,6 +777,52 @@ function setConversationTodos(convId, items) {
   notify("todos", getConversationTodos(key));
 }
 
+// ── 侧栏任务状态与排序（徽标数据源，见 services/task_list.js） ────────
+
+// 只记"上一场怎么结束的"。进行中不在这里：它由实时生成权判定，落库就会在重启后
+// 留下永远转不完的僵尸态。seen 支撑"已完成未查看"，切进该会话即清。
+function recordTaskFlag(convId, { kind = "", seen = false } = {}) {
+  const key = convId || "";
+  if (!key || !FLAG_KINDS.includes(kind)) return false;
+  state.taskFlags = normalizeTaskFlags({
+    ...state.taskFlags,
+    [key]: { kind, at: Date.now(), seen: seen === true },
+  });
+  savePersistent();
+  notify("taskFlags", state.taskFlags);
+  return true;
+}
+
+function markTaskSeen(convId) {
+  const flag = state.taskFlags?.[convId || ""];
+  if (!flag || flag.seen) return false;   // 已看过就别再写盘：列表每秒重绘时这里是热路径
+  flag.seen = true;
+  savePersistent();
+  notify("taskFlags", state.taskFlags);
+  return true;
+}
+
+// 会话被删（含批量管理）后残项要跟着走：只在成功取到全量列表时剪，空列表 = 真删光
+function pruneTaskFlags(existingIds) {
+  const live = new Set((Array.isArray(existingIds) ? existingIds : []).filter(Boolean));
+  const before = state.taskFlags || {};
+  const kept = Object.fromEntries(Object.entries(before).filter(([id]) => live.has(id)));
+  if (Object.keys(kept).length === Object.keys(before).length) return false;
+  state.taskFlags = kept;
+  savePersistent();
+  notify("taskFlags", state.taskFlags);
+  return true;
+}
+
+function setTaskListSort(mode) {
+  const next = normalizeTaskListSort(mode);
+  if (state.taskListSort === next) return false;
+  state.taskListSort = next;
+  savePersistent();
+  notify("taskListSort", next);
+  return true;
+}
+
 function addUsage(usage) {
   if (!usage) return;
   state.usage.promptTokens += usage.prompt_tokens || 0;
@@ -980,6 +1044,7 @@ export {
   REASONING_LEVELS_BY_CAP, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS, getModelDefinition,
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens,
   getConversationTodos, setConversationTodos,
+  recordTaskFlag, markTaskSeen, pruneTaskFlags, setTaskListSort,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage,
   setConversations, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,

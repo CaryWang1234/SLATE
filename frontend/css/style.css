@@ -34,6 +34,9 @@
   --toast-fg: #FFFFFF;
   --danger: #C0392B;
   --danger-dim: rgba(192, 57, 43, 0.08);
+  /* 侧栏任务徽标：四态里只有"需要操作"没有现成色可用（既不是错误也不是完成）*/
+  --task-needs: #9A5B12;
+  --task-needs-dim: rgba(154, 91, 18, 0.10);
   --font-main: "Microsoft YaHei", "微软雅黑", "PingFang SC", sans-serif;
   --font-code: Consolas, "JetBrains Mono", "Courier New", monospace;
   --font-mono: var(--font-code);
@@ -73,6 +76,8 @@
   --toast-fg: #0A0A0A;
   --danger: #E2725B;
   --danger-dim: rgba(226, 114, 91, 0.12);
+  --task-needs: #E0A94A;
+  --task-needs-dim: rgba(224, 169, 74, 0.14);
 }
 
 /* ── Reset ────────────────────────────── */
@@ -3590,6 +3595,82 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .conv-item-del:hover {
+  color: var(--text);
+}
+
+/* ── 侧栏任务状态徽标：进行中 / 需要操作 / 出错 / 已完成未查看 ──
+   图标形状各不同（波形 / 铃铛 / 警示三角 / 实心圆勾），状态不单靠颜色传达；
+   色调全部走变量，明暗两套主题同一口径，深色下描边与底色同步提亮。 */
+.conv-item-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  margin-right: 6px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.conv-item-status .svg-icon {
+  width: 9px;
+  height: 9px;
+}
+
+.conv-item-status[data-status="running"] {
+  color: var(--accent-bg);
+  animation: conv-status-pulse 1.5s ease-in-out infinite;
+}
+
+.conv-item-status[data-status="needs"] {
+  color: var(--task-needs);
+  background: var(--task-needs-dim);
+}
+
+.conv-item-status[data-status="error"] {
+  color: var(--danger);
+  background: var(--danger-dim);
+}
+
+/* 已完成未查看：实心最重的一枚，扫列表时最先看到的就是它 */
+.conv-item-status[data-status="unread"] {
+  color: var(--bg);
+  background: var(--gold-strong);
+  border-color: var(--gold-strong);
+}
+
+@keyframes conv-status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conv-item-status[data-status="running"] { animation: none; }
+}
+
+.conv-item.is-unread .conv-item-title { font-weight: 700; }
+.conv-item.is-needs { border-left: 2px solid var(--task-needs); }
+.conv-item.is-error { border-left: 2px solid var(--danger); }
+
+/* 排序偏好：与「管理」同处一行的迷你下拉，宽度收在标题栏里不换行 */
+.conv-sort {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.conv-sort:hover {
+  border-color: var(--border-hover);
   color: var(--text);
 }
 
@@ -9115,6 +9196,9 @@ img.file-type-icon {
   font-size: 10px;
   padding: 2px 6px;
   color: var(--text-secondary);
+  /* 同一行新加了排序下拉：按钮不许换行，收缩让给"新建对话"那颗弹性按钮 */
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .conv-manage-btn:hover {
@@ -9892,6 +9976,19 @@ html[data-ui="codex"] .codex-dock-nav {
   width: 100%;
 }
 
+/* 排序条：Codex 用户够不到的偏好等于没有这个功能，所以控件跟着历史一起搬过来 */
+.codex-dock-sortbar {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding: 6px 8px 2px;
+  border-top: 1px solid var(--border);
+}
+
+.codex-dock-sortbar .conv-sort {
+  max-width: 100%;
+}
+
 html[data-ui="codex"] #codex-dock-history {
   flex: 1;
   min-height: 0;
@@ -10000,6 +10097,26 @@ html[data-ui="codex"] #codex-dock-history {
   background: currentColor;
   opacity: 0.4;
   flex-shrink: 0;
+}
+
+/* 有状态时这一枚从装饰点变成徽标：放大到能装下图标，透明度交还给各态配色 */
+.codex-hist-dot.conv-item-status {
+  width: 15px;
+  height: 15px;
+  margin-right: 0;
+  opacity: 1;
+}
+
+.codex-hist-dot.conv-item-status .svg-icon {
+  width: 9px;
+  height: 9px;
+}
+
+.codex-hist-item.is-unread .codex-hist-item-title { font-weight: 700; }
+
+/* 分组折叠时也要看得见"这组里有要处理的"：徽标贴着计数排在行尾 */
+.codex-hist-group-status {
+  margin-left: 6px;
 }
 
 .codex-hist-item-title {

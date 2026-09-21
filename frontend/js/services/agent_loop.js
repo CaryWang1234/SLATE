@@ -17,9 +17,9 @@
  * 约定：policy 返回的模型可见字符串不被 t() 包裹（t() 只包用户可见文本）。
  */
 
-import { state, addMessage } from "../store.js?v=20260921-001";
-import { stripToolCalls } from "./tools.js?v=20260921-001";
-import { _pendingToolMsgs } from "./agent_common.js?v=20260921-001";
+import { state, addMessage } from "../store.js?v=20260921-003";
+import { stripToolCalls } from "./tools.js?v=20260921-003";
+import { _pendingToolMsgs } from "./agent_common.js?v=20260921-003";
 
 export function createAgentLoop({ policy = {}, view = {}, io }) {
   const reasonOf = (key) => policy.exitReasons?.[key] ?? "";
@@ -35,6 +35,9 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
       // exitKind 由 policy 在决定退出时标注："done"=走完完成通道，"stopped"=其余一切。
       // 上层据此区分"干完了"和"停下了"，不再把后者报成前者。
       exitKind: "",
+      // exitStatus 由 kernel 在 finally 里落：error/cancelled/switched/completed。
+      // 侧栏徽标要它才知道"这一场是炸了还是被停的"，policy 自己看不到 failure。
+      exitStatus: "",
       extra: policy.beginRun ? policy.beginRun(opts) : {},
     };
     const switched = () => genConvId !== null && state.currentConversationId !== genConvId;
@@ -213,8 +216,11 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
           if (!settledIds.has(c.callId)) ledger.emit("call.cancelled", { callId: c.callId, tool: c.tool, round: c.round, messageId: run.lastMsg?.id || "", data: { by } });
         }
       }
+      const exitStatus = failure ? "error" : signal?.aborted ? "cancelled" : switched() ? "switched" : "completed";
+      // 退场方式写给 policy 收尾用（侧栏徽标要说"上一场怎么结束的"），账本与它同一口径
+      run.exitStatus = exitStatus;
       ledger?.finish({
-        status: failure ? "error" : signal?.aborted ? "cancelled" : switched() ? "switched" : "completed",
+        status: exitStatus,
         stops: run.exitReason || (failure ? String(failure?.message || failure) : ""),
       });
       try {

@@ -2,32 +2,33 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, fmtContextTokens } from "./store.js?v=20260921-001";
-import { initI18n, t } from "./services/i18n.js?v=20260921-001";
-import { iconSvgEl } from "./services/icons.js?v=20260921-001";
-import { get, post, put } from "./services/api.js?v=20260921-001";
-import { dlgConfirm } from "./services/dialog.js?v=20260921-001";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260921-001";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260921-001";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260921-001";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260921-001";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260921-001";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260921-001";
-import { initTeamPanel } from "./components/team.js?v=20260921-001";
-import { initProjectBar } from "./components/project_bar.js?v=20260921-001";
-import { initSessionSummary } from "./components/session_summary.js?v=20260921-001";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260921-001";
-import { initTypingGame } from "./components/typing_game.js?v=20260921-001";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260921-001";
-import { initMemoryPanel } from "./components/memory.js?v=20260921-001";
-import { initExpertsPanel } from "./components/experts.js?v=20260921-001";
-import { initSchedule } from "./components/schedule.js?v=20260921-001";
-import { initRiskGuard } from "./services/riskguard.js?v=20260921-001";
-import { initUnderstandPanel } from "./components/understand.js?v=20260921-001";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260921-001";
-import { setProject, setProjectFileTree } from "./store.js?v=20260921-001";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260921-001";
-import { installErrorSink } from "./services/error_sink.js?v=20260921-001";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, fmtContextTokens, setTaskListSort } from "./store.js?v=20260921-003";
+import { initI18n, t } from "./services/i18n.js?v=20260921-003";
+import { iconSvgEl } from "./services/icons.js?v=20260921-003";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260921-003";
+import { get, post, put } from "./services/api.js?v=20260921-003";
+import { dlgConfirm } from "./services/dialog.js?v=20260921-003";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260921-003";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260921-003";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260921-003";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260921-003";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260921-003";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260921-003";
+import { initTeamPanel } from "./components/team.js?v=20260921-003";
+import { initProjectBar } from "./components/project_bar.js?v=20260921-003";
+import { initSessionSummary } from "./components/session_summary.js?v=20260921-003";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260921-003";
+import { initTypingGame } from "./components/typing_game.js?v=20260921-003";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260921-003";
+import { initMemoryPanel } from "./components/memory.js?v=20260921-003";
+import { initExpertsPanel } from "./components/experts.js?v=20260921-003";
+import { initSchedule } from "./components/schedule.js?v=20260921-003";
+import { initRiskGuard } from "./services/riskguard.js?v=20260921-003";
+import { initUnderstandPanel } from "./components/understand.js?v=20260921-003";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260921-003";
+import { setProject, setProjectFileTree } from "./store.js?v=20260921-003";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260921-003";
+import { installErrorSink } from "./services/error_sink.js?v=20260921-003";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -1107,7 +1108,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260921-001").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260921-003").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1344,7 +1345,30 @@ function buildCodexDock() {
   const bottom = document.createElement("div");
   bottom.className = "codex-dock-bottom";
   bottom.appendChild(buildCodexDockItem({ key: "settings", label: "设置", text: "设置", source: "btn-settings" }));
-  dock.append(nav, history, bottom);
+  dock.append(nav, buildCodexSortBar(), history, bottom);
+}
+
+// 排序偏好在两种布局里都得能改：只放在经典栏的话，一直用 Codex 的用户永远够不到这个开关。
+// 控件仍是同一份 state.taskListSort，两处列表各自订阅，不各写各的。
+function buildCodexSortBar() {
+  const bar = document.createElement("div");
+  bar.className = "codex-dock-sortbar";
+  const sel = document.createElement("select");
+  sel.id = "cx-conv-sort";
+  sel.className = "conv-sort";
+  sel.title = t("任务列表排序");
+  sel.setAttribute("aria-label", t("任务列表排序"));
+  for (const mode of SORT_MODES) {
+    const opt = document.createElement("option");
+    opt.value = mode.key;
+    opt.textContent = t(mode.label);
+    sel.appendChild(opt);
+  }
+  sel.value = normalizeTaskListSort(state.taskListSort);
+  sel.addEventListener("change", () => setTaskListSort(sel.value));
+  subscribe("taskListSort", (mode) => { sel.value = normalizeTaskListSort(mode); });
+  bar.appendChild(sel);
+  return bar;
 }
 
 function updateDockActive() {
@@ -1412,9 +1436,12 @@ function handleCodexQuick(key) {
 
 let cxConvsCache = [];
 const cxHistoryCollapsed = new Set();
+// 生成归属会话：由 chat.js 的 slate:task-badges-updated 事件带过来（切换会话即中断，
+// 这个数只有那一侧知道），Codex 列表据此点亮"进行中"
+let cxActiveConvId = "";
 
-function cxProjectLabel(conv) {
-  return (conv.project && conv.project.trim()) ? conv.project.trim() : "未分类";
+function cxTaskCtx() {
+  return { flags: state.taskFlags, activeConvId: cxActiveConvId };
 }
 
 async function refreshCodexHistory() {
@@ -1428,6 +1455,12 @@ async function refreshCodexHistory() {
   } catch (e) { /* 列表刷新失败静默 */ }
 }
 
+// chat.js 落徽标/换排序/生成权变动时重绘（不重新拉列表：状态变了，数据没变）
+window.addEventListener("slate:task-badges-updated", (e) => {
+  cxActiveConvId = e?.detail?.activeConvId || "";
+  renderCodexHistory();
+});
+
 function renderCodexHistory() {
   const box = document.getElementById("codex-dock-history");
   if (!box) return;
@@ -1438,24 +1471,20 @@ function renderCodexHistory() {
     cxHistReveal(box);
     return;
   }
-  const groups = new Map();
-  for (const conv of cxConvsCache) {
-    const name = cxProjectLabel(conv);
-    if (!groups.has(name)) groups.set(name, []);
-    groups.get(name).push(conv);
-  }
-  for (const [name, convs] of groups) {
-    box.appendChild(buildCodexHistGroup(name, convs.length));
+  const ctx = cxTaskCtx();
+  // 分组顺序、组内条目次序都交给 task_list：换排序时两处列表才不会各排各的
+  for (const [name, convs] of groupConversationsByProject(cxConvsCache, state.taskListSort, ctx)) {
+    box.appendChild(buildCodexHistGroup(name, convs, ctx));
     if (cxHistoryCollapsed.has(name)) continue;
     const list = document.createElement("div");
     list.className = "codex-hist-list";
-    for (const conv of convs) list.appendChild(buildCodexHistItem(conv));
+    for (const conv of convs) list.appendChild(buildCodexHistItem(conv, ctx));
     box.appendChild(list);
   }
   cxHistReveal(box);
 }
 
-function buildCodexHistGroup(name, count) {
+function buildCodexHistGroup(name, convs, ctx) {
   const head = document.createElement("button");
   head.type = "button";
   head.className = "codex-hist-group";
@@ -1470,8 +1499,20 @@ function buildCodexHistGroup(name, count) {
   head.appendChild(title);
   const num = document.createElement("span");
   num.className = "codex-hist-group-count";
-  num.textContent = String(count);
+  num.textContent = String(convs.length);
   head.appendChild(num);
+  // 折叠起来也要看得见"这组里有要处理的"：取组内最急的那个状态
+  const top = convs.map(c => taskStatusOf(c, ctx)).filter(s => s !== STATUS.IDLE)
+    .sort((a, b) => statusMark(a).rank - statusMark(b).rank)[0];
+  const badge = statusBadge(top || STATUS.IDLE);
+  if (badge) {
+    const mark = document.createElement("span");
+    mark.className = badge.className + " codex-hist-group-status";
+    mark.dataset.status = badge.status;
+    mark.title = t(badge.label);
+    mark.appendChild(iconSvgEl(badge.icon));
+    head.appendChild(mark);
+  }
   head.addEventListener("click", () => {
     if (collapsed) cxHistoryCollapsed.delete(name);
     else cxHistoryCollapsed.add(name);
@@ -1480,13 +1521,21 @@ function buildCodexHistGroup(name, count) {
   return head;
 }
 
-function buildCodexHistItem(conv) {
+function buildCodexHistItem(conv, ctx) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "codex-hist-item" + (conv.id === state.currentConversationId ? " active" : "");
   btn.dataset.convId = conv.id;
+  const badge = statusBadge(taskStatusOf(conv, ctx));
+  if (badge) btn.classList.add("is-" + badge.status);
+  // 装饰点换成真状态点：没有徽标就是没有可说的状态，不占位也不画"正常"
   const dot = document.createElement("span");
-  dot.className = "codex-hist-dot";
+  dot.className = "codex-hist-dot" + (badge ? " " + badge.className : "");
+  if (badge) {
+    dot.dataset.status = badge.status;
+    dot.title = t(badge.label);
+    dot.appendChild(iconSvgEl(badge.icon));
+  }
   btn.appendChild(dot);
   const title = document.createElement("span");
   title.className = "codex-hist-item-title";
@@ -1658,7 +1707,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260921-001");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260921-003");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1906,7 +1955,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260921-001");
+        const { openProject } = await import("./services/project.js?v=20260921-003");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }

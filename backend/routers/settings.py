@@ -59,6 +59,9 @@ async def save_shared_state(req: SharedStateRequest):
         "permissionMode",
         "chatMode",
         "reasoningEffort",
+        # 侧栏任务列表的排序偏好。刻意不收 taskFlags：那条映射记的是"这块屏幕有没有看过"，
+        # 跨设备同步只会把另一台机器的阅读进度盖过来。
+        "taskListSort",
         "webSearch",
         "imageGen",
         "videoGen",
