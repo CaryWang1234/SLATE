@@ -86,7 +86,8 @@ Autopilot 是默认的“少打继续”执行层。只要你的消息明显是�
 **你怎么用：**
 - 直接说“修复 xxx”“排查项目 bug”“优化工具调用”“跑一下测试并修掉报错”
 - 不需要手动开启 Harness，也不需要反复发送“继续”
-- 普通任务最多自动推进 18 轮；全面扫描、项目级、多文件任务最多 28 轮
+- 普通任务最多自动推进 24 轮；全面扫描、项目级、多文件任务最多 40 轮
+- 轮数是止损线不是预算：交付并逐项验证通过后，模型调用 `exit_autopilot` 收口，循环随即结束
 
 **它会自动做：**
 1. 读取相关目录、文件、配置或 Git 状态
@@ -99,7 +100,7 @@ Autopilot 是默认的“少打继续”执行层。只要你的消息明显是�
 
 **停止是真取消：** 点击停止会同时关闭模型流与工具调用的流式通道，后端随即终止对应的子进程与在跑任务，不再是“界面停了、活还在干”。被取消的调用会以独立状态记进本地事件账，与正常完成区分开。
 
-**什么时候还用 Harness：** 需要更强约束、明确 TODOLIST、长任务 50 轮闭环时，点击输入框左侧 **＋** 菜单里的「目标模式」开关。
+**什么时候还用 Harness：** 需要更强约束、明确 TODOLIST、长任务 80 轮闭环时，点击输入框左侧 **＋** 菜单里的「目标模式」开关；验证全部通过后模型调用 `exit_target_mode` 收口，目标模式开关随之关闭。
 
 ---
 
@@ -120,7 +121,7 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 6. **追溯归档** → 记录到 TODOLIST
 
 **特性：**
-- 最多 50 轮自主调用
+- 最多 80 轮自主调用，验证通过后由模型调 `exit_target_mode` 显式收口
 - 中途可暂停（仅中断当轮，不丢失进度）
 - 自动建立 TODOLIST 统筹大任务
 - 异常自动恢复推进
@@ -169,6 +170,9 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 - 设置 → 团队管理 → 添加/编辑/删除成员
 - 每个成员可指定模型、角色、人设
 
+**讨论记录：** 每次发言除了写进本机历史，还会落进后端（团队会话 + 名册 + 每人一次事件账本 run），
+黑板 · 工作流视图的星图读的就是这份；落库失败时历史仍在，列表里标「仅本机记录」。
+
 ---
 
 ### 8. 白板逻辑链
@@ -186,6 +190,17 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
   - `card_edit` 编辑卡片
   - `arrow_create` 建立连线
   - `board_summarize` 总结全局
+
+**第 5 档「工作流」：把"怎么跑"和"跑得怎么样"放进同一屏**
+- 控制条：停止 / 继续跑完 / 自动推进（目标模式）/ 回复方式 / 思考强度。
+  这些控件不另存一份状态，写的就是聊天框顶部那套共用的状态，两处永远一致
+- 流程卡片墙：`data/actions/*.yml` 里每份流程说明书一张卡，卡面写清共几步、几项输入、
+  谁写的、产出落到哪；「跑这条」以 @提及 发进当前对话，「看步骤」就地展开步骤清单（懒加载）
+- 置顶与「只看置顶」存在本机 `slate_board_wf_prefs`，只影响这一屏的排布
+- 当前运行：直接从事件账本投影——哪一步在跑、跑了多久、成没成；
+  活数据只改自己那截 DOM 的文本，运行中每秒一跳不会把整块看板抖散
+- 团队星图：按角色摆出这场对话最近一次团队讨论，谁回应了谁、谁动过哪些工具、
+  谁派生了子代理，全部取自后端真实记录；没有团队记录时这里会直说，不画装饰性的图
 
 ---
 
@@ -353,7 +368,7 @@ SLATE 内置 34 个 MCP 工具，模型在对话中自主决定何时使用。
 | 设置 | 说明 |
 |------|------|
 | 模型管理 | 添加/删除 API Key，配置自定义端点，可选启用 Responses API |
-| 推理强度 | 按模型能力下发思考档位（自动/关/低/中/高），上游不认的档位自动置灰 |
+| 推理强度 | 点输入框左侧胶囊开滑杆弹窗，按模型能力给出可选档位（自动/关/低/中/高），每档下方小字标注对应墨色（随墨/清墨/淡墨/浓墨/焦墨）；上游不认的档位不会出现，拖动松手才落盘 |
 | 上下文预算 | 模型行上的滑杆（自动/100K/200K/400K/600K/800K/1M），同时决定自动压缩阈值与用量条分母 |
 | 输出控制 | 最大 Token 数、流式输出开关 |
 | 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 |
@@ -447,7 +462,8 @@ Autopilot is the default "do not make me type continue" execution layer. When yo
 **How to use it:**
 - Say things like "fix xxx", "scan the project for bugs", "optimize tool calling", or "run tests and fix failures"
 - You do not need to enable Harness manually, and you do not need to keep sending "continue"
-- Ordinary tasks can auto-advance up to 18 rounds; broad project-wide or multi-file tasks can auto-advance up to 28 rounds
+- Ordinary tasks can auto-advance up to 24 rounds; broad project-wide or multi-file tasks can auto-advance up to 40 rounds
+- The round budget is a stop-loss, not a target: once every deliverable is verified the model calls `exit_autopilot` to close the loop
 
 **What it does automatically:**
 1. Reads relevant directories, files, config, or Git state
@@ -460,7 +476,7 @@ Autopilot is the default "do not make me type continue" execution layer. When yo
 
 **Stop really cancels:** pressing Stop closes both the model stream and the tool-call stream, so the backend terminates the matching subprocess or running task instead of "UI stopped, work still going". Cancelled calls are recorded in the local event ledger under their own status, kept apart from successful ones.
 
-**When to use Harness:** use the **Target Mode** toggle in the **＋** menu (left of the chat input) when you want the stronger six-phase mode, explicit TODOLIST enforcement, and a 50-round long-task loop.
+**When to use Harness:** use the **Target Mode** toggle in the **＋** menu (left of the chat input) when you want the stronger six-phase mode, explicit TODOLIST enforcement, and an 80-round long-task loop; after verification passes the model closes it with `exit_target_mode`, which also switches Target Mode off.
 
 ---
 
@@ -481,7 +497,7 @@ Harness is SLATE's "autopilot" — state your goal, and the model autonomously p
 6. **Trace** → Log to TODOLIST
 
 **Features:**
-- Up to 50 autonomous rounds
+- Up to 80 autonomous rounds, closed by the model calling `exit_target_mode` once verification passes
 - Pause anytime (only interrupts current round, no progress loss)
 - Auto-creates TODOLIST for large tasks
 - Auto-recovery from exceptions
@@ -530,6 +546,10 @@ Multiple AI roles debate your question across rounds, producing a consensus conc
 - Settings → Team Management → Add/Edit/Delete members
 - Each member can specify model, role, and persona
 
+**Discussion record:** every turn is stored besides the local history — a team session, its roster,
+and one event-ledger run per member — which is exactly what the Whiteboard → Workflow star map reads.
+If the write fails, the local history stays and that session is labelled "Local only".
+
 ---
 
 ### 8. Whiteboard Logic Chain
@@ -540,13 +560,28 @@ Visual cards + connections system for reasoning and planning.
 - Click "Whiteboard" tab to enter
 - AI auto-creates cards (analysis results, comparisons)
 - Drag cards, create connections manually
-- Switch display modes from the whiteboard header: Git, Flow, Kanban, and Outline. The main whiteboard is the default freeform canvas.
+- Switch display modes from the whiteboard header: Git, Flow, Kanban, Outline and Workflow. The main whiteboard is the default freeform canvas.
 - Git Tree recognizes the opened project's Git elements: HEAD, branches, remote branches, commits, tags, remotes, worktrees, stash, staged/changed/untracked counts, and unpushed commits. Nodes and the canvas viewport are draggable.
 - 4 AI whiteboard tools:
   - `card_create` — Create cards
   - `card_edit` — Edit cards
   - `arrow_create` — Create connections
   - `board_summarize` — Summarize the board
+
+**The 5th mode, "Workflow": how to run it and how it's going, on one screen**
+- Run bar: stop / resume / autopilot (goal mode) / response mode / reasoning effort.
+  These controls don't keep a second copy of the state — they write the very state the chat
+  header uses, so the two can never disagree.
+- Flow wall: every playbook in `data/actions/*.yml` becomes a card stating its step count,
+  inputs, author and where the output lands. "Run this" sends it into the current chat as an
+  @mention; "Steps" expands the step list in place (fetched lazily).
+- Pinning and "Pinned only" live in `slate_board_wf_prefs` on this machine and only reorder this view.
+- Current run: projected straight from the event ledger — which step is live, how long it has taken,
+  whether it succeeded. The live layer only patches text in its own subtree, so a per-second tick
+  never re-renders the board underneath it.
+- Team star map: the most recent team discussion of this conversation, laid out by role, showing who
+  replied to whom, which tools each member used and which sub-agents they spawned — all from real
+  backend records. With no team record it says so instead of drawing a decorative graph.
 
 ---
 
@@ -714,7 +749,7 @@ Let AI automatically execute tasks on schedule or by events.
 | Setting | Description |
 |---------|-------------|
 | Model Management | Add/remove API keys, configure custom endpoints, optionally enable Responses API |
-| Reasoning Effort | Per-model capability levels (auto/off/low/medium/high); unsupported levels are greyed out |
+| Reasoning Effort | Click the pill left of the input to open a slider; levels follow the model's capability (auto/off/low/medium/high), each tick annotated with its ink shade in small type (free/clear/light/rich/charred); unsupported levels never appear, and the value is persisted only when you let go |
 | Context Budget | Per-model slider (auto/100K/200K/400K/600K/800K/1M) driving both the auto-compress threshold and the usage bar |
 | Output Control | Max tokens, streaming toggle |
 | Auto-Advance | Autopilot / short-reply review / long-stall review |

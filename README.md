@@ -32,7 +32,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 ## ✨ Highlights
 
 - 🗣️ **Unified Multi-Model Access** — Major LLMs worldwide + custom OpenAI-compatible endpoints + local models (Ollama / LM Studio)
-- ⚡ **Agent Autopilot + Target Mode** — Ordinary project requests now auto-run in an Agent loop without needing repeated "continue" prompts; Target Mode remains the explicit six-phase, 50-round closed-loop mode for large tasks
+- ⚡ **Agent Autopilot + Target Mode** — Ordinary project requests now auto-run in an Agent loop without needing repeated "continue" prompts; Target Mode remains the explicit six-phase, 80-round closed-loop mode for large tasks
 - ✒️ **InkStream — arguments as they are written** — While the model streams a tool call token by token, SLATE parses the half-formed JSON against the local schema and shows which fields are closed and which is still being written; preview only — incomplete arguments never reach execution, and long body fields collapse to line/char counts
 - 🛑 **Stop really cancels** — Pressing Stop closes both the LLM stream and the tool-call stream, so the backend terminates the running subprocess or task instead of "UI stopped, work still going"; cancelled calls are recorded as their own status in the event ledger
 - 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Target Mode
@@ -49,7 +49,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 - 👥 **AI Team Multi-Round Debate** — Multi-role propose/oppose/decide with light/heavy model division; plus DAG workflow pipeline with **8 built-in templates** (Dev Flow, Code Review, Doc Generation, Data Analysis, Research Report, Product Requirements, Bug Investigation, Parallel Research); stop button for mid-debate interruption; **9 built-in team presets** (Code Review, Product Brainstorm, Red-Blue Debate, etc.) + custom configuration; workflow import/export/delete
 - ⏰ **Scheduled Chat Tasks** — Auto-execute preset prompts on schedule, results archived as separate sessions
 - ➕ **Unified ＋ Mode Menu** — one ＋ button left of the chat input consolidates every mode entry: Grind / Brainstorm / Target Mode / Scheduled Tasks, plus an **@-mention group** (Skills / Tools / MCP / Files) that opens a filtered picker; works in both the classic and the minimal Codex UI
-- 🧠 **Upgraded Whiteboard** — Card + connector brainstorming, Mermaid-rendered flowcharts & mindmaps, flow/kanban/outline modes, draggable Git tree view for branches/commits/worktrees/staged/unpushed state, and auto-logged tool execution steps
+- 🧠 **Upgraded Whiteboard** — Card + connector brainstorming, Mermaid-rendered flowcharts & mindmaps, flow/kanban/outline/Git-tree/workflow modes, draggable Git tree view for branches/commits/worktrees/staged/unpushed state, and auto-logged tool execution steps. The Workflow view also drives the conversation from the board (stop / resume / autopilot / response mode / reasoning effort) and puts your flow playbooks, the live run and the team star map on one screen
 - 💾 **Long-Term Memory & Knowledge Base** — Auto-distill chat highlights, cross-session recall; **overwrite outdated memories and delete obsolete ones** via AI-driven add/overwrite/delete actions; **✨ Spark** — auto-capture technical insights when conversations end, archive as knowledge docs for future RAG injection
 - 🗜️ **Smart Context Compression** — Auto-summarize over threshold, four-layer truncation defense with auto-continuation, four-layer timeout prevention
 - 🏭 **Prompt Factory** — Constitution + context + constraints integrated into a deliverable prompt
@@ -71,7 +71,8 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 ### Agent Autopilot
 
 - Project/action requests are detected automatically and run through an Agent loop without requiring you to type "continue"
-- Default loop budget: 18 rounds for ordinary environment tasks, 28 rounds for broad project-wide tasks; Harness keeps its configurable 50-round strong mode
+- Default loop budget: 24 rounds for ordinary environment tasks, 40 rounds for broad project-wide tasks; Harness keeps its configurable 80-round strong mode
+- Stop when it's done: once every deliverable is verified the model must call `exit_autopilot` / `exit_target_mode` to close the loop; any other exit is reported as interrupted and offers a one-click resume
 - If a model only says it will inspect/edit/verify, SLATE nudges it to call tools; if it claims completion without tool evidence, SLATE asks it to verify or actually act
 - Tool results are fed back invisibly so the model can observe → act → verify → report in one run
 - **InkStream**: while the model writes a tool call token by token, a local schema-aware prefix parser infers which fields are already closed and which one is still being written, and renders that as a live one-line preview — preview only, half-formed arguments never enter execution, and large content fields fold into line / character counts
@@ -82,7 +83,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 
 - Six-phase loop: Goal → Plan → Execute → Verify → Report → Trace
 - Auto-generates TODOLIST for large tasks (live sidebar display), batch progress tracking, no sign-off until all items resolved
-- 50 tool-call rounds by default; exits only on: manual stop / rounds exhausted / checklist done — model failures, zero output, and repeated calls auto-recover
+- 80 tool-call rounds by default; exits only on: manual stop / rounds exhausted / checklist done / model called `exit_target_mode` — model failures, zero output, and repeated calls auto-recover
 - Each round shows current round number (x/N), model self-paces based on remaining budget
 - Four-layer truncation defense: 6-round anchor continuation + truncation guard + `file_append` segmented write + prompt prevention
 
@@ -176,15 +177,17 @@ Action Playbooks: Write the required flow for a recurring task into `data/action
 - Auto-generated discussion summaries (≤500 tokens), user can intervene with votes
 - **Stop mechanism**: Abort mid-debate with one click; completed replies are preserved
 - **Whiteboard integration**: Debate steps auto-logged as cards with action type and summary
+- **Persisted discussions**: Each turn is stored beyond local history — a team session with its roster and one event-ledger run per member — feeding the Whiteboard → Workflow star map; if the write fails, local history stays and that session is labelled "Local only"
 - **Team Workflow DAG**: Requirements → Decompose → Code → Review → Summarize pipeline with upstream/downstream artifact passing, real-time node status, auto-archive to knowledge base; **parallel execution** for independent nodes, **stop button** for mid-run interruption
 
 ### Whiteboard Logic Chain
 
 - Idea/feature/thought cards, drag-to-layout, arrow connectors for dependencies and data flow
 - Mermaid.js rendered flowcharts & mindmaps
-- Display modes: main freeform board, Git tree, flow, kanban, and outline
+- Display modes: main freeform board, Git tree, flow, kanban, outline, and workflow
 - Git tree recognizes the opened project's repository state: HEAD, local/remote branches, commits, tags, remotes, worktrees, staged/changed/untracked counts, stashes, and unpushed commits; nodes and canvas are draggable in SLATE style
 - **Auto-logging**: Tool execution steps automatically create step cards with icons, descriptions, and status colors (yellow=running, green=done, red=error); the cards are a projection of the call event ledger — created and updated per call id, cleared when a new run starts, and titled from the same label source as the chat tool cards
+- **Workflow view**: one screen is both the console and the scene — a run bar (stop / resume / autopilot / response mode / reasoning effort, sharing the same state the chat header writes), a flow wall (one card per `data/actions/*.yml` playbook, "Run this" sends it into the chat as an @mention), the current run projected from the event ledger (patching only its own subtree, so a per-second tick never re-renders the board), and a team star map whose reply edges, tool leaves and sub-agent spawns all come from real records
 - **Thinking process display**: Model reasoning/thinking shown in collapsible panel, auto-collapses after thinking completes
 
 ### More
