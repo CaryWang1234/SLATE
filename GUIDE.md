@@ -77,6 +77,11 @@ SLATE 支持同时接入多个模型，在对话界面顶部下拉框随时切�
 - 每条会话按当下处境给出独立标志：**需要操作**（上一场被停止或还有下一步）、**出错**、**进行中**（呼吸动画，只在这一场真的在生成时出现）、**已完成未查看**（点进会话即清除）
 - 标志记的是"上一场怎么结束的"：若在别处（如手机遥控）继续过这条会话，旧标志自动作废
 
+**消息区右侧「任务清单」栏：**
+- 大任务跑起来时逐条展示进度；点顶栏「任务清单」按钮（Codex 布局在输入框上方那行）即可整栏收起，把宽度还给消息区，再点一下展开
+- 收起是记在你这台机器上的偏好：刷新、重启都保持折叠，清单继续往下跑也不会擅自把栏撑回来
+- 折叠期间按钮悬停会报 `{done}/{total}`，进度不至于彻底隐身；这场没有清单时按钮置灰
+
 **快捷键：**
 - `Enter` 发送消息
 - `Shift + Enter` 换行
@@ -128,7 +133,7 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 **特性：**
 - 最多 80 轮自主调用，验证通过后由模型调 `exit_target_mode` 显式收口
 - 中途可暂停（仅中断当轮，不丢失进度）
-- 自动建立 TODOLIST 统筹大任务
+- 自动建立 TODOLIST 统筹大任务（消息区右栏实时展示；顶栏「任务清单」按钮可随时折叠/展开，折叠后按钮上仍报 `{done}/{total}` 进度）
 - 异常自动恢复推进
 
 ---
@@ -458,6 +463,11 @@ SLATE supports multiple models simultaneously — switch anytime from the top dr
 - Each conversation carries a mark matching where it stands: **needs action** (you stopped it, or a next step remains), **error** (request failed / stream cut), **running** (breathing animation, only while this run is actually generating), **done but unread** (cleared the moment you open it)
 - The mark records how the last run ended: if the conversation was continued elsewhere (e.g. phone remote), the stale mark retires itself
 
+**Task list rail on the right:**
+- Large tasks stream their checklist into the rail beside the messages; the "Task list" button on the chat header (the quick-action row above the input in the Codex layout) folds the whole rail and hands the width back, one more click unfolds it
+- Folding is a preference stored on this machine: it survives reload and restart, and a list still making progress will not force the rail back open
+- While folded the button tooltip keeps reporting `{done}/{total}`, so progress does not vanish entirely; with no checklist in this conversation the button greys out
+
 **Shortcuts:**
 - `Enter` to send
 - `Shift + Enter` for newline
@@ -509,7 +519,7 @@ Harness is SLATE's "autopilot" — state your goal, and the model autonomously p
 **Features:**
 - Up to 80 autonomous rounds, closed by the model calling `exit_target_mode` once verification passes
 - Pause anytime (only interrupts current round, no progress loss)
-- Auto-creates TODOLIST for large tasks
+- Auto-creates TODOLIST for large tasks (shown live in the right rail; the "Task list" button on the chat header folds or unfolds it anytime, and keeps reporting `{done}/{total}` while folded)
 - Auto-recovery from exceptions
 
 ---

@@ -83,7 +83,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 ### Target Mode (Harness)
 
 - Six-phase loop: Goal → Plan → Execute → Verify → Report → Trace
-- Auto-generates TODOLIST for large tasks (live sidebar display), batch progress tracking, no sign-off until all items resolved
+- Auto-generates TODOLIST for large tasks (live right-rail display; collapse it anytime with the "Task list" button on the chat header, which keeps reporting `{done}/{total}` while folded), batch progress tracking, no sign-off until all items resolved
 - 80 tool-call rounds by default; exits only on: manual stop / rounds exhausted / checklist done / model called `exit_target_mode` — model failures, zero output, and repeated calls auto-recover
 - Each round shows current round number (x/N), model self-paces based on remaining budget
 - Four-layer truncation defense: 6-round anchor continuation + truncation guard + `file_append` segmented write + prompt prevention
