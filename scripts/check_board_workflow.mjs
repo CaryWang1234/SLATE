@@ -19,8 +19,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260921-003";
-import { memberHue, roleRank, starPositions } from "../frontend/js/services/star_map.js?v=20260921-003";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260922-002";
+import { memberHue, roleRank, starPositions } from "../frontend/js/services/star_map.js?v=20260922-002";
 
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 const WF = read("../frontend/js/components/board_workflow.js");

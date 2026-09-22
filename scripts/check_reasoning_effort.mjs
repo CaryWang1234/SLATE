@@ -227,6 +227,11 @@ assert.match(CHAT, /if \(unsupported\) setEffortPop\(false\)/,
 assert.match(CHAT, /btn\.setAttribute\("aria-expanded"/, "弹窗没有 aria-expanded，读屏器不知道开合");
 assert.match(CSS, /\.effort-tick i\s*\{[^}]*opacity:\s*var\(--ink/,
   "墨色小字必须走 --ink，写死颜色就没法跟着主题翻转浓淡");
+// 桌面端 style.css 里没有全局 .hidden 工具类（那是 mobile.css 的），所以 JS 切 hidden
+// 这个类本身不产生任何视觉效果——必须有人为这个元素单独写一条隐藏规则。
+// 漏掉的后果：弹窗带着 hidden 照样 display:block，从页面加载起一直摊在输入框上方。
+assert.match(CSS, /\.effort-pop\.hidden\s*\{[^}]*display:\s*none/,
+  "#effort-pop 靠切 hidden 类开合，桌面 CSS 必须有 .effort-pop.hidden{display:none}，否则弹窗永远显示");
 
 // ── 5c. 落盘链路：共享状态读的每个字段，都得有人真的产出它 ─────────
 // savePersistent() 把 buildPersistentData() 的结果交给 getSharedPersistentData(data)。

@@ -16,12 +16,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  emptyBoard, moveLine, move, spawn, isOver, maxTile,
-} from "../frontend/js/components/game_2048.js?v=20260921-003";
+  emptyBoard, moveLine, move, spawn, isOver, maxTile, moveWithTrail,
+} from "../frontend/js/components/game_2048.js?v=20260922-002";
 import {
   WEEKS, buildGrid, monthLabels, levelFor,
-} from "../frontend/js/components/usage_heatmap.js?v=20260921-003";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260921-003";
+} from "../frontend/js/components/usage_heatmap.js?v=20260922-002";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260922-002";
 
 const BACKEND_WINDOW_DAYS = 371;  // backend/routers/chat.py: ACTIVITY_WINDOW_DAYS
 
@@ -61,6 +61,60 @@ for (const [axis, src, dst] of [["h", "right", "left"], ["v", "down", "up"]]) {
   const bb = move(mirrored, dst).board;
   assert.deepEqual(mirrorOf(bb, axis), a, `${src} 与 ${dst} 不互为镜像`);
   assert.equal(move(BOARD, src).gained, move(mirrored, dst).gained, `${src} 与 ${dst} 得分不等`);
+}
+
+// ── 2b. 滑动来源表：动画靠它定位，错了方块会飞到别的格子上 ──
+// 这一类错得很隐蔽：棋盘状态完全正确（走的是纯逻辑），只有方块飞错地方，
+// 而 Node 侧看不见像素。所以把「来源值之和 = 目标值」「目标位/源位都不重复」
+// 钉成不变量，四个方向各验一遍。
+const FULL = b([2, 2, 4, 8], [0, 4, 0, 4], [8, 0, 8, 0], [2, 2, 2, 2]);
+for (const dir of ["left", "right", "up", "down"]) {
+  const plan = moveWithTrail(FULL, dir);
+  const plain = move(FULL, dir);
+  assert.deepEqual(plan.board, plain.board, `${dir}：带来源的移动结果必须与纯逻辑逐格一致`);
+  assert.equal(plan.gained, plain.gained, `${dir}：得分必须一致`);
+  assert.equal(plan.moved, plain.moved, `${dir}：moved 必须一致`);
+
+  const dests = [];
+  const sources = [];
+  for (const step of plan.trail) {
+    const [tr, tc] = step.to;
+    assert.equal(plan.board[tr][tc], step.value, `${dir}：目标位上的值必须等于 trail 报的值`);
+    const vals = step.from.map(([r, c]) => FULL[r][c]);
+    assert.equal(vals.reduce((x, y) => x + y, 0), step.value, `${dir}：来源值之和必须等于目标值`);
+    assert.equal(step.merged, vals.length > 1, `${dir}：merged 标记要和来源个数对得上`);
+    assert.deepEqual(vals.filter(v => v === vals[0]), vals, `${dir}：合并只允许同值`);
+    dests.push(`${tr},${tc}`);
+    for (const [r, c] of step.from) sources.push(`${r},${c}`);
+  }
+  assert.equal(new Set(dests).size, dests.length, `${dir}：同一目标位不能有两条来源记录（方块会叠在一起）`);
+  assert.equal(new Set(sources).size, sources.length, `${dir}：同一颗方块不能被两条轨迹同时认领`);
+
+  const nonEmpty = [];
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if (plan.board[r][c]) nonEmpty.push(`${r},${c}`);
+  assert.deepEqual([...dests].sort(), nonEmpty.sort(), `${dir}：每个非空格子都必须有一条来源记录`);
+  // 被吃掉的格子落回 0：来源表里不能还留着指向它的记录
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (!FULL[r][c]) continue;
+      const landed = plan.board[r][c];
+      const claimed = sources.includes(`${r},${c}`);
+      if (!landed) assert.ok(claimed, `${dir}：源格 ${r},${c} 被清空，它必须出现在某条来源里`);
+    }
+  }
+}
+{
+  // 推不动的方向：棋盘原样返回，来源表退化成一张「原地不动」的恒等映射。
+  // 恒等也不能变成「源位写错」——写错就是方块原地抖一下。
+  const PACKED_LEFT_ALL = b([2, 4, 0, 0], [8, 16, 0, 0], [2, 8, 0, 0], [4, 16, 0, 0]);
+  const plan = moveWithTrail(PACKED_LEFT_ALL, "left");
+  assert.equal(plan.moved, false);
+  assert.deepEqual(plan.board, PACKED_LEFT_ALL, "没动时棋盘必须原样返回");
+  assert.ok(
+    plan.trail.every(s => s.from.length === 1 && s.from[0][0] === s.to[0] && s.from[0][1] === s.to[1]),
+    "没动时每条轨迹都必须是恒等映射"
+  );
+  assert.equal(plan.trail.length, 8, "这张盘有 8 颗牌，就该有 8 条轨迹");
 }
 
 // 已经推到位的牌面：moved=false，前端据此拒绝补牌
@@ -165,9 +219,9 @@ for (const probe of [new Date(2026, 8, 13), new Date(2026, 8, 12), new Date(2026
     { date: "bad-date", count: 5 },          // 脏数据不能污染任何格子
     { date: grid.cells[0].date },            // count 缺失按 0
   ], today);
-  assert.equal(g.max, 12);
-  assert.equal(g.total, 15);
-  assert.equal(g.activeDays, 2);
+  assert.equal(g.metrics.count.max, 12);
+  assert.equal(g.metrics.count.total, 15);
+  assert.equal(g.metrics.count.activeDays, 2);
   assert.equal(g.cells.find(c => c.date === grid.endDate).count, 12, "今天的量要落在今天的格子上");
   assert.equal(g.cells.filter(c => c.count === 999).length, 0, "窗口外的日期不得进画布");
   assert.equal(g.cells.filter(c => c.count === 5).length, 0, "脏日期不得污染任何格子");
@@ -201,32 +255,71 @@ for (let n = 0; n <= 40; n++) {
     { date: day(1), count: 2 },
     { date: day(2), count: 6 },
   ], today);
-  assert.equal(g3.longestStreak, 3, "连着的三天要算成 3 天");
-  assert.equal(g3.currentStreak, 3, "今天有消息 → 当前连续算到今天");
-  assert.deepEqual(g3.bestDay, { date: day(2), count: 6 }, "峰值日取单日最大，并列时留最早的");
-  assert.equal(g3.avgPerActiveDay, 4, "(4+2+6)/3 取整");
+  assert.equal(g3.metrics.count.longestStreak, 3, "连着的三天要算成 3 天");
+  assert.equal(g3.metrics.count.currentStreak, 3, "今天有消息 → 当前连续算到今天");
+  assert.deepEqual(g3.metrics.count.bestDay, { date: day(2), value: 6 }, "峰值日取单日最大，并列时留最早的");
+  assert.equal(g3.metrics.count.avgPerActiveDay, 4, "(4+2+6)/3 取整");
   assert.equal(g3.visibleDays, vis.length, "可见天数就是非 future 格数");
 
   // 今天还没过完：今天空着不该把还在延续的连续记录断掉
   const gGrace = buildGrid([{ date: day(1), count: 1 }, { date: day(2), count: 1 }], today);
-  assert.equal(gGrace.currentStreak, 2, "今天空、前两天有 → 从昨天往前数仍是 2");
-  assert.equal(gGrace.longestStreak, 2);
+  assert.equal(gGrace.metrics.count.currentStreak, 2, "今天空、前两天有 → 从昨天往前数仍是 2");
+  assert.equal(gGrace.metrics.count.longestStreak, 2);
 
   const gGap = buildGrid([{ date: day(1), count: 1 }, { date: day(3), count: 9 }], today);
-  assert.equal(gGap.currentStreak, 1, "昨天有、前天没有 → 当前连续 1");
-  assert.equal(gGap.longestStreak, 1, "中间断一天就不算连续");
-  assert.equal(gGap.bestDay.count, 9);
+  assert.equal(gGap.metrics.count.currentStreak, 1, "昨天有、前天没有 → 当前连续 1");
+  assert.equal(gGap.metrics.count.longestStreak, 1, "中间断一天就不算连续");
+  assert.equal(gGap.metrics.count.bestDay.value, 9);
 
   const gStale = buildGrid([{ date: day(10), count: 5 }], today);
-  assert.equal(gStale.currentStreak, 0, "十天前才发过 → 当前连续归零");
-  assert.equal(gStale.longestStreak, 1, "孤立的一天仍是最长连续 1 天");
+  assert.equal(gStale.metrics.count.currentStreak, 0, "十天前才发过 → 当前连续归零");
+  assert.equal(gStale.metrics.count.longestStreak, 1, "孤立的一天仍是最长连续 1 天");
 
   const gEmpty = buildGrid([], today);
-  assert.equal(gEmpty.longestStreak, 0);
-  assert.equal(gEmpty.currentStreak, 0);
-  assert.equal(gEmpty.bestDay, null, "一条都没有时峰值日必须是 null，界面才好回落到 0");
-  assert.equal(gEmpty.avgPerActiveDay, 0, "活跃天为 0 时不能算出 NaN");
-  assert.ok(Number.isFinite(gEmpty.avgPerActiveDay), "活跃天为 0 时不能算出 Infinity");
+  assert.equal(gEmpty.metrics.count.longestStreak, 0);
+  assert.equal(gEmpty.metrics.count.currentStreak, 0);
+  assert.equal(gEmpty.metrics.count.bestDay, null, "一条都没有时峰值日必须是 null，界面才好回落到 0");
+  assert.equal(gEmpty.metrics.count.avgPerActiveDay, 0, "活跃天为 0 时不能算出 NaN");
+  assert.ok(Number.isFinite(gEmpty.metrics.count.avgPerActiveDay), "活跃天为 0 时不能算出 Infinity");
+  assert.equal(gEmpty.metrics.tokens.total, 0, "token 口径在空数据下同样得是 0");
+}
+
+// ── 6c. 两个口径互不串味：一天的 token 与消息条数各算各的 ──
+// 串味的典型症状是「切到 Tokens 后指标条数字没变」——看着像缓存，其实是共用了一套汇总。
+{
+  const vis = grid.cells.filter(c => !c.future);
+  const day = n => vis[vis.length - 1 - n].date;
+  const g = buildGrid([
+    { date: day(0), count: 2, tokens: 5000, estimated: false },
+    { date: day(1), count: 40, tokens: 10, estimated: true },     // 消息多、token 少
+    { date: day(3), count: 0, tokens: 800, estimated: true },      // 只记账没发言
+  ], today);
+
+  assert.equal(g.metrics.count.total, 42, "消息口径只数条数");
+  assert.equal(g.metrics.tokens.total, 5810, "token 口径只数 token");
+  assert.equal(g.metrics.count.max, 40);
+  assert.equal(g.metrics.tokens.max, 5000);
+  assert.equal(g.metrics.count.activeDays, 2, "count=0 的那天不算活跃");
+  assert.equal(g.metrics.tokens.activeDays, 3, "只有 token 的那天在 token 口径里算活跃");
+  assert.equal(g.metrics.tokens.bestDay.date, day(0));
+  assert.equal(g.metrics.tokens.bestDay.value, 5000);
+  assert.equal(g.metrics.count.bestDay.value, 40);
+  assert.equal(g.metrics.tokens.avgPerActiveDay, Math.round(5810 / 3));
+
+  // estimated 只跟 token 走，且原样落到格子上
+  assert.equal(g.cells.find(c => c.date === day(0)).estimated, false);
+  assert.equal(g.cells.find(c => c.date === day(1)).estimated, true);
+  assert.equal(g.cells.find(c => c.date === day(0)).tokens, 5000);
+  assert.equal(g.cells.find(c => c.date === day(1)).count, 40);
+
+  // 负值/脏值一律夹成 0：界面上的色阶不接受负数
+  const dirty = buildGrid([
+    { date: day(0), count: -5, tokens: -100 },
+    { date: day(1), count: "abc", tokens: null },
+  ], today);
+  assert.equal(dirty.metrics.count.total, 0);
+  assert.equal(dirty.metrics.tokens.total, 0);
+  assert.equal(dirty.cells.find(c => c.date === day(0)).count, 0);
 }
 
 // ── 7. 月份标签：按列递增、不在首列、一个月只标一次 ──
@@ -243,12 +336,18 @@ for (let n = 0; n <= 40; n++) {
 
 // ── 8. 双语文案：新界面用到的中文键都要有英文，否则英文装在界面上漏中文 ──
 for (const key of [
-  "活跃度", "{start} 至 {end}：发送 {n} 条消息 · {d} 天活跃", "{date} · 发送 {n} 条消息", "{date} · 未使用",
+  "活跃度", "消息", "{start} 至 {end}：发送 {n} 条消息 · {d} 天活跃", "{date} · 发送 {n} 条消息", "{date} · 未使用",
   "周一", "周三", "周五", "少", "多",
+  // 双口径：切换按钮、token 版汇总/指标/提示与估算标注
+  "{start} 至 {end}：{n} tokens · {d} 天活跃", "{date} · {n} tokens", "（估算）",
+  "单日最高（tokens）", "活跃日均（tokens）",
+  "窗口内单日消耗 token 最多的一天", "最耗 token 的一天：{date}，{n} tokens", "总 token ÷ 有活动的天数",
+  "逐日真实记账自 {date} 起；更早的 token 为估算（按对话累计摊分）",
+  "token 暂全为估算（按对话累计摊分），从下次对话起逐日真实记账",
   "最长连续（天）", "当前连续（天）", "单日最高（条）", "活跃日均（条）",
   "窗口内连续每天都发消息的最长天数", "到今天为止连续有消息的天数；今天还没发则从昨天往前数",
   "窗口内单日发送消息最多的一天", "最活跃的一天：{date}，发送 {n} 条消息", "总消息数 ÷ 有消息的天数",
-  "分数", "最高分", "新游戏", "返回热力图",
+  "分数", "最高分", "新游戏", "Esc 或点棋盘外返回",
   "方向键或 WASD 移动方块，合出 2048", "合出 2048 了！可以接着往上刷", "无步可走，点「新游戏」再来一局",
 ]) {
   assert.ok(EN_DICT[key], `i18n_dict.js 缺英文词条：${key}`);
@@ -259,7 +358,7 @@ for (const m of ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月",
 
 // ── 9. 结构与文案：Node 侧没 DOM，直接读源码钉住两条走查里真炸过的 ──
 {
-  const src = readFileSync(new URL("../frontend/js/components/usage_heatmap.js?v=20260921-003", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../frontend/js/components/usage_heatmap.js?v=20260922-002", import.meta.url), "utf8");
   const css = readFileSync(new URL("../frontend/css/style.css", import.meta.url), "utf8");
   assert.match(src, /shell\.append\(gameHost\)/, "棋盘宿主得并进 .heat-shell");
   assert.doesNotMatch(src, /heat\.append\(gameHost\)/, "棋盘宿主挂进 .heat 会被 .heat.hidden 一起藏掉，双击永远打不开");
@@ -284,6 +383,41 @@ for (const m of ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月",
   // 指标条：渲染入口与四张卡都在
   assert.match(src, /heat-stats/, "指标条要渲染出来");
   assert.match(src, /heat-stat-num/);
+
+  // 双口径：切换控件、口径持久化、估算标注，以及「切口径不许重建 DOM」
+  assert.match(src, /div\("heat-seg"\)/, "消息 / Tokens 切换控件要渲染出来");
+  assert.match(src, /heat-seg-btn/, "切换按钮的类名得和 CSS 对上");
+  assert.match(src, /slate_heat_metric/, "口径要持久化，别每次进设置都跳回消息口径");
+  assert.match(src, /setMetric\(metric, \{ animate: false \}\)/, "首屏那次不该播数字滚动");
+  assert.doesNotMatch(src, /gridEl\.innerHTML/, "切口径不许重建格子 DOM：入场动效会重播，鼠标下的格子也会被换掉");
+  assert.match(src, /recordedFrom/, "估算标注要拿到真实记账起点，否则说不清哪段是摊的");
+  assert.match(css, /\.heat-note\.hidden\s*\{[^}]*display:\s*none/, "桌面 CSS 没有全局 .hidden，估算标注得自己声明一次");
+
+  // 动效：错峰点亮 / 数字滚动 / 减少动效降级
+  assert.match(css, /@keyframes heat-in/, "首屏点亮的关键帧");
+  assert.match(css, /\.heat-grid\.heat-enter \.heat-cell/, "点亮只挂在首屏那个类上，切口径不重播");
+  assert.match(css, /animation-delay:\s*calc\(var\(--heat-i/, "错峰延迟按 --heat-i 算");
+  assert.match(src, /--heat-i/, "格子要写上错峰下标");
+  assert.match(src, /animateNumber/, "数字滚动走公共动效工具");
+  assert.match(src, /prefersReducedMotion\(\)/, "减少动效要判");
+  assert.match(css, /\.heat-grid\.heat-enter \.heat-cell\s*\{[^}]*animation:\s*none/, "减少动效下不播点亮");
+
+  // 2048：外层定位 + 内层动画两层结构，退出靠 Esc / 点外
+  const game = readFileSync(new URL("../frontend/js/components/game_2048.js?v=20260922-002", import.meta.url), "utf8");
+  assert.match(game, /export function moveWithTrail/, "滑动来源表要导出，否则只能靠人眼看");
+  assert.match(game, /t2048-tile-face/, "方块要拆成外层定位、内层动画两层");
+  assert.doesNotMatch(game, /t2048-cell/, "旧的单层方块不再渲染，留着就是死样式");
+  assert.match(game, /e\.key === "Escape"/, "Esc 要能退出");
+  assert.doesNotMatch(game, /返回热力图/, "退出改成 Esc / 点棋盘外，别再放返回按钮");
+  assert.match(game, /document\.addEventListener\("click", onDocClick\)/, "点棋盘外退出");
+  assert.match(game, /document\.removeEventListener\("click", onDocClick\)/, "destroy 必须解绑外部点击，否则关掉设置后还在偷偷吃点击");
+  assert.match(css, /\.t2048-board\s*\{[^}]*position:\s*relative/, "方块绝对定位，棋盘必须是定位父级");
+  assert.match(css, /\.t2048-tile\s*\{[^}]*transition:\s*transform/, "位移过渡挂在定位那一层");
+  assert.match(css, /@keyframes t2048-spawn/, "补牌动效");
+  assert.match(css, /@keyframes t2048-merge/, "合并动效");
+  assert.match(css, /@keyframes t2048-win/, "合出 2048 的整盘金光");
+  assert.match(css, /\.t2048-gain/, "得分飘字");
+  assert.match(css, /\.t2048-esc/, "没有返回按钮，退路那行字就必须在");
 }
 
 console.log("热力图排布与 2048 合并契约：通过");

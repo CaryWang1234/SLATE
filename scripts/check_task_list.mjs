@@ -5,8 +5,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 // 导入必须带与前端一致的 ?v= 串：少了它 Node 里会另起一份模块实例
-import * as tl from "../frontend/js/services/task_list.js?v=20260921-003";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260921-003";
+import * as tl from "../frontend/js/services/task_list.js?v=20260922-002";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260922-002";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
 const NOW_MS = 1_800_000_000_000;
@@ -158,5 +158,39 @@ for (const [needle, why] of [[".conv-item.is-unread .conv-item-title", "未读�
 for (const { label } of BADGES) assert.ok(EN_DICT[label] && EN_DICT[label] !== label);
 for (const mode of tl.SORT_MODES) assert.ok(EN_DICT[mode.label], `排序档位「${mode.label}」缺英文词条`);
 assert.ok(EN_DICT["任务列表排序"], "排序控件的 aria 标题缺英文词条");
+
+// ── 右栏 TODOLIST 的开合：一份状态、两处入口、折叠不许被系统擅自撑回 ──
+// 折叠的是"这一栏占不占我的屏幕"，所以它既不能同步到手机（那边根本不长这样），
+// 也不能只在有清单时才可点——那等于没有随时一说。
+assert.match(HTML, /<button id="btn-todo-panel" class="icon-btn"[^>]*aria-pressed=/,
+  "顶栏缺右栏开关（或它没带 aria-pressed，读屏器不知道现在是展开还是收起）");
+assert.match(STORE, /todoPanelOpen: state\.todoPanelOpen !== false,/,
+  "开合偏好没进本机持久化：折叠一次，刷新就又弹回来");
+assert.match(STORE, /state\.todoPanelOpen = data\.todoPanelOpen !== false;/,
+  "本机装载要认这个键（老状态文件里没有它 = 默认展开）");
+assert.ok(!/todoPanelOpen/.test(/function getSharedPersistentData[\s\S]*?\n\}/.exec(STORE)[0]),
+  "右栏开合是本机的事，不该被同步进手机遥控那份状态");
+assert.match(CHAT, /setTodoPanelOpen\(state\.todoPanelOpen === false\)/,
+  "顶栏开关没写回 store：栏里栏外各记一套，折叠撑不过切会话");
+assert.match(CHAT, /items\.length \|\| state\.todoPanelOpen === false/,
+  "折叠了照样渲染右栏：整栏还占着 280px，折叠就是假的");
+assert.match(CHAT, /subscribe\("todoPanelOpen"/,
+  "另一处入口改了开合而这一处不重绘：顶栏金着、Codex 那侧却显示收起");
+// 经典布局的 panel-header 在 Codex 下是 display:none，只挂顶栏的控件对 Codex 用户等于不存在
+assert.match(APP, /\{ key: "todo", label: "任务清单", source: "btn-todo-panel" \}/,
+  "Codex 快捷行没挂右栏开关：极简布局里这个偏好根本没有入口");
+assert.match(CHAT, /data-cx-key="todo"/,
+  "开关没同时回显 Codex 快捷行那一份：两处显示两种开合状态就是在骗人");
+// 收合靠切 hidden 类：桌面 style.css 没有全局 .hidden 工具类（那是 mobile.css 的）
+assert.match(CSS, /\.todo-panel\.hidden\s*\{[^}]*display:\s*none/,
+  "右栏靠 hidden 收合，桌面 CSS 必须有对应隐藏规则，否则类在切、像素不动");
+assert.match(CSS, /\.icon-btn\.is-na[\s\S]{0,200}?\.cx-quick-item\.is-na/,
+  "没有清单时开关的置灰态没样式：按钮看着仍可点，点了却什么都不发生");
+for (const key of ["折叠任务清单", "展开任务清单 {done}/{total}", "这一场还没有任务清单"]) {
+  assert.ok(EN_DICT[key] && EN_DICT[key] !== key, `右栏开关缺英文词条：${key}`);
+}
+// 收起之后清单彻底看不见，进度只能靠这颗按钮的悬浮说明报一句
+assert.match(CHAT, /t\("展开任务清单 \{done\}\/\{total\}", \{ done, total: count \}\)/,
+  "折叠态的开关没报进度：收起来就等于和这场任务清单失联");
 
 console.log("侧栏任务列表：四态判定、五种排序、分组、清洗与跨文件契约全等：通过");

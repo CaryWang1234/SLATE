@@ -6,9 +6,9 @@
  * 首字延迟单独计时：连接通但迟迟不出字，多半是上游排队或被中间层吞了流。
  */
 
-import { state, subscribe, getModelKey } from "../store.js?v=20260921-003";
-import { streamChat, REASONING_PREFIX } from "../services/api.js?v=20260921-003";
-import { t } from "../services/i18n.js?v=20260921-003";
+import { state, subscribe, getModelKey } from "../store.js?v=20260922-002";
+import { streamChat, REASONING_PREFIX } from "../services/api.js?v=20260922-002";
+import { t } from "../services/i18n.js?v=20260922-002";
 
 const TEST_MAX_TOKENS = 64;
 const PREVIEW_MAX = 400;

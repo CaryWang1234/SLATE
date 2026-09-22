@@ -1111,6 +1111,10 @@ textarea::-webkit-scrollbar-thumb {
   z-index: 60;
 }
 
+/* 桌面端没有全局 .hidden 工具类（那是 mobile.css 里的），所以每个自带 hidden 的元素
+   都必须自己声明一次：漏了就是"类在切、像素不动"——弹窗从加载起就一直摊在输入框上方。 */
+.effort-pop.hidden { display: none; }
+
 .effort-pop-head {
   display: flex;
   align-items: baseline;
@@ -4907,6 +4911,54 @@ textarea::-webkit-scrollbar-thumb {
   color: var(--text-muted);
 }
 
+/* 口径切换：消息 / Tokens 两个按钮拼成一段，选中那个压到卡片底色上描金 */
+.heat-seg {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 1px;
+  padding: 1px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.heat-seg-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  border-radius: max(1px, calc(var(--radius) - 1px));
+  cursor: pointer;
+  transition: color var(--transition), background-color var(--transition);
+}
+
+.heat-seg-btn:hover {
+  color: var(--text);
+}
+
+.heat-seg-btn.active {
+  color: var(--gold-strong);
+  background: var(--bg);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+/* 估算标注：只有 token 口径、且历史里真有摊出来的值时才露面 */
+.heat-note {
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.heat-note.hidden {
+  display: none;
+}
+
 /* 指标条：连续天数 / 峰值日 / 活跃日均，居中排在画布上方 */
 .heat-stats {
   display: flex;
@@ -5006,7 +5058,20 @@ textarea::-webkit-scrollbar-thumb {
   background: var(--bg-alt);
   box-shadow: inset 0 0 0 1px var(--border);
   cursor: pointer;
-  transition: transform 90ms ease, box-shadow 90ms ease;
+  /* 底色给足时间：切口径时整片色阶要像退潮一样换过去，不是硬闪一下 */
+  transition: transform 90ms ease, box-shadow 90ms ease, background-color 240ms ease;
+}
+
+/* 首屏错峰点亮：延迟按 --heat-i 排（组件里写的是格子在画布里的序号），
+   一周一周从左往右推过去。只播一次，切口径不重播 */
+@keyframes heat-in {
+  from { opacity: 0; transform: scale(0.45); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.heat-grid.heat-enter .heat-cell {
+  animation: heat-in 300ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+  animation-delay: calc(var(--heat-i, 0) * 1.1ms);
 }
 
 .heat-cell.future {
@@ -5060,15 +5125,19 @@ textarea::-webkit-scrollbar-thumb {
   .heat-cell:not(.future):hover {
     transform: none;
   }
+  .heat-grid.heat-enter .heat-cell {
+    animation: none;
+  }
 }
 
-/* 2048：与热力图同一块地盘，替换显示 */
+/* 2048：与热力图同一块地盘，替换显示。方块沿用热力图的墨金阶梯——
+   同一个墨色系统里，游戏才像热力图长出的一块，而不是嵌进来的外来户 */
 .t2048 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: 320px;
-  /* 热力图铺满整行，棋盘只有 320px：居中才不像漏在左边 */
+  max-width: 340px;
+  /* 热力图铺满整行，棋盘只有几百 px：居中才不像漏在左边 */
   margin-inline: auto;
 }
 
@@ -5087,6 +5156,7 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .t2048-score {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5106,9 +5176,29 @@ textarea::-webkit-scrollbar-thumb {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 得分飘字：+N 从分数卡上方浮起散掉，余光就能看见刚才那一手赚了多少 */
+.t2048-gain {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold-strong);
+  pointer-events: none;
+  animation: t2048-gain 780ms ease-out forwards;
+}
+
+@keyframes t2048-gain {
+  0% { opacity: 0; transform: translate(-50%, 3px) scale(0.9); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -24px) scale(1.05); }
 }
 
 .t2048-board {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
@@ -5118,39 +5208,117 @@ textarea::-webkit-scrollbar-thumb {
   border-radius: var(--radius);
 }
 
-.t2048-cell {
+.t2048-slot {
   aspect-ratio: 1;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--text) 4%, var(--bg));
+}
+
+/* 方块分两层：外层只管位移（transition 挂在 transform 上），内层承担弹跳与
+   落下的缩放。合成一个元素做的话，动画里的 scale 会把定位用的 translate
+   一起顶掉——方块会瞬间飞回棋盘左上角。 */
+.t2048-tile {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: transform 110ms cubic-bezier(0.25, 0.8, 0.35, 1);
+  will-change: transform;
+}
+
+.t2048-tile-face {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--text) 5%, var(--bg));
-  font-size: 18px;
   font-weight: 700;
+  line-height: 1;
   color: var(--text);
+  background: color-mix(in srgb, var(--gold) 6%, var(--bg-alt));
 }
 
-.t2048-cell.tv2 { background: color-mix(in srgb, var(--text) 9%, var(--bg)); }
-.t2048-cell.tv4 { background: color-mix(in srgb, var(--text) 15%, var(--bg)); }
-.t2048-cell.tv8 { background: color-mix(in srgb, var(--text) 24%, var(--bg)); }
-.t2048-cell.tv16 { background: color-mix(in srgb, var(--text) 34%, var(--bg)); }
-.t2048-cell.tv32 { background: color-mix(in srgb, var(--text) 46%, var(--bg)); }
-.t2048-cell.tv64 { background: color-mix(in srgb, var(--text) 62%, var(--bg)); color: var(--bg); }
-.t2048-cell.tv128 { background: color-mix(in srgb, var(--text) 74%, var(--bg)); color: var(--bg); }
-.t2048-cell.tv256 { background: color-mix(in srgb, var(--text) 84%, var(--bg)); color: var(--bg); }
-.t2048-cell.tv512 { background: color-mix(in srgb, var(--text) 92%, var(--bg)); color: var(--bg); }
-.t2048-cell.tv1024 { background: var(--gold); color: #1A1A1A; font-size: 15px; }
-.t2048-cell.tv2048 { background: var(--gold-strong); color: #FFFFFF; font-size: 15px; }
-.t2048-cell.tv4096, .t2048-cell.tv8192 { background: var(--text); color: var(--bg); font-size: 14px; }
+.t2048-tile-face.tv2 { background: color-mix(in srgb, var(--gold) 14%, var(--bg-alt)); }
+.t2048-tile-face.tv4 { background: color-mix(in srgb, var(--gold) 24%, var(--bg-alt)); }
+.t2048-tile-face.tv8 { background: color-mix(in srgb, var(--gold) 36%, var(--bg-alt)); }
+.t2048-tile-face.tv16 { background: color-mix(in srgb, var(--gold) 48%, var(--bg-alt)); }
+.t2048-tile-face.tv32 { background: color-mix(in srgb, var(--gold) 60%, var(--bg-alt)); }
+.t2048-tile-face.tv64 { background: color-mix(in srgb, var(--gold) 72%, var(--bg-alt)); }
+.t2048-tile-face.tv128 { background: color-mix(in srgb, var(--gold) 84%, var(--bg-alt)); }
+.t2048-tile-face.tv256 { background: color-mix(in srgb, var(--gold) 94%, var(--bg-alt)); }
+.t2048-tile-face.tv512 { background: var(--gold); color: var(--bg); }
+.t2048-tile-face.tv1024 { background: var(--gold-strong); color: var(--bg); }
+.t2048-tile-face.tv2048 {
+  background: var(--gold-strong);
+  color: var(--bg);
+  box-shadow: 0 0 0 1px var(--gold), 0 0 22px -4px var(--gold);
+}
+.t2048-tile-face.tv4096,
+.t2048-tile-face.tv8192 { background: var(--text); color: var(--bg); }
 
-.t2048-cell.pop {
-  animation: t2048-pop 140ms ease-out;
+/* 补牌：新方块从小长起来 */
+.t2048-tile-face.is-new {
+  animation: t2048-spawn 180ms cubic-bezier(0.2, 0.8, 0.3, 1.1);
 }
 
-@keyframes t2048-pop {
-  0% { transform: scale(0.82); }
-  60% { transform: scale(1.04); }
-  100% { transform: scale(1); }
+@keyframes t2048-spawn {
+  from { opacity: 0; transform: scale(0.2); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 合并：先压后弹，再补一圈金边，一眼看出哪一格是刚合出来的 */
+.t2048-tile-face.is-merged {
+  animation: t2048-merge 220ms ease-out;
+}
+
+@keyframes t2048-merge {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 var(--gold); }
+  40% { transform: scale(1.22); box-shadow: 0 0 0 2px var(--gold); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 var(--gold); }
+}
+
+/* 合出 2048：整盘扫一层金光 */
+.t2048-board::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.t2048-board.is-win::after {
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--gold) 55%, transparent) 0%,
+    transparent 72%);
+  animation: t2048-win 900ms ease-out;
+}
+
+@keyframes t2048-win {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* 无步可走：棋盘晃一下，比只在下面换一行字显眼 */
+.t2048-board.is-over {
+  animation: t2048-shake 400ms ease-in-out;
+}
+
+@keyframes t2048-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+.t2048-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 10px;
 }
 
 .t2048-hint {
@@ -5158,8 +5326,22 @@ textarea::-webkit-scrollbar-thumb {
   color: var(--text-muted);
 }
 
+/* 退出没有按钮，那行退路就得一直摆在那儿 */
+.t2048-esc {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .t2048-cell.pop {
+  .t2048-tile {
+    transition: none;
+  }
+  .t2048-tile-face.is-new,
+  .t2048-tile-face.is-merged,
+  .t2048-board.is-win::after,
+  .t2048-board.is-over,
+  .t2048-gain {
     animation: none;
   }
 }
@@ -7030,6 +7212,27 @@ img.file-type-icon {
 .todo-toggle {
   color: var(--text-muted);
   font-size: 11px;
+}
+
+/* 右栏开合开关：顶栏按钮与 Codex 快捷行共用这两个状态（同一份 store 值）。
+   栏展开时描金；这场还没有清单时置灰——点开是空动作，别留一个能按的死按钮。 */
+.rail-toggle-on {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.icon-btn.is-na,
+.cx-quick-item.is-na {
+  color: var(--text-muted);
+  border-color: var(--border);
+  opacity: 0.45;
+  cursor: default;
+}
+
+.icon-btn.is-na:hover,
+.cx-quick-item.is-na:hover {
+  color: var(--text-muted);
+  border-color: var(--border);
 }
 
 .todo-panel-body {

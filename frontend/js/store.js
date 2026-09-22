@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260921-003";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260921-003";
+import { makeId } from "./services/utils.js?v=20260922-002";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260922-002";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -59,6 +59,11 @@ const state = {
 
   // 侧栏任务列表的排序偏好（recent|project|status|created|usage，见 services/task_list.js）
   taskListSort: "recent",
+
+  // 消息区右侧 TODOLIST 栏：false = 用户主动收起（有清单也不占位）。
+  // 与 taskFlags 同理只存本机——"这一栏占不占我的屏幕"是这台设备的事，
+  // 手机遥控同步过去只会把桌面的布局偏好盖到一块根本不长这样的屏上。
+  todoPanelOpen: true,
 
   // 模型列表
   modelRegistry: {},
@@ -196,6 +201,7 @@ function buildPersistentData() {
     conversationTodos: state.conversationTodos,
     taskFlags: state.taskFlags,
     taskListSort: normalizeTaskListSort(state.taskListSort),
+    todoPanelOpen: state.todoPanelOpen !== false,
     maxTokens: state.maxTokens,
     modelContextCaps: state.modelContextCaps,
     autoReview: state.autoReview,
@@ -408,6 +414,7 @@ function loadPersistent() {
     state.conversationTodos = data.conversationTodos || {};
     state.taskFlags = normalizeTaskFlags(data.taskFlags);
     state.taskListSort = normalizeTaskListSort(data.taskListSort);
+    state.todoPanelOpen = data.todoPanelOpen !== false;
     state.maxTokens = Math.max(1000, parseInt(data.maxTokens) || 64000);
     state.modelContextCaps = normalizeContextCaps(data.modelContextCaps);
     state.autoReview = {
@@ -823,6 +830,16 @@ function setTaskListSort(mode) {
   return true;
 }
 
+// 右栏 TODOLIST 折叠：值只有 true/false，undefined 一律当"展开"（老状态文件没这个键）
+function setTodoPanelOpen(open) {
+  const next = open !== false;
+  if ((state.todoPanelOpen !== false) === next) return false;
+  state.todoPanelOpen = next;
+  savePersistent();
+  notify("todoPanelOpen", next);
+  return true;
+}
+
 function addUsage(usage) {
   if (!usage) return;
   state.usage.promptTokens += usage.prompt_tokens || 0;
@@ -1044,7 +1061,7 @@ export {
   REASONING_LEVELS_BY_CAP, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS, getModelDefinition,
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens,
   getConversationTodos, setConversationTodos,
-  recordTaskFlag, markTaskSeen, pruneTaskFlags, setTaskListSort,
+  recordTaskFlag, markTaskSeen, pruneTaskFlags, setTaskListSort, setTodoPanelOpen,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage,
   setConversations, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,

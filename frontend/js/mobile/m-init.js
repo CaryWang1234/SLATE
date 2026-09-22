@@ -5,19 +5,19 @@
  * 3. 装配外壳与各面板
  */
 
-import { state, subscribe, loadPersistent, loadSharedPersistent, setModelRegistry } from "../store.js?v=20260921-003";
-import { measureContext } from "../services/context_meter.js?v=20260921-003";
-import { setLanToken, get } from "../services/api.js?v=20260921-003";
-import { initI18n } from "../services/i18n.js?v=20260921-003";
-import { initMApp } from "./m-app.js?v=20260921-003";
-import { mToast } from "./m-ui.js?v=20260921-003";
-import { initMChat } from "./m-chat.js?v=20260921-003";
-import { initMChatInput } from "./m-chat-input.js?v=20260921-003";
-import { initMConversations } from "./m-conversations.js?v=20260921-003";
-import { initMMemory } from "./m-memory.js?v=20260921-003";
-import { initMSchedule } from "./m-schedule.js?v=20260921-003";
-import { initMSettings } from "./m-settings.js?v=20260921-003";
-import { mGuardTerminal } from "./m-auth.js?v=20260921-003";
+import { state, subscribe, loadPersistent, loadSharedPersistent, setModelRegistry } from "../store.js?v=20260922-002";
+import { measureContext } from "../services/context_meter.js?v=20260922-002";
+import { setLanToken, get } from "../services/api.js?v=20260922-002";
+import { initI18n } from "../services/i18n.js?v=20260922-002";
+import { initMApp } from "./m-app.js?v=20260922-002";
+import { mToast } from "./m-ui.js?v=20260922-002";
+import { initMChat } from "./m-chat.js?v=20260922-002";
+import { initMChatInput } from "./m-chat-input.js?v=20260922-002";
+import { initMConversations } from "./m-conversations.js?v=20260922-002";
+import { initMMemory } from "./m-memory.js?v=20260922-002";
+import { initMSchedule } from "./m-schedule.js?v=20260922-002";
+import { initMSettings } from "./m-settings.js?v=20260922-002";
+import { mGuardTerminal } from "./m-auth.js?v=20260922-002";
 
 // 移动端接管高危命令审批 UI（底部 sheet），桌面不受影响
 window.__slateGuardOverride = mGuardTerminal;

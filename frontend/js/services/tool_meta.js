@@ -9,8 +9,8 @@
  * （git / node / curl…）挑对应品牌图标，命令行 / 文件 / 工具三类行共用这套识别链。
  */
 
-import { TOOLS } from "./tools.js?v=20260921-003";
-import { t } from "./i18n.js?v=20260921-003";
+import { TOOLS } from "./tools.js?v=20260922-002";
+import { t } from "./i18n.js?v=20260922-002";
 
 const SUMMARY_MAX = 60;
 

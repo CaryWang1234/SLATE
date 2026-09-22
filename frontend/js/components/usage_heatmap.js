@@ -1,8 +1,14 @@
 /**
- * 设置页「用量统计」里的活跃度热力图：按本地日期看每天发了多少条消息。
+ * 设置页「用量统计」里的活跃度热力图：按本地日期看每天的活动量。
  *
  * 数据来自 GET /api/chat/usage/summary 的 data.daily（后端只回有活动的日子，
- * 空档由这里补 0）。老后端不带 daily 时 app.js 直接跳过渲染，这里不再兜底。
+ * 空档由这里补 0）。每条带三样东西：count（用户发言条数）、tokens（当天 token
+ * 增量）、estimated（该天 token 是不是按对话累计摊出来的估算值）。老后端不带
+ * daily 时 app.js 直接跳过渲染，这里不再兜底。
+ *
+ * 两个口径共用一份格子：消息看「发得勤不勤」，token 看「烧得狠不狠」。
+ * 切口径只重算色阶、tooltip、汇总行与指标条，绝不重建 DOM——重建会让入场动效
+ * 重播，还会把鼠标底下的那个格子换掉。口径记在 localStorage。
  *
  * 格子按 GitHub 口径排：一列一周，周日打头，53 列刚好对上后端的 371 天。
  * 53 列在窄的设置栏里铺不开，所以格子边长由 syncCellSize 量容器宽度回算成
@@ -13,22 +19,40 @@
  * 内容一旦比容器宽，溢出到左侧的半截就再也滚不到了）。
  *
  * 汇总行只报日期区间：周日打头的固定 53 列里非 future 格只有 365+今天星期数天，
- * 报「近 53 周」是虚的。下面的指标条（最长/当前连续、单日最高、活跃日均）
- * 同样只在这段可见区间里算，future 格不能混进来截断连续天数。
+ * 报「近 53 周」是虚的。指标条（最长/当前连续、单日最高、日均）同样只在这段
+ * 可见区间里算，future 格不能混进来截断连续天数。
  *
- * 半隐藏的 2048：双击任一格子，棋盘就地替掉热力图（见 game_2048.js）。
+ * 动效：首屏按周错峰点亮（--heat-i 排的延迟，只播一次，切口径不重播）、
+ * 指标数字滚动、切口径时格子底色过渡。一律在 prefers-reduced-motion 下直出。
+ *
+ * 2048：双击任一格子，棋盘就地替掉热力图（见 game_2048.js）。
  * 不留可见入口，也不写提示文案——这是彩蛋，不是功能按钮。
  */
 
-import { t } from "../services/i18n.js?v=20260921-003";
-import { mount2048 } from "./game_2048.js?v=20260921-003";
+import { t } from "../services/i18n.js?v=20260922-002";
+import { fmtTokens } from "../services/usage.js?v=20260922-002";
+import { animateNumber, prefersReducedMotion } from "../services/anim.js?v=20260922-002";
+import { mount2048 } from "./game_2048.js?v=20260922-002";
 
 const WEEKS = 53;
+const METRICS = ["count", "tokens"];
+const METRIC_KEY = "slate_heat_metric";
 const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
 
 function fmtDate(dt) {
   const p = n => String(n).padStart(2, "0");
   return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
+
+function readMetric() {
+  try {
+    const v = localStorage.getItem(METRIC_KEY);
+    return METRICS.includes(v) ? v : "count";
+  } catch { return "count"; }
+}
+
+function writeMetric(metric) {
+  try { localStorage.setItem(METRIC_KEY, metric); } catch {}
 }
 
 /** 0 无活动；其余按占最大值的比例分 4 档（样本极小时直接按条数走） */
@@ -42,6 +66,39 @@ export function levelFor(count, max) {
   return 1;
 }
 
+/**
+ * 把一套口径压成指标条要的几个数。
+ * 只认可见区间：future 格恒为 0，混进来会把末尾的连续天数直接截断。
+ */
+function summarize(visible, key) {
+  let total = 0, max = 0, activeDays = 0;
+  for (const c of visible) {
+    const v = c[key];
+    total += v;
+    if (v) activeDays += 1;
+    if (v > max) max = v;
+  }
+  let longestStreak = 0, run = 0;
+  for (const c of visible) {
+    run = c[key] > 0 ? run + 1 : 0;
+    if (run > longestStreak) longestStreak = run;
+  }
+  let currentStreak = 0;
+  for (let i = visible.length - 1; i >= 0; i--) {
+    if (visible[i][key] > 0) currentStreak += 1;
+    // 今天往往还没过完：它没量不该把还在延续的连续记录断掉，跳过继续往前数
+    else if (i !== visible.length - 1) break;
+  }
+  let bestDay = null;
+  for (const c of visible) {
+    if (c[key] > 0 && (!bestDay || c[key] > bestDay.value)) bestDay = { date: c.date, value: c[key] };
+  }
+  return {
+    total, max, activeDays, longestStreak, currentStreak, bestDay,
+    avgPerActiveDay: activeDays ? Math.round(total / activeDays) : 0,
+  };
+}
+
 /** 把稀疏的 daily 摊成 53 列 × 7 行的格子，末尾未到的一周置 future */
 export function buildGrid(daily, today = new Date()) {
   const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -49,49 +106,34 @@ export function buildGrid(daily, today = new Date()) {
     end.getFullYear(), end.getMonth(),
     end.getDate() - end.getDay() - (WEEKS - 1) * 7
   );
-  const counts = new Map();
+  const rows = new Map();
   for (const item of daily || []) {
     if (!item || !item.date) continue;
-    counts.set(String(item.date), Math.max(0, Number(item.count) || 0));
+    rows.set(String(item.date), {
+      count: Math.max(0, Number(item.count) || 0),
+      tokens: Math.max(0, Number(item.tokens) || 0),
+      estimated: item.estimated === true,
+    });
   }
   const cells = [];
-  let total = 0, max = 0, activeDays = 0;
   for (let w = 0; w < WEEKS; w++) {
     for (let d = 0; d < 7; d++) {
       const dt = new Date(firstSunday.getFullYear(), firstSunday.getMonth(), firstSunday.getDate() + w * 7 + d);
       const date = fmtDate(dt);
       const future = dt.getTime() > end.getTime();
-      const count = future ? 0 : (counts.get(date) || 0);
-      if (!future) {
-        total += count;
-        if (count) activeDays += 1;
-        if (count > max) max = count;
-      }
-      cells.push({ date, count, week: w, dow: d, future });
+      const rec = future ? null : rows.get(date);
+      cells.push({
+        date, week: w, dow: d, future,
+        count: rec ? rec.count : 0,
+        tokens: rec ? rec.tokens : 0,
+        estimated: rec ? rec.estimated : false,
+      });
     }
   }
-  // 指标只认可见区间：future 格恒为 0，混进来会把末尾的连续天数直接截断
   const visible = cells.filter(c => !c.future);
-  let longestStreak = 0, run = 0;
-  for (const c of visible) {
-    run = c.count > 0 ? run + 1 : 0;
-    if (run > longestStreak) longestStreak = run;
-  }
-  let currentStreak = 0;
-  for (let i = visible.length - 1; i >= 0; i--) {
-    if (visible[i].count > 0) currentStreak += 1;
-    // 今天往往还没过完：它没消息不该把还在延续的连续记录断掉，跳过继续往前数
-    else if (i !== visible.length - 1) break;
-  }
-  let bestDay = null;
-  for (const c of visible) {
-    if (c.count > 0 && (!bestDay || c.count > bestDay.count)) bestDay = { date: c.date, count: c.count };
-  }
   return {
-    cells, weeks: WEEKS, total, max, activeDays,
-    longestStreak, currentStreak, bestDay,
-    visibleDays: visible.length,
-    avgPerActiveDay: activeDays ? Math.round(total / activeDays) : 0,
+    cells, weeks: WEEKS, visibleDays: visible.length,
+    metrics: { count: summarize(visible, "count"), tokens: summarize(visible, "tokens") },
     startDate: fmtDate(firstSunday), endDate: fmtDate(end),
   };
 }
@@ -121,57 +163,68 @@ function div(cls, text) {
   return node;
 }
 
-function cellTitle(cell) {
+function cellTitle(cell, metric) {
+  if (metric === "tokens") {
+    if (!cell.tokens) return t("{date} · 未使用", { date: cell.date });
+    const base = t("{date} · {n} tokens", { date: cell.date, n: fmtTokens(cell.tokens) });
+    return cell.estimated ? `${base}${t("（估算）")}` : base;
+  }
   return cell.count
     ? t("{date} · 发送 {n} 条消息", { date: cell.date, n: cell.count })
     : t("{date} · 未使用", { date: cell.date });
 }
 
-/** 指标条：口头报一句「最近挺稳」不如把连续天数和峰值日摆出来 */
-function renderStats(grid) {
-  const row = div("heat-stats");
-  const chip = (value, labelKey, title) => {
-    const box = div("heat-stat");
-    box.append(div("heat-stat-num", String(value)));
-    box.append(div("heat-stat-label", t(labelKey)));
-    if (title) box.title = title;
-    return box;
-  };
-  row.append(chip(grid.longestStreak, "最长连续（天）", t("窗口内连续每天都发消息的最长天数")));
-  row.append(chip(grid.currentStreak, "当前连续（天）", t("到今天为止连续有消息的天数；今天还没发则从昨天往前数")));
-  row.append(chip(
-    grid.bestDay ? grid.bestDay.count : 0,
-    "单日最高（条）",
-    grid.bestDay
-      ? t("最活跃的一天：{date}，发送 {n} 条消息", { date: grid.bestDay.date, n: grid.bestDay.count })
-      : t("窗口内单日发送消息最多的一天")
-  ));
-  row.append(chip(grid.avgPerActiveDay, "活跃日均（条）", t("总消息数 ÷ 有消息的天数")));
-  return row;
-}
-
 /** 画热力图；game 视图与热力图视图共用同一块地盘，切换靠 data-view */
-export function renderActivityHeatmap(host, daily) {
+export function renderActivityHeatmap(host, daily, opts = {}) {
   const grid = buildGrid(daily);
+  const recordedFrom = opts.recordedFrom || null;
+  const reduceMotion = prefersReducedMotion();
   host.innerHTML = "";
 
   const shell = div("heat-shell");
   const heat = div("heat");
 
+  // ── 头部：标题 + 口径切换 + 汇总行 ──
   const head = div("heat-head");
   head.append(div("heat-title", t("活跃度")));
-  // 格子周日打头，末列今天之后还有几个空格（周六才刚好填满），所以看得见的天数
-  // 是 365+星期数，够不到后端的 371 天窗口。报日期区间而不是周数，
-  // 数字才和屏幕上这些格子一一对得上。
-  head.append(div("heat-total", t("{start} 至 {end}：发送 {n} 条消息 · {d} 天活跃", {
-    start: grid.startDate, end: grid.endDate, n: grid.total, d: grid.activeDays,
-  })));
+
+  const seg = div("heat-seg");
+  const segBtns = {};
+  for (const m of METRICS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "heat-seg-btn";
+    btn.dataset.metric = m;
+    btn.textContent = m === "tokens" ? "Tokens" : t("消息");
+    btn.addEventListener("click", () => setMetric(m));
+    seg.append(btn);
+    segBtns[m] = btn;
+  }
+  head.append(seg);
+
+  const totalEl = div("heat-total");
+  head.append(totalEl);
   heat.append(head);
 
-  heat.append(renderStats(grid));
+  // ── 指标条 ──
+  const stats = div("heat-stats");
+  const chips = [];
+  for (let i = 0; i < 4; i++) {
+    const box = div("heat-stat");
+    const num = div("heat-stat-num", "0");
+    const label = div("heat-stat-label");
+    box.append(num, label);
+    stats.append(box);
+    chips.push({ box, num, label });
+  }
+  heat.append(stats);
+
+  // ── 估算标注：只有 token 口径且真有估算日时才露 ──
+  const note = div("heat-note hidden");
+  heat.append(note);
 
   const scroll = div("heat-scroll");
-  // 画布比容器窄时整块居中（min-width:100% 撑满 + 行居中），比容器宽时退化成
+  // 画布比容器窄时整块居中（min-width 撑满 + 行居中），比容器宽时退化成
   // max-content 的横向滚动区，见 CSS 里 .heat-canvas
   const canvas = div("heat-canvas");
 
@@ -193,13 +246,15 @@ export function renderActivityHeatmap(host, daily) {
   bodyRow.append(days);
 
   const gridEl = div("heat-grid");
-  for (const cell of grid.cells) {
-    const node = div(`heat-cell lv${cell.future ? 0 : levelFor(cell.count, grid.max)}`);
+  const cellNodes = grid.cells.map((cell, i) => {
+    const node = div("heat-cell lv0");
     if (cell.future) node.classList.add("future");
     node.dataset.date = cell.date;
-    node.title = cellTitle(cell);
+    // 错峰下标按周排：点亮是从左到右一周一周推过去，不是满屏随机闪
+    node.style.setProperty("--heat-i", String(i));
     gridEl.append(node);
-  }
+    return node;
+  });
   gridEl.addEventListener("dblclick", () => openGame(shell));
   bodyRow.append(gridEl);
   canvas.append(bodyRow);
@@ -219,7 +274,93 @@ export function renderActivityHeatmap(host, daily) {
   shell.append(gameHost);
   host.append(shell);
 
+  const shown = [0, 0, 0, 0];
+  let metric = readMetric();
+
+  function paintStats(m, animate) {
+    const s = grid.metrics[m];
+    const isTokens = m === "tokens";
+    const totalFmt = isTokens ? fmtTokens : v => v.toLocaleString();
+    const dayFmt = v => String(v);
+    const best = s.bestDay;
+    const cfg = [
+      {
+        to: s.longestStreak, format: dayFmt,
+        label: t("最长连续（天）"),
+        title: t("窗口内连续每天都发消息的最长天数"),
+      },
+      {
+        to: s.currentStreak, format: dayFmt,
+        label: t("当前连续（天）"),
+        title: t("到今天为止连续有消息的天数；今天还没发则从昨天往前数"),
+      },
+      {
+        to: best ? best.value : 0, format: totalFmt,
+        label: t(isTokens ? "单日最高（tokens）" : "单日最高（条）"),
+        title: best
+          ? t(isTokens ? "最耗 token 的一天：{date}，{n} tokens" : "最活跃的一天：{date}，发送 {n} 条消息",
+            { date: best.date, n: isTokens ? fmtTokens(best.value) : best.value })
+          : t(isTokens ? "窗口内单日消耗 token 最多的一天" : "窗口内单日发送消息最多的一天"),
+      },
+      {
+        to: s.avgPerActiveDay, format: totalFmt,
+        label: t(isTokens ? "活跃日均（tokens）" : "活跃日均（条）"),
+        title: t(isTokens ? "总 token ÷ 有活动的天数" : "总消息数 ÷ 有消息的天数"),
+      },
+    ];
+    cfg.forEach((item, i) => {
+      chips[i].label.textContent = item.label;
+      chips[i].box.title = item.title;
+      animateNumber(chips[i].num, shown[i], item.to, item.format, animate && !reduceMotion);
+      shown[i] = item.to;
+    });
+  }
+
+  function setMetric(next, { animate = true } = {}) {
+    if (!METRICS.includes(next)) next = "count";
+    metric = next;
+    if (animate) writeMetric(next);
+    for (const m of METRICS) segBtns[m].classList.toggle("active", m === next);
+    segBtns[next].setAttribute("aria-pressed", "true");
+
+    const s = grid.metrics[next];
+    totalEl.textContent = next === "tokens"
+      ? t("{start} 至 {end}：{n} tokens · {d} 天活跃", {
+        start: grid.startDate, end: grid.endDate, n: fmtTokens(s.total), d: s.activeDays,
+      })
+      : t("{start} 至 {end}：发送 {n} 条消息 · {d} 天活跃", {
+        start: grid.startDate, end: grid.endDate, n: s.total, d: s.activeDays,
+      });
+
+    grid.cells.forEach((cell, i) => {
+      const node = cellNodes[i];
+      node.className = `heat-cell lv${cell.future ? 0 : levelFor(cell[next], s.max)}`
+        + (cell.future ? " future" : "");
+      node.title = cellTitle(cell, next);
+    });
+
+    paintStats(next, animate);
+
+    const estimated = grid.cells.some(c => !c.future && c.estimated);
+    if (next === "tokens" && estimated) {
+      note.textContent = recordedFrom
+        ? t("逐日真实记账自 {date} 起；更早的 token 为估算（按对话累计摊分）", { date: recordedFrom })
+        : t("token 暂全为估算（按对话累计摊分），从下次对话起逐日真实记账");
+      note.classList.remove("hidden");
+    } else {
+      note.textContent = "";
+      note.classList.add("hidden");
+    }
+  }
+
+  setMetric(metric, { animate: false });
   syncCellSize(heat, scroll, days);
+
+  // 首屏错峰点亮：只加一次类，播完就摘掉，切口径不会重播
+  if (!reduceMotion) {
+    gridEl.classList.add("heat-enter");
+    setTimeout(() => gridEl.classList.remove("heat-enter"), 1400);
+  }
   return grid;
 }
 

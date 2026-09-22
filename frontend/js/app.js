@@ -2,33 +2,33 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, fmtContextTokens, setTaskListSort } from "./store.js?v=20260921-003";
-import { initI18n, t } from "./services/i18n.js?v=20260921-003";
-import { iconSvgEl } from "./services/icons.js?v=20260921-003";
-import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260921-003";
-import { get, post, put } from "./services/api.js?v=20260921-003";
-import { dlgConfirm } from "./services/dialog.js?v=20260921-003";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260921-003";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260921-003";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260921-003";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260921-003";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260921-003";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260921-003";
-import { initTeamPanel } from "./components/team.js?v=20260921-003";
-import { initProjectBar } from "./components/project_bar.js?v=20260921-003";
-import { initSessionSummary } from "./components/session_summary.js?v=20260921-003";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260921-003";
-import { initTypingGame } from "./components/typing_game.js?v=20260921-003";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260921-003";
-import { initMemoryPanel } from "./components/memory.js?v=20260921-003";
-import { initExpertsPanel } from "./components/experts.js?v=20260921-003";
-import { initSchedule } from "./components/schedule.js?v=20260921-003";
-import { initRiskGuard } from "./services/riskguard.js?v=20260921-003";
-import { initUnderstandPanel } from "./components/understand.js?v=20260921-003";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260921-003";
-import { setProject, setProjectFileTree } from "./store.js?v=20260921-003";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260921-003";
-import { installErrorSink } from "./services/error_sink.js?v=20260921-003";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, fmtContextTokens, setTaskListSort } from "./store.js?v=20260922-002";
+import { initI18n, t } from "./services/i18n.js?v=20260922-002";
+import { iconSvgEl } from "./services/icons.js?v=20260922-002";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260922-002";
+import { get, post, put } from "./services/api.js?v=20260922-002";
+import { dlgConfirm } from "./services/dialog.js?v=20260922-002";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260922-002";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260922-002";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260922-002";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260922-002";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260922-002";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260922-002";
+import { initTeamPanel } from "./components/team.js?v=20260922-002";
+import { initProjectBar } from "./components/project_bar.js?v=20260922-002";
+import { initSessionSummary } from "./components/session_summary.js?v=20260922-002";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260922-002";
+import { initTypingGame } from "./components/typing_game.js?v=20260922-002";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260922-002";
+import { initMemoryPanel } from "./components/memory.js?v=20260922-002";
+import { initExpertsPanel } from "./components/experts.js?v=20260922-002";
+import { initSchedule } from "./components/schedule.js?v=20260922-002";
+import { initRiskGuard } from "./services/riskguard.js?v=20260922-002";
+import { initUnderstandPanel } from "./components/understand.js?v=20260922-002";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260922-002";
+import { setProject, setProjectFileTree } from "./store.js?v=20260922-002";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260922-002";
+import { installErrorSink } from "./services/error_sink.js?v=20260922-002";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -1058,7 +1058,11 @@ async function renderUsageSummary() {
       box.appendChild(list);
     }
 
-    if (Array.isArray(d.daily)) renderActivityHeatmap(box, d.daily);
+    // tokens_recorded_from = 第一条真实按天记账的日期；它之前的热力图 token 是估算值，
+    // 传给组件是为了在界面上如实标注，别把摊出来的数字说得像真的
+    if (Array.isArray(d.daily)) {
+      renderActivityHeatmap(box, d.daily, { recordedFrom: d.tokens_recorded_from || null });
+    }
   } catch (e) {
     box.innerHTML = "";
     const err = document.createElement("div");
@@ -1108,7 +1112,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260921-003").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260922-002").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1227,6 +1231,7 @@ const CODEX_QUICK_ACTIONS = [
   { key: "memory", label: "记忆与画像", source: "btn-memory" },
   { key: "experts", label: "专家包", source: "btn-experts" },
   { key: "snippets", label: "提示词素材", source: "btn-snippets" },
+  { key: "todo", label: "任务清单", source: "btn-todo-panel" },
   { key: "theme", label: "明暗主题", source: "btn-theme" },
 ];
 
@@ -1411,6 +1416,13 @@ function buildCodexQuickItem(item) {
   const src = document.getElementById(item.source);
   if (src) {
     if (src.title) btn.title = src.title;
+    // 镜像出来的入口得从同步状态起步：顶栏那颗已经收起/置灰，这里还报"可按、已展开"就是骗人
+    const pressed = src.getAttribute("aria-pressed");
+    if (pressed !== null) btn.setAttribute("aria-pressed", pressed);
+    if (src.disabled) {
+      btn.disabled = true;
+      btn.classList.toggle("is-na", true);
+    }
     const svg = src.querySelector("svg");
     if (svg) icon.appendChild(svg.cloneNode(true));
     else if (src.firstChild && src.firstChild.nodeType === Node.TEXT_NODE && src.firstChild.textContent.trim()) {
@@ -1707,7 +1719,7 @@ async function saveSettings() {
     try {
       const constData = JSON.parse(constText);
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260921-003");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260922-002");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1955,7 +1967,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260921-003");
+        const { openProject } = await import("./services/project.js?v=20260922-002");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }

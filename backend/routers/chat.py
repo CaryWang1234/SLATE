@@ -83,7 +83,17 @@ def _get_db() -> sqlite3.Connection:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_role ON messages(role)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at DESC)")
-    
+
+    # 按天 token 记账（0.4.2 起）：conversations 只存累计值，热力图要按天看 token
+    # 就必须另记一份。每次同步用量时把「相对上次的增量」写到本地当天——
+    # 增量口径天然对上「这一轮花了多少」，也不用给 messages 加列。
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS daily_usage (
+            day TEXT PRIMARY KEY,
+            tokens INTEGER DEFAULT 0
+        )
+    """)
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS memories (
             id TEXT PRIMARY KEY,
@@ -124,6 +134,37 @@ async def list_conversations() -> dict[str, Any]:
     return {"code": 0, "data": conversations, "message": "ok"}
 
 
+def estimate_daily_tokens(
+    per_conv_days: dict[str, dict[str, int]],
+    conv_tokens: dict[str, int],
+    window_start: str,
+    cutoff_day: str | None,
+) -> dict[str, int]:
+    """历史 token 估算：把每个对话的累计 token 按它自己在各天的发言条数比例摊到天。
+
+    只输出「窗口内、且早于 cutoff_day」的天——cutoff 是第一条真实记账的日期，
+    它之后一律走真实增量，两边不重叠，估算不会和记账互相污染。
+    cutoff_day 为 None（一条记账都没有）表示整窗都按估算。
+    这些数字只用来给历史填色，与真实日用量对不上，界面必须标注成估算。
+
+    按「全部天」的比例摊、再只取历史段，而不是只在历史段内部分摊：
+    后者会把该对话的全部 token 都堆进历史段，等于按段内占比放大一遍。
+    """
+    out: dict[str, int] = {}
+    for conv_id, days in per_conv_days.items():
+        total = int(conv_tokens.get(conv_id, 0) or 0)
+        all_n = sum(days.values())
+        if total <= 0 or all_n <= 0:
+            continue
+        for day, n in days.items():
+            if day < window_start:
+                continue
+            if cutoff_day is not None and day >= cutoff_day:
+                continue
+            out[day] = out.get(day, 0) + int(round(total * n / all_n))
+    return out
+
+
 @router.get("/usage/summary")
 async def usage_summary() -> dict[str, Any]:
     """全部对话的累计用量汇总（设置页统计用）。"""
@@ -140,17 +181,45 @@ async def usage_summary() -> dict[str, Any]:
         "SELECT id, title, total_tokens, message_count FROM conversations "
         "WHERE total_tokens > 0 ORDER BY total_tokens DESC LIMIT 5"
     ).fetchall()
-    # 活跃度热力图：按本地日聚合的用户发言条数，回溯 53 周。
+    # 活跃度热力图：按本地日聚合的用户发言条数与 token，回溯 53 周。
     # 起点必须是 epoch 数值——created_at 是 REAL，拿日期字符串比较会因
     # SQLite 的类型序（文本恒大于数值）而一行不剩。
     start_day = datetime.now().date() - timedelta(days=ACTIVITY_WINDOW_DAYS - 1)
+    window_start = start_day.isoformat()
     start_ts = datetime(start_day.year, start_day.month, start_day.day).timestamp()
     daily_rows = conn.execute(
-        "SELECT date(created_at, 'unixepoch', 'localtime') AS day, COUNT(*) AS n "
-        "FROM messages WHERE role = 'user' AND created_at >= ? GROUP BY day ORDER BY day",
+        "SELECT conversation_id, date(created_at, 'unixepoch', 'localtime') AS day, COUNT(*) AS n "
+        "FROM messages WHERE role = 'user' AND created_at >= ? "
+        "GROUP BY conversation_id, day ORDER BY day",
         (start_ts,),
     ).fetchall()
+    counts: dict[str, int] = {}
+    per_conv_days: dict[str, dict[str, int]] = {}
+    for r in daily_rows:
+        if not r["day"]:
+            continue
+        day, n = r["day"], int(r["n"])
+        counts[day] = counts.get(day, 0) + n
+        per_conv_days.setdefault(r["conversation_id"], {})[day] = n
+    recorded = {
+        r["day"]: int(r["tokens"] or 0)
+        for r in conn.execute(
+            "SELECT day, tokens FROM daily_usage WHERE day >= ?", (window_start,)
+        ).fetchall()
+        if r["day"]
+    }
+    cutoff_row = conn.execute("SELECT MIN(day) AS d FROM daily_usage").fetchone()
+    cutoff = cutoff_row["d"] if cutoff_row else None
+    conv_tokens = {
+        r["id"]: int(r["total_tokens"] or 0)
+        for r in conn.execute(
+            "SELECT id, total_tokens FROM conversations WHERE total_tokens > 0"
+        ).fetchall()
+    }
+    estimated = estimate_daily_tokens(per_conv_days, conv_tokens, window_start, cutoff)
     conn.close()
+    # 只回有活动的日子（消息、记账、估算三者的并集），空档交给前端补 0
+    days = sorted(set(counts) | set(recorded) | set(estimated))
     return {
         "code": 0,
         "data": {
@@ -161,10 +230,17 @@ async def usage_summary() -> dict[str, Any]:
             "message_count": row["message_count"],
             "top": [dict(r) for r in top_rows],
             "daily": [
-                {"date": r["day"], "count": r["n"]}
-                for r in daily_rows if r["day"]
+                {
+                    "date": day,
+                    "count": counts.get(day, 0),
+                    "tokens": recorded[day] if day in recorded else estimated.get(day, 0),
+                    "estimated": day not in recorded and day in estimated,
+                }
+                for day in days
             ],
             "daily_window": ACTIVITY_WINDOW_DAYS,
+            # 第一条真实记账日期；它之前是估算。界面据此标注，null 表示全是估算
+            "tokens_recorded_from": cutoff,
         },
         "message": "ok",
     }
@@ -483,19 +559,32 @@ async def save_backup_file(body: dict[str, Any]) -> dict[str, Any]:
 
 @router.patch("/conversations/{conv_id}/usage")
 async def update_usage(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
-    """更新对话的用量统计。"""
-    total = body.get("total_tokens", 0)
-    prompt = body.get("prompt_tokens", 0)
-    completion = body.get("completion_tokens", 0)
-    msg_count = body.get("message_count", 0)
-    ctx = body.get("context_tokens", 0)
+    """更新对话的用量统计，并把本轮 token 增量记到当天。"""
+    total = int(body.get("total_tokens", 0) or 0)
+    prompt = int(body.get("prompt_tokens", 0) or 0)
+    completion = int(body.get("completion_tokens", 0) or 0)
+    msg_count = int(body.get("message_count", 0) or 0)
+    ctx = int(body.get("context_tokens", 0) or 0)
 
     conn = _get_db()
+    prev = conn.execute(
+        "SELECT total_tokens FROM conversations WHERE id = ?", (conv_id,)
+    ).fetchone()
+    prev_total = int(prev["total_tokens"] or 0) if prev else 0
     conn.execute(
         "UPDATE conversations SET total_tokens=?, prompt_tokens=?, completion_tokens=?, "
         "message_count=?, context_tokens=? WHERE id=?",
         (total, prompt, completion, msg_count, ctx, conv_id),
     )
+    # 前端每次同步的是该对话的累计值，所以增量 = 本次 - 上次。只记正增量：
+    # 负数来自删对话/重置之类的回退，记进去会把当天的数字拉成负的。
+    delta = total - prev_total
+    if delta > 0:
+        conn.execute(
+            "INSERT INTO daily_usage (day, tokens) VALUES (?, ?) "
+            "ON CONFLICT(day) DO UPDATE SET tokens = tokens + excluded.tokens",
+            (datetime.now().strftime("%Y-%m-%d"), delta),
+        )
     conn.commit()
     conn.close()
     return {"code": 0, "data": None, "message": "ok"}
