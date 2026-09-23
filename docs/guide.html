@@ -509,6 +509,7 @@ python desktop.py</pre>
             <p><strong>Agent Autopilot</strong> 是默认的”少打继续”执行层。只要你要求 SLATE 查看项目、修改文件、运行命令、排查 bug、提交代码或生成文件，它会自动进入多轮 Agent Loop，不需要反复发送”继续”。</p>
             <p><strong>默认轮数：</strong>普通环境任务最多 24 轮；全面排查、项目级、多文件任务最多 40 轮。系统会把工具结果隐藏回灌给模型，让它继续观察 → 执行 → 验证 → 汇报。</p>
             <p><strong>干完了就停：</strong>轮数是止损线不是预算。交付物逐项验证通过后，模型调用 <code>exit_autopilot</code>（目标模式为 <code>exit_target_mode</code>）显式收口，再给出最终汇报；没做完则继续动手，不靠停发工具或只说“已完成”来结束循环。</p>
+            <p><strong>Continue Autopilot（默认开，设置 → 自动推进里可关）：</strong>轮数用完不等于干完。末轮还在执行工具时，系统把上限往后推 8 轮（最多推 3 次），让它把手上的活做完；末轮空手停笔时，系统把清单剩余项念回给它，催它继续推进或明确写【任务完成】。追加次数有上限，止损线只是被推后，没有被抹掉。</p>
             <p>如果模型只说”我将检查 / 接下来修改 / 是否继续”，系统会自动催它直接调工具；如果没有任何工具记录却口头说完成，系统会要求它先验证或真正动手。</p>
             <p><strong>砚流 · 落笔即所见：</strong>模型正在逐个 token 写工具参数时，SLATE 会按本地工具 schema 解析这份还没写完的参数，实时演成一行预览——哪些字段已经闭合、哪个字段正在写。它只做预览，<strong>半成品参数永不触发执行</strong>；几十 KB 的正文类字段一律折叠成行数与字数，不刷屏。</p>
             <p><strong>停止是真取消：</strong>点击停止会同时关闭模型流与工具调用的流式通道，后端随即终止对应的子进程与在跑任务，不再是“界面停了、活还在干”。被取消的调用会以独立状态记进本地事件账，与正常完成区分开。</p>
@@ -529,6 +530,7 @@ python desktop.py</pre>
             <p><strong>Default budgets:</strong> ordinary environment tasks can auto-advance up to 24 rounds; broad project-wide or multi-file tasks can auto-advance up to 40 rounds. Tool results are fed back invisibly so the model can continue Observe → Act → Verify → Report.</p>
             <p>If the model only says it will inspect/edit/continue, SLATE nudges it to call tools. If it claims completion without any tool evidence, SLATE asks it to verify or actually act first.</p>
             <p><strong>Stop when it's done:</strong> the round budget is a stop-loss, not a target. Once every deliverable is verified, the model closes the loop by calling <code>exit_autopilot</code> (<code>exit_target_mode</code> in Target Mode) and then writes the final report; unfinished work keeps moving instead of ending on silence or a bare "done".</p>
+            <p><strong>Continue Autopilot (on by default; Settings → Auto-Advance):</strong> running out of rounds is not the same as being done. When the last round was still executing tools, the ceiling moves back by 8 rounds (at most 3 top-ups) so the work in flight can finish; when the model stops without doing anything, the open TODOLIST items are read back to it and it is told to keep going or write 【任务完成】 explicitly. Top-ups are capped, so the stop-loss is pushed later rather than erased.</p>
             <p><strong>InkStream — arguments as they are written:</strong> while the model streams a tool call token by token, SLATE parses the half-formed arguments against the local tool schema and shows a live one-line preview of which fields are already closed and which one is still being written. It is preview only — <strong>incomplete arguments never reach execution</strong>; multi-KB text fields fold into line and character counts instead of flooding the screen.</p>
             <p><strong>Stop really cancels:</strong> pressing Stop closes both the model stream and the tool-call stream, so the backend terminates the matching subprocess or running task instead of "UI stopped, work still going". Cancelled calls are recorded in the local event ledger under their own status, kept apart from successful ones.</p>
             <p><strong>Target Mode</strong> is the stronger explicit loop. Toggle "Target Mode" in the <strong>＋</strong> menu (left of the chat input), or mention "use Target Mode", when you want 80 rounds, TODOLIST enforcement, and six-phase constraints.</p>
@@ -672,6 +674,7 @@ python desktop.py</pre>
               <tr><td>扩展</td><td><code>mcp_factory</code>（动态注册外部工具）</td></tr>
             </table>
             <p><strong>特殊字符与编码：</strong><code>file_peek</code> / <code>file_edit</code> 自动识别 UTF-8、UTF-8 BOM、GB18030、GBK、UTF-16 等常见文本编码；中文、emoji、全角符号会原样保留。Windows 下 <code>terminal</code> 隐藏 PowerShell 子窗口，并对 Python / Node / Git / npm / rg 等原生命令做 Unicode-safe 输出捕获。</p>
+            <p><strong>Windows 命令语义：</strong>一条命令一个 PowerShell 进程，命令正文经 stdin 送入并整体按脚本解析——多行块（<code>foreach</code> / <code>if</code>）直接执行，不会因为缺一个空行而石沉大海；<code>&amp;&amp;</code> 与 <code>||</code> 在 PowerShell 5.1 上自动翻成 <code>if ($?)</code> 嵌套；语法错误原样返回并把退出码标成失败，不会再出现「报成功但什么都没跑」。会话仍保持 <code>cd</code> 与环境变量（PowerShell 变量不跨命令），交互式 REPL（裸 <code>python</code> / <code>node</code>）拿不到输入会立刻退出，不会拖住在跑的任务。</p>
             <p><strong>Actions 流程说明书：</strong>除了内置工具，你还可以把「干某件事的必要流程」写成一份 <code>data/actions/&lt;id&gt;.yml</code>，让模型按你的流程办事。一份 Action 描述「这件事怎么做」，SKILL.md 描述「怎么装一个外部工具」，两者定位不同、互不覆盖。</p>
             <ul>
               <li>字段：<code>name</code> · <code>description</code> · <code>when</code> · <code>tags</code> · <code>author</code> · <code>inputs</code> · <code>steps</code> · <code>output</code>，<code>steps[].tool</code> 只是建议，模型可按实际情况换用工具</li>
@@ -701,6 +704,7 @@ python desktop.py</pre>
               <tr><td>Extension</td><td><code>mcp_factory</code> (register external tools)</td></tr>
             </table>
             <p><strong>Unicode and encoding:</strong> <code>file_peek</code> / <code>file_edit</code> auto-detect UTF-8, UTF-8 BOM, GB18030, GBK, UTF-16, and other common text encodings. Chinese, emoji, and full-width symbols are preserved as-is. On Windows, <code>terminal</code> hides PowerShell windows and captures Unicode-safe output for native commands such as Python / Node / Git / npm / rg.</p>
+            <p><strong>Windows command semantics:</strong> one command, one PowerShell process. The command text is handed over on stdin and parsed as a whole script, so multi-line blocks (<code>foreach</code> / <code>if</code>) run without waiting for a blank line, <code>&amp;&amp;</code> and <code>||</code> are rewritten into <code>if ($?)</code> nesting for PowerShell 5.1, and a syntax error comes back verbatim with a failing exit code instead of "success" plus nothing. The session still keeps <code>cd</code> and environment variables (PowerShell variables do not cross commands), and an interactive REPL (bare <code>python</code> / <code>node</code>) exits immediately instead of holding the task open.</p>
             <p><strong>Action Playbooks:</strong> beyond the built-in tools, you can write the required procedure for a task as a <code>data/actions/&lt;id&gt;.yml</code> file and have the model follow it. An Action describes "how this task is done"; a SKILL.md describes "how to install an external tool". The two have different roles and never overwrite each other.</p>
             <ul>
               <li>Fields: <code>name</code> · <code>description</code> · <code>when</code> · <code>tags</code> · <code>author</code> · <code>inputs</code> · <code>steps</code> · <code>output</code>. <code>steps[].tool</code> is advisory — the model may pick a different tool when the situation calls for it</li>
@@ -931,10 +935,10 @@ python desktop.py</pre>
             <table class="ink-table">
               <tr><th>能力</th><th>一句话说明</th><th>详见</th></tr>
               <tr><td>统一多模型接入</td><td>GPT / Claude / Gemini、DeepSeek / Kimi / Qwen / GLM 等十余家，加自定义 OpenAI 兼容端点与本地模型（Ollama / LM Studio），一个界面随时换「大脑」</td><td><a href="#ch3">3</a></td></tr>
-              <tr><td>Agent 自动驾驶 + 目标模式</td><td>普通请求自动进入 Agent 循环，默认 24 轮、宽泛项目任务 40 轮；目标模式是显式 80 轮六阶段循环并强制 TODOLIST；干完活由模型调 <code>exit_autopilot</code> / <code>exit_target_mode</code> 收口</td><td><a href="#ch4">4</a></td></tr>
+              <tr><td>Agent 自动驾驶 + 目标模式</td><td>普通请求自动进入 Agent 循环，默认 24 轮、宽泛项目任务 40 轮；目标模式是显式 80 轮六阶段循环并强制 TODOLIST；干完了由模型调 <code>exit_autopilot</code> / <code>exit_target_mode</code> 收口；轮数用完而活没干完时 Continue Autopilot 追加轮数并催它继续（可关）</td><td><a href="#ch4">4</a></td></tr>
               <tr><td>磨墨模式</td><td><code>/grind</code> + 一个粗略想法，三阶段追问（接 → 磨 → 收，最多 10 轮）产出含目标、交付物、验收标准的任务书</td><td><a href="#ch5">5</a></td></tr>
               <tr><td>34 个内置工具</td><td>文件读写编辑、全项目代码检索、Unicode 安全终端、PPT / Word / Excel、PDF 抽取、图表 / 二维码、代码与文档安全扫描、git 信息、联网搜索与抓取、图像视频生成、浏览器与桌面自动化</td><td><a href="#ch8">8</a></td></tr>
-              <tr><td>外部 MCP Server</td><td>SSE 传输接入远端 MCP Server，工具自动发现，与内置工具同列展示、同一接口调用</td><td><a href="#ch8">8</a></td></tr>
+              <tr><td>外部 MCP Server</td><td>SSE 传输接入远端 MCP Server，工具自动发现，与内置工具同列展示、同一接口调用；认得出的品牌按 LobeHub 图标显示 logo，认不出的走通用 MCP mark</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>高危命令审批</td><td>23 类高危操作需你确认，灾难性命令无条件阻止，审批弹窗附带 AI 对这条命令用途的解释</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>全沙箱安全</td><td>路径校验 + 高危规则拦截 + 独立数据目录，删除与覆盖前先给看清楚</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>自定义技能体系</td><td>SKILL.md 即插即用，上传或导入后 <code>@</code> 提及自动注入上下文；其他 Agent 生态的技能目录可原样导入</td><td><a href="#ch9">9</a></td></tr>
@@ -947,6 +951,7 @@ python desktop.py</pre>
               <tr><td>长期记忆与知识库</td><td>项目知识长期存储，对话时自动注入相关上下文，跨会话生效</td><td><a href="#ch11">11</a></td></tr>
               <tr><td>Markdown 笔记库</td><td>本地 wiki：双向链接、全文检索，把散落的记录连成网</td><td><a href="#ch11">11</a></td></tr>
               <tr><td>项目理解</td><td>先给 AI 做「入职培训」：结构、规则、约定写成文档，作为系统上下文注入</td><td><a href="#ch11">11</a></td></tr>
+              <tr><td>工作区项目</td><td>一个项目可以同时收进多个互不相关的文件夹，同一时刻只在一个「当前根」上工作（文件 / Git / 终端都跟着它走），侧栏点一下就切；宪法也能只属于某个项目</td><td><a href="#ch11">11</a></td></tr>
               <tr><td>Code Review</td><td>对 diff 逐条给问题与修复建议，提交前先过一遍</td><td><a href="#ch12">12</a></td></tr>
               <tr><td>任务完成通知</td><td>长任务跑完发系统通知，切到别的窗口也不漏</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>聊天与数据管理</td><td>历史可搜索 / 导出 / 编辑，一键打包，磁盘占用看得清楚</td><td><a href="#ch16">16</a></td></tr>
@@ -989,10 +994,10 @@ python desktop.py</pre>
             <table class="ink-table">
               <tr><th>Capability</th><th>In one line</th><th>See</th></tr>
               <tr><td>Unified multi-model access</td><td>GPT / Claude / Gemini, DeepSeek / Kimi / Qwen / GLM and more, plus custom OpenAI-compatible endpoints and local models (Ollama / LM Studio) — switch brains mid-conversation</td><td><a href="#ch3">3</a></td></tr>
-              <tr><td>Agent Autopilot + Target Mode</td><td>Ordinary requests enter an agent loop automatically: 24 rounds by default, 40 for broad project tasks; Target Mode is the explicit 80-round six-phase loop with enforced TODOLIST; finished work closes via <code>exit_autopilot</code> / <code>exit_target_mode</code></td><td><a href="#ch4">4</a></td></tr>
+              <tr><td>Agent Autopilot + Target Mode</td><td>Ordinary requests enter an agent loop automatically: 24 rounds by default, 40 for broad project tasks; Target Mode is the explicit 80-round six-phase loop with enforced TODOLIST; finished work closes via <code>exit_autopilot</code> / <code>exit_target_mode</code>; when rounds run out with work still open, Continue Autopilot tops up the budget and nudges it on (toggleable)</td><td><a href="#ch4">4</a></td></tr>
               <tr><td>Grind Mode</td><td>Type <code>/grind</code> with a rough idea; three-phase questioning (Receive → Grind → Collect, up to 10 rounds) yields a brief with goals, deliverables and acceptance criteria</td><td><a href="#ch5">5</a></td></tr>
               <tr><td>34 built-in tools</td><td>File read/write/edit, project-wide code search, Unicode-safe terminal, PPT / Word / Excel, PDF extraction, charts &amp; QR codes, code and document security scans, git info, web search &amp; scraping, image &amp; video generation, browser and desktop automation</td><td><a href="#ch8">8</a></td></tr>
-              <tr><td>External MCP Server</td><td>Connect remote MCP Servers over SSE; remote tools are auto-discovered and listed beside built-ins, called through the same interface</td><td><a href="#ch8">8</a></td></tr>
+              <tr><td>External MCP Server</td><td>Connect remote MCP Servers over SSE; remote tools are auto-discovered and listed beside built-ins, called through the same interface. Recognised brands show their LobeHub mark, everything else falls back to the generic MCP glyph</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>High-risk command approval</td><td>23 categories of risky operations need your confirmation, catastrophic commands are blocked unconditionally, and the popup carries the AI's explanation of what the command does</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>Sandbox security</td><td>Path validation plus rule-based command interception and an isolated data directory — deletion and overwrite get shown to you first</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>Custom skill system</td><td>SKILL.md is plug-and-play; <code>@</code>mention auto-injects its context. Skill directories from other agent ecosystems import as-is</td><td><a href="#ch9">9</a></td></tr>
@@ -1005,6 +1010,7 @@ python desktop.py</pre>
               <tr><td>Long-term memory &amp; knowledge base</td><td>Project knowledge persists and is auto-injected as relevant context, across sessions</td><td><a href="#ch11">11</a></td></tr>
               <tr><td>Markdown vault</td><td>A local wiki: backlinks and full-text search connect scattered notes</td><td><a href="#ch11">11</a></td></tr>
               <tr><td>Project understanding</td><td>Give the AI orientation first: structure, rules and conventions written down and injected as system context</td><td><a href="#ch11">11</a></td></tr>
+              <tr><td>Workspace projects</td><td>One project can hold several unrelated folders with exactly one active root at a time (files, Git and the terminal all follow it) — switch in one click from the sidebar; project rules can be scoped to that project too</td><td><a href="#ch11">11</a></td></tr>
               <tr><td>Code Review</td><td>Line-by-line issues and fixes on a diff, before it becomes a bug</td><td><a href="#ch12">12</a></td></tr>
               <tr><td>Task completion notices</td><td>System notification when a long task ends, so you can leave the window</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>Chat &amp; data management</td><td>History is searchable, exportable, editable; one-click packaging and clear disk usage</td><td><a href="#ch16">16</a></td></tr>

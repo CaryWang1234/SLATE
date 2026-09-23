@@ -42,6 +42,8 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 - 📋 **Action Playbooks** — Capture the required flow for a recurring task in `data/actions/<id>.yml`; the model sees the catalog and reads a playbook in full before following it. Editable in Settings, model-writable behind an approval gate, every overwrite backed up for one-click rollback
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
 - 📖 **Better Project Understanding** — Three scan levels (brief/balanced/detailed) auto-generate project guide & rulebook
+- 🗂️ **Workspace projects** — one project can hold several unrelated folders; exactly one is the active root at a time (files, Git and the terminal all follow it), switch with one click in the sidebar
+- 📜 **Per-project constitution** — project rules can live in that project's own `.slate/config.json`; settings and the Prompt Factory say which document you are editing, falling back to the global one when a project has none
 - 🔍 **Code Review** — Read git diff (staged/unstaged/commit range), AI reviews across code quality, security, performance, and maintainability with structured report and line-level comments
 - 🔔 **Task Completion Notifications** — Chime sound + system notification when Harness/team/workflow finishes; both toggleable in settings
 - 📡 **LAN Remote Control with Auth** — Opens port 8001 on launch; phone/tablet browsers auto-switch to the dedicated **SLATE Mobile UI** — bottom-tab navigation across Chat / Conversations / Memory / Tasks / Settings, full chat & tool-loop capability, bottom-sheet confirmations for high-risk commands and file diffs, desktop zero-regression; optional LAN password prevents other devices on the network from operating SLATE
@@ -75,6 +77,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 - Default loop budget: 24 rounds for ordinary environment tasks, 40 rounds for broad project-wide tasks; Harness keeps its configurable 80-round strong mode
 - Stop when it's done: once every deliverable is verified the model must call `exit_autopilot` / `exit_target_mode` to close the loop; any other exit is reported as interrupted and offers a one-click resume
 - If a model only says it will inspect/edit/verify, SLATE nudges it to call tools; if it claims completion without tool evidence, SLATE asks it to verify or actually act
+- **Continue Autopilot (toggle in Settings, on by default)**: running out of rounds is not the same as being done. When the last round was still executing tools, the budget is topped up by 8 rounds (at most 3 top-ups) so the work in flight can finish; when the model stops without doing anything, the open TODOLIST items are read back to it and it is told to either keep going or write 【任务完成】 explicitly
 - Tool results are fed back invisibly so the model can observe → act → verify → report in one run
 - **InkStream**: while the model writes a tool call token by token, a local schema-aware prefix parser infers which fields are already closed and which one is still being written, and renders that as a live one-line preview — preview only, half-formed arguments never enter execution, and large content fields fold into line / character counts
 - **Real cancellation**: Stop closes the LLM stream and the tool-call stream together, and the backend terminates the subprocess or task through its `CallContext`; cancelled calls get their own status instead of being blurred into "done"
@@ -104,7 +107,7 @@ Built-in tools — 34 in total (`backend/skills/`):
 | `file_tree` / `file_peek` | Browse project structure / Read files |
 | `file_create` / `file_edit` | Create files / Diff-preview editing; preserves UTF-8/BOM/GB18030/GBK/UTF-16 and handles Chinese/emoji safely |
 | `file_append` | Append to files, segmented writes for long content |
-| `terminal` | Sandboxed command execution; hidden Windows subprocesses and Unicode-safe native output capture |
+| `terminal` | Sandboxed command execution; hidden Windows subprocesses and Unicode-safe native output capture. On Windows each command runs in its own PowerShell process, so multi-line blocks and `&&` / `||` work, syntax errors come back with a failing exit code, and `cd` / `$env:` persist across commands |
 | `html_render` / `css_color` | HTML skeleton generation / CSS color tuning |
 | `doc_write` / `text_summarize` | Markdown writing / Text summarization |
 | `ppt_create` / `word_create` | .pptx presentations / .docx Word documents |

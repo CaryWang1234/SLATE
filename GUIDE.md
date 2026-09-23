@@ -98,6 +98,7 @@ Autopilot 是默认的“少打继续”执行层。只要你的消息明显是�
 - 不需要手动开启 Harness，也不需要反复发送“继续”
 - 普通任务最多自动推进 24 轮；全面扫描、项目级、多文件任务最多 40 轮
 - 轮数是止损线不是预算：交付并逐项验证通过后，模型调用 `exit_autopilot` 收口，循环随即结束
+- 轮数用完不等于干完：默认开启的 **Continue Autopilot** 在末轮不松手。上一轮还在执行工具时，把上限往后推 8 轮（最多推 3 次），让它把手上的活做完；上一轮空手停笔时，把清单剩余项念回给它，催它继续推进或明确写【任务完成】。不想要这个行为，去「设置 → 自动推进」取消勾选
 
 **它会自动做：**
 1. 读取相关目录、文件、配置或 Git 状态
@@ -105,6 +106,7 @@ Autopilot 是默认的“少打继续”执行层。只要你的消息明显是�
 3. 把工具结果隐藏回灌给模型，让它继续下一步
 4. 修改后重新读取、运行检查、测试或构建
 5. 没有工具记录却口头说“完成”时，系统会要求它先验证
+6. 跑到轮数上限而任务还没干完时，按 Continue Autopilot 追加轮数并接着推进（可在「设置 → 自动推进」关掉）
 
 **砚流 · 落笔即所见：** 模型正在逐个 token 写工具参数时，SLATE 会按本地工具 schema 解析这份还没写完的参数，实时演成一行预览——哪些字段已经闭合、哪个字段正在写。它只做预览，**半成品参数永不触发执行**；几十 KB 的正文类字段一律折叠成行数与字数，不刷屏。
 
@@ -242,6 +244,7 @@ SLATE 内置 34 个 MCP 工具，模型在对话中自主决定何时使用。
 - `file_peek` / `file_edit` 自动识别 UTF-8、UTF-8 BOM、GB18030、GBK、UTF-16 等常见文本编码
 - 中文、emoji、全角符号会原样保留；如果旧编码无法表达新字符，工具会安全升级写入编码而不是丢字符
 - Windows 下 `terminal` 会隐藏 PowerShell 子窗口，并对 Python / Node / Git / npm / rg 等原生命令做 Unicode-safe 输出捕获
+- Windows 下 `terminal` 一条命令一个 PowerShell 进程：多行块（`foreach` / `if`）直接执行，`&&` / `||` 在 PowerShell 5.1 上自动翻成 `if ($?)` 嵌套，语法错误带非零退出码原样返回；会话保持 `cd` 与 `$env:`（PowerShell 变量不跨命令），裸 `python` / `node` 这类交互式 REPL 拿不到输入会立刻退出
 
 **Actions 流程说明书：**
 
@@ -381,7 +384,7 @@ SLATE 内置 34 个 MCP 工具，模型在对话中自主决定何时使用。
 | 推理强度 | 点输入框左侧胶囊开滑杆弹窗，按模型能力给出可选档位（自动/关/低/中/高），每档下方小字标注对应墨色（随墨/清墨/淡墨/浓墨/焦墨）；上游不认的档位不会出现，拖动松手才落盘 |
 | 上下文预算 | 模型行上的滑杆（自动/100K/200K/400K/600K/800K/1M），同时决定自动压缩阈值与用量条分母 |
 | 输出控制 | 最大 Token 数、流式输出开关 |
-| 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 |
+| 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 / Continue Autopilot（末轮续跑） |
 | 安全模式 | 高危命令审批策略 |
 | 局域网遥控 | 查看访问地址与二维码，设置局域网访问密码 |
 | 主题 | 深色/浅色切换 |
@@ -484,6 +487,7 @@ Autopilot is the default "do not make me type continue" execution layer. When yo
 - You do not need to enable Harness manually, and you do not need to keep sending "continue"
 - Ordinary tasks can auto-advance up to 24 rounds; broad project-wide or multi-file tasks can auto-advance up to 40 rounds
 - The round budget is a stop-loss, not a target: once every deliverable is verified the model calls `exit_autopilot` to close the loop
+- Out of rounds is not the same as done: **Continue Autopilot** (on by default) refuses to let go at the last round. If that round was still executing tools, the ceiling moves back by 8 rounds (at most 3 top-ups) so the work in flight can finish; if the model stopped without doing anything, the open TODOLIST items are read back to it and it is told to keep going or write 【任务完成】 explicitly. Don't want it? Uncheck it under Settings → Auto-Advance
 
 **What it does automatically:**
 1. Reads relevant directories, files, config, or Git state
@@ -491,6 +495,7 @@ Autopilot is the default "do not make me type continue" execution layer. When yo
 3. Feeds tool results back into the model invisibly so it can continue
 4. Re-reads files or runs checks/tests/builds after changes
 5. If the model claims completion without tool evidence, SLATE asks it to verify or actually act first
+6. When the round budget runs out while work is still open, Continue Autopilot tops up the rounds and keeps going (toggle it off under Settings → Auto-Advance)
 
 **InkStream — arguments as they are written:** while the model streams a tool call token by token, SLATE parses the half-formed arguments against the local tool schema and shows a live one-line preview of which fields are already closed and which one is still being written. It is preview only — **incomplete arguments never reach execution**; multi-KB text fields fold into line and character counts instead of flooding the screen.
 
@@ -633,6 +638,7 @@ SLATE includes 34 built-in MCP tools. The model decides when to use them during 
 - `file_peek` / `file_edit` auto-detect UTF-8, UTF-8 BOM, GB18030, GBK, UTF-16, and other common text encodings
 - Chinese, emoji, and full-width symbols are preserved as-is; if a legacy encoding cannot represent a new character, the tool safely upgrades the write encoding instead of losing text
 - On Windows, `terminal` hides PowerShell windows and captures Unicode-safe output for native commands such as Python / Node / Git / npm / rg
+- On Windows `terminal` runs one PowerShell process per command: multi-line blocks (`foreach` / `if`) execute directly, `&&` / `||` are rewritten into `if ($?)` nesting on PowerShell 5.1, and a syntax error comes back verbatim with a failing exit code. The session keeps `cd` and `$env:` (PowerShell variables do not cross commands), and interactive REPLs such as bare `python` / `node` exit at once instead of holding the task open
 
 **Action Playbooks:**
 
@@ -772,7 +778,7 @@ Let AI automatically execute tasks on schedule or by events.
 | Reasoning Effort | Click the pill left of the input to open a slider; levels follow the model's capability (auto/off/low/medium/high), each tick annotated with its ink shade in small type (free/clear/light/rich/charred); unsupported levels never appear, and the value is persisted only when you let go |
 | Context Budget | Per-model slider (auto/100K/200K/400K/600K/800K/1M) driving both the auto-compress threshold and the usage bar |
 | Output Control | Max tokens, streaming toggle |
-| Auto-Advance | Autopilot / short-reply review / long-stall review |
+| Auto-Advance | Autopilot / short-reply review / long-stall review / Continue Autopilot |
 | Safety Mode | High-risk command approval policy |
 | LAN Remote | View LAN URL / QR code, configure remote access password |
 | Theme | Dark/Light toggle |
