@@ -2,13 +2,18 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260922-002";
-import { openProject, closeProject, browseFiles, listDrives } from "../services/project.js?v=20260922-002";
-import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260922-002";
-import { iconSvgEl, setIconText } from "../services/icons.js?v=20260922-002";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260922-002";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260922-005";
+import {
+  openProject, closeProject, browseFiles, listDrives,
+  createWorkspace, switchProjectRoot, editWorkspaceFolders,
+} from "../services/project.js?v=20260922-005";
+import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260922-005";
+import { iconSvgEl, setIconText } from "../services/icons.js?v=20260922-005";
+import { t } from "../services/i18n.js?v=20260922-005";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260922-005";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
+let workspaceNameInput, workspaceFoldersInput;
 let fileTreeContainer, projectInfoEl, projectCloseBtn;
 let currentBrowsePath = "";
 let sidebarCollapsed = false;
@@ -36,14 +41,22 @@ function renderProjectBar() {
 
     const icon = document.createElement("span");
     icon.className = "project-bar-icon";
-    icon.appendChild(iconSvgEl("folder"));
+    icon.appendChild(iconSvgEl(proj.kind === "workspace" ? "copy" : "folder"));
     info.appendChild(icon);
 
     const name = document.createElement("span");
     name.className = "project-bar-name";
     name.textContent = proj.name;
-    name.title = proj.path;
+    name.title = proj.workspace_dir || proj.path;
     info.appendChild(name);
+
+    if (proj.kind === "workspace") {
+      const badge = document.createElement("span");
+      badge.className = "project-bar-kind";
+      badge.textContent = "工作区";
+      badge.title = `${t("工作区包含 {n} 个文件夹", { n: (proj.roots || []).length })}，${t("当前")}: ${dirBase(proj.path)}`;
+      info.appendChild(badge);
+    }
 
     projectBar.appendChild(info);
 
@@ -59,7 +72,7 @@ function renderProjectBar() {
     understandBtn.appendChild(iconSvgEl("book-open"));
     understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册";
     understandBtn.addEventListener("click", () => {
-      import("./understand.js?v=20260922-002")
+      import("./understand.js?v=20260922-005")
         .then(({ openUnderstandModal }) => openUnderstandModal())
         .catch(() => {});
     });
@@ -70,7 +83,7 @@ function renderProjectBar() {
     reviewBtn.appendChild(iconSvgEl("search"));
     reviewBtn.title = "Code Review\uff1aAI \u4ee3\u7801\u5ba1\u67e5\uff08git diff \u00b7 \u56db\u7ef4\u5ea6 \u00b7 \u884c\u7ea7\u8bc4\u8bba\uff09";
     reviewBtn.addEventListener("click", () => {
-      import("./review.js?v=20260922-002")
+      import("./review.js?v=20260922-005")
         .then(({ openReviewModal }) => openReviewModal())
         .catch(() => {});
     });
@@ -93,8 +106,8 @@ function renderProjectBar() {
 
     projectBar.appendChild(actions);
 
-    // 自动浏览根目录
-    if (!state.projectFileTree?.entries) {
+    // 自动浏览根目录（数组自带 .entries 方法，判空必须按类型判，否则关项目后重开不会自动浏览）
+    if (!Array.isArray(state.projectFileTree?.entries)) {
 
       refreshFileTree("");
     }
@@ -167,6 +180,23 @@ async function handleOpenProject() {
   }
 }
 
+async function handleCreateWorkspace() {
+  const name = (workspaceNameInput?.value || "").trim();
+  const folders = (workspaceFoldersInput?.value || "")
+    .split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (!name) { dlgToast("请填写工作区名称", 2600); return; }
+  if (!folders.length) { dlgToast("请至少填写一个文件夹路径", 2600); return; }
+  const res = await createWorkspace(name, folders);
+  if (res.code === 0) {
+    setProject(res.data);
+    projectOpenModal.classList.add("hidden");
+    currentBrowsePath = "";
+    await refreshFileTree("");
+  } else {
+    dlgToast(res.message || "新建工作区失败", 3200);
+  }
+}
+
 async function handleCloseProject() {
   if (!await dlgConfirm("关闭当前项目？", { okText: "关闭" })) return;
   await closeProject();
@@ -176,7 +206,8 @@ async function handleCloseProject() {
 
 async function handleRefreshProject(button) {
   if (!state.project) return;
-  const path = state.project.path;
+  // 工作区要重开宿主目录：开当前根会把它降级成普通单目录项目
+  const path = state.project.workspace_dir || state.project.path;
   const browsePath = currentBrowsePath || "";
   if (button) button.disabled = true;
   try {
@@ -191,6 +222,82 @@ async function handleRefreshProject(button) {
   } finally {
     if (button) button.disabled = false;
   }
+}
+
+// ── 工作区：成员目录与当前根 ────────────────────
+
+function dirBase(p) {
+  return String(p || "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() || String(p || "");
+}
+
+async function applyWorkspaceResult(res, keptBrowse) {
+  if (res.code !== 0) {
+    dlgToast(res.message || "操作失败", 3200);
+    return false;
+  }
+  setProject(res.data);
+  if (!keptBrowse) currentBrowsePath = "";
+  await refreshFileTree(keptBrowse || "");
+  return true;
+}
+
+async function handleSwitchRoot(rootPath) {
+  if (!state.project || rootPath === state.project.path) return;
+  await applyWorkspaceResult(await switchProjectRoot(rootPath));
+}
+
+async function handleAddRoot() {
+  const raw = await dlgPrompt("文件夹的绝对路径：", { title: "添加到工作区", placeholder: "C:\\Users\\...\\other" });
+  const path = (raw || "").trim();
+  if (!path) return;
+  await applyWorkspaceResult(await editWorkspaceFolders("add", path), currentBrowsePath);
+}
+
+async function handleRemoveRoot(rootPath) {
+  const ok = await dlgConfirm(t("从工作区移除「{name}」？磁盘上的文件不会被删除。", { name: dirBase(rootPath) }),
+    { danger: true, okText: t("移除") });
+  if (!ok) return;
+  const kept = rootPath === state.project?.path ? "" : currentBrowsePath;
+  await applyWorkspaceResult(await editWorkspaceFolders("remove", rootPath), kept);
+}
+
+function renderWorkspaceRoots() {
+  const proj = state.project;
+  if (!proj || proj.kind !== "workspace") return null;
+  const roots = Array.isArray(proj.roots) ? proj.roots : [];
+
+  const row = document.createElement("div");
+  row.className = "workspace-roots";
+
+  for (const r of roots) {
+    const active = r === proj.path;
+    const chip = document.createElement("button");
+    chip.className = `workspace-root-chip${active ? " active" : ""}`;
+    chip.title = active ? `${r}（${t("当前工作文件夹")}）` : `${t("切换到")} ${r}`;
+    const label = document.createElement("span");
+    label.className = "workspace-root-name";
+    label.textContent = dirBase(r);
+    chip.appendChild(label);
+    chip.addEventListener("click", () => handleSwitchRoot(r));
+    if (roots.length > 1) {
+      const x = document.createElement("span");
+      x.className = "workspace-root-remove";
+      x.textContent = "×";
+      x.title = `${t("从工作区移除")} ${r}`;
+      x.addEventListener("click", (e) => { e.stopPropagation(); handleRemoveRoot(r); });
+      chip.appendChild(x);
+    }
+    row.appendChild(chip);
+  }
+
+  const add = document.createElement("button");
+  add.className = "workspace-root-add";
+  add.textContent = "＋";
+  add.title = "把一个文件夹加入本工作区";
+  add.addEventListener("click", handleAddRoot);
+  row.appendChild(add);
+
+  return row;
 }
 
 // ── 文件树 ───────────────────────────────────
@@ -214,11 +321,14 @@ function renderFileTree() {
   if (!fileTreeContainer) return;
   fileTreeContainer.innerHTML = "";
 
+  const rootsRow = renderWorkspaceRoots();
   const data = state.projectFileTree;
-  if (!data || !data.entries) {
+  if (!Array.isArray(data?.entries)) {
     fileTreeContainer.innerHTML = '<div class="file-tree-empty">未浏览目录</div>';
+    if (rootsRow) fileTreeContainer.prepend(rootsRow);
     return;
   }
+  if (rootsRow) fileTreeContainer.appendChild(rootsRow);
 
   // 面包屑导入
   if (currentBrowsePath && currentBrowsePath !== ".") {
@@ -388,11 +498,18 @@ function initProjectBar() {
   projectOpenModal = document.getElementById("project-open-modal");
   projectPathInput = document.getElementById("project-path-input");
   projectDrivesList = document.getElementById("project-drives-list");
+  workspaceNameInput = document.getElementById("workspace-name-input");
+  workspaceFoldersInput = document.getElementById("workspace-folders-input");
 
   // 打开项目按钮
   const btnConfirmOpen = document.getElementById("btn-confirm-open-project");
   if (btnConfirmOpen) {
     btnConfirmOpen.addEventListener("click", handleOpenProject);
+  }
+
+  const btnCreateWs = document.getElementById("btn-create-workspace");
+  if (btnCreateWs) {
+    btnCreateWs.addEventListener("click", handleCreateWorkspace);
   }
 
   // 路径输入回车

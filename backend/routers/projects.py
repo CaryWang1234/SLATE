@@ -1,8 +1,14 @@
-"""项目管理路由：打开本地目录作为项目，每个项目拥有独立的宪法、配置和文件上下文。"""
+"""项目管理路由：打开本地目录作为项目，每个项目拥有独立的宪法、配置和文件上下文。
+
+项目有两种：单目录项目（path 就是那个目录）与工作区（一个宿主目录存配置，
+成员是若干彼此无关的文件夹）。工作区任何时刻只"当前"一个根，切根即换 path，
+文件、Git、终端的语义和单目录项目完全一致，不额外发明一套路径口径。
+"""
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -15,6 +21,9 @@ from backend.subprocess_utils import hidden_subprocess_kwargs
 from backend.skills.text_io import read_text_file, write_text_file
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
+WORKSPACE_DIR = DATA_DIR / "workspaces"
 
 # 服务端当前项目状态（内存态，重启丢失）
 _current_project: dict[str, Any] | None = None
@@ -47,14 +56,70 @@ def _read_slate_config(project_dir: Path) -> dict:
     return {}
 
 
+def _norm_dir(raw: str) -> str:
+    """把用户给的目录路径规整成可比较的绝对路径；不存在或不是目录返回 ""。"""
+    p = Path(str(raw or "")).expanduser()
+    try:
+        p = p.resolve()
+    except OSError:
+        return ""
+    return str(p) if p.is_dir() else ""
+
+
+def _write_config(host_dir: Path, config: dict) -> None:
+    slate_dir = host_dir / ".slate"
+    slate_dir.mkdir(parents=True, exist_ok=True)
+    atomic_write_json(slate_dir / "config.json", config)
+
+
+def _workspace_roots(host_dir: Path, config: dict) -> list[str]:
+    """工作区成员：绝对路径、真实存在的目录、去重、保序。
+
+    相对路径按宿主目录解析——这样把整个工作区目录连同配置拷到别处也不会散架。
+    """
+    roots: list[str] = []
+    for raw in config.get("folders") or []:
+        p = Path(str(raw)).expanduser()
+        if not p.is_absolute():
+            p = host_dir / p
+        try:
+            p = p.resolve()
+        except OSError:
+            continue
+        if p.is_dir() and str(p) not in roots:
+            roots.append(str(p))
+    return roots
+
+
+def _active_root(host_dir: Path, roots: list[str], config: dict) -> str:
+    """当前根：配置里记的那一个，失效就退回第一个成员，都没有就退回宿主目录。"""
+    wanted = str(config.get("root") or "")
+    if wanted and wanted in roots:
+        return wanted
+    return roots[0] if roots else str(host_dir)
+
+
 def _project_info(project_dir: Path, config: dict) -> dict:
-    return {
-        "path": str(project_dir),
+    """把宿主目录 + 配置整理成前端要的项目对象。
+
+    工作区的 path 是"当前根"而不是宿主目录：文件、Git、终端工作目录全部沿用单根语义，
+    配置的读写位置另用 workspace_dir 记住。
+    """
+    is_workspace = config.get("kind") == "workspace"
+    roots = _workspace_roots(project_dir, config) if is_workspace else [str(project_dir)]
+    path = _active_root(project_dir, roots, config) if is_workspace else str(project_dir)
+    info = {
+        "path": path,
         "name": project_dir.name,
         "config": config,
         "constitution": config.get("constitution"),
         "has_slate_dir": (project_dir / ".slate").is_dir(),
+        "kind": "workspace" if is_workspace else "folder",
+        "roots": roots,
     }
+    if is_workspace:
+        info["workspace_dir"] = str(project_dir)
+    return info
 
 
 def _safe_file_size(path: Path) -> int | None:
@@ -160,6 +225,20 @@ class FindRequest(BaseModel):
     limit: int = 30
 
 
+class SwitchRootRequest(BaseModel):
+    path: str
+
+
+class CreateWorkspaceRequest(BaseModel):
+    name: str
+    folders: list[str] = []
+
+
+class WorkspaceFoldersRequest(BaseModel):
+    action: str
+    path: str
+
+
 # ── 路由 ──────────────────────────────────────
 
 @router.post("/open")
@@ -201,15 +280,97 @@ async def update_project_config(req: UpdateConfigRequest):
     if not _current_project:
         return {"code": 1, "message": "未打开项目"}
 
-    project_dir = Path(_current_project["path"])
+    # 工作区的配置写在宿主目录，不写进某个成员仓库：成员各自的 .slate 不该被串改
+    project_dir = Path(_current_project.get("workspace_dir") or _current_project["path"])
     slate_dir = project_dir / ".slate"
-    slate_dir.mkdir(exist_ok=True)
+    slate_dir.mkdir(parents=True, exist_ok=True)
 
     config_path = slate_dir / "config.json"
     atomic_write_json(config_path, req.config)
 
     _current_project = _project_info(project_dir, req.config)
 
+    return {"code": 0, "data": _current_project}
+
+
+@router.post("/root")
+async def switch_project_root(req: SwitchRootRequest):
+    """工作区切当前根：只认成员目录，切完文件/Git/终端都跟着换。"""
+    global _current_project
+    if not _current_project or _current_project.get("kind") != "workspace":
+        return {"code": 1, "message": "当前项目不是工作区"}
+    wanted = _norm_dir(req.path)
+    if wanted not in _current_project.get("roots", []):
+        return {"code": 1, "message": "该目录不在工作区内"}
+    host = Path(_current_project["workspace_dir"])
+    config = {**_current_project.get("config", {}), "root": wanted}
+    _write_config(host, config)
+    _current_project = _project_info(host, config)
+    return {"code": 0, "data": _current_project}
+
+
+@router.post("/workspace")
+async def create_workspace(req: CreateWorkspaceRequest):
+    """新建工作区：宿主目录落在 data/workspaces/<name>，成员是任意已有文件夹。
+
+    宿主放本机数据目录而不是让用户另挑一处：他要选的只有"哪些文件夹参与"，
+    多一个"这个工作区该存哪"的问题只会变成随手点默认值。
+    """
+    global _current_project
+    name = (req.name or "").strip()
+    if not name or len(name) > 64 or any(sep in name for sep in "\\/:*?\"<>|"):
+        return {"code": 1, "message": "工作区名称不能为空，且不能包含路径分隔符或 : ? * \" < > |"}
+    folders_wanted: list[str] = []
+    for raw in req.folders:
+        p = _norm_dir(raw)
+        if not p:
+            return {"code": 1, "message": f"文件夹不存在：{raw}"}
+        if p not in folders_wanted:
+            folders_wanted.append(p)
+    if not folders_wanted:
+        return {"code": 1, "message": "至少选择一个文件夹"}
+
+    host = WORKSPACE_DIR / name
+    existing = _read_slate_config(host)
+    if existing.get("kind") == "workspace":
+        # 同名再建一次 = 补充成员，不是推倒重来：宪法、当前根这些已有设置不该被吃掉
+        folders = [f for f in (existing.get("folders") or []) if f not in folders_wanted]
+        config = {**existing, "kind": "workspace", "folders": [*folders, *folders_wanted]}
+    else:
+        config = {"kind": "workspace", "folders": folders_wanted, "root": folders_wanted[0]}
+    host.mkdir(parents=True, exist_ok=True)
+    _write_config(host, config)
+    _current_project = _project_info(host, config)
+    return {"code": 0, "data": _current_project}
+
+
+@router.post("/workspace/folders")
+async def edit_workspace_folders(req: WorkspaceFoldersRequest):
+    """给当前工作区加/减成员目录；减掉正当前的根时，当前根退回第一个成员。"""
+    global _current_project
+    if not _current_project or _current_project.get("kind") != "workspace":
+        return {"code": 1, "message": "当前项目不是工作区"}
+    host = Path(_current_project["workspace_dir"])
+    config = dict(_current_project.get("config") or {})
+    folders = list(config.get("folders") or [])
+    target = _norm_dir(req.path)
+    if req.action == "add":
+        if not target:
+            return {"code": 1, "message": "文件夹不存在"}
+        if target not in folders:
+            folders.append(target)
+    elif req.action == "remove":
+        folders = [f for f in folders if f != target]
+    else:
+        return {"code": 1, "message": f"未知操作: {req.action}"}
+    if not folders:
+        return {"code": 1, "message": "工作区至少要留一个文件夹"}
+    config["folders"] = folders
+    # 只在当前根被减掉时才回落到首成员；减别的成员不该顺手把用户正在看的目录换掉
+    if config.get("root") and config["root"] not in folders:
+        config.pop("root", None)
+    _write_config(host, config)
+    _current_project = _project_info(host, config)
     return {"code": 0, "data": _current_project}
 
 

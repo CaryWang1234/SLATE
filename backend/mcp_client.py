@@ -326,6 +326,9 @@ def get_all_remote_tools() -> list[dict[str, Any]]:
                     "description": t.get("description", ""),
                     "server": conn.name,
                     "serverId": conn.server_id,
+                    # 带 url 才认得出品牌：Server 名是用户手输的任意字符串，
+                    # "My MCP" 指向 mcp.notion.com 时前端也该画 Notion 的 mark。
+                    "url": conn.url,
                 })
     return tools
 

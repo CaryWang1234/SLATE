@@ -1,10 +1,11 @@
-"""技能：持久化终端会话（支持多会话、状态保持、进程管理）。
+"""技能：终端会话（支持多会话、状态保持、进程管理）。
 
 核心特性：
-- 每个会话维护独立的 shell 进程，保持 cwd 和环境变量
+- 会话保持 cwd 与环境变量，跨命令可见（cd / $env:X 下一步仍生效）
 - 支持创建/列出/关闭多个终端会话
-- 命令在会话内执行，状态（cd、export）跨命令保持
-- 后台进程可真正终止（kill）
+- Windows：一条命令一次 powershell 进程（脚本尾部回报 cwd/env/exit 供会话吸收）
+- POSIX：一条命令喂给常驻 bash（逐行读入即执行完整命令）
+- 后台进程可真正终止（kill），超时/取消都杀掉整棵进程树
 - 高危命令双层拦截（写死规则 + 用户审批）
 
 会话管理：
@@ -17,6 +18,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import os
 import re
 import subprocess
@@ -91,6 +94,224 @@ POWERSHELL_HINTS = re.compile(
     re.I,
 )
 
+# ── Windows：一次性 shell 调用 ─────────────────────────────────────
+# 常驻 shell（-Command - 从 stdin 逐行吃命令）有三类吞命令的坑，都是实测出来的：
+#   1) 多行块（foreach/if/here-string）在交互式续行模式下要再空一行才执行 —— 于是命令
+#      永远不执行、超时、"(无输出)"；
+#   2) 脏管道（`Get-ChildItem |`）把 shell 钉在续行状态，后面几条一起被吞；
+#   3) 完成标记由 shell 自己 Write-Output 出来，和子进程直写的 stdout 抢跑，
+#      上一条的输出会落到下一条的结果里。
+# 改成"每条命令一次 powershell 进程"：脚本整体按脚本解析（不需要空行、续行状态不跨命令），
+# 输出读到进程结束（不再有抢跑），会话状态（cwd / 环境变量 / 退出码）由脚本尾部的
+# base64 单行回报，Python 侧吸收进 TerminalSession —— 于是"状态保持"这件事照旧成立。
+# 命令主体还要从 stdin 喂、在运行时解析（见 _powershell_body_block）：拼进脚本文本里
+# 的一句语法错误会让整个脚本解析失败，PowerShell 转而把错误用 CLIXML 吐到 stderr，
+# 结果是"一行输出都没有 + 几百字节 XML 噪声 + 中文错误乱码 + 退出码丢失"。
+STATE_TRAILER_PREFIX = "__SLATE_STATE__"
+POWERSHELL_CANDIDATES = ("pwsh.exe", "powershell.exe")
+_POWERSHELL_CACHE: dict[str, Any] = {}
+
+
+def _resolve_powershell() -> tuple[str, bool]:
+    """返回 (shell 可执行文件, 是否 PowerShell 7+)。pwsh 在就用它（原生认 &&）。"""
+    if "shell" in _POWERSHELL_CACHE:
+        return _POWERSHELL_CACHE["shell"], _POWERSHELL_CACHE["ps7"]
+    shell, ps7 = "powershell.exe", False
+    for candidate in POWERSHELL_CANDIDATES:
+        try:
+            probe = subprocess.run(
+                [candidate, "-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.Major"],
+                capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace",
+                **hidden_subprocess_kwargs(),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if probe.returncode == 0 and (probe.stdout or "").strip().isdigit():
+            shell = candidate
+            ps7 = int(probe.stdout.strip()) >= 7
+            break
+    _POWERSHELL_CACHE["shell"], _POWERSHELL_CACHE["ps7"] = shell, ps7
+    return shell, ps7
+
+
+def _split_top_level(command: str) -> tuple[list[str], list[str]]:
+    """按引号/括号深度做顶层切分，返回 (段, 段间运算符)。切不开就原样一段（宁可不翻译）。"""
+    parts: list[str] = []
+    ops: list[str] = []
+    buf: list[str] = []
+    depth = 0
+    quote = ""
+    i = 0
+    while i < len(command):
+        ch = command[i]
+        if quote:
+            buf.append(ch)
+            if ch == quote:
+                quote = ""
+            i += 1
+            continue
+        if ch in "\"'":
+            quote = ch
+            buf.append(ch)
+            i += 1
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif depth == 0 and (ch == "&" or ch == "|"):
+            op = (ch * 2) if command.startswith(ch * 2, i) else ""
+            if op in ("&&", "||"):
+                parts.append("".join(buf))
+                ops.append(op)
+                buf = []
+                i += len(op)
+                continue
+        buf.append(ch)
+        i += 1
+    parts.append("".join(buf))
+    if quote or depth != 0 or len(parts) < 2:
+        return [command], []
+    return parts, ops
+
+
+def translate_shell_chain(command: str, ps7: bool | None = None) -> str:
+    """把 `A && B || C` 写成 Windows PowerShell 5.1 认的 if ($?) 嵌套（左结合）。
+
+    PS7 原生支持这两个运算符，直接原样返回；带换行的命令不翻译 —— here-string（@" … "@）
+    里的 && 认不出来（它不是普通引号），一旦拆进去就没法还原，宁可让 shell 报错。
+    """
+    if ("&&" not in command and "||" not in command) or "\n" in command:
+        return command
+    if ps7 is None:
+        ps7 = _resolve_powershell()[1]
+    if ps7:
+        return command
+    parts, ops = _split_top_level(command)
+    if not ops:
+        return command
+
+    def indent(text: str) -> str:
+        return "\n".join(("  " + line) if line.strip() else line for line in text.splitlines())
+
+    def build(items: list[str], links: list[str]) -> str:
+        head = items[0].strip()
+        if not links:
+            return head
+        cond = "$?" if links[0] == "&&" else "-not $?"
+        nested = build(items[1:], links[1:])
+        return f"{head}\nif ({cond}) {{\n{indent(nested)}\n}}"
+
+    return build(parts, ops)
+
+
+def _powershell_state_script() -> str:
+    """脚本尾部：把最终 cwd / 环境变量增量 / 退出码编成一整行 base64 JSON 带回来。"""
+    return f"""$__slateCwd = (Get-Location).Path
+$__slateNow = @{{}}
+Get-ChildItem env: | ForEach-Object {{ $__slateNow[$_.Name] = $_.Value }}
+$__slateDiff = @{{}}
+foreach ($__slateK in $__slateNow.Keys) {{
+  if (-not $__slateBase.ContainsKey($__slateK) -or $__slateBase[$__slateK] -ne $__slateNow[$__slateK]) {{ $__slateDiff[$__slateK] = $__slateNow[$__slateK] }}
+}}
+foreach ($__slateK in $__slateBase.Keys) {{
+  if (-not $__slateNow.ContainsKey($__slateK)) {{ $__slateDiff[$__slateK] = $null }}
+}}
+$__slateJson = ConvertTo-Json -Compress -InputObject @{{ cwd = $__slateCwd; exit = $__slateExit; env = $__slateDiff }}
+$__slateB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($__slateJson))
+Write-Output ("{STATE_TRAILER_PREFIX}" + $__slateB64)
+"""
+
+
+def _powershell_preamble() -> str:
+    """管道一律走 UTF-8；关掉进度条；顺带记录进来之前的环境变量，供尾部算增量。"""
+    return """$ErrorActionPreference = 'Continue'
+$ProgressPreference = 'SilentlyContinue'
+[Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$env:PYTHONIOENCODING = 'utf-8'
+$env:PYTHONUTF8 = '1'
+chcp.com 65001 > $null
+$__slateBase = @{}
+Get-ChildItem env: | ForEach-Object { $__slateBase[$_.Name] = $_.Value }
+$__slateSt = @{ errs = 0; aborted = $false }
+"""
+
+
+def _powershell_body_block() -> str:
+    """命令主体从 stdin 读入、在运行时解析，绝不参与外壳脚本的解析。
+
+    为什么非要绕这一道：把命令直接拼进 -EncodedCommand 的脚本文本里，一条语法错误
+    （`Get-ChildItem |` 这种空管道元素）会让**整个脚本**解析失败 —— 主体一行不跑、
+    尾部回报也不跑，而 PowerShell 把解析错误用 CLIXML 吐到重定向后的 stderr 上：
+    几百字节的 XML 噪声 + 中文错误全成乱码 + 退出码丢失。改成运行时解析，
+    解析错误就是我们 caught 住的一条普通错误，照常写进 stdout、照常回报状态。
+    """
+    return """$__slateCode = [Console]::In.ReadToEnd()
+$__slateSb = $null
+try { $__slateSb = [ScriptBlock]::Create($__slateCode) } catch {
+  $__slateSt.aborted = $true
+  Write-Output ("[PARSE_ERROR] " + $_.Exception.Message)
+}
+if ($null -ne $__slateSb) {
+  try {
+    & $__slateSb 2>&1 | ForEach-Object {
+      if ($_ -is [System.Management.Automation.ErrorRecord]) {
+        Write-Output $_.ToString()
+        if ($_.FullyQualifiedErrorId -notlike 'NativeCommandError*') { $__slateSt.errs = $__slateSt.errs + 1 }
+      } else {
+        Write-Output $_
+      }
+    }
+  } catch {
+    $__slateSt.aborted = $true
+    Write-Output ("[ERROR] " + $_.ToString())
+  }
+}
+$__slateExit = 0
+if ($__slateSt.aborted -or $__slateSt.errs -gt 0) { $__slateExit = 1 }
+if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) { $__slateExit = $LASTEXITCODE }
+"""
+
+
+def powershell_wrapper_script() -> str:
+    """外壳脚本（每条命令都同一份，编码后作为进程参数传入）。"""
+    return _powershell_preamble() + _powershell_body_block() + _powershell_state_script()
+
+
+def powershell_command_body(command: str) -> str:
+    """喂给 stdin 的命令主体：只做 &&/|| 翻译，不与外壳脚本拼接（见 _powershell_body_block）。"""
+    return translate_shell_chain(command) + "\n"
+
+
+def _powershell_argv(script: str) -> list[str]:
+    shell, _ = _resolve_powershell()
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    # -EncodedCommand 走进程参数，不经过任何 shell 解析：引号/反引号/$ 都不可能被吞
+    return [shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded]
+
+
+def _take_state_trailer(stdout: str) -> tuple[str, dict[str, Any]]:
+    """从 stdout 末尾摘出状态行，返回（去掉状态行的 stdout，状态字典）。
+
+    用 rfind 而不是逐行 startswith：命令最后一条输出没带换行时，状态串会直接接在
+    那一行尾巴上，行首匹配就找不到它了（于是 cwd 悄悄退回原位，比报错更难查）。
+    """
+    idx = (stdout or "").rfind(STATE_TRAILER_PREFIX)
+    if idx < 0:
+        return (stdout or "").strip(), {}
+    tail = stdout[idx + len(STATE_TRAILER_PREFIX):]
+    line_end = tail.find("\n")
+    payload = (tail if line_end < 0 else tail[:line_end]).strip()
+    remainder = stdout[:idx] if line_end < 0 else (stdout[:idx] + tail[line_end + 1:])
+    state: Any = {}
+    try:
+        state = json.loads(base64.b64decode(payload.encode("ascii")).decode("utf-8"))
+    except Exception:
+        state = {}
+    return remainder.strip(), (state if isinstance(state, dict) else {})
+
 
 def check_high_risk(command: str) -> str:
     """返回命中的高危原因；未命中返回空字符串。"""
@@ -150,21 +371,30 @@ def _strip_completion_marker(output: str, marker: str) -> tuple[str, int | None]
     return "\n".join(kept).strip(), exit_code
 
 
-def _looks_like_windows_native_command(command: str) -> bool:
-    """Prefer direct subprocess capture for native commands on Windows.
+def is_windows_native_command(command: str) -> bool:
+    """Whether a Windows command can be run directly (no shell text transcoding).
 
     Windows PowerShell 5 decodes native stdout through the legacy code page in
     many cases, which corrupts UTF-8 output from Python/Node/Git. Direct capture
     keeps those bytes under Python's UTF-8 decoder.
+
+    只认"带参数的原生命令"：裸 `python` / `node` 是"要个 REPL"，直连时它拿着 cmd.exe 的
+    stdin 能一直挂到超时；PowerShell 那侧 stdin 在起进程前就读完关掉了，子进程拿到
+    EOF 立刻退出。
     """
-    if sys.platform != "win32":
-        return False
     cmd = (command or "").strip()
     if not cmd or "\n" in cmd or POWERSHELL_HINTS.search(cmd):
         return False
-    first = re.split(r"\s+", cmd, 1)[0].strip("\"'").lower()
+    tokens = re.split(r"\s+", cmd)
+    if len(tokens) < 2:
+        return False
+    first = tokens[0].strip("\"'").lower()
     base = Path(first).stem.lower()
     return base in WINDOWS_NATIVE_PREFIXES
+
+
+def _looks_like_windows_native_command(command: str) -> bool:
+    return sys.platform == "win32" and is_windows_native_command(command)
 
 
 # cd / Set-Location / chdir / sl（PowerShell 中 rd 也是 Remove-Item，不在此列）
@@ -217,7 +447,13 @@ class TerminalSession:
         self._lock = threading.Lock()  # 保护并发 run_command
         
     def start(self) -> None:
-        """启动 shell 进程。"""
+        """启动常驻 shell 进程（仅 POSIX 路径需要）。
+
+        Windows 不再养常驻 shell：每条命令一次 powershell 进程（见 _run_command_powershell），
+        "会话"只剩 self.cwd / self.env 这份状态，由每条命令尾部的回报更新。
+        """
+        if sys.platform == "win32":
+            return
         if self.process and self.process.poll() is None:
             return  # 已在运行
         
@@ -269,10 +505,23 @@ class TerminalSession:
         stdout_thread.join()
         stderr_thread.join()
 
-    def _run_command_direct(self, command: str, timeout: float = TIMEOUT, ctx: CallContext | None = None) -> dict[str, Any]:
-        """Run a Windows native command without PowerShell's text transcoding."""
-        self.current_command = command
-        self.running = True
+    def _collect(
+        self,
+        argv: str | list[str],
+        timeout: float,
+        ctx: CallContext | None,
+        *,
+        shell: bool = False,
+        stdin_text: str | None = None,
+    ) -> dict[str, Any]:
+        """跑一个一次性子进程：输出读到进程结束，超时/取消都杀掉整棵树。
+
+        不等任何"完成标记"再收工 —— 标记由 shell 自己 Write-Output，和子进程直写的
+        stdout 抢跑，早收工就会把上一条命令的尾巴记到下一条头上。
+
+        stdin_text 非空时用一条独立线程写入后立刻关闭：写大命令不能挡在读取线程前面
+        （管道缓冲区满了会互等），关掉 stdin 则让误起的交互式程序直接 EOF 退出。
+        """
         stdout_lines: list[str] = []
         stderr_lines: list[str] = []
 
@@ -283,71 +532,156 @@ class TerminalSession:
             except Exception:
                 pass
 
-        try:
-            proc = subprocess.Popen(
-                command,
-                cwd=str(self.cwd),
-                env=self.env,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding=TERMINAL_ENCODING,
-                errors="replace",
-                bufsize=1,
-                **hidden_subprocess_kwargs(),
-            )
-            readers = [
-                threading.Thread(target=pump, args=(proc.stdout, stdout_lines), daemon=True),
-                threading.Thread(target=pump, args=(proc.stderr, stderr_lines), daemon=True),
-            ]
-            for reader in readers:
-                reader.start()
-
-            deadline = time.monotonic() + max(float(timeout or TIMEOUT), 0.1)
-            timed_out = False
-            cancelled = False
-            emitted = 0
-            out_bytes = 0
-            while proc.poll() is None:
-                if ctx is not None:
-                    fresh = stdout_lines[emitted:]
-                    if fresh:
-                        chunk = "".join(fresh)
-                        ctx.output(chunk, stream="stdout", offset=out_bytes)
-                        out_bytes += len(chunk.encode("utf-8"))
-                        emitted = len(stdout_lines)
-                    if ctx.cancelled:
-                        cancelled = True
-                        break
-                if time.monotonic() >= deadline:
-                    timed_out = True
+        proc = subprocess.Popen(
+            argv,
+            cwd=str(self.cwd),
+            env=self.env,
+            shell=shell,
+            stdin=(subprocess.PIPE if stdin_text is not None else subprocess.DEVNULL),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding=TERMINAL_ENCODING,
+            errors="replace",
+            bufsize=1,
+            **hidden_subprocess_kwargs(),
+        )
+        self.process = proc   # 停止按钮/action="kill" 要能拿到它杀整棵树
+        readers = [
+            threading.Thread(target=pump, args=(proc.stdout, stdout_lines), daemon=True),
+            threading.Thread(target=pump, args=(proc.stderr, stderr_lines), daemon=True),
+        ]
+        for reader in readers:
+            reader.start()
+        if stdin_text is not None:
+            def feed() -> None:
+                try:
+                    proc.stdin.write(stdin_text)
+                    proc.stdin.flush()
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        proc.stdin.close()
+                    except Exception:
+                        pass
+            threading.Thread(target=feed, daemon=True).start()
+        deadline = time.monotonic() + max(float(timeout or TIMEOUT), 0.1)
+        timed_out = False
+        cancelled = False
+        emitted = 0
+        out_bytes = 0
+        while proc.poll() is None:
+            if ctx is not None:
+                fresh = stdout_lines[emitted:]
+                if fresh:
+                    chunk = "".join(fresh)
+                    ctx.output(chunk, stream="stdout", offset=out_bytes)
+                    out_bytes += len(chunk.encode("utf-8"))
+                    emitted = len(stdout_lines)
+                if ctx.cancelled:
+                    cancelled = True
                     break
-                time.sleep(0.05)
+            if time.monotonic() >= deadline:
+                timed_out = True
+                break
+            time.sleep(0.05)
+        if cancelled or timed_out:
+            _kill_process_tree(proc)
+        # 收割退出码：读取线程还在并排排水，这里 wait 不会被管道卡住；
+        # 不 wait 的话 kill 完 returncode 仍是 None，"命令失败"会被写成"成功"。
+        try:
+            proc.wait(timeout=5 if (cancelled or timed_out) else 2)
+        except Exception:
+            pass
+        for reader in readers:
+            reader.join(timeout=2)
+        self.process = None
+        return {
+            "stdout": "".join(stdout_lines),
+            "stderr": "".join(stderr_lines),
+            "returncode": proc.returncode,
+            "timed_out": timed_out,
+            "cancelled": cancelled,
+        }
 
-            if cancelled or timed_out:
-                _kill_process_tree(proc)
-            for reader in readers:
-                reader.join(timeout=1)
+    def _shape_result(
+        self,
+        command: str,
+        stdout: str,
+        stderr: str,
+        exit_code: int | None,
+        run: dict[str, Any],
+        timeout: float,
+    ) -> dict[str, Any]:
+        base: dict[str, Any] = {
+            "command": command,
+            "session_id": self.session_id,
+            "work_dir": str(self.cwd),
+        }
+        output = (stdout or "").strip()
+        errors = (stderr or "").strip()
+        if errors:
+            output += f"\n[STDERR]\n{errors}"
+        if run.get("cancelled"):
+            partial, truncated = truncate_output(output or "(无输出)")
+            return {**base, "error": "已取消：连接已关闭，命令进程已终止", "output": partial,
+                    "truncated": truncated, "cancelled": True}
+        if run.get("timed_out"):
+            partial, truncated = truncate_output(output or "(无输出)")
+            return {**base, "error": f"命令超时（{timeout}s）", "output": partial, "truncated": truncated}
+        output, truncated = truncate_output(output or "(无输出)")
+        return {**base, "output": output, "exit_code": exit_code, "truncated": truncated}
 
-            output = "".join(stdout_lines).strip()
-            errors = "".join(stderr_lines).strip()
-            if errors:
-                output += f"\n[STDERR]\n{errors}"
-            base = {
-                "command": command,
-                "session_id": self.session_id,
-                "work_dir": str(self.cwd),
-            }
-            if cancelled:
-                partial, was_truncated = truncate_output(output or "(无输出)")
-                return {**base, "error": "已取消：连接已关闭，命令进程已终止", "output": partial,
-                        "truncated": was_truncated, "cancelled": True}
-            if timed_out:
-                partial, was_truncated = truncate_output(output or "(无输出)")
-                return {**base, "error": f"命令超时（{timeout}s）", "output": partial, "truncated": was_truncated}
-            output, was_truncated = truncate_output(output or "(无输出)")
-            return {**base, "output": output, "exit_code": proc.returncode, "truncated": was_truncated}
+    def _run_command_powershell(self, command: str, timeout: float = TIMEOUT, ctx: CallContext | None = None) -> dict[str, Any]:
+        """Windows 主路径：一条命令一次 powershell 进程，状态靠脚本尾部回报吸收回会话。"""
+        self.current_command = command
+        self.running = True
+        try:
+            run = self._collect(
+                _powershell_argv(powershell_wrapper_script()),
+                timeout,
+                ctx,
+                stdin_text=powershell_command_body(command),
+            )
+            stdout, state = _take_state_trailer(run["stdout"])
+            exit_code = state.get("exit", run["returncode"])
+            # 语法错误/进程被杀时脚本跑不到尾部：退回进程退出码，别把失败报成 0
+            if exit_code is None:
+                exit_code = run["returncode"]
+            if state:
+                self._adopt_state(state)
+            return self._shape_result(command, stdout, run["stderr"], exit_code, run, timeout)
+        except Exception as e:
+            return {"error": f"执行失败: {e}"}
+        finally:
+            self.running = False
+            self.current_command = ""
+
+    def _adopt_state(self, state: dict[str, Any]) -> None:
+        """把脚本回报的 cwd / 环境变量增量吸收进会话（跨命令状态就靠这一步）。"""
+        new_cwd = str(state.get("cwd") or "").strip()
+        if new_cwd:
+            try:
+                resolved = Path(new_cwd).resolve()
+                self.cwd = resolved
+            except OSError:
+                pass
+        env = state.get("env")
+        if isinstance(env, dict):
+            for key, value in env.items():
+                if value is None:
+                    self.env.pop(str(key), None)
+                else:
+                    self.env[str(key)] = str(value)
+
+    def _run_command_direct(self, command: str, timeout: float = TIMEOUT, ctx: CallContext | None = None) -> dict[str, Any]:
+        """Run a Windows native command without PowerShell's text transcoding."""
+        self.current_command = command
+        self.running = True
+        try:
+            run = self._collect(command, timeout, ctx, shell=True)
+            return self._shape_result(command, run["stdout"], run["stderr"], run["returncode"], run, timeout)
         except Exception as e:
             return {"error": f"执行失败: {e}"}
         finally:
@@ -386,11 +720,16 @@ class TerminalSession:
 
     def _run_command_locked(self, command: str, timeout: float = TIMEOUT, ctx: CallContext | None = None) -> dict[str, Any]:
         """在持有锁的情况下执行命令（内部方法）。"""
-        # 先同步 cwd（cd 命令本身仍交给 shell 执行）
-        self._apply_cd(command)
+        if sys.platform == "win32":
+            # Windows 一律一次性进程。cwd 不在这里预先应用：脚本跑完会把最终位置回报回来，
+            # 预先应用会让 `cd backend` 被算两次（Python 一次、shell 一次），
+            # shell 立刻回"找不到路径 …\backend\backend"。
+            if _looks_like_windows_native_command(command):
+                return self._run_command_direct(command, timeout, ctx)
+            return self._run_command_powershell(command, timeout, ctx)
 
-        if _looks_like_windows_native_command(command):
-            return self._run_command_direct(command, timeout, ctx)
+        # POSIX 仍走常驻 shell：bash 读入完整命令即执行，没有 PowerShell 的续行/抢跑问题
+        self._apply_cd(command)
 
         if not self.process or self.process.poll() is not None:
             self.start()

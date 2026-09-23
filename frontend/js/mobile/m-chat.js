@@ -6,20 +6,20 @@
  */
 
 import {
-  state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit,
-} from "../store.js?v=20260922-002";
-import { fmtTokens } from "../services/usage.js?v=20260922-002";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260922-002";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260922-002";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260922-002";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260922-002";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260922-002";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260922-002";
-import { toolLabel } from "../services/tool_meta.js?v=20260922-002";
-import { renderMarkdown } from "../services/markdown.js?v=20260922-002";
-import { mToast, t } from "./m-ui.js?v=20260922-002";
-import { mHandleStructured } from "./m-auth.js?v=20260922-002";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260922-002";
+  state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit, effectiveConstitution,
+} from "../store.js?v=20260922-005";
+import { fmtTokens } from "../services/usage.js?v=20260922-005";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260922-005";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260922-005";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260922-005";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260922-005";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260922-005";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260922-005";
+import { toolLabel } from "../services/tool_meta.js?v=20260922-005";
+import { renderMarkdown } from "../services/markdown.js?v=20260922-005";
+import { mToast, t } from "./m-ui.js?v=20260922-005";
+import { mHandleStructured } from "./m-auth.js?v=20260922-005";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260922-005";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -263,7 +263,7 @@ async function mStreamAssistant({ wrap, modelId, apiKey, baseUrl, params, signal
   let panel = null;
   const meta = {};
   const contentEl = wrap?.querySelector(".m-msg-content");
-  const messages = buildMessages(history, state.constitution);
+  const messages = buildMessages(history, effectiveConstitution());
   try {
     for await (const chunk of streamChat({
       model: modelId,

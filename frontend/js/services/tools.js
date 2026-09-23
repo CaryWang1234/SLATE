@@ -12,14 +12,14 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit } from "../store.js?v=20260922-002";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260922-002";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260922-002";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260922-002";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260922-002";
-import { t } from "./i18n.js?v=20260922-002";
-import { makeId } from "./utils.js?v=20260922-002";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260922-002";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution } from "../store.js?v=20260922-005";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260922-005";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260922-005";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260922-005";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260922-005";
+import { t } from "./i18n.js?v=20260922-005";
+import { makeId } from "./utils.js?v=20260922-005";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260922-005";
 
 function normalizeProjectRelativePath(rawPath) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
@@ -419,7 +419,7 @@ const TOOLS = {
 
   skill_run: {
     name: "执行工具",
-    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/replace_range按行号范围替换（start_line/end_line/content，推荐先view确认行号）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(持久化终端会话：支持多会话管理、状态保持（cd/export跨命令保持）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，高危命令双层拦截), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，engine可选auto（Bing+DuckDuckGo并发合并去重，推荐）/bing/ddg，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文Markdown，支持JS渲染页面与PDF，mode=html时返回原始HTML，render_js可选auto（正文过短自动渲染）/on/off，max_chars截断长度默认20000上限60000), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果), image_gen(AI图片生成：prompt描述必填、size尺寸可选如1024x1024、n数量默认1最多4，需先在设置中配置模型与Key，返回preview_url可预览), video_gen(AI视频生成：prompt描述必填、duration时长秒数默认5最多30，需先在设置中配置模型与Key，返回preview_url可预览)。也可传入 SKILL.md 技能名读取其定义内容",
+    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/replace_range按行号范围替换（start_line/end_line/content，推荐先view确认行号）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(终端会话：支持多会话管理、状态保持（cd/$env: 跨命令保持，PowerShell 变量不跨命令）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，Windows 每条命令一个 PowerShell 进程：多行块与 &&/|| 均可用，交互式 REPL（裸 python/node）拿不到输入会拖到超时故别用，高危命令双层拦截), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，engine可选auto（Bing+DuckDuckGo并发合并去重，推荐）/bing/ddg，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文Markdown，支持JS渲染页面与PDF，mode=html时返回原始HTML，render_js可选auto（正文过短自动渲染）/on/off，max_chars截断长度默认20000上限60000), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果), image_gen(AI图片生成：prompt描述必填、size尺寸可选如1024x1024、n数量默认1最多4，需先在设置中配置模型与Key，返回preview_url可预览), video_gen(AI视频生成：prompt描述必填、duration时长秒数默认5最多30，需先在设置中配置模型与Key，返回preview_url可预览)。也可传入 SKILL.md 技能名读取其定义内容",
     params: {
       skill: { type: "string", description: "工具或技能名称", required: true },
       params: { type: "object", description: "工具参数" },
@@ -766,7 +766,7 @@ const TOOLS = {
     },
     async execute({ task, context, constraints }) {
       const parts = [];
-      const c = state.constitution;
+      const c = effectiveConstitution();
       if (c?.rules?.length) {
         parts.push("【项目宪法】");
         c.rules.forEach((r, i) => parts.push(`  ${i + 1}. ${r}`));
@@ -1815,13 +1815,15 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   s += "◈◈◈project_files\n{\"path\": \"\"}\n◈◆◆\n";
   s += "（等待工具返回目录列表后，再根据结果回答用户）\n\n";
 
-  // 项目上下文
+  // 项目上下文（宪法不在这里重复：buildSystemContent 已经把生效的那份按 [项目宪法] 注入了，
+  // 两处都写会在同一条系统提示里翻来覆去说同一批规则，还占上下文）
   if (state.project) {
-
     s += `[当前项目] ${state.project.name} (${state.project.path})\n`;
-    if (state.project.constitution?.rules?.length) {
-      s += "项目宪法:\n";
-      state.project.constitution.rules.forEach((r, i) => { s += `  ${i + 1}. ${r}\n`; });
+    const roots = Array.isArray(state.project.roots) ? state.project.roots : [];
+    const otherRoots = roots.filter(r => r !== state.project.path);
+    if (otherRoots.length) {
+      s += `这是一个工作区：除当前根外还含 ${otherRoots.length} 个文件夹（${otherRoots.join("、")}）。`
+        + `工具默认的工作目录只是上面那个当前根，碰其他文件夹要传它们的绝对路径。\n`;
     }
     s += "\n";
   }

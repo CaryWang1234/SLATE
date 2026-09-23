@@ -3,9 +3,11 @@
  * 在设置页中展示已配置的外部 MCP Server，支持添加/删除/连接/断开。
  */
 
-import { get, post, del } from "../services/api.js?v=20260922-002";
-import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260922-002";
-import { refreshSkills } from "./skill_panel.js?v=20260922-002";
+import { get, post, del } from "../services/api.js?v=20260922-005";
+import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260922-005";
+import { refreshSkills } from "./skill_panel.js?v=20260922-005";
+import { iconSvgEl } from "../services/icons.js?v=20260922-005";
+import { mcpIconKey } from "../services/mcp_logos.js?v=20260922-005";
 
 let serverListEl, btnAdd, btnRefresh;
 
@@ -47,13 +49,19 @@ function renderServerList(servers) {
     statusDot.className = `mcp-server-status ${srv.status || "disconnected"}`;
     statusDot.title = STATUS_LABEL[srv.status] || srv.status;
 
+    // 品牌 mark 当行首头像；认不出品牌的 Server 一律画 MCP 官方 mark
+    const avatar = document.createElement("span");
+    avatar.className = "mcp-server-avatar";
+    avatar.dataset.mcpIcon = mcpIconKey(srv.name, srv.url); // 走查与排障要能看出匹配到了哪个 mark
+    avatar.appendChild(iconSvgEl(avatar.dataset.mcpIcon, "mcp-server-logo"));
+
     // 信息区
     const info = document.createElement("div");
     info.className = "mcp-server-info";
 
     const nameRow = document.createElement("div");
     nameRow.className = "mcp-server-name";
-    nameRow.appendChild(statusDot);
+    nameRow.appendChild(statusDot); // 状态灯贴着名字：头像只说明"是哪一家"，不说明连没连上
     nameRow.appendChild(document.createTextNode(srv.name || srv.id));
 
     const urlRow = document.createElement("div");
@@ -105,7 +113,7 @@ function renderServerList(servers) {
     btnDelete.addEventListener("click", () => handleRemove(srv.id, srv.name));
     actions.appendChild(btnDelete);
 
-    item.appendChild(statusDot);
+    item.appendChild(avatar);
     item.appendChild(info);
     item.appendChild(actions);
     serverListEl.appendChild(item);

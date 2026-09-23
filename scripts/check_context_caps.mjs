@@ -7,11 +7,13 @@
  * 白名单漏了字段：拖完就没了，且只在重启后显形；
  * 消费者没跟上：条子跟压缩阈值各算各的，正是这次要修的毛病。
  * 所以这里真跑解析器，而不是只 grep：
- * ①档位表 + 吸附语义 + 按模型窗口封顶（import store.js 实测）；
- * ②持久化两头都带 modelContextCaps，且后端白名单放行（跨语言，源码级 pin）；
- * ③两个消费者都经 resolver，且硬编码 64000 不许回潮；
- * ④滑杆控件真的存在于设置页模型行；
- * ⑤用量条上的上下文段可点，能直达该模型那一行滑杆（预算要看得见也要改得动）。
+ * ①档位表 + 吸附语义 + 每模型默认上限（自动档 = 标称窗口留两成余量后吸附档位）
+ *   + 按模型窗口封顶（import store.js 实测）；
+ * ②内置注册表每台都带 context_window——少一台，那台的自动档就退回全局 64K；
+ * ③持久化两头都带 modelContextCaps，且后端白名单放行（跨语言，源码级 pin）；
+ * ④两个消费者都经 resolver，且硬编码 64000 不许回潮；
+ * ⑤滑杆控件真的存在于设置页模型行；
+ * ⑥用量条上的上下文段可点，能直达该模型那一行滑杆（预算要看得见也要改得动）。
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -36,16 +38,35 @@ assert.deepEqual(
   "滑杆档位变了：设置页读数、已存的用户偏好都要一起迁移"
 );
 const FIRST = store.state.currentModel?.id || "cap-guard-a";
-const registry = { guard: [{ id: "cap-guard-a", context_window: 400000 }, { id: "cap-guard-b", context_window: 8192 }] };
+const registry = { guard: [
+  { id: "cap-guard-a", context_window: 400000 },   // 400K × 0.8 = 320K → 向下吸附 200K
+  { id: "cap-guard-b", context_window: 8192 },     // 小得凑不满一档 → 落回全局上限
+  { id: "cap-guard-c", context_window: 1048576 },  // 1M 级 → 800K
+  { id: "cap-guard-d" },                           // 自定义模型：没有标称窗口
+] };
 store.setModelRegistry(registry);
 store.state.maxTokens = 64000;
 
-// 自动档 = 全局上限：不动滑杆必须与本次改动之前的压缩行为逐字一致
-assert.equal(store.contextBudgetOf("cap-guard-a"), 64000, "自动档应沿用全局「上下文 Token 上限」");
+// 自动档 = 这个模型自己的默认上限：内置模型不再共用全局那一个 64K
+// 余量放在最前面查：没余量时默认值会变成 1M/400K，后面的具体档位反而先报错、说不到点上
+assert.ok(store.defaultContextCap("cap-guard-c") <= 1048576 * 0.8, "默认上限没按标称窗口留余量");
+assert.equal(store.defaultContextCap("cap-guard-c"), 800000, "1M 窗口的默认上限该吸附到 800K");
+assert.equal(store.defaultContextCap("cap-guard-a"), 200000, "400K 窗口的默认上限该吸附到 200K");
+assert.equal(store.defaultContextCap("cap-guard-b"), 0, "8K 窗口凑不满任何档位，不该硬造默认值");
+assert.equal(store.defaultContextCap("cap-guard-d"), 0, "没有标称窗口的模型不该凭空长出默认上限");
+assert.equal(store.contextBudgetOf("cap-guard-c"), 800000, "自动档没用上模型默认上限");
+assert.equal(store.contextBudgetOf("cap-guard-a"), 200000, "自动档没用上模型默认上限（400K 模型）");
+// 落不到默认档的两条：沿用全局「上下文 Token 上限」，且仍按标称窗口封顶
+assert.equal(store.contextBudgetOf("cap-guard-b"), 8192, "小窗口模型没被标称窗口封顶");
+assert.equal(store.contextBudgetOf("cap-guard-d"), 64000, "无标称窗口的模型应沿用全局上限");
+// 默认档不能压过用户：给 1M 模型手动选 100K，生效的就得是 100K 而不是它的默认 800K
+store.setModelContextCap("cap-guard-c", 100000);
+assert.equal(store.contextBudgetOf("cap-guard-c"), 100000, "模型默认档压过了用户手动档");
+store.setModelContextCap("cap-guard-c", 0);
 store.setModelContextCap("cap-guard-a", 200000);
 assert.equal(store.contextBudgetOf("cap-guard-a"), 200000, "设了 200K 却没用上");
 assert.equal(store.getContextCap("cap-guard-a"), 200000);
-// 超出模型标称窗口要封顶，而不是照发出去等上游 400
+// 手动档优先于默认档；超出模型标称窗口要封顶，而不是照发出去等上游 400
 store.setModelContextCap("cap-guard-a", 1000000);
 assert.equal(store.contextBudgetOf("cap-guard-a"), 400000, "1M 档没被 400K 窗口封顶");
 store.setModelContextCap("cap-guard-b", 200000);
@@ -55,13 +76,22 @@ store.setModelContextCap("cap-guard-a", 180000);
 assert.equal(store.getContextCap("cap-guard-a"), 200000, "180K 没吸附到 200K");
 store.setModelContextCap("cap-guard-a", 120000);
 assert.equal(store.getContextCap("cap-guard-a"), 100000, "120K 没吸附到 100K");
-// 归零 = 回到自动，且不留键
+// 归零 = 回到自动（= 回到该模型的默认档），且不留残值
 store.setModelContextCap("cap-guard-a", 0);
 assert.equal(store.getContextCap("cap-guard-a"), 0);
 assert.ok(!("cap-guard-a" in store.state.modelContextCaps), "自动档不该在状态里留残值");
-assert.equal(store.contextBudgetOf("cap-guard-a"), 64000);
+assert.equal(store.contextBudgetOf("cap-guard-a"), 200000, "归零后没回到该模型的默认上限");
 // 未知模型（无标称窗口）也要有个数，不能 0 分母
 assert.equal(store.contextBudgetOf("cap-guard-unknown"), 64000, "未知模型预算塌成 0 会让上下文条除零");
+
+// ── 1b. 内置注册表每台都要带默认上限（少一台，那台就退回全局 64K）──
+const PROXY = read("backend/routers/proxy.py");
+const reg = PROXY.slice(PROXY.indexOf("MODEL_REGISTRY"), PROXY.indexOf("@router.get(\"/models\")"));
+const entries = [...reg.matchAll(/\{[^{}]*?"id":\s*"([^"]+)"[^{}]*?\}/gs)];
+assert.ok(entries.length >= 20, `内置模型条目数异常：${entries.length}`);
+const missing = entries.filter((m) => !/"context_window":\s*[1-9]\d{3,}/.test(m[0])).map((m) => m[1]);
+assert.deepEqual(missing, [], `这些内置模型缺 context_window 默认值：${missing.join("、")}`);
+
 
 // ── 2. 持久化两头 + 后端白名单 ───────────────────────────────────
 assert.match(STORE, /modelContextCaps:\s*state\.modelContextCaps/, "buildPersistentData 漏了 modelContextCaps");
@@ -93,9 +123,14 @@ assert.ok(inputLine && !inputLine.includes("setModelContextCap"),
 // ── 5. 双语文案齐备 ────────────────────────────────────────────
 const DICT = read("frontend/js/services/i18n_dict.js");
 for (const key of ["最大上下文", "自动压缩阈值与上下文条都按 {b} 计算", "超出模型标称窗口，已按 {w} 封顶",
+  "自动取该模型的默认上限：标称窗口 {w} 留两成余量，压缩阈值与上下文条都按 {b} 计算",
   "预算 {b} · 模型窗口 {w}", "点按调整该模型的上下文预算"]) {
   assert.ok(DICT.includes(`"${key}"`), `i18n 缺词条：${key}`);
 }
+// 「自动 = 模型默认」这句契约要在源码里，别只活在 tooltip 文案里
+assert.match(STORE, /function defaultContextCap\(/, "store 里没有每模型默认上限的解析器");
+assert.match(STORE, /CONTEXT_HEADROOM_RATIO\s*=\s*0\.8/, "默认上限的余量比例没被钉住");
+assert.match(APP, /defaultContextCap\(model\.id\)/, "设置页读数不认模型默认档，自动位会显示成全局值");
 
 // ── 6. 从用量条直达该模型的滑杆（预算是个数字，看得见也要改得动）────
 assert.match(CHAT, /class="usage-ctx" role="button" tabindex="0"/,

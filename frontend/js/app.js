@@ -2,33 +2,33 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, fmtContextTokens, setTaskListSort } from "./store.js?v=20260922-002";
-import { initI18n, t } from "./services/i18n.js?v=20260922-002";
-import { iconSvgEl } from "./services/icons.js?v=20260922-002";
-import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260922-002";
-import { get, post, put } from "./services/api.js?v=20260922-002";
-import { dlgConfirm } from "./services/dialog.js?v=20260922-002";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260922-002";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260922-002";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260922-002";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260922-002";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260922-002";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260922-002";
-import { initTeamPanel } from "./components/team.js?v=20260922-002";
-import { initProjectBar } from "./components/project_bar.js?v=20260922-002";
-import { initSessionSummary } from "./components/session_summary.js?v=20260922-002";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260922-002";
-import { initTypingGame } from "./components/typing_game.js?v=20260922-002";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260922-002";
-import { initMemoryPanel } from "./components/memory.js?v=20260922-002";
-import { initExpertsPanel } from "./components/experts.js?v=20260922-002";
-import { initSchedule } from "./components/schedule.js?v=20260922-002";
-import { initRiskGuard } from "./services/riskguard.js?v=20260922-002";
-import { initUnderstandPanel } from "./components/understand.js?v=20260922-002";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260922-002";
-import { setProject, setProjectFileTree } from "./store.js?v=20260922-002";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260922-002";
-import { installErrorSink } from "./services/error_sink.js?v=20260922-002";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution } from "./store.js?v=20260922-005";
+import { initI18n, t } from "./services/i18n.js?v=20260922-005";
+import { iconSvgEl } from "./services/icons.js?v=20260922-005";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260922-005";
+import { get, post, put } from "./services/api.js?v=20260922-005";
+import { dlgConfirm } from "./services/dialog.js?v=20260922-005";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260922-005";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260922-005";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260922-005";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260922-005";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260922-005";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260922-005";
+import { initTeamPanel } from "./components/team.js?v=20260922-005";
+import { initProjectBar } from "./components/project_bar.js?v=20260922-005";
+import { initSessionSummary } from "./components/session_summary.js?v=20260922-005";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260922-005";
+import { initTypingGame } from "./components/typing_game.js?v=20260922-005";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260922-005";
+import { initMemoryPanel } from "./components/memory.js?v=20260922-005";
+import { initExpertsPanel } from "./components/experts.js?v=20260922-005";
+import { initSchedule } from "./components/schedule.js?v=20260922-005";
+import { initRiskGuard } from "./services/riskguard.js?v=20260922-005";
+import { initUnderstandPanel } from "./components/understand.js?v=20260922-005";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260922-005";
+import { setProject, setProjectFileTree } from "./store.js?v=20260922-005";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260922-005";
+import { installErrorSink } from "./services/error_sink.js?v=20260922-005";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -348,7 +348,8 @@ function saveCustomModel() {
 
 // ── 每模型上下文预算滑杆 ───────────────────────────────
 // 一档 = 这个模型在 SLATE 里能用多少上下文：同时决定自动压缩阈值与上下文条的分母。
-// 0 档「自动」沿用全局「上下文 Token 上限」，所以不动滑杆的行为与改动前完全一致。
+// 0 档「自动」用该模型自己的默认上限（标称窗口留两成余量后吸附到档位）；
+// 标称窗口缺失或小到凑不满一档的模型（自定义 / 本地），自动才落回全局「上下文 Token 上限」。
 function buildContextCapControl(model) {
   const wrap = document.createElement("div");
   wrap.className = "ctx-cap";
@@ -372,14 +373,18 @@ function buildContextCapControl(model) {
 
   const paint = (stop) => {
     const declared = declaredContextWindow(model.id);
-    const eff = stop ? Math.min(stop, declared || stop) : contextBudgetOf(model.id);
-    const clamped = !!stop && declared > 0 && stop > declared;
+    const auto = !stop;
+    const eff = auto ? contextBudgetOf(model.id) : Math.min(stop, declared || stop);
+    const clamped = !auto && declared > 0 && stop > declared;
+    const perModel = auto && declaredContextWindow(model.id) > 0 && defaultContextCap(model.id) > 0;
     readout.textContent = stop
       ? (clamped ? `${fmtContextTokens(stop)} → ${fmtContextTokens(eff)}` : fmtContextTokens(stop))
       : `${t("自动")} · ${fmtContextTokens(eff)}`;
     readout.title = clamped
       ? t("超出模型标称窗口，已按 {w} 封顶", { w: fmtContextTokens(declared) })
-      : t("自动压缩阈值与上下文条都按 {b} 计算", { b: fmtContextTokens(eff) });
+      : perModel
+        ? t("自动取该模型的默认上限：标称窗口 {w} 留两成余量，压缩阈值与上下文条都按 {b} 计算", { w: fmtContextTokens(declared), b: fmtContextTokens(eff) })
+        : t("自动压缩阈值与上下文条都按 {b} 计算", { b: fmtContextTokens(eff) });
     slider.classList.toggle("is-auto", !stop);
   };
 
@@ -529,6 +534,21 @@ function renderKeyManagement() {
 
 let settingsModal;
 
+// ── 设置页：项目宪法 ──────────────
+// 框里是"当前生效的那一份"，下面一行说明这次保存会写到哪儿。以前打开项目会把项目的宪法
+// 盖进全局状态，于是关掉项目、或切到一个没写宪法的项目，规则还在沿用——这里改成现算。
+function renderConstitutionSettings() {
+  const box = document.getElementById("setting-constitution");
+  if (!box) return;
+  const active = effectiveConstitution();
+  if (active) box.value = JSON.stringify(active, null, 2);
+  const hint = document.getElementById("constitution-scope");
+  if (!hint) return;
+  hint.textContent = constitutionScope() === "project"
+    ? t("正在编辑项目「{name}」的宪法：存进该项目的 .slate/config.json，只对这个项目生效", { name: state.project?.name || "" })
+    : t("正在编辑全局宪法：打开带宪法的项目时，以该项目的宪法为准");
+}
+
 function openSettings(options = {}) {
   settingsModal = document.getElementById("panel-settings");
   document.getElementById("setting-max-tokens").value = state.maxTokens || 64000;
@@ -538,6 +558,7 @@ function openSettings(options = {}) {
   document.getElementById("setting-auto-review-enabled").checked = state.autoReview?.enabled !== false;
   document.getElementById("setting-auto-review-long-stall").checked = state.autoReview?.reviewLongStall === true;
   document.getElementById("setting-auto-review-min-chars").value = state.autoReview?.minChars || 120;
+  document.getElementById("setting-continue-autopilot").checked = state.continueAutopilot !== false;
   populateAutoReviewModelSelect();
   // 通知设置
   document.getElementById("setting-notif-sound").checked = state.notifications?.soundEnabled !== false;
@@ -548,9 +569,7 @@ function openSettings(options = {}) {
   renderWebSearchSettings();
   renderImageGenSettings();
   renderVideoGenSettings();
-  if (state.constitution) {
-    document.getElementById("setting-constitution").value = JSON.stringify(state.constitution, null, 2);
-  }
+  renderConstitutionSettings();
   renderCustomModelManagement();
   renderKeyManagement();
   refreshApiTestModels();
@@ -1088,6 +1107,12 @@ function initAutoReviewPersistence() {
   document.getElementById("setting-auto-review-model")?.addEventListener("change", applyAutoReviewSettings);
   document.getElementById("setting-auto-review-min-chars")?.addEventListener("change", applyAutoReviewSettings);
   document.getElementById("setting-auto-review-long-stall")?.addEventListener("change", applyAutoReviewSettings);
+  // Continue Autopilot 是循环行为开关，不进 autoReview（那是审阅模型的配置），
+  // 也刻意不同步到手机：末轮续跑只有桌面循环实现。
+  document.getElementById("setting-continue-autopilot")?.addEventListener("change", (e) => {
+    state.continueAutopilot = e.target.checked;
+    savePersistent();
+  });
 }
 
 // 通知设置：变更后立即持久化
@@ -1112,7 +1137,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260922-002").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260922-005").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1716,18 +1741,26 @@ async function saveSettings() {
   
   const constText = document.getElementById("setting-constitution").value.trim();
   if (constText) {
+    let constData = null;
     try {
-      const constData = JSON.parse(constText);
+      constData = JSON.parse(constText);
+    } catch {
+      // 以前这里静默吞掉：填了个不合法 JSON，点保存什么也没发生
+      toast(t("宪法不是合法 JSON，未保存"));
+    }
+    if (constData) {
       if (state.project) {
-        const { updateProjectConfig } = await import("./services/project.js?v=20260922-002");
+        // 打开着项目就写进项目（.slate/config.json，跟着仓库走），全局那份保持不动
+        const { updateProjectConfig } = await import("./services/project.js?v=20260922-005");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
+        else toast(t("项目宪法保存失败：{msg}", { msg: res.message || "" }));
       } else {
         await put("/constitution", constData);
+        setConstitution(constData);
       }
-      state.constitution = constData;
-    } catch (e) { /* ignore */ }
+    }
   }
 
   savePersistent();
@@ -1967,7 +2000,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260922-002");
+        const { openProject } = await import("./services/project.js?v=20260922-005");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }

@@ -2,12 +2,12 @@
  * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交付 Prompt
  */
 
-import { state, subscribe, addPromptSnippet } from "../store.js?v=20260922-002";
-import { get, post } from "../services/api.js?v=20260922-002";
-import { browseFiles } from "../services/project.js?v=20260922-002";
-import { t } from "../services/i18n.js?v=20260922-002";
-import { iconSvg } from "../services/icons.js?v=20260922-002";
-import { makeId } from "../services/utils.js?v=20260922-002";
+import { state, subscribe, addPromptSnippet, effectiveConstitution } from "../store.js?v=20260922-005";
+import { get, post } from "../services/api.js?v=20260922-005";
+import { browseFiles } from "../services/project.js?v=20260922-005";
+import { t } from "../services/i18n.js?v=20260922-005";
+import { iconSvg } from "../services/icons.js?v=20260922-005";
+import { makeId } from "../services/utils.js?v=20260922-005";
 
 const FACTORY_PRESETS = {
   codex: {
@@ -88,7 +88,8 @@ function escapeHtml(text) {
 }
 
 function getRules() {
-  return Array.isArray(state.constitution?.rules) ? state.constitution.rules : [];
+  const c = effectiveConstitution();
+  return Array.isArray(c?.rules) ? c.rules : [];
 }
 
 function getPromptText() {
@@ -538,6 +539,8 @@ function initPromptFactory() {
     // 切换项目后清空旧项目的勾选路径，防止串项目
     selectedFiles.clear();
     renderFilePicker();
+    // 生效的宪法随项目换，展示区与清单要跟着重画
+    renderConstitution();
     renderChecklist();
   });
   subscribe("projectFileTree", renderFilePicker);

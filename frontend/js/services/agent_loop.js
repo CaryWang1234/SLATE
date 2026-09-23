@@ -6,7 +6,11 @@
  * 平台差异全部经三个注入面对象交回调用方：
  *   io      —— 与后端/存储打交道的动作（探测调用、执行、落库、续写一轮）
  *   view    —— 与 DOM 打交道的动作（气泡重锚定、渲染、进度条、步骤卡、砚流进度）
- *   policy  —— 与产品策略打交道的决策（空轮如何推进、回灌文案、轮末是否退出）
+ *   policy  —— 与产品策略打交道的决策（空轮如何推进、回灌文案、轮末是否退出、触顶是否续跑）
+ *
+ * 预算归 kernel 管，但上限可以被 policy 推后：emptyRound / atCap 返回 extend>0 时，kernel
+ * 抬高 run.maxRounds（emptyRound 的 nudge 话术照常注入，atCap 只放宽轮数、不另塞消息）。
+ * 追加几次、追加多少由 policy 自己计数封顶——止损线可以推后，不能在 kernel 这边被抹掉。
  *
  * 事件账本同样在 kernel 里落：policy.openRun(run) 返回一个 ledger（agent_ledger.js 的实例，
  * mode 这类平台标签由 policy 决定），kernel 在轮次与调用的各节点 emit。
@@ -17,9 +21,9 @@
  * 约定：policy 返回的模型可见字符串不被 t() 包裹（t() 只包用户可见文本）。
  */
 
-import { state, addMessage } from "../store.js?v=20260922-002";
-import { stripToolCalls } from "./tools.js?v=20260922-002";
-import { _pendingToolMsgs } from "./agent_common.js?v=20260922-002";
+import { state, addMessage } from "../store.js?v=20260922-005";
+import { stripToolCalls } from "./tools.js?v=20260922-005";
+import { _pendingToolMsgs } from "./agent_common.js?v=20260922-005";
 
 export function createAgentLoop({ policy = {}, view = {}, io }) {
   const reasonOf = (key) => policy.exitReasons?.[key] ?? "";
@@ -68,7 +72,9 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
     policy.onStart?.(run);
     let failure = null;
     try {
-      for (let round = 0; round < maxRounds; round++) {
+      // 预算读 run.maxRounds 而不是入参：policy 在末轮可以给续跑追加轮数（Continue Autopilot），
+      // 追加只放宽不收紧，且每次追加都由 policy 自己计数封顶。
+      for (let round = 0; round < run.maxRounds; round++) {
         run.round = round;
         if (signal?.aborted) { run.exitReason = reasonOf("aborted"); break; }
         if (switched()) { run.exitReason = reasonOf("switched"); break; }
@@ -121,6 +127,9 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
               break;
             }
             runEvent("notice", { kind: r.kind || "nudge", text: r.hiddenMsg?.content || "" });
+            // policy 可以带着 nudge 追加轮数（Continue Autopilot）：先把上限抬高再注入提醒，
+            // 顺序反了的话 for 条件仍读旧上限，这条催办就成了没人执行的空话
+            if (Number(r.extend) > 0) run.maxRounds += Number(r.extend);
             if (r.hiddenMsg) addMessage(r.hiddenMsg);
             if (r.progressText !== undefined) view.setProgress?.(r.progressText);
             run.nudged = true;
@@ -194,6 +203,22 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
           if (r?.action === "break") {
             if (r.exitReason !== undefined) run.exitReason = r.exitReason;
             break;
+          }
+
+          // 末轮兜底：预算就在这一轮用完了，可"用完"不等于"干完"——本轮的工具结果刚回灌、
+          // 模型续写的那句"接下来我要……"还没轮到执行，循环就散了（用户看到的正是活没干完就断）。
+          // 续不续、给几轮由 policy 定（它看得到清单与用户偏好），kernel 只在恰好触顶时问一次。
+          // 这条路径刻意不注入提醒消息：本轮结尾已经续写出新的 assistant 回复，再塞一条 user 消息
+          // 会让下一轮开头的"队尾必须是待处理回复"守卫直接散场。模型下一步想干什么就写在它那句
+          // 回复里，把上限放宽就能真的被执行；若它停笔不说话，下一轮走 emptyRound，那里才有催办话术。
+          if (round === run.maxRounds - 1) {
+            const c = policy.atCap?.(run) ?? null;
+            const grant = Number(c?.extend) || 0;
+            if (grant > 0) {
+              run.maxRounds += grant;
+              runEvent("notice", { kind: c.kind || "cap_extend", text: c.progressText || "" });
+              if (c.progressText !== undefined) view.setProgress?.(c.progressText);
+            }
           }
         } finally {
           runEvent("round.finished", {

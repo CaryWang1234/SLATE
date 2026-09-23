@@ -3145,6 +3145,30 @@ textarea::-webkit-scrollbar-thumb {
   flex-shrink: 0;
 }
 
+/* MCP Server 行首的品牌 mark：底留空、只描一圈边，图形本身靠 currentColor 跟随
+   --text-muted，明暗两种主题都画得出来（换成 <img> 就会退成黑色）。 */
+.mcp-server-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+}
+
+.mcp-server-item:hover .mcp-server-avatar {
+  color: var(--text);
+}
+
+.mcp-server-logo {
+  display: block;
+  width: 17px;
+  height: 17px;
+}
+
 .mcp-server-status.connected { background: #22c55e; }
 .mcp-server-status.connecting { background: #f59e0b; }
 .mcp-server-status.disconnected { background: #9ca3af; }
@@ -6694,7 +6718,8 @@ body.resizing {
 .project-bar-info {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px 6px;
   min-width: 0;
   flex: 1;
 }
@@ -6711,6 +6736,95 @@ body.resizing {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.project-bar-kind {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+}
+
+/* 工作区成员目录：同一行里切换当前根，激活的那个用反白底 */
+.workspace-roots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-root-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 6px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition), background-color var(--transition);
+}
+
+.workspace-root-chip:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.workspace-root-chip.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-bg);
+  color: var(--accent-fg);
+}
+
+.workspace-root-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.workspace-root-remove {
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.5;
+}
+
+.workspace-root-remove:hover {
+  opacity: 1;
+}
+
+.workspace-root-add {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 1.4;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.workspace-root-add:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.workspace-folders-input {
+  font-family: var(--font-code);
+  font-size: 12px;
+  resize: vertical;
+  margin-top: 6px;
 }
 
 .project-bar-actions {

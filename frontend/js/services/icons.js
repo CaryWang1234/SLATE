@@ -1,6 +1,8 @@
 /**
  * 内联 SVG 图标集（Feather/Lucide 风格：24×24 viewBox，stroke=currentColor）。
  * 用于替代界面中的 emoji 图标，保证中英文模式下外观一致。
+ * MCP 品牌 mark 走 mcp_icons.js（fill=currentColor，同样跟着文字颜色走），
+ * 不能退成 <img src>：那种写法下 currentColor 只会变成黑色，暗色主题等于没画。
  *
  * 用法：
  *   iconSvg(name, cls)  → 返回 <svg> 字符串（可赋给 innerHTML）
@@ -8,7 +10,8 @@
  *   iconText(name, text) → 返回 <span class="icon-text">图标+文本</span>（文本走 textNode，无 XSS）
  */
 
-import { CUSTOM_ICONS, CUSTOM_VIEWBOXES } from "./icons_custom.js?v=20260922-002";
+import { CUSTOM_ICONS, CUSTOM_VIEWBOXES } from "./icons_custom.js?v=20260922-005";
+import { MCP_ICONS, MCP_VIEWBOXES } from "./mcp_icons.js?v=20260922-005";
 
 const ICONS = {
   key: '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
@@ -191,10 +194,11 @@ const ICON_ALIASES = {
 };
 
 export function iconSvg(name, cls = "") {
-  const inner = ICONS[name] || CUSTOM_ICONS[name] || ICONS[ICON_ALIASES[name]] || "";
+  const inner = ICONS[name] || CUSTOM_ICONS[name] || MCP_ICONS[name] || ICONS[ICON_ALIASES[name]] || "";
   if (!inner) return "";
-  const vb = CUSTOM_VIEWBOXES[name] || "0 0 24 24";
-  const fill = CUSTOM_VIEWBOXES[name] ? "fill=\"currentColor\"" : "fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"";
+  const vb = CUSTOM_VIEWBOXES[name] || MCP_VIEWBOXES[name] || "0 0 24 24";
+  // 品牌 mark 与自绘图都靠 currentColor 描色，所以不能带 stroke 的默认属性
+  const fill = (CUSTOM_VIEWBOXES[name] || MCP_VIEWBOXES[name]) ? "fill=\"currentColor\"" : "fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"";
   return `<svg class="svg-icon${cls ? " " + cls : ""}" viewBox="${vb}" ${fill} aria-hidden="true">${inner}</svg>`;
 }
 

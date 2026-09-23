@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import * as common from "../frontend/js/services/agent_common.js";
 // 版本串必须与 tools.js 里的 import 说明符同形：写成 store.js（无 ?v=）会载入第二个 store 实例，
 // 工具改的是那一份 state，守卫读的是这一份 → 永远假红/假绿
-import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20260922-002";
+import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20260922-005";
 
 const NEXT_OK = "Next: use this result to continue the task. Do not repeat the same tool call unless new parameters are needed.";
 const NEXT_FAIL = "Next: fix the parameters or choose a different tool. Do not repeat the identical failing call.";
@@ -271,6 +271,72 @@ assert.equal(effectiveToolMode("local", "openai", "chat"), "none");
   assert.match(mchatSrc, /if \(run\?\.extra\?\.loopExit\) \{[\s\S]{0,200}?action: "break", exitReason: `模型已调/,
     "mobilePolicy 的退出原因要如实写收口，不能报成普通收尾");
   assert.match(chatSrc, /subscribe\("harness"/, "开关能被工具关掉：不订阅就会留下假开关");
+}
+
+// ── Continue Autopilot：末轮不松手的接线与话术 ─────────────────
+// 判据要钉的是"追加预算这件事只有一条通道、一处配额、一个上限"：
+// 政策侧算额度、kernel 侧动循环上限，两边各写一半就可能出现"提醒发了但循环已经散了"。
+{
+  const storeSrc = readFileSync(new URL("../frontend/js/store.js", import.meta.url), "utf8");
+  const chatSrc = readFileSync(new URL("../frontend/js/components/chat.js", import.meta.url), "utf8");
+  const kernelSrc = readFileSync(new URL("../frontend/js/services/agent_loop.js", import.meta.url), "utf8");
+  const htmlSrc = readFileSync(new URL("../frontend/index.html", import.meta.url), "utf8");
+  const appSrc = readFileSync(new URL("../frontend/js/app.js", import.meta.url), "utf8");
+  const dictSrc = readFileSync(new URL("../frontend/js/services/i18n_dict.js", import.meta.url), "utf8");
+  const mchatSrc = readFileSync(new URL("../frontend/js/mobile/m-chat.js", import.meta.url), "utf8");
+
+  assert.match(chatSrc, /const AUTOPILOT_CONTINUE_GRANT = 8;/, "末轮续跑每次追加的轮数偏离基线");
+  assert.match(chatSrc, /const AUTOPILOT_CONTINUE_MAX = 3;/, "末轮续跑的追加次数偏离基线");
+  const grantFn = /function takeContinueAutopilotGrant\(run\) \{([\s\S]*?)\n\}/.exec(chatSrc);
+  assert.ok(grantFn, "末轮续跑的判定必须收在一个函数里：两处触顶路径各算一份配额迟早对不上");
+  const grantBody = grantFn[1];
+  assert.match(grantBody, /state\.continueAutopilot !== true/, "设置开关必须能一票否决续跑");
+  assert.match(grantBody, /extra\.loopExit \|\| run\.exitKind === "done"/, "已显式收口/已走完完成通道的不得再催它继续");
+  assert.match(grantBody, /extra\.continueGrants >= AUTOPILOT_CONTINUE_MAX/, "追加次数要有界：止损线可以推后，不能抹掉");
+  assert.match(grantBody, /round !== maxRounds - 1/, "只在恰好触顶那一轮追加，中途不许提前给自己加轮数");
+  assert.ok(!/run\.maxRounds\s*(\+?=)/.test(grantBody), "policy 只报预算，放宽循环上限由 kernel 做（两处路径共用同一处落点）");
+
+  // 两条触顶路径都要走到同一个判定：空手停笔（emptyRound）与末轮还在动手（atCap）
+  assert.equal((chatSrc.match(/= takeContinueAutopilotGrant\(run\);/g) || []).length, 2,
+    "末轮续跑应恰好有 emptyRound / atCap 两个入口，多一个就重复追加，少一个就有路径漏掉");
+  assert.match(chatSrc, /kind: "continue_autopilot",\s*\n\s*extend: g\.extend,/, "emptyRound 的 nudge 要把 extend 交给 kernel");
+  assert.match(chatSrc, /atCap\(run\) \{[\s\S]{0,1400}?extend: g\.extend,/, "atCap 必须把追加轮数交给 kernel，否则提醒没人执行");
+  assert.match(chatSrc, /atCap\(run\) \{[\s\S]{0,200}?if \(!run\.calls\.length\) return null;/,
+    "空手轮归 emptyRound 管：atCap 再追加一次就是同一轮加两遍预算");
+  assert.ok(!/atCap\(run\) \{[\s\S]{0,900}?hiddenMsg:/.test(chatSrc),
+    "atCap 只放宽轮数：末轮那句回复已在队尾，再塞一条 user 消息会把下一轮直接判死");
+  assert.match(chatSrc, /atCap\(run\) \{[\s\S]{0,700}?hasExplicitSettle\(last\.content\)/,
+    "末轮最后一句已按协议写明【任务完成】的，不能再当作没干完去催促跑");
+
+  // kernel：循环上限读 run.maxRounds，且只在恰好触顶时问一次 policy
+  assert.match(kernelSrc, /for \(let round = 0; round < run\.maxRounds; round\+\+\)/,
+    "循环上限必须读 run.maxRounds，否则 policy 追加的轮数永远不会被走到");
+  assert.match(kernelSrc, /if \(round === run\.maxRounds - 1\) \{[\s\S]{0,700}?policy\.atCap\?\.\(run\)/,
+    "kernel 只在末轮问一次 policy 要不要续跑");
+  assert.match(kernelSrc, /run\.maxRounds \+= grant;/, "kernel 要把 atCap 报的 extend 落到循环上限上");
+  assert.match(kernelSrc, /if \(Number\(r\.extend\) > 0\) run\.maxRounds \+= Number\(r\.extend\);[\s\S]{0,200}?if \(r\.hiddenMsg\) addMessage\(r\.hiddenMsg\);/,
+    "emptyRound 的 extend 要先落账再注入提醒：顺序反了这条催办就成了空话");
+  assert.ok(!/atCap|continueGrants/.test(mchatSrc), "移动端没有末轮续跑：设置项刻意不同步过去，别在 m-chat 里另起一份");
+
+  // 提醒话术（模型可见）：二选一要说清，还要把剩余清单念出来
+  const reminderFn = /function continueAutopilotReminderText\(g\) \{([\s\S]*?)\n\}/.exec(chatSrc);
+  assert.ok(reminderFn, "续跑话术收在一个函数里：两条路径念的是同一份内容");
+  assert.match(reminderFn[1], /不要停笔等用户说"继续"/, "话术要明说别等用户再发继续——这正是这个功能要消灭的动作");
+  assert.match(reminderFn[1], /【任务完成】/, "话术要给完成通道：不然模型只知道继续干活，不知道何时算完");
+  assert.match(reminderFn[1], /getTodoLoopState\(\)\.pending/, "话术要念出清单剩余项：只让它继续，等于要它重新规划一遍");
+  assert.ok(!/\bt\(/.test(reminderFn[1]), "模型可见字符串不经 t()（约定：t() 只包用户可见文本）");
+
+  // 开关的存储与回显：只存本机
+  assert.match(storeSrc, /continueAutopilot: true,/, "Continue Autopilot 默认开启：默认关就等于没做这个功能");
+  assert.match(storeSrc, /continueAutopilot: state\.continueAutopilot !== false,/, "本机持久化要写 builder");
+  assert.match(storeSrc, /state\.continueAutopilot = data\.continueAutopilot !== false;/, "loadPersistent 要读回开关（老状态文件回落默认开）");
+  const shared = /function getSharedPersistentData[\s\S]*?\n\}/.exec(storeSrc)?.[0] || "";
+  assert.ok(!shared.includes("continueAutopilot"), "这条偏好只存本机：末轮续跑只有桌面循环实现，同步过去就是个不兑现的开关");
+  assert.match(htmlSrc, /<input id="setting-continue-autopilot" type="checkbox" checked>/, "设置页缺少 Continue Autopilot 开关");
+  assert.match(appSrc, /getElementById\("setting-continue-autopilot"\)\.checked = state\.continueAutopilot !== false;/, "设置页不回显开关");
+  assert.match(appSrc, /state\.continueAutopilot = e\.target\.checked;[\s\S]{0,60}?savePersistent\(\);/, "开关变更没有落盘");
+  assert.match(dictSrc, /"\{m\} · Continue Autopilot 追加 \{x\} 轮（第 \{k\}/, "进度文案缺英文词条");
+  assert.match(dictSrc, /"Continue Autopilot（Autopilot \/ 目标模式用完轮数上限时/, "设置项文案缺英文词条");
 }
 
 console.log("agent_common.js 输出与基线逐字全等：通过");

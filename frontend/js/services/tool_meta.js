@@ -9,8 +9,10 @@
  * （git / node / curl…）挑对应品牌图标，命令行 / 文件 / 工具三类行共用这套识别链。
  */
 
-import { TOOLS } from "./tools.js?v=20260922-002";
-import { t } from "./i18n.js?v=20260922-002";
+import { TOOLS } from "./tools.js?v=20260922-005";
+import { t } from "./i18n.js?v=20260922-005";
+import { state } from "../store.js?v=20260922-005";
+import { mcpIconKeyFromTool } from "./mcp_logos.js?v=20260922-005";
 
 const SUMMARY_MAX = 60;
 
@@ -345,12 +347,14 @@ export function commandOf(name, params) {
   return { ...head, command, segments: segments.length ? segments : [fallback] };
 }
 
-/** 工具图标：技能名优先，远程 MCP 用插头，未知用通用工具图标 */
+/** 工具图标：技能名优先，远程 MCP 认品牌 mark（认不出落 MCP 官方 mark），未知用通用工具图标 */
 export function toolIcon(name, args) {
   const key = name === "skill_run" ? String(args?.skill || "") : String(name || "");
   if (!key) return "tool";
   if (TOOL_ICONS[key]) return TOOL_ICONS[key];
-  return key.startsWith("mcp__") ? "plug" : "tool";
+  // 远程工具的名号是 mcp__<serverId>__<tool>：id 认不出品牌，得回到 Server 的名称与 URL
+  if (key.startsWith("mcp__")) return mcpIconKeyFromTool(key, state.skills?.remoteTools);
+  return "tool";
 }
 
 /** 文件图标：按扩展名派生，无扩展名时按目录/文件区分 */

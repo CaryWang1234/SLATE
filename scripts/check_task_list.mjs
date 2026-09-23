@@ -5,8 +5,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 // 导入必须带与前端一致的 ?v= 串：少了它 Node 里会另起一份模块实例
-import * as tl from "../frontend/js/services/task_list.js?v=20260922-002";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260922-002";
+import * as tl from "../frontend/js/services/task_list.js?v=20260922-005";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260922-005";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
 const NOW_MS = 1_800_000_000_000;

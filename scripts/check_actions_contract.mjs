@@ -162,7 +162,7 @@ assert.equal(buildBody.split("systemContent += getActionsSystemPrompt();").lengt
 assert.match(STORE_SRC, /actions: \[\]/, "state 要有 actions 快照");
 assert.match(STORE_SRC, /actionsBroken: \[\]/, "解析失败的文件也要进状态，面板才有的可显示");
 assert.match(STORE_SRC, /function setActions\(data\)[\s\S]*?notify\("actions"/, "setActions 要 notify，面板订阅才生效");
-assert.match(STORE_SRC, /setConstitution, setSkills, setActions/, "setActions 要导出");
+assert.ok(/export \{[^}]*\bsetActions\b[^}]*\}/.test(STORE_SRC), "setActions 要导出");
 const persistentBody = STORE_SRC.slice(
   STORE_SRC.indexOf("function buildPersistentData()"),
   STORE_SRC.indexOf("function savePersistent()"),

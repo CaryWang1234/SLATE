@@ -9,10 +9,10 @@
  * 用桩件驱动真 kernel（不复制实现），在 Node 侧跑，不依赖浏览器。
  */
 import assert from "node:assert/strict";
-import { state, addMessage } from "../frontend/js/store.js?v=20260922-002";
-import { _pendingToolMsgs } from "../frontend/js/services/agent_common.js?v=20260922-002";
-import { createAgentLoop } from "../frontend/js/services/agent_loop.js?v=20260922-002";
-import { projectChat, projectSteps } from "../frontend/js/services/agent_ledger.js?v=20260922-002";
+import { state, addMessage } from "../frontend/js/store.js?v=20260922-005";
+import { _pendingToolMsgs } from "../frontend/js/services/agent_common.js?v=20260922-005";
+import { createAgentLoop } from "../frontend/js/services/agent_loop.js?v=20260922-005";
+import { projectChat, projectSteps } from "../frontend/js/services/agent_ledger.js?v=20260922-005";
 
 const c1 = [{ name: "read", params: { p: 1 } }];
 const c2 = [{ name: "write", params: { p: 2 } }];
@@ -122,11 +122,30 @@ function makeStubs(scenario) {
       },
       emptyRound(run) {
         trace.push(`emptyRound(round=${run.round},stall=${run.stallStreak},ok=${run.successfulTool})`);
+        // 复刻桌面 policy 的末轮续跑：只有恰好触顶那一轮给预算，且次数封顶
+        if (scenario.emptyGrant && run.round === run.maxRounds - 1 && (run.extra.emptyGrants || 0) < scenario.emptyGrant.max) {
+          run.extra.emptyGrants = (run.extra.emptyGrants || 0) + 1;
+          trace.push("emptyCapGrant");
+          return {
+            action: "nudge",
+            kind: "continue_autopilot",
+            extend: scenario.emptyGrant.extend,
+            hiddenMsg: { role: "user", model: "[continue_autopilot]", content: `empty-cap-${run.extra.emptyGrants}`, hidden: true },
+          };
+        }
         if (run.stallStreak < (scenario.warnAfter ?? 1)) {
           return { action: "nudge", hiddenMsg: { role: "user", model: "[stall_warn]", content: `warn-${run.stallStreak}`, hidden: true } };
         }
         return { action: "break", exitReason: `stalled-${run.stallStreak}` };
       },
+      ...(scenario.capGrant ? { atCap(run) {
+        const used = run.extra.capGrants || 0;
+        trace.push(`atCap(round=${run.round},cap=${run.maxRounds},used=${used})`);
+        if (used >= scenario.capGrant.max) return null;
+        run.extra.capGrants = used + 1;
+        // 与桌面 policy 同形：atCap 只报预算与进度，不塞消息（塞了会把下一轮的队尾守卫打崩）
+        return { extend: scenario.capGrant.extend, kind: "continue_autopilot", progressText: `cap-progress-${used + 1}` };
+      } } : {}),
       progressForRound(run) {
         return run.extra?.progress ? `round-${run.round + 1}` : undefined;
       },
@@ -355,6 +374,42 @@ async function expectReject(scenario) {
   appearsInOrder(trace, ["detect(0)", "cardsBegin(1)", "commit(1)", "feeds(1)", "turn(0)"], "稀疏 policy 骨架");
   assert.equal(run.round, 0, trace.join(" | "));
   assert.equal(_pendingToolMsgs.size, 0, "缺 policy.finish 也要解除渲染抑制");
+}
+
+// ── 13. 末轮续跑（atCap）：policy 报 extend 时 kernel 放宽上限并注入提醒，配额用完才散场
+{
+  const alt = [
+    { seq: 0, calls: c1 }, { seq: 1, calls: c2 }, { seq: 2, calls: c1 }, { seq: 3, calls: c2 },
+    { seq: 4, calls: c1 }, { seq: 5, calls: c2 }, { seq: 6, calls: c1 }, { seq: 7, calls: c2 },
+  ];
+  const { trace, run, ledger } = await runLoop({
+    rounds: alt, maxRounds: 3, extra: { capGrants: 0 }, capGrant: { extend: 2, max: 2 },
+  });
+  assert.deepEqual(trace.filter(t2 => t2.startsWith("atCap(")), [
+    "atCap(round=2,cap=3,used=0)", "atCap(round=4,cap=5,used=1)", "atCap(round=6,cap=7,used=2)",
+  ], "atCap 只在恰好触顶那一轮问一次\n" + trace.join(" | "));
+  assert.equal(run.maxRounds, 7, "两次各追加 2 轮：上限 3 → 5 → 7");
+  assert.equal(run.round, 6, "第三次触顶不再追加，循环在该轮之后散场");
+  assert.equal(count(trace, "turn("), 7, "追加的轮数必须真的被走到，否则提醒是空话");
+  assert.equal(count(trace, "execute("), 7, trace.join(" | "));
+  assert.equal(count(trace, "progress(cap-progress-"), 2, trace.join(" | "));
+  assert.equal(state.messages.filter(m => m.model === "[continue_autopilot]").length, 0,
+    "atCap 只放宽轮数：往队尾塞一条 user 消息会让下一轮的「队尾须是待处理回复」守卫直接散场");
+  assert.equal(count(trace, "emit(notice"), 2, "续跑要在账本里留 notice（黑板/星图看得见它为什么多跑了）");
+  assert.equal(ledger.events.filter(e => e.type === "notice" && String(e.data?.text || "").includes("cap-progress-1")).length, 1, trace.join(" | "));
+}
+
+// ── 14. 末轮续跑（emptyRound.extend）：先抬上限，再走催办通道
+{
+  const { trace, run } = await runLoop({
+    rounds: [{ seq: 0, calls: [] }], maxRounds: 2, extra: {}, warnAfter: 99, emptyGrant: { extend: 1, max: 1 },
+  });
+  assert.equal(count(trace, "emptyCapGrant"), 1, "只在触顶那一轮给预算：" + trace.join(" | "));
+  assert.equal(run.maxRounds, 3, "emptyRound 的 extend 要落到循环上限");
+  assert.equal(count(trace, "emptyRound"), 3, trace.join(" | "));
+  assert.equal(count(trace, "turn("), 3, "多给的那一轮必须真的跑掉");
+  const reminders = state.messages.filter(m => m.model === "[continue_autopilot]");
+  assert.deepEqual(reminders.map(m => m.content), ["empty-cap-1"], "配额只有 1 次，第二次触顶不再注入");
 }
 
 console.log("agent_loop.js 骨架语义守卫：通过");

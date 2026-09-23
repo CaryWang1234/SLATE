@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260922-002";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260922-002";
+import { makeId } from "./services/utils.js?v=20260922-005";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260922-005";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -128,6 +128,12 @@ const state = {
     maxRounds: HARNESS_MAX_ROUNDS,
   },
 
+  // Continue Autopilot：自主推进跑到轮数上限时，若任务还没干完，提醒模型继续并
+  // 有界地追加轮数预算——把"用户手动再发一遍继续"换成系统自己开口。
+  // 只存本机：这条偏好只有桌面循环兑现得了（移动端 m-chat 的 policy 没有末轮续跑），
+  // 同步到手机只会显示"已开启"却不做事。
+  continueAutopilot: true,
+
   // 任务完成通知：音效 + 系统通知
   notifications: {
     soundEnabled: true,
@@ -196,7 +202,8 @@ function buildPersistentData() {
     memories: state.memories,
     userProfile: state.userProfile,
     promptSnippets: state.promptSnippets,
-    lastProjectPath: state.project?.path || null,
+    // 工作区记宿主目录：记当前根的话，下次启动会被当成普通单目录项目重新打开，工作区身份就丢了
+    lastProjectPath: state.project?.workspace_dir || state.project?.path || null,
     conversationUsage: state.conversationUsage,
     conversationTodos: state.conversationTodos,
     taskFlags: state.taskFlags,
@@ -208,6 +215,9 @@ function buildPersistentData() {
     outputSettings: state.outputSettings,
     fileOutput: state.fileOutput,
     harness: state.harness,
+    // 只存本机：下面 getSharedPersistentData 刻意不收它——末轮续跑只有桌面循环实现，
+    // 同步到手机只会多一个"显示已开启却不兑现"的开关
+    continueAutopilot: state.continueAutopilot !== false,
     notifications: state.notifications,
     knowledgeSettings: state.knowledgeSettings,
     activeExpertId: state.activeExpertId,
@@ -436,6 +446,8 @@ function loadPersistent() {
     // 旧版本持久化的 maxRounds=20/50 统一提到当前上限：上限只放宽不收紧，
     // 收到低于上限的值就等于把"多给的预算"又悄悄拿走了
     if ((state.harness.maxRounds || 0) < HARNESS_MAX_ROUNDS) state.harness.maxRounds = HARNESS_MAX_ROUNDS;
+    // 老状态文件没这个键：读成 undefined 时按默认值（开启）走
+    state.continueAutopilot = data.continueAutopilot !== false;
     state.notifications = {
       ...state.notifications,
       ...(data.notifications || {}),
@@ -680,12 +692,32 @@ function setModelContextCap(modelId, tokens) {
 }
 
 // 生效预算：这一条同时喂给上下文条与自动压缩阈值，两边不再是两个数。
-// 自动档沿用全局「上下文 Token 上限」（今天压缩阈值就是它，只是以前上下文条没跟着它走）。
-// 再按模型标称窗口封顶：滑杆能选到 1M，不代表 32K 的本地模型真能吃下 1M。
+// 「自动」= 这个模型自己的默认上限（见 defaultContextCap）：1M 窗口的模型默认 800K、
+// 256K 的默认 200K，而不是所有模型共用全局那一个 64K。只有标称窗口缺失或小到凑不满
+// 一档的模型（自定义 / 本地），才沿用全局「上下文 Token 上限」，再按窗口封顶。
 function contextBudgetOf(modelId) {
-  const cap = getContextCap(modelId) || (parseInt(state.maxTokens, 10) > 0 ? parseInt(state.maxTokens, 10) : CONTEXT_CAP_FALLBACK);
   const declared = declaredContextWindow(modelId);
-  return declared > 0 ? Math.min(cap, declared) : cap;
+  const manual = getContextCap(modelId);
+  if (manual) return declared > 0 ? Math.min(manual, declared) : manual;
+  const perModel = defaultContextCap(modelId);
+  if (perModel) return perModel;
+  const global = parseInt(state.maxTokens, 10) > 0 ? parseInt(state.maxTokens, 10) : CONTEXT_CAP_FALLBACK;
+  return declared > 0 ? Math.min(global, declared) : global;
+}
+
+// 每模型默认上限：按标称窗口留两成余量（上下文塞到刚好等于窗口，第一条回复就没地方写了），
+// 再向下吸附到滑杆档位——默认值必须是滑杆表达得出来的数，否则"自动"和拖到同一档不等价。
+const CONTEXT_HEADROOM_RATIO = 0.8;
+
+function defaultContextCap(modelId) {
+  const declared = declaredContextWindow(modelId);
+  if (!(declared > 0)) return 0;
+  const room = Math.floor(declared * CONTEXT_HEADROOM_RATIO);
+  let best = 0;
+  for (const stop of CONTEXT_CAP_STOPS) {
+    if (stop > 0 && stop <= room && stop > best) best = stop;
+  }
+  return best;
 }
 
 // 模型标称窗口：只做展示（预算小于它时，界面要告诉用户模型本身能吃多少）
@@ -909,6 +941,20 @@ function setConstitution(data) {
   notify("constitution", data);
 }
 
+// 全局宪法与项目宪法是两份东西，各存各的：state.constitution 永远只表示本机全局那份，
+// 生效哪一份由这里现算。以前是"打开项目就把 state.constitution 换成项目的"，于是
+// 关掉项目后它的规则还在给无项目的对话用，切到一个没写宪法的项目又沿用上一个项目的。
+function effectiveConstitution() {
+  const own = state.project?.constitution;
+  return own && typeof own === "object" ? own : state.constitution;
+}
+
+/** 这份宪法改下去会落到哪儿：设置页要写清楚，不然用户以为改的是全局 */
+function constitutionScope() {
+  const own = state.project?.constitution;
+  return own && typeof own === "object" ? "project" : "global";
+}
+
 function setSkills(data) {
   state.skills = data;
   notify("skills", data);
@@ -926,13 +972,9 @@ function setActions(data) {
 
 function setProject(data) {
   state.project = data;
-  if (data) {
-    savePersistent();
-    // 如果项目有自己的宪法，覆盖全局宪法
-    if (data.constitution) {
-      setConstitution(data.constitution);
-    }
-  }
+  // 项目的宪法留在 state.project 上，由 effectiveConstitution() 现算：
+  // 这里曾经直接覆写 state.constitution，关项目/换项目时没人还原，规则会串台。
+  if (data) savePersistent();
   notify("project", data);
 }
 
@@ -1054,7 +1096,7 @@ function setModelRegistry(registry) {
 export {
   API_BASE, state, subscribe, notify,
   setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel,
-  CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, isContextCapManual, fmtContextTokens,
+  CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, isContextCapManual, fmtContextTokens,
   setActiveExpertId,
   setChatMode, setReasoningEffort, normalizeChatMode, normalizeReasoningEffort,
   setHarnessEnabled, requestLoopExit, takeLoopExit,
@@ -1065,7 +1107,7 @@ export {
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage,
   setConversations, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,
-  setConstitution, setSkills, setActions, setModelRegistry,
+  setConstitution, effectiveConstitution, constitutionScope, setSkills, setActions, setModelRegistry,
   setProject, setProjectFileTree,
   setMemories, addMemory, updateMemory, removeMemory,
   setUserProfile, resetUserProfile,
