@@ -7,19 +7,20 @@
 
 import {
   state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit, effectiveConstitution,
-} from "../store.js?v=20260922-005";
-import { fmtTokens } from "../services/usage.js?v=20260922-005";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260922-005";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260922-005";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260922-005";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260922-005";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260922-005";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260922-005";
-import { toolLabel } from "../services/tool_meta.js?v=20260922-005";
-import { renderMarkdown } from "../services/markdown.js?v=20260922-005";
-import { mToast, t } from "./m-ui.js?v=20260922-005";
-import { mHandleStructured } from "./m-auth.js?v=20260922-005";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260922-005";
+} from "../store.js?v=20260922-006";
+import { fmtTokens } from "../services/usage.js?v=20260922-006";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260922-006";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260922-006";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260922-006";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260922-006";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260922-006";
+import { hasBgEvents, takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20260922-006";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260922-006";
+import { toolLabel } from "../services/tool_meta.js?v=20260922-006";
+import { renderMarkdown } from "../services/markdown.js?v=20260922-006";
+import { mToast, t } from "./m-ui.js?v=20260922-006";
+import { mHandleStructured } from "./m-auth.js?v=20260922-006";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260922-006";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -360,6 +361,16 @@ const mobilePolicy = {
     // 模型调过收口工具后给出的最终汇报：退出原因要如实写，别报成普通收尾
     if (run?.extra?.loopExit) {
       return { action: "break", exitReason: `模型已调 ${run.extra.loopExit.mode === "target" ? "exit_target_mode" : "exit_autopilot"} 收口` };
+    }
+    // 后台任务的消息到了：移动端不自己开新一场（没有空闲续跑），但在跑的循环里
+    // 照样把消息交给模型——事件取走即清，一条事件最多唤醒一次，不会自转。
+    if (hasBgEvents()) {
+      const events = takeBgEvents();
+      return {
+        action: "nudge",
+        kind: "bg_event",
+        hiddenMsg: { role: "user", content: bgWakeText(events), model: "[bg_task]", hidden: true },
+      };
     }
     return { action: "break" }; // 模型收尾，无工具调用
   },
@@ -756,6 +767,9 @@ export function initMChat() {
     if (_generating) return;
     mRenderAllMessages();
   });
+  // 后台任务：移动端不进面板，但至少要轮询，才能把事件交给在跑的循环。
+  // 空态时它自己退到 20 秒慢探，不会一直打后端。
+  startBgPolling();
 }
 
 export { t };

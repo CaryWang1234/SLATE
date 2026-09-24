@@ -7407,6 +7407,146 @@ img.file-type-icon {
   color: #c0392b;
 }
 
+/* ── 后台终端任务面板（与 TODOLIST 同栏并列；没任务时整栏不出现） ─── */
+
+.bg-task-panel {
+  /* 比 TODOLIST 宽一点：命令与输出都是长字符串，太窄只能看成一串省略号 */
+  width: 320px;
+}
+
+.bg-task-body {
+  gap: 8px;
+}
+
+.bg-task-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.bg-task-running {
+  border-color: var(--gold);
+}
+
+.bg-task-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bg-task-icon {
+  flex-shrink: 0;
+  width: 14px;
+  color: var(--text-muted);
+}
+
+.bg-task-running .bg-task-icon {
+  color: var(--gold);
+}
+
+.bg-task-label {
+  flex: 1;
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bg-task-meta {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.bg-task-cmd {
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bg-task-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.bg-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.bg-icon-btn:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.bg-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.bg-icon-danger:hover {
+  color: #c0392b;
+  border-color: #c0392b;
+}
+
+.bg-icon-btn .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.bg-task-output {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  max-height: 240px;
+  overflow: auto;
+  background: var(--bg-alt);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.bg-panel-spacer {
+  flex: 1;
+}
+
+/* 顶栏那颗入口上的在册任务数（0 个时不显示，靠 :empty 收掉） */
+#btn-bg-tasks {
+  position: relative;
+}
+
+.bg-rail-count {
+  margin-left: 2px;
+  font-size: 10px;
+  color: var(--gold);
+}
+
+.bg-rail-count:empty {
+  display: none;
+}
+
 /* ── 定时任务 ─────────────────────── */
 
 .schedule-prompt {

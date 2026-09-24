@@ -413,11 +413,11 @@
         </div>
         <div class="chapter-body">
           <div class="lang-zh">
-            <p>SLATE（砚）是一款<strong>本地优先</strong>的 AI 协作调度台。它把主流大模型、34 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。</p>
+            <p>SLATE（砚）是一款<strong>本地优先</strong>的 AI 协作调度台。它把主流大模型、35 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。</p>
             <div class="ink-note"><strong>核心理念：</strong>让灵感直达行动，中间不隔工具摩擦。</div>
           </div>
           <div class="lang-en">
-            <p>SLATE is a <strong>local-first</strong> AI collaboration studio. It integrates mainstream LLMs, 34 built-in tools, team debates, DAG workflows, and whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.</p>
+            <p>SLATE is a <strong>local-first</strong> AI collaboration studio. It integrates mainstream LLMs, 35 built-in tools, team debates, DAG workflows, and whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.</p>
             <div class="ink-note"><strong>Core philosophy:</strong> Let ideas go straight to action, without tool friction in between.</div>
           </div>
         </div>
@@ -654,7 +654,7 @@ python desktop.py</pre>
       <!-- Ch8 -->
       <div class="scroll-section" id="ch8">
         <div class="chapter-title"><span class="chapter-num">8</span>
-          <span class="lang-zh">工具箱（34 个）</span><span class="lang-en">Toolbox (34 Tools)</span>
+          <span class="lang-zh">工具箱（35 个）</span><span class="lang-en">Toolbox (35 Tools)</span>
         </div>
         <div class="chapter-body">
           <div class="lang-zh">
@@ -662,7 +662,7 @@ python desktop.py</pre>
             <table class="ink-table">
               <tr><th>类别</th><th>工具</th></tr>
               <tr><td>文件操作</td><td><code>file_tree</code> <code>file_peek</code> <code>file_create</code> <code>file_edit</code> <code>file_append</code></td></tr>
-              <tr><td>终端</td><td><code>terminal</code>（沙箱执行，高危需审批）</td></tr>
+              <tr><td>终端</td><td><code>terminal</code>（沙箱执行，高危需审批） <code>bg_task</code>（后台终端任务：起了就返回，不占住对话）</td></tr>
               <tr><td>检索与代码</td><td><code>code_search</code> <code>code_scan</code> <code>doc_scan</code> <code>repo_stats</code> <code>todo_scan</code> <code>python_api_extract</code></td></tr>
               <tr><td>文档生成</td><td><code>doc_write</code> <code>ppt_create</code> <code>word_create</code> <code>html_render</code> <code>html_bundle</code></td></tr>
               <tr><td>办公与 PDF</td><td><code>excel_tool</code> <code>pdf_tool</code></td></tr>
@@ -675,6 +675,7 @@ python desktop.py</pre>
             </table>
             <p><strong>特殊字符与编码：</strong><code>file_peek</code> / <code>file_edit</code> 自动识别 UTF-8、UTF-8 BOM、GB18030、GBK、UTF-16 等常见文本编码；中文、emoji、全角符号会原样保留。Windows 下 <code>terminal</code> 隐藏 PowerShell 子窗口，并对 Python / Node / Git / npm / rg 等原生命令做 Unicode-safe 输出捕获。</p>
             <p><strong>Windows 命令语义：</strong>一条命令一个 PowerShell 进程，命令正文经 stdin 送入并整体按脚本解析——多行块（<code>foreach</code> / <code>if</code>）直接执行，不会因为缺一个空行而石沉大海；<code>&amp;&amp;</code> 与 <code>||</code> 在 PowerShell 5.1 上自动翻成 <code>if ($?)</code> 嵌套；语法错误原样返回并把退出码标成失败，不会再出现「报成功但什么都没跑」。会话仍保持 <code>cd</code> 与环境变量（PowerShell 变量不跨命令），交互式 REPL（裸 <code>python</code> / <code>node</code>）拿不到输入会立刻退出，不会拖住在跑的任务。</p>
+            <p><strong>后台终端任务：</strong>跑实验服务器后端、编译、训练、长测试这类耗时的活儿交给 <code>bg_task</code>：<code>action=start</code> 起完立刻返回（带上 pid、开头一小段输出和日志路径），进程在后台继续跑，模型不会为了等它而反复轮询——要结果用 <code>action=status</code> / <code>log</code> 主动问，或者起任务时带上 <code>notify=true</code>，任务结束/命中你给的正则（<code>trigger={on:"match", pattern:"..."}</code>）时系统会把事件和输出尾巴送回对话里叫醒模型；<code>action=stop</code> 杀整棵进程树，「停止」不是只杀一个壳。任务寿命等于 SLATE 后端进程的寿命，日志落在 <code>data/bg_tasks/&lt;id&gt;.log</code>；右栏会有「后台任务」面板，状态、输出、停止按钮都在那儿，没任务时整栏不出现。高危命令走的还是那道审批门——后台不等于免审批。</p>
             <p><strong>Actions 流程说明书：</strong>除了内置工具，你还可以把「干某件事的必要流程」写成一份 <code>data/actions/&lt;id&gt;.yml</code>，让模型按你的流程办事。一份 Action 描述「这件事怎么做」，SKILL.md 描述「怎么装一个外部工具」，两者定位不同、互不覆盖。</p>
             <ul>
               <li>字段：<code>name</code> · <code>description</code> · <code>when</code> · <code>tags</code> · <code>author</code> · <code>inputs</code> · <code>steps</code> · <code>output</code>，<code>steps[].tool</code> 只是建议，模型可按实际情况换用工具</li>
@@ -692,7 +693,7 @@ python desktop.py</pre>
             <table class="ink-table">
               <tr><th>Category</th><th>Tools</th></tr>
               <tr><td>File Ops</td><td><code>file_tree</code> <code>file_peek</code> <code>file_create</code> <code>file_edit</code> <code>file_append</code></td></tr>
-              <tr><td>Terminal</td><td><code>terminal</code> (sandbox, high-risk needs approval)</td></tr>
+              <tr><td>Terminal</td><td><code>terminal</code> (sandbox, high-risk needs approval) <code>bg_task</code> (background terminal task: returns at once, doesn't hold the chat)</td></tr>
               <tr><td>Search &amp; Code</td><td><code>code_search</code> <code>code_scan</code> <code>doc_scan</code> <code>repo_stats</code> <code>todo_scan</code> <code>python_api_extract</code></td></tr>
               <tr><td>Doc Gen</td><td><code>doc_write</code> <code>ppt_create</code> <code>word_create</code> <code>html_render</code> <code>html_bundle</code></td></tr>
               <tr><td>Office &amp; PDF</td><td><code>excel_tool</code> <code>pdf_tool</code></td></tr>
@@ -705,6 +706,7 @@ python desktop.py</pre>
             </table>
             <p><strong>Unicode and encoding:</strong> <code>file_peek</code> / <code>file_edit</code> auto-detect UTF-8, UTF-8 BOM, GB18030, GBK, UTF-16, and other common text encodings. Chinese, emoji, and full-width symbols are preserved as-is. On Windows, <code>terminal</code> hides PowerShell windows and captures Unicode-safe output for native commands such as Python / Node / Git / npm / rg.</p>
             <p><strong>Windows command semantics:</strong> one command, one PowerShell process. The command text is handed over on stdin and parsed as a whole script, so multi-line blocks (<code>foreach</code> / <code>if</code>) run without waiting for a blank line, <code>&amp;&amp;</code> and <code>||</code> are rewritten into <code>if ($?)</code> nesting for PowerShell 5.1, and a syntax error comes back verbatim with a failing exit code instead of "success" plus nothing. The session still keeps <code>cd</code> and environment variables (PowerShell variables do not cross commands), and an interactive REPL (bare <code>python</code> / <code>node</code>) exits immediately instead of holding the task open.</p>
+            <p><strong>Background terminal tasks:</strong> hand the slow jobs to <code>bg_task</code> — experiment server processes, compiles, training runs, long test suites. <code>action=start</code> returns at once (pid, the first slice of output, the log path) while the process keeps running in the background, so the model is told not to poll it: ask with <code>action=status</code> / <code>log</code> when you want a result, or pass <code>notify=true</code> at start time and the system wakes the model with the event plus an output tail when the task ends (or matches your regex via <code>trigger={on:"match", pattern:"..."}</code>). <code>action=stop</code> kills the whole process tree, so "stop" is never a white lie. A task lives exactly as long as the SLATE backend process and its log lands in <code>data/bg_tasks/&lt;id&gt;.log</code>; the right rail carries a Background Tasks panel with state, output and the stop button, and the panel stays away entirely when there is nothing to show. High-risk commands still go through the same approval dialog — background is not a bypass.</p>
             <p><strong>Action Playbooks:</strong> beyond the built-in tools, you can write the required procedure for a task as a <code>data/actions/&lt;id&gt;.yml</code> file and have the model follow it. An Action describes "how this task is done"; a SKILL.md describes "how to install an external tool". The two have different roles and never overwrite each other.</p>
             <ul>
               <li>Fields: <code>name</code> · <code>description</code> · <code>when</code> · <code>tags</code> · <code>author</code> · <code>inputs</code> · <code>steps</code> · <code>output</code>. <code>steps[].tool</code> is advisory — the model may pick a different tool when the situation calls for it</li>
@@ -937,7 +939,7 @@ python desktop.py</pre>
               <tr><td>统一多模型接入</td><td>GPT / Claude / Gemini、DeepSeek / Kimi / Qwen / GLM 等十余家，加自定义 OpenAI 兼容端点与本地模型（Ollama / LM Studio），一个界面随时换「大脑」</td><td><a href="#ch3">3</a></td></tr>
               <tr><td>Agent 自动驾驶 + 目标模式</td><td>普通请求自动进入 Agent 循环，默认 24 轮、宽泛项目任务 40 轮；目标模式是显式 80 轮六阶段循环并强制 TODOLIST；干完了由模型调 <code>exit_autopilot</code> / <code>exit_target_mode</code> 收口；轮数用完而活没干完时 Continue Autopilot 追加轮数并催它继续（可关）</td><td><a href="#ch4">4</a></td></tr>
               <tr><td>磨墨模式</td><td><code>/grind</code> + 一个粗略想法，三阶段追问（接 → 磨 → 收，最多 10 轮）产出含目标、交付物、验收标准的任务书</td><td><a href="#ch5">5</a></td></tr>
-              <tr><td>34 个内置工具</td><td>文件读写编辑、全项目代码检索、Unicode 安全终端、PPT / Word / Excel、PDF 抽取、图表 / 二维码、代码与文档安全扫描、git 信息、联网搜索与抓取、图像视频生成、浏览器与桌面自动化</td><td><a href="#ch8">8</a></td></tr>
+              <tr><td>35 个内置工具</td><td>文件读写编辑、全项目代码检索、Unicode 安全终端、后台终端任务（起了就走，别轮询）、PPT / Word / Excel、PDF 抽取、图表 / 二维码、代码与文档安全扫描、git 信息、联网搜索与抓取、图像视频生成、浏览器与桌面自动化</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>外部 MCP Server</td><td>SSE 传输接入远端 MCP Server，工具自动发现，与内置工具同列展示、同一接口调用；认得出的品牌按 LobeHub 图标显示 logo，认不出的走通用 MCP mark</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>高危命令审批</td><td>23 类高危操作需你确认，灾难性命令无条件阻止，审批弹窗附带 AI 对这条命令用途的解释</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>全沙箱安全</td><td>路径校验 + 高危规则拦截 + 独立数据目录，删除与覆盖前先给看清楚</td><td><a href="#ch16">16</a></td></tr>
@@ -996,7 +998,7 @@ python desktop.py</pre>
               <tr><td>Unified multi-model access</td><td>GPT / Claude / Gemini, DeepSeek / Kimi / Qwen / GLM and more, plus custom OpenAI-compatible endpoints and local models (Ollama / LM Studio) — switch brains mid-conversation</td><td><a href="#ch3">3</a></td></tr>
               <tr><td>Agent Autopilot + Target Mode</td><td>Ordinary requests enter an agent loop automatically: 24 rounds by default, 40 for broad project tasks; Target Mode is the explicit 80-round six-phase loop with enforced TODOLIST; finished work closes via <code>exit_autopilot</code> / <code>exit_target_mode</code>; when rounds run out with work still open, Continue Autopilot tops up the budget and nudges it on (toggleable)</td><td><a href="#ch4">4</a></td></tr>
               <tr><td>Grind Mode</td><td>Type <code>/grind</code> with a rough idea; three-phase questioning (Receive → Grind → Collect, up to 10 rounds) yields a brief with goals, deliverables and acceptance criteria</td><td><a href="#ch5">5</a></td></tr>
-              <tr><td>34 built-in tools</td><td>File read/write/edit, project-wide code search, Unicode-safe terminal, PPT / Word / Excel, PDF extraction, charts &amp; QR codes, code and document security scans, git info, web search &amp; scraping, image &amp; video generation, browser and desktop automation</td><td><a href="#ch8">8</a></td></tr>
+              <tr><td>35 built-in tools</td><td>File read/write/edit, project-wide code search, Unicode-safe terminal, background terminal tasks (start and walk away, get woken when they end), PPT / Word / Excel, PDF extraction, charts &amp; QR codes, code and document security scans, git info, web search &amp; scraping, image &amp; video generation, browser and desktop automation</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>External MCP Server</td><td>Connect remote MCP Servers over SSE; remote tools are auto-discovered and listed beside built-ins, called through the same interface. Recognised brands show their LobeHub mark, everything else falls back to the generic MCP glyph</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>High-risk command approval</td><td>23 categories of risky operations need your confirmation, catastrophic commands are blocked unconditionally, and the popup carries the AI's explanation of what the command does</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>Sandbox security</td><td>Path validation plus rule-based command interception and an isolated data directory — deletion and overwrite get shown to you first</td><td><a href="#ch16">16</a></td></tr>

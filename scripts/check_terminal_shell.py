@@ -78,6 +78,11 @@ ok("外壳里没有模型命令的插值位",
    "command" not in WRAP and "$__slateCode" in WRAP, WRAP[:120])
 ok("主体从 stdin 读入并运行时解析",
    "[Console]::In.ReadToEnd()" in WRAP and "[ScriptBlock]::Create($__slateCode)" in WRAP)
+ok("首 token 是引号路径时回退到调用运算符 & 再解析一次",
+   "[ScriptBlock]::Create('& ' + $__slateCode)" in WRAP
+   and 'Write-Output ("[PARSE_ERROR] " + $__slateParseErr)' in WRAP
+   and "$__slateParseErr = $_.Exception.Message" in WRAP,
+   "找不到 '& ' 回退链，或首个错误被第二次解析的错误顶掉")
 ok("外壳经 -EncodedCommand 传入（不过任何 shell 解析）",
    _powershell_argv(WRAP)[1:5] == ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand"],
    str(_powershell_argv(WRAP)[:6]))

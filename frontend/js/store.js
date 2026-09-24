@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260922-005";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260922-005";
+import { makeId } from "./services/utils.js?v=20260922-006";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260922-006";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -64,6 +64,10 @@ const state = {
   // 与 taskFlags 同理只存本机——"这一栏占不占我的屏幕"是这台设备的事，
   // 手机遥控同步过去只会把桌面的布局偏好盖到一块根本不长这样的屏上。
   todoPanelOpen: true,
+
+  // 后台任务面板是否展开。刻意不落盘：这一栏是"有任务才出现"的，跨重启记住"上次收起了"
+  // 只会让新任务静悄悄地被藏起来
+  bgPanelOpen: true,
 
   // 模型列表
   modelRegistry: {},
@@ -169,6 +173,15 @@ const state = {
   // 联网搜索配置：engine=auto（Bing+DDG 合并）/ bing / ddg；renderJs=auto（正文过短自动渲染）/ on / off
   webSearch: { engine: "auto", renderJs: "auto" },
 
+  // 后台终端任务（services/bg_tasks.js 轮询写入；任务本体活在后端进程里，这里只是快照）
+  bgTasks: [],
+  // 后端送来但还没被消费的事件（模型唤醒用；消费即清空）
+  bgTaskEvents: [],
+  // 空闲自动续跑：任务还在跑、模型已经收工时，允许系统自己把话头接回去（每对话有次数上限）
+  bgAutoResume: true,
+  // 每对话已用掉几次自动续跑（convId → 次数），防"活一直干不完"时无限自转
+  bgResumeUsed: {},
+
   // 媒体生成配置：未配置 model / api_key 时对应工具（image_gen / video_gen）不可用
   imageGen: { model: "", base_url: "https://api.openai.com/v1", api_key: "" },
   videoGen: { model: "", base_url: "https://api.openai.com/v1", api_key: "" },
@@ -229,6 +242,10 @@ function buildPersistentData() {
     webSearch: normalizeWebSearch(state.webSearch),
     imageGen: normalizeGenConfig(state.imageGen),
     videoGen: normalizeGenConfig(state.videoGen),
+    // 后台任务本身与事件不落盘：任务活在后端进程里，重启后这些快照全无意义
+    // （日志文件仍在 data/bg_tasks/）。开关与"已续跑几次"是用户偏好/配额，要跨重启。
+    bgAutoResume: state.bgAutoResume !== false,
+    bgResumeUsed: normalizeCountMap(state.bgResumeUsed),
   };
 }
 
@@ -323,6 +340,17 @@ function normalizeGenConfig(value) {
     base_url: typeof v.base_url === "string" && v.base_url.trim() ? v.base_url.trim() : "https://api.openai.com/v1",
     api_key: typeof v.api_key === "string" ? v.api_key : "",
   };
+}
+
+/** 计数表（convId → 非负整数）：坏值一律丢掉，别让脏数据把配额算成负数 */
+function normalizeCountMap(value) {
+  const v = value && typeof value === "object" ? value : {};
+  const out = {};
+  for (const [k, n] of Object.entries(v)) {
+    const num = Number(n);
+    if (k && Number.isFinite(num) && num > 0) out[k] = Math.floor(num);
+  }
+  return out;
 }
 
 function saveLocalPersistent(data = buildPersistentData()) {
@@ -425,6 +453,8 @@ function loadPersistent() {
     state.taskFlags = normalizeTaskFlags(data.taskFlags);
     state.taskListSort = normalizeTaskListSort(data.taskListSort);
     state.todoPanelOpen = data.todoPanelOpen !== false;
+    state.bgAutoResume = data.bgAutoResume !== false;
+    state.bgResumeUsed = normalizeCountMap(data.bgResumeUsed);
     state.maxTokens = Math.max(1000, parseInt(data.maxTokens) || 64000);
     state.modelContextCaps = normalizeContextCaps(data.modelContextCaps);
     state.autoReview = {
@@ -881,6 +911,34 @@ function addUsage(usage) {
   notify("usage", state.usage);
 }
 
+// ── 后台任务：空闲自动续跑开关与配额 ─────────────────────────
+
+/** 全局开关：任务还在跑、模型已收工时，是否允许系统自己把话头接回去 */
+function setBgAutoResume(enabled) {
+  const next = enabled !== false;
+  if ((state.bgAutoResume !== false) === next) return false;
+  state.bgAutoResume = next;
+  savePersistent();
+  notify("bgAutoResume", next);
+  return true;
+}
+
+/** 该对话已用掉几次自动续跑（配额由 services/agent_loop.js 判定） */
+function bgResumeUsedOf(convId) {
+  const n = Number((state.bgResumeUsed || {})[convId || ""]);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+function markBgResumeUsed(convId) {
+  const key = convId || "";
+  if (!key) return 0;
+  const next = bgResumeUsedOf(key) + 1;
+  state.bgResumeUsed = { ...(state.bgResumeUsed || {}), [key]: next };
+  savePersistent();
+  notify("bgResumeUsed", state.bgResumeUsed);
+  return next;
+}
+
 function estimateTokens(text) {
   if (!text) return 0;
   // 粗略估算：中英文混合约 3 字符/token
@@ -1104,6 +1162,7 @@ export {
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens,
   getConversationTodos, setConversationTodos,
   recordTaskFlag, markTaskSeen, pruneTaskFlags, setTaskListSort, setTodoPanelOpen,
+  setBgAutoResume, bgResumeUsedOf, markBgResumeUsed,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage,
   setConversations, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,

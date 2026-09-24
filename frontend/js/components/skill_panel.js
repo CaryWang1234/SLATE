@@ -3,12 +3,12 @@
  * + Actions（data/actions/*.yml 流程说明书：可编辑、试校验、删除、留底回滚）。
  */
 
-import { state, subscribe, setSkills, setActions } from "../store.js?v=20260922-005";
-import { get, post, put, del, upload } from "../services/api.js?v=20260922-005";
-import { guardSkillParams } from "../services/riskguard.js?v=20260922-005";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260922-005";
-import { t } from "../services/i18n.js?v=20260922-005";
-import { setIconText } from "../services/icons.js?v=20260922-005";
+import { state, subscribe, setSkills, setActions } from "../store.js?v=20260922-006";
+import { get, post, put, del, upload } from "../services/api.js?v=20260922-006";
+import { guardSkillParams } from "../services/riskguard.js?v=20260922-006";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260922-006";
+import { t } from "../services/i18n.js?v=20260922-006";
+import { setIconText } from "../services/icons.js?v=20260922-006";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -48,6 +48,19 @@ const SKILL_PARAM_DEFS = {
     { key: "action", label: "操作类型", type: "text", placeholder: "create / list / close / kill / 空串执行命令" },
     { key: "session_id", label: "会话 ID", type: "text", placeholder: "default" },
     { key: "timeout", label: "超时秒数", type: "number", placeholder: "30" },
+  ],
+  bg_task: [
+    { key: "action", label: "操作类型", type: "text", placeholder: "start / status / log / stop / list" },
+    { key: "command", label: "命令（action=start）", type: "text", placeholder: "python server.py" },
+    { key: "label", label: "任务名（给人看）", type: "text", placeholder: "实验服务器" },
+    { key: "work_dir", label: "工作目录", type: "text", placeholder: "." },
+    { key: "task_id", label: "任务 ID（status/log/stop）", type: "text", placeholder: "bt_xxxxxxxx" },
+    { key: "trigger", label: "触发条件（JSON）", type: "text", placeholder: '{"on":"exit"} 或 {"on":"match","pattern":"Done"}' },
+    { key: "notify", label: "命中/结束时叫醒模型", type: "text", placeholder: "true / false" },
+    { key: "timeout", label: "超时秒数（0=不限）", type: "number", placeholder: "0" },
+    { key: "since_offset", label: "只取该偏移之后的输出", type: "number", placeholder: "0" },
+    { key: "tail_lines", label: "取最后 N 行", type: "number", placeholder: "20" },
+    { key: "grep", label: "按关键词过滤输出", type: "text", placeholder: "error" },
   ],
   html_render: [
     { key: "title", label: "页面标题", type: "text", placeholder: "SLATE 页面" },

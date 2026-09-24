@@ -17,11 +17,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   emptyBoard, moveLine, move, spawn, isOver, maxTile, moveWithTrail,
-} from "../frontend/js/components/game_2048.js?v=20260922-005";
+} from "../frontend/js/components/game_2048.js?v=20260922-006";
 import {
   WEEKS, buildGrid, monthLabels, levelFor,
-} from "../frontend/js/components/usage_heatmap.js?v=20260922-005";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260922-005";
+} from "../frontend/js/components/usage_heatmap.js?v=20260922-006";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260922-006";
 
 const BACKEND_WINDOW_DAYS = 371;  // backend/routers/chat.py: ACTIVITY_WINDOW_DAYS
 
@@ -358,7 +358,7 @@ for (const m of ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月",
 
 // ── 9. 结构与文案：Node 侧没 DOM，直接读源码钉住两条走查里真炸过的 ──
 {
-  const src = readFileSync(new URL("../frontend/js/components/usage_heatmap.js?v=20260922-005", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../frontend/js/components/usage_heatmap.js?v=20260922-006", import.meta.url), "utf8");
   const css = readFileSync(new URL("../frontend/css/style.css", import.meta.url), "utf8");
   assert.match(src, /shell\.append\(gameHost\)/, "棋盘宿主得并进 .heat-shell");
   assert.doesNotMatch(src, /heat\.append\(gameHost\)/, "棋盘宿主挂进 .heat 会被 .heat.hidden 一起藏掉，双击永远打不开");
@@ -403,7 +403,7 @@ for (const m of ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月",
   assert.match(css, /\.heat-grid\.heat-enter \.heat-cell\s*\{[^}]*animation:\s*none/, "减少动效下不播点亮");
 
   // 2048：外层定位 + 内层动画两层结构，退出靠 Esc / 点外
-  const game = readFileSync(new URL("../frontend/js/components/game_2048.js?v=20260922-005", import.meta.url), "utf8");
+  const game = readFileSync(new URL("../frontend/js/components/game_2048.js?v=20260922-006", import.meta.url), "utf8");
   assert.match(game, /export function moveWithTrail/, "滑动来源表要导出，否则只能靠人眼看");
   assert.match(game, /t2048-tile-face/, "方块要拆成外层定位、内层动画两层");
   assert.doesNotMatch(game, /t2048-cell/, "旧的单层方块不再渲染，留着就是死样式");

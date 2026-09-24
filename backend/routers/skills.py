@@ -39,6 +39,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "file_tree": "扫描目录树（支持递归、glob 过滤、快速模式）",
     "file_peek": "读取文件内容（支持多编码 gbk/gb2312、行范围、tail 模式、自动检测编码）",
     "terminal": "终端会话：支持多会话管理、状态保持（cd / $env: 跨命令保持）、进程管理，高危命令双层拦截；Windows 每条命令一个 PowerShell 进程，多行块与 &&/|| 均可用",
+    "bg_task": "后台终端任务：跑长耗时命令（实验服务器后端、编译/训练）不占住对话。start 起任务后立刻返回，模型不该轮询；status/log/list 按需查看输出与状态（log 带 since_offset 只取新增）；stop 杀整棵进程树；trigger 可挂事件（on=exit 结束 / on=match 命中正则），配 notify=true 时命中即把消息送回叫醒模型，中间不输出以省 token",
     "html_render": "生成纯黑白 HTML 骨架",
     "css_color": "基于描述生成 CSS 配色方案（支持暖色/冷色/自然/深色等多种风格）",
     "doc_write": "生成 Markdown 格式技术文档或需求说明",

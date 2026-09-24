@@ -31,7 +31,7 @@
 
 ### 1. SLATE 是什么？
 
-SLATE（砚）是一款**本地优先**的 AI 协作调度台。它把主流大模型、34 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。
+SLATE（砚）是一款**本地优先**的 AI 协作调度台。它把主流大模型、35 个内置工具、团队辩论、DAG 工作流、白板式逻辑链整合在一个轻量界面里——零 npm、零构建、开箱即用。
 
 核心理念：**让灵感直达行动，中间不隔工具摩擦。**
 
@@ -218,7 +218,7 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 
 ### 9. MCP 工具箱
 
-SLATE 内置 34 个 MCP 工具，模型在对话中自主决定何时使用。
+SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 
 **使用方式：**
 - 直接描述需求（如"帮我搜索 xxx"）
@@ -229,7 +229,7 @@ SLATE 内置 34 个 MCP 工具，模型在对话中自主决定何时使用。
 | 类别 | 工具 |
 |------|------|
 | 文件操作 | `file_tree` `file_peek` `file_create` `file_edit` `file_append` |
-| 终端 | `terminal`（沙箱执行，高危命令需审批） |
+| 终端 | `terminal`（沙箱执行，高危命令需审批） `bg_task`（后台终端任务：起了就返回，结束会叫醒模型） |
 | 检索与代码 | `code_search` `code_scan` `doc_scan` `repo_stats` `todo_scan` `python_api_extract` |
 | 文档生成 | `doc_write` `ppt_create` `word_create` `html_render` `html_bundle` |
 | 办公与 PDF | `excel_tool` `pdf_tool` |
@@ -420,7 +420,7 @@ SLATE 内置 34 个 MCP 工具，模型在对话中自主决定何时使用。
 
 ### 1. What is SLATE?
 
-SLATE is a **local-first** AI collaboration studio. It integrates mainstream LLMs, 34 built-in tools, team debates, DAG workflows, whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.
+SLATE is a **local-first** AI collaboration studio. It integrates mainstream LLMs, 35 built-in tools, team debates, DAG workflows, whiteboard logic chains — all in a lightweight interface. Zero npm, zero build, ready to use.
 
 Core philosophy: **Let ideas go straight to action, without tool friction in between.**
 
@@ -612,7 +612,7 @@ Visual cards + connections system for reasoning and planning.
 
 ### 9. MCP Toolbox
 
-SLATE includes 34 built-in MCP tools. The model decides when to use them during conversations.
+SLATE includes 35 built-in MCP tools. The model decides when to use them during conversations.
 
 **Usage:**
 - Describe your need naturally (e.g., "search for xxx")
@@ -623,7 +623,7 @@ SLATE includes 34 built-in MCP tools. The model decides when to use them during 
 | Category | Tools |
 |----------|-------|
 | File Ops | `file_tree` `file_peek` `file_create` `file_edit` `file_append` |
-| Terminal | `terminal` (sandbox execution, high-risk commands need approval) |
+| Terminal | `terminal` (sandbox execution, high-risk commands need approval) `bg_task` (background task: returns at once, wakes the model when it ends) |
 | Search & Code | `code_search` `code_scan` `doc_scan` `repo_stats` `todo_scan` `python_api_extract` |
 | Doc Gen | `doc_write` `ppt_create` `word_create` `html_render` `html_bundle` |
 | Office & PDF | `excel_tool` `pdf_tool` |

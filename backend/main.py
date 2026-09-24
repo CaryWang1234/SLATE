@@ -11,8 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import actions, chat, constitution, diagnostics, events, experts, files, grind, i18n, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, typing, update, vault, workflows
+from backend.routers import actions, bg_tasks, chat, constitution, diagnostics, events, experts, files, grind, i18n, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, typing, update, vault, workflows
 from backend import mcp_client
+from backend.skills import bg_task as bg_task_skill
 
 # system_info 需要 psutil，可能不在所有环境中可用
 try:
@@ -96,6 +97,7 @@ app.include_router(mcp_servers.router, prefix="/api")
 app.include_router(typing.router, prefix="/api")
 app.include_router(diagnostics.router, prefix="/api")
 app.include_router(actions.router, prefix="/api")
+app.include_router(bg_tasks.router, prefix="/api")
 
 # system_info 路由（需要 psutil，可能不可用）
 if HAS_SYSTEM_INFO:
@@ -124,6 +126,12 @@ async def _start_mcp_clients():
 async def _shutdown_mcp_clients():
     """关闭时断开所有 MCP Server 连接。"""
     await mcp_client.shutdown_disconnect_all()
+
+
+@app.on_event("shutdown")
+async def _shutdown_bg_tasks():
+    """关闭时收尾在册后台任务：托管在宿主进程里的进程树不该活过宿主。"""
+    bg_task_skill.shutdown()
 
 # 挂载前端静态文件
 frontend_dir = PROJECT_ROOT / "frontend"

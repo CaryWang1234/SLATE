@@ -250,9 +250,20 @@ def _powershell_body_block() -> str:
     """
     return """$__slateCode = [Console]::In.ReadToEnd()
 $__slateSb = $null
+$__slateParseErr = ""
 try { $__slateSb = [ScriptBlock]::Create($__slateCode) } catch {
+  $__slateParseErr = $_.Exception.Message
+}
+if ($null -eq $__slateSb) {
+  # 主体第一个 token 是被引号包起来的可执行文件路径时（`"C:\\Program Files\\x\\y.exe" -v`
+  # 这种，中文路径带空格也常见），脚本块开头的字符串会被当成表达式起点，
+  # 紧随其后的参数就成了"意外的标记"。调用运算符 & 能把语句拉回命令模式，再解析一次。
+  # 只有第一条语句会踩这个坑：后续语句本来就按命令模式解析。
+  try { $__slateSb = [ScriptBlock]::Create('& ' + $__slateCode) } catch { }
+}
+if ($null -eq $__slateSb) {
   $__slateSt.aborted = $true
-  Write-Output ("[PARSE_ERROR] " + $_.Exception.Message)
+  Write-Output ("[PARSE_ERROR] " + $__slateParseErr)
 }
 if ($null -ne $__slateSb) {
   try {

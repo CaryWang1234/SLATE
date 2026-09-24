@@ -37,7 +37,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 - 🛑 **Stop really cancels** — Pressing Stop closes both the LLM stream and the tool-call stream, so the backend terminates the running subprocess or task instead of "UI stopped, work still going"; cancelled calls are recorded as their own status in the event ledger
 - 🖌️ **Grind Mode** — `/grind` a rough idea, AI refines it through three-phase questioning into a structured task brief, one-click send to Target Mode
 - 🗂️ **Chat & Data Management** — Full-text search, export/rename/batch-manage sessions, edit/delete messages, one-click backup/restore, storage usage visualization
-- 🛠️ **34 Built-in MCP Tools** — File read/write/edit/append, project-wide code search, Unicode-safe terminal, PPT/Word/Excel/PDF tools, SVG charts & QR codes, Python API doc extraction, portable web bundling, code & document security scanning, read-only git info, web search & page scraping, MCP Factory for self-production, screenshot-to-code, AI image & video generation, browser & desktop automation
+- 🛠️ **35 Built-in MCP Tools** — File read/write/edit/append, project-wide code search, Unicode-safe terminal, background terminal tasks (start and walk away, get woken when they end), PPT/Word/Excel/PDF tools, SVG charts & QR codes, Python API doc extraction, portable web bundling, code & document security scanning, read-only git info, web search & page scraping, MCP Factory for self-production, screenshot-to-code, AI image & video generation, browser & desktop automation
 - 🧩 **Custom Skill System** — `SKILL.md` plug-and-play, `@` mention in chat to inject context
 - 📋 **Action Playbooks** — Capture the required flow for a recurring task in `data/actions/<id>.yml`; the model sees the catalog and reads a playbook in full before following it. Editable in Settings, model-writable behind an approval gate, every overwrite backed up for one-click rollback
 - 🎓 **Expert Packs** — Persona + rules + knowledge + skills in a zip, importable/exportable, injectable via chat dropdown / team cards / @mention
@@ -100,7 +100,7 @@ It features multi-model chat, Agent Autopilot, MCP tool calling, Target Mode aut
 
 ### MCP Tools & Skill System
 
-Built-in tools — 34 in total (`backend/skills/`):
+Built-in tools — 35 in total (`backend/skills/`):
 
 | Tool | Description |
 |------|-------------|
@@ -108,6 +108,7 @@ Built-in tools — 34 in total (`backend/skills/`):
 | `file_create` / `file_edit` | Create files / Diff-preview editing; preserves UTF-8/BOM/GB18030/GBK/UTF-16 and handles Chinese/emoji safely |
 | `file_append` | Append to files, segmented writes for long content |
 | `terminal` | Sandboxed command execution; hidden Windows subprocesses and Unicode-safe native output capture. On Windows each command runs in its own PowerShell process, so multi-line blocks and `&&` / `||` work, syntax errors come back with a failing exit code, and `cd` / `$env:` persist across commands |
+| `bg_task` | Background terminal tasks: `action=start` returns immediately (pid, first output, log path) instead of holding the chat; ask later with `status` / `log`, or start with `notify=true` and get woken with the output tail when the task ends or matches your regex; `action=stop` kills the whole process tree. Tasks live as long as the backend process, logs land in `data/bg_tasks/`, high-risk commands still need approval |
 | `html_render` / `css_color` | HTML skeleton generation / CSS color tuning |
 | `doc_write` / `text_summarize` | Markdown writing / Text summarization |
 | `ppt_create` / `word_create` | .pptx presentations / .docx Word documents |
@@ -294,7 +295,7 @@ SLATE/
 │   │   ├── update.py           # Startup update check (GitHub Releases)
 │   │   ├── workflows.py        # Team workflow DAG definition
 │   │   └── files.py            # Multimodal file parsing
-│   └── skills/                 # 34 built-in MCP tool implementations (incl. Unicode-safe file/terminal tools, high-risk command dual interception, and a cancellable call context)
+│   └── skills/                 # 35 built-in MCP tool implementations (incl. Unicode-safe file/terminal tools, background terminal tasks, high-risk command dual interception, and a cancellable call context)
 ├── frontend/
 │   ├── index.html              # Three-column layout entry (Chat / Whiteboard / Factory+Capabilities)
 │   ├── m.html                  # Mobile remote UI entry (SLATE Mobile)

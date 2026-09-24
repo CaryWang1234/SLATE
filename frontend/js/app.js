@@ -2,33 +2,33 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution } from "./store.js?v=20260922-005";
-import { initI18n, t } from "./services/i18n.js?v=20260922-005";
-import { iconSvgEl } from "./services/icons.js?v=20260922-005";
-import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260922-005";
-import { get, post, put } from "./services/api.js?v=20260922-005";
-import { dlgConfirm } from "./services/dialog.js?v=20260922-005";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260922-005";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260922-005";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260922-005";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260922-005";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260922-005";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260922-005";
-import { initTeamPanel } from "./components/team.js?v=20260922-005";
-import { initProjectBar } from "./components/project_bar.js?v=20260922-005";
-import { initSessionSummary } from "./components/session_summary.js?v=20260922-005";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260922-005";
-import { initTypingGame } from "./components/typing_game.js?v=20260922-005";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260922-005";
-import { initMemoryPanel } from "./components/memory.js?v=20260922-005";
-import { initExpertsPanel } from "./components/experts.js?v=20260922-005";
-import { initSchedule } from "./components/schedule.js?v=20260922-005";
-import { initRiskGuard } from "./services/riskguard.js?v=20260922-005";
-import { initUnderstandPanel } from "./components/understand.js?v=20260922-005";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260922-005";
-import { setProject, setProjectFileTree } from "./store.js?v=20260922-005";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260922-005";
-import { installErrorSink } from "./services/error_sink.js?v=20260922-005";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume } from "./store.js?v=20260922-006";
+import { initI18n, t } from "./services/i18n.js?v=20260922-006";
+import { iconSvgEl } from "./services/icons.js?v=20260922-006";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260922-006";
+import { get, post, put } from "./services/api.js?v=20260922-006";
+import { dlgConfirm } from "./services/dialog.js?v=20260922-006";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260922-006";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260922-006";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260922-006";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260922-006";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260922-006";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260922-006";
+import { initTeamPanel } from "./components/team.js?v=20260922-006";
+import { initProjectBar } from "./components/project_bar.js?v=20260922-006";
+import { initSessionSummary } from "./components/session_summary.js?v=20260922-006";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260922-006";
+import { initTypingGame } from "./components/typing_game.js?v=20260922-006";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260922-006";
+import { initMemoryPanel } from "./components/memory.js?v=20260922-006";
+import { initExpertsPanel } from "./components/experts.js?v=20260922-006";
+import { initSchedule } from "./components/schedule.js?v=20260922-006";
+import { initRiskGuard } from "./services/riskguard.js?v=20260922-006";
+import { initUnderstandPanel } from "./components/understand.js?v=20260922-006";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260922-006";
+import { setProject, setProjectFileTree } from "./store.js?v=20260922-006";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260922-006";
+import { installErrorSink } from "./services/error_sink.js?v=20260922-006";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -563,6 +563,7 @@ function openSettings(options = {}) {
   // 通知设置
   document.getElementById("setting-notif-sound").checked = state.notifications?.soundEnabled !== false;
   document.getElementById("setting-notif-system").checked = state.notifications?.systemNotifEnabled === true;
+  document.getElementById("setting-bg-auto-resume").checked = state.bgAutoResume !== false;
   updateNotifPermissionHint();
   renderPermissionModeSettings();
   document.getElementById("setting-ui-mode").checked = state.uiMode === "codex";
@@ -1113,6 +1114,11 @@ function initAutoReviewPersistence() {
     state.continueAutopilot = e.target.checked;
     savePersistent();
   });
+  // 后台任务的空闲续跑：同样只存本机（只有桌面循环会自己开新一场）；
+  // 走 store 的 setter 而不是直接改 state，配额与开关是同一份状态，别绕过它
+  document.getElementById("setting-bg-auto-resume")?.addEventListener("change", (e) => {
+    setBgAutoResume(e.target.checked);
+  });
 }
 
 // 通知设置：变更后立即持久化
@@ -1137,7 +1143,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260922-005").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260922-006").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1257,6 +1263,7 @@ const CODEX_QUICK_ACTIONS = [
   { key: "experts", label: "专家包", source: "btn-experts" },
   { key: "snippets", label: "提示词素材", source: "btn-snippets" },
   { key: "todo", label: "任务清单", source: "btn-todo-panel" },
+  { key: "bgtasks", label: "后台任务", source: "btn-bg-tasks" },
   { key: "theme", label: "明暗主题", source: "btn-theme" },
 ];
 
@@ -1751,7 +1758,7 @@ async function saveSettings() {
     if (constData) {
       if (state.project) {
         // 打开着项目就写进项目（.slate/config.json，跟着仓库走），全局那份保持不动
-        const { updateProjectConfig } = await import("./services/project.js?v=20260922-005");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260922-006");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -2000,7 +2007,7 @@ async function init() {
       if (res.code === 0 && res.data) {
         setProject(res.data);
       } else {
-        const { openProject } = await import("./services/project.js?v=20260922-005");
+        const { openProject } = await import("./services/project.js?v=20260922-006");
         const openRes = await openProject(state._lastProjectPath);
         if (openRes.code === 0) setProject(openRes.data);
       }

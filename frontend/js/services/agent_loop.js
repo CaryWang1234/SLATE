@@ -21,9 +21,9 @@
  * 约定：policy 返回的模型可见字符串不被 t() 包裹（t() 只包用户可见文本）。
  */
 
-import { state, addMessage } from "../store.js?v=20260922-005";
-import { stripToolCalls } from "./tools.js?v=20260922-005";
-import { _pendingToolMsgs } from "./agent_common.js?v=20260922-005";
+import { state, addMessage } from "../store.js?v=20260922-006";
+import { stripToolCalls } from "./tools.js?v=20260922-006";
+import { _pendingToolMsgs } from "./agent_common.js?v=20260922-006";
 
 export function createAgentLoop({ policy = {}, view = {}, io }) {
   const reasonOf = (key) => policy.exitReasons?.[key] ?? "";
@@ -154,6 +154,9 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
             const progress = view.execProgress?.(run.bubble) ?? null;
             run.results = await io.execute(run.calls, {
               signal,
+              // 归属会话：后台任务这类"结果晚于本轮到达"的副作用要记在起它的那个会话名下
+              // （徽标按会话亮）。宿主没给 genConvId 时回落当前会话。
+              convId: genConvId || state.currentConversationId || "",
               // 账本 callId 交给执行器透传：派生型工具（subagent_run）据此把 spawn 边
               // 挂到自己的那一行上，星图才认得出谁派生了谁
               callIdFor: (i) => (ledger ? ledger.callId(run.round, i) : ""),
