@@ -9,7 +9,10 @@ echo [SLATE] Building desktop package...
 if not exist "dist\SLATE\data\skills" mkdir "dist\SLATE\data\skills"
 if exist "data\constitution.json" copy /Y "data\constitution.json" "dist\SLATE\data\constitution.json" >nul
 if exist "data\skills\.gitkeep" copy /Y "data\skills\.gitkeep" "dist\SLATE\data\skills\.gitkeep" >nul
-rem 内置 SKILL.md 技能与专家包种子（整目录随包分发，安装端 onlyifdoesntexist 不覆盖用户改动）
+rem NOTE: keep this file ASCII-only. cmd.exe parses .bat in the OEM code page, so a
+rem non-ASCII line with LF endings makes it swallow the next newline and run the
+rem following command as garbage. Bundled SKILL.md skills and expert packs are
+rem shipped as whole dirs; the installer uses onlyifdoesntexist so user edits stay.
 if exist "data\skills" xcopy "data\skills" "dist\SLATE\data\skills\" /E /I /Y /Q >nul
 if exist "data\experts" xcopy "data\experts" "dist\SLATE\data\experts\" /E /I /Y /Q >nul
 
