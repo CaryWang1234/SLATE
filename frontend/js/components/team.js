@@ -8,18 +8,18 @@
  * 历史仍在，只是这场讨论画不进星图（列表里标"仅本机记录"）。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260925-007";
-import { notifyTaskComplete } from "../services/notify.js?v=20260925-007";
-import { streamChat, post } from "../services/api.js?v=20260925-007";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260925-007";
-import { openRun as openLedgerRun } from "../services/agent_ledger.js?v=20260925-007";
-import { memberHue } from "../services/star_map.js?v=20260925-007";
-import { renderMarkdown } from "../services/markdown.js?v=20260925-007";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260925-007";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260925-007";
-import { getExpertsCached } from "./experts.js?v=20260925-007";
-import { t } from "../services/i18n.js?v=20260925-007";
-import { makeId } from "../services/utils.js?v=20260925-007";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20260925-008";
+import { notifyTaskComplete } from "../services/notify.js?v=20260925-008";
+import { streamChat, post } from "../services/api.js?v=20260925-008";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20260925-008";
+import { openRun as openLedgerRun } from "../services/agent_ledger.js?v=20260925-008";
+import { memberHue } from "../services/star_map.js?v=20260925-008";
+import { renderMarkdown } from "../services/markdown.js?v=20260925-008";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20260925-008";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20260925-008";
+import { getExpertsCached } from "./experts.js?v=20260925-008";
+import { t } from "../services/i18n.js?v=20260925-008";
+import { makeId } from "../services/utils.js?v=20260925-008";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());

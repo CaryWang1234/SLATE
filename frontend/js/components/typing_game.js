@@ -10,8 +10,8 @@
  * 哪些行算题目在这里判（后端只管存文本），所以外部编辑器改完点「重新读取」即生效。
  */
 
-import { get, post } from "../services/api.js?v=20260925-007";
-import { t } from "../services/i18n.js?v=20260925-007";
+import { get, post } from "../services/api.js?v=20260925-008";
+import { t } from "../services/i18n.js?v=20260925-008";
 
 // git / shell
 const BUILTIN = [
@@ -107,7 +107,7 @@ let pasted = false;
 let timer = 0;
 
 function notify(msg) {
-  import("../app.js?v=20260925-007").then(({ toast }) => toast(msg)).catch(() => {});
+  import("../app.js?v=20260925-008").then(({ toast }) => toast(msg)).catch(() => {});
 }
 
 function span(cls, text) {

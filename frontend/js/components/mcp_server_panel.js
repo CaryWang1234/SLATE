@@ -3,14 +3,14 @@
  * 在设置页中展示已配置的外部 MCP Server，支持添加/删除/连接/断开。
  */
 
-import { get, post, del } from "../services/api.js?v=20260925-007";
-import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260925-007";
-import { refreshSkills } from "./skill_panel.js?v=20260925-007";
-import { iconSvgEl } from "../services/icons.js?v=20260925-007";
-import { mcpIconKey } from "../services/mcp_logos.js?v=20260925-007";
-import { state, subscribe } from "../store.js?v=20260925-007";
-import { t } from "../services/i18n.js?v=20260925-007";
-import { forgetScopeCatalog } from "../services/project_scope.js?v=20260925-007";
+import { get, post, del } from "../services/api.js?v=20260925-008";
+import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260925-008";
+import { refreshSkills } from "./skill_panel.js?v=20260925-008";
+import { iconSvgEl } from "../services/icons.js?v=20260925-008";
+import { mcpIconKey } from "../services/mcp_logos.js?v=20260925-008";
+import { state, subscribe } from "../store.js?v=20260925-008";
+import { t } from "../services/i18n.js?v=20260925-008";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20260925-008";
 
 let serverListEl, btnAdd, btnRefresh;
 

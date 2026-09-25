@@ -5,19 +5,19 @@
  * 3. 装配外壳与各面板
  */
 
-import { state, subscribe, loadPersistent, loadSharedPersistent, setModelRegistry } from "../store.js?v=20260925-007";
-import { measureContext } from "../services/context_meter.js?v=20260925-007";
-import { setLanToken, get } from "../services/api.js?v=20260925-007";
-import { initI18n } from "../services/i18n.js?v=20260925-007";
-import { initMApp } from "./m-app.js?v=20260925-007";
-import { mToast } from "./m-ui.js?v=20260925-007";
-import { initMChat } from "./m-chat.js?v=20260925-007";
-import { initMChatInput } from "./m-chat-input.js?v=20260925-007";
-import { initMConversations } from "./m-conversations.js?v=20260925-007";
-import { initMMemory } from "./m-memory.js?v=20260925-007";
-import { initMSchedule } from "./m-schedule.js?v=20260925-007";
-import { initMSettings } from "./m-settings.js?v=20260925-007";
-import { mApprovalSheet } from "./m-auth.js?v=20260925-007";
+import { state, subscribe, loadPersistent, loadSharedPersistent, setModelRegistry } from "../store.js?v=20260925-008";
+import { measureContext } from "../services/context_meter.js?v=20260925-008";
+import { setLanToken, get } from "../services/api.js?v=20260925-008";
+import { initI18n } from "../services/i18n.js?v=20260925-008";
+import { initMApp } from "./m-app.js?v=20260925-008";
+import { mToast } from "./m-ui.js?v=20260925-008";
+import { initMChat } from "./m-chat.js?v=20260925-008";
+import { initMChatInput } from "./m-chat-input.js?v=20260925-008";
+import { initMConversations } from "./m-conversations.js?v=20260925-008";
+import { initMMemory } from "./m-memory.js?v=20260925-008";
+import { initMSchedule } from "./m-schedule.js?v=20260925-008";
+import { initMSettings } from "./m-settings.js?v=20260925-008";
+import { mApprovalSheet } from "./m-auth.js?v=20260925-008";
 
 // 移动端把"问人"那张脸换成底部 sheet；判口（哪一档问什么）仍在 riskguard，桌面不受影响
 window.__slateGuardUi = mApprovalSheet;

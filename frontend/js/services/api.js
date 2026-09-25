@@ -2,8 +2,8 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260925-007";
-import { t } from "./i18n.js?v=20260925-007";
+import { API_BASE } from "../store.js?v=20260925-008";
+import { t } from "./i18n.js?v=20260925-008";
 
 // 思考内容标记前缀（用于在流式输出中区分 reasoning 与 content）
 export const REASONING_PREFIX = "\x00\x01R\x01\x00";
@@ -281,6 +281,9 @@ async function* streamChat(payload, opts = {}) {
           yieldedAny = true;
           yield chunk;
         }
+        // 既没见到 [DONE]、也没有 finish_reason：上游/代理提前收流了。这里过去一律当成功，
+        // 半截回复于是静默收场——调用方靠 meta.truncated 把它如实报出来（见 chat.js 收尾）。
+        if (meta && !meta.finishReason) meta.truncated = true;
       }
       if (!yieldedAny && !toolYielded) {
         throw new Error("模型连接已结束，但没有返回任何可显示内容。\n诊断：可能是上游返回空 SSE、只返回了错误但被代理吞掉、Responses API 与当前模型不兼容，或模型输出被服务商过滤。");
