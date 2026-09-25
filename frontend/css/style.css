@@ -1,39 +1,46 @@
 /* ═══════════════════════════════════════════
-   SLATE — 典雅黑白 / 黑金配色系统
-   浅色：黑白极简  |  深色：黑金奢华
+   SLATE — 纸墨金 / 黑金配色系统
+   浅色：暖纸墨金（砚＝纸墨）  |  深色：黑金奢华
+   中性色带暖调与金色强调色同源，四个文字层级都过 WCAG AA
    ═══════════════════════════════════════════ */
 
-/* ── 浅色主题：黑白（默认） ─────────────── */
+/* ── 浅色主题：暖宣纸（默认） ────────────── */
 :root {
-  --bg: #FFFFFF;
-  --bg-alt: #F7F7F7;
+  --bg: #FCFBF8;
+  --bg-alt: #F3EFE8;
   --bg-input: #FFFFFF;
-  --text: #1A1A1A;
-  --text-secondary: #666666;
-  --text-muted: #999999;
-  --text-faint: #D0D0D0;
-  --border: #E2E2E2;
-  --border-hover: #1A1A1A;
-  --accent-bg: #1A1A1A;
-  --accent-fg: #FFFFFF;
-  --gold: #bfa365;
-  --gold-dim: rgba(215, 181, 107, 0.05);
-  --gold-strong: #8f7331;
-  --code-bg: #1e1e1e;
-  --code-fg: #d4d4d4;
-  --inline-code-bg: rgba(0,0,0,0.06);
-  --msg-user-bg: #1A1A1A;
-  --msg-user-fg: #FFFFFF;
-  --msg-asst-bg: #F7F7F7;
-  --selection-bg: #1A1A1A;
+  /* 浮在 --bg-alt 面板上的卡片，比面板亮一档 */
+  --bg-card: #FFFFFF;
+  --text: #26231E;
+  --text-secondary: #5C5548;
+  --text-muted: #6F6859;
+  --text-faint: #B0A899;
+  --border: #E5DFD4;
+  --border-hover: #26231E;
+  --accent-bg: #26231E;
+  --accent-fg: #FCFBF8;
+  /* 品牌强调色。浅色下必须深到能当正文色用（填充 + 文字同一个值） */
+  --accent: #836523;
+  --gold: #836523;
+  --gold-dim: rgba(131, 101, 35, 0.08);
+  --gold-strong: #6F5620;
+  --code-bg: #201D18;
+  --code-fg: #DED6C6;
+  --inline-code-bg: rgba(38, 35, 30, 0.06);
+  --msg-user-bg: #26231E;
+  --msg-user-fg: #FCFBF8;
+  --msg-asst-bg: #F3EFE8;
+  --selection-bg: #836523;
   --selection-fg: #FFFFFF;
-  --scrollbar-thumb: #D0D0D0;
-  --board-grid: #EEEEEE;
-  --modal-backdrop: rgba(0,0,0,0.25);
-  --toast-bg: #1A1A1A;
-  --toast-fg: #FFFFFF;
+  --scrollbar-thumb: #D6CFC3;
+  --board-grid: #EDE8DF;
+  --modal-backdrop: rgba(38, 31, 22, 0.32);
+  --toast-bg: #26231E;
+  --toast-fg: #FCFBF8;
   --danger: #C0392B;
   --danger-dim: rgba(192, 57, 43, 0.08);
+  --ok: #2D6A3F;
+  --ok-dim: rgba(45, 106, 63, 0.10);
   /* 侧栏任务徽标：四态里只有"需要操作"没有现成色可用（既不是错误也不是完成）*/
   --task-needs: #9A5B12;
   --task-needs-dim: rgba(154, 91, 18, 0.10);
@@ -50,6 +57,7 @@
   --bg: #0A0A0A;
   --bg-alt: #131313;
   --bg-input: #181818;
+  --bg-card: #161616;
   --text: #E8DCC8;
   --text-secondary: #9b8c73;
   --text-muted: #5C5347;
@@ -58,6 +66,7 @@
   --border-hover: #c6b18a;
   --accent-bg: #C9A96E;
   --accent-fg: #0A0A0A;
+  --accent: #ceb381;
   --gold: #ceb381;
   --gold-dim: rgba(201, 169, 110, 0.10);
   --gold-strong: #ceb381;
@@ -76,6 +85,8 @@
   --toast-fg: #0A0A0A;
   --danger: #E2725B;
   --danger-dim: rgba(226, 114, 91, 0.12);
+  --ok: #6FBF9A;
+  --ok-dim: rgba(111, 191, 154, 0.12);
   --task-needs: #E0A94A;
   --task-needs-dim: rgba(224, 169, 74, 0.14);
 }
@@ -469,7 +480,7 @@ textarea:focus-visible {
 .chat-scroll:empty::before {
   content: "开始一段对话，或先从左侧打开项目补充上下文。";
   margin: auto;
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: 12px;
   letter-spacing: 0.5px;
   text-align: center;
@@ -2985,9 +2996,9 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .skill-kind-skill {
-  color: #d9a441;
-  background: rgba(217, 164, 65, 0.12);
-  border: 1px solid rgba(217, 164, 65, 0.35);
+  color: var(--gold-strong);
+  background: color-mix(in srgb, var(--gold-strong) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold-strong) 35%, transparent);
 }
 
 /* 解析失败的 Action 必须留在列表里说明原因，而不是静默消失 */
@@ -3022,9 +3033,9 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .skill-kind-file {
-  color: #6fbf9a;
-  background: rgba(111, 191, 154, 0.12);
-  border: 1px solid rgba(111, 191, 154, 0.35);
+  color: var(--ok);
+  background: var(--ok-dim);
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
 }
 
 /* 模型代写的 Action：徽标要跳出来，它等于模型往自己系统提示里加过料 */
@@ -3049,8 +3060,8 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .skill-item-del:hover {
-  background: rgba(220, 80, 80, 0.15);
-  color: #e05252;
+  background: var(--danger-dim);
+  color: var(--danger);
 }
 
 .skill-upload {
@@ -3108,7 +3119,7 @@ textarea::-webkit-scrollbar-thumb {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--bg-card, #fff);
+  background: var(--bg-card);
   transition: box-shadow 0.15s;
 }
 
@@ -3191,22 +3202,23 @@ textarea::-webkit-scrollbar-thumb {
   font-size: 11px;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: var(--bg-card, #fff);
+  background: var(--bg);
+  color: var(--text);
   cursor: pointer;
   transition: background 0.15s;
 }
 
 .mcp-server-actions button:hover {
-  background: var(--bg-hover, #f3f4f6);
+  background: var(--bg-alt);
 }
 
 .mcp-server-actions button.danger {
-  color: #ef4444;
-  border-color: #fca5a5;
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
 }
 
 .mcp-server-actions button.danger:hover {
-  background: #fef2f2;
+  background: var(--danger-dim);
 }
 
 .mcp-server-empty {
@@ -3432,7 +3444,7 @@ textarea::-webkit-scrollbar-thumb {
 }
 
 .action-validate-msg.action-ok {
-  color: #6fbf9a;
+  color: var(--ok);
 }
 
 .action-validate-msg.action-warn {
@@ -5471,7 +5483,7 @@ textarea::-webkit-scrollbar-thumb {
 
 .ai-feature-row {
   padding: 6px 0 10px;
-  border-bottom: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--border);
 }
 
 .ai-feature-row:last-child {
@@ -5491,7 +5503,7 @@ textarea::-webkit-scrollbar-thumb {
   font-size: 10px;
   font-weight: 400;
   color: var(--text-secondary);
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 1px 6px;
   white-space: nowrap;
@@ -6941,7 +6953,7 @@ button.project-bar-switch:hover {
 }
 
 .project-switcher-act.danger:hover {
-  color: var(--error);
+  color: var(--danger);
 }
 
 .project-switcher-open {
@@ -11236,6 +11248,7 @@ html[data-ui="codex"][data-theme="dark"] {
   --bg: #141414;
   --bg-alt: #1c1c1c;
   --bg-input: #232323;
+  --bg-card: #212121;
   --text: #ECECEC;
   --text-secondary: #a8a8a8;
   --text-muted: #767676;

@@ -390,6 +390,8 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 | 主题 | 深色/浅色切换 |
 | 语言 | 中文/English |
 | 上下文压缩 | 自动/手动压缩历史对话 |
+| AI 辅助功能 | 对话以外的 13 项耗 Token 功能逐项开关 + 单独选模型；关掉即一次模型都不发，工具类的三项（子代理/图片/视频）还会从工具目录里消失 |
+| 多任务与项目 | 切走会话是否让它继续在跑（关掉即旧语义：切换即中断）、同时最多跑几场（1–4）、同一项目内最多几场（1–3，默认串行）；排队中的任务在右栏任务中心与输入框上方都看得见 |
 
 ---
 
@@ -784,6 +786,8 @@ Let AI automatically execute tasks on schedule or by events.
 | Theme | Dark/Light toggle |
 | Language | Chinese / English |
 | Context Compression | Auto/manual compression of history |
+| AI Assistance | 13 token-spending features outside the chat loop, each with its own switch and optional pinned model; off means no request at all, and the three tool-driven ones also disappear from the tool catalogue |
+| Tasks & Projects | Whether a run keeps going when you switch away (off restores the old "switch means stop"), how many runs may go at once (1-4), and how many within one project (1-3, serial by default); queued sends are visible both in the right-hand task centre and above the input box |
 
 ---
 

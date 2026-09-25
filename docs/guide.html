@@ -906,6 +906,7 @@ python desktop.py</pre>
               <tr><td>主题</td><td>深色/浅色切换</td></tr>
               <tr><td>语言</td><td>中文 / English</td></tr>
               <tr><td>上下文压缩</td><td>自动/手动压缩历史对话</td></tr>
+              <tr><td>AI 辅助功能</td><td>对话以外的 13 项耗 Token 功能，逐项开关 + 单独选模型</td></tr>
               <tr><td>短回复审阅</td><td>模型回复后自动检查是否需要推进</td></tr>
             </table>
           </div>
@@ -918,8 +919,15 @@ python desktop.py</pre>
               <tr><td>Theme</td><td>Dark/Light toggle</td></tr>
               <tr><td>Language</td><td>Chinese / English</td></tr>
               <tr><td>Context Compression</td><td>Auto/manual history compression</td></tr>
+              <tr><td>AI Assistance</td><td>13 token-spending features outside the chat loop, each with its own switch and model</td></tr>
               <tr><td>Short Reply Review</td><td>Auto-check if reply needs follow-up</td></tr>
             </table>
+          </div>
+          <div class="lang-zh">
+            <p><strong>AI 辅助功能这一栏管的是「你没开口时也在发的那请求」：</strong>上下文压缩、记忆蒸馏、对话洞察捕获、代码理解、代码审查、黑板整理、子代理、高危命令说明、工作流执行、定时任务、图片/视频生成，共 13 项，逐项可关、可单独指定模型（不选就跟随当前主模型）。关掉即一次模型都不发：工具类的三项（子代理、图片、视频）会直接从工具目录里消失，模型看不到也就不会调；定时任务被关掉时触发记录仍在，状态里写明是「已关闭」而不是「跑失败」。</p>
+          </div>
+          <div class="lang-en">
+            <p><strong>What this section really controls is the requests you never asked for:</strong> context compression, memory distillation, conversation insights, code understanding, code review, board organize, sub-agents, command explanation, workflow runs, scheduled tasks and image/video generation — 13 items, each switchable and each able to pin its own model (otherwise it follows the main model). Off means zero requests: the three tool-driven ones vanish from the tool catalogue so the model never calls them, and a disabled scheduled task still records the trigger with "switched off" as the reason, not a failure.</p>
           </div>
         </div>
       </div>
