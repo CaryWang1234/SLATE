@@ -3,9 +3,9 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20260925-004";
-import { getToolsSystemPrompt } from "./tools.js?v=20260925-004";
-import { catalogForScope } from "./project_scope.js?v=20260925-004";
+import { state } from "../store.js?v=20260925-007";
+import { getToolsSystemPrompt } from "./tools.js?v=20260925-007";
+import { catalogForScope } from "./project_scope.js?v=20260925-007";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -108,7 +108,7 @@ function getMemorySystemPrompt() {
 }
 
 function getKnowledgeSystemPrompt(items = null) {
-  // 并行时由调用方把自己那场检索到的片段传进来：读全局那份会把 B 项目的知识库
+  // 并行时由调用方把自己那场检索到的片段传进来：读全局版本会把 B 项目的知识库
   // 片段塞进 A 项目的请求里（后台那场的检索比这行代码晚到或早到都不受控）。
   const list = (Array.isArray(items) ? items : (Array.isArray(state.knowledgeContext) ? state.knowledgeContext : [])).slice(0, 8);
   if (!list.length) return "";
@@ -149,7 +149,7 @@ function getExpertSystemPrompt() {
 const ACTIONS_CATALOG_LIMIT = 20;
 
 function getActionsSystemPrompt(project = null) {
-  // 目录按「这一场的项目」取：项目里的同名 Action 顶掉全局那份，后台那场
+  // 目录按「这一场的项目」取：项目里的同名 Action 顶掉全局版本，后台那场
   // 拿的必须是它自己项目的清单，否则模型看到的是另一个项目的流程。
   const list = catalogForScope(project).actions;
   if (!list.length) return "";
@@ -174,7 +174,7 @@ function getActionsSystemPrompt(project = null) {
  */
 function buildSystemContent(modelId, constitution, opts = {}) {
   // opts.knowledge / opts.project：并行时这一场的知识库与项目现场由调用方带进来，
-  // 不带的才读全局——全局那份表示的是"屏幕上那个项目"，后台那场不该共用它。
+  // 不带的才读全局——全局版本表示的是"屏幕上那个项目"，后台那场不该共用它。
   const chatMode = opts.withTools === false;
   let systemContent = getSystemPrompt(modelId, chatMode);
 

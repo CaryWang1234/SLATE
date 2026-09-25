@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import * as common from "../frontend/js/services/agent_common.js";
 // 版本串必须与 tools.js 里的 import 说明符同形：写成 store.js（无 ?v=）会载入第二个 store 实例，
 // 工具改的是那一份 state，守卫读的是这一份 → 永远假红/假绿
-import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20260925-004";
+import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20260925-007";
 
 const NEXT_OK = "Next: use this result to continue the task. Do not repeat the same tool call unless new parameters are needed.";
 const NEXT_FAIL = "Next: fix the parameters or choose a different tool. Do not repeat the identical failing call.";
@@ -336,7 +336,7 @@ assert.equal(effectiveToolMode("local", "openai", "chat"), "none");
   assert.match(appSrc, /getElementById\("setting-continue-autopilot"\)\.checked = state\.continueAutopilot !== false;/, "设置页不回显开关");
   assert.match(appSrc, /state\.continueAutopilot = e\.target\.checked;[\s\S]{0,60}?savePersistent\(\);/, "开关变更没有落盘");
   assert.match(dictSrc, /"\{m\} · Continue Autopilot 追加 \{x\} 轮（第 \{k\}/, "进度文案缺英文词条");
-  assert.match(dictSrc, /"Continue Autopilot（Autopilot \/ 目标模式用完轮数上限时/, "设置项文案缺英文词条");
+  assert.match(dictSrc, /"Continue Autopilot（Autopilot \/ 目标模式用完轮数上限而任务未完成时/, "设置项文案缺英文词条");
 }
 
 console.log("agent_common.js 输出与基线逐字全等：通过");

@@ -168,8 +168,8 @@ ok("审批弹窗字段名跟着这一笔变（命令 / 访问目标），联网�
 ok("设置页那一族按钮改的是默认档（走 store setter，会通知胶囊重画）",
   /function applyPermissionMode\(mode\) \{\s*\n\s*\/\/[\s\S]{0,120}setDefaultPermissionMode\(mode\)/.test(APPJS)
   && !/function applyPermissionMode\(mode\) \{\s*\n\s*state\.permissionMode = mode;/.test(APPJS));
-ok("设置页文案说明白「这是每个对话的默认」",
-  /每个对话的默认审批模式/.test(HTML));
+ok("设置页文案说明白「这是新对话的默认档，单场可改」",
+  /新对话的默认审批模式/.test(HTML));
 for (const key of ["审批模式", "手动审批", "完全访问", "命令执行审批", "联网访问审批", "只改这一场"]) {
   ok(`词条：${key}`, new RegExp(`"${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}":`).test(DICT));
 }

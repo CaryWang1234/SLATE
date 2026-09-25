@@ -3,10 +3,10 @@
  * 遥控地址 + 二维码 / 模型选择 / 密钥管理 / 主题切换
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, toggleTheme, contextBudgetOf, fmtContextTokens, setReasoningEffort, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS } from "../store.js?v=20260925-004";
-import { get } from "../services/api.js?v=20260925-004";
-import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20260925-004";
-import { onTab } from "./m-app.js?v=20260925-004";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, toggleTheme, contextBudgetOf, fmtContextTokens, setReasoningEffort, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS } from "../store.js?v=20260925-007";
+import { get } from "../services/api.js?v=20260925-007";
+import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20260925-007";
+import { onTab } from "./m-app.js?v=20260925-007";
 
 function $id(id) { return document.getElementById(id); }
 
@@ -183,7 +183,7 @@ function renderEffortSection(box) {
   if (levels.length <= 1) {
     card.appendChild(mkRow({
       title: t("当前模型不支持推理强度设置"),
-      sub: t("端点能力未核实，SLATE 不会向它下发该字段"),
+      sub: t("端点能力未核实，不下发该字段"),
     }));
     box.appendChild(group);
     return;
@@ -207,7 +207,7 @@ function renderEffortSection(box) {
     const hint = document.createElement("div");
     hint.className = "m-setting-row-sub";
     hint.style.cssText = "padding:6px 12px 10px;";
-    hint.textContent = t("该端点只分开关，低/中/高都会按「开」下发");
+    hint.textContent = t("该端点只区分开关：低/中/高都按「开」下发");
     card.appendChild(hint);
   }
   box.appendChild(group);

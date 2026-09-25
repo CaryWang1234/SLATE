@@ -2,15 +2,15 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260925-004";
-import { aiModelFor, aiFeatureBlocked } from "../services/ai_features.js?v=20260925-004";
-import { get, streamChat } from "../services/api.js?v=20260925-004";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260925-004";
-import { t } from "../services/i18n.js?v=20260925-004";
-import { iconSvgEl } from "../services/icons.js?v=20260925-004";
-import { makeId } from "../services/utils.js?v=20260925-004";
-import { reportError } from "../services/error_sink.js?v=20260925-004";
-import { renderWorkflowView, startWorkflowTick, stopWorkflowTick, initBoardWorkflow } from "./board_workflow.js?v=20260925-004";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260925-007";
+import { aiModelFor, aiFeatureBlocked } from "../services/ai_features.js?v=20260925-007";
+import { get, streamChat } from "../services/api.js?v=20260925-007";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260925-007";
+import { t } from "../services/i18n.js?v=20260925-007";
+import { iconSvgEl } from "../services/icons.js?v=20260925-007";
+import { makeId } from "../services/utils.js?v=20260925-007";
+import { reportError } from "../services/error_sink.js?v=20260925-007";
+import { renderWorkflowView, startWorkflowTick, stopWorkflowTick, initBoardWorkflow } from "./board_workflow.js?v=20260925-007";
 
 // 逐元素求极值：把整个数组当实参展开时，笔迹点上万会让 V8 抛
 // RangeError: Maximum call stack size exceeded，所以这里一律不展开。

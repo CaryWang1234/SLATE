@@ -12,17 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260925-004";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-004";
-import { guardSkillCall } from "./riskguard.js?v=20260925-004";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-004";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260925-004";
-import { t } from "./i18n.js?v=20260925-004";
-import { makeId } from "./utils.js?v=20260925-004";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260925-004";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20260925-004";
-import { isAiToolOff } from "./ai_features.js?v=20260925-004";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260925-004";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260925-007";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-007";
+import { guardSkillCall } from "./riskguard.js?v=20260925-007";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-007";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260925-007";
+import { t } from "./i18n.js?v=20260925-007";
+import { makeId } from "./utils.js?v=20260925-007";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260925-007";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20260925-007";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20260925-007";
+import { isAiToolOff } from "./ai_features.js?v=20260925-007";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260925-007";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -592,7 +593,7 @@ const TOOLS = {
     params: {
       id: { type: "string", description: "Action id（yml 文件名，小写字母开头的 a-z0-9_-）", required: true },
       content: { type: "string", description: "完整的 SAY-1 YAML 原文", required: true },
-      scope: { type: "string", description: '写哪一份："global"（默认，本机所有项目共用）或 "project"（只进当前项目的 .slate/actions/，同名时顶掉全局那份）。用户明确说"这个项目里"才用 project', required: false },
+      scope: { type: "string", description: '写哪一份："global"（默认，本机所有项目共用）或 "project"（只进当前项目的 .slate/actions/，同名时顶掉全局版本）。用户明确说"这个项目里"才用 project', required: false },
     },
     async execute({ id, content, scope }, callCtx = {}) {
       try {
@@ -637,7 +638,7 @@ const TOOLS = {
         const d = res.data || {};
         await refreshActionSnapshot();
         const lines = [`已${d.created ? "创建" : "更新"} Action ${clean}（${d.stepCount} 步、${d.inputCount} 个输入项），落在 ${targetPath}。`];
-        if (writeScope === "project") lines.push("这一份只属于当前项目，同名时顶掉全局那份；删掉它会自动回落全局。");
+        if (writeScope === "project") lines.push("这一份只属于当前项目，同名时顶掉全局版本；删掉它会自动回落全局。");
         if (d.backedUp) lines.push(`原内容已留底（${d.backedUp}），可在 设置 → 技能与工具 → Actions 的历史里回滚。`);
         if (warnings.length) lines.push(`书写提醒：${warnings.join("；")}`);
         lines.push("Action 只是流程约定，本次任务仍要按步骤实际执行并完成验证。");
@@ -650,24 +651,37 @@ const TOOLS = {
 
   subagent_run: {
     name: "并行子代理",
-    description: "一次性派出多个子代理并行执行相互独立的子任务，全部完成后汇总各子代理结论返回。适用场景：互不依赖的多路调研/扫描/分析（如同时调研多个目录、多个技术方案并行试错、多文件独立审查）。每个子代理拥有与你相同的工具（读文件/执行命令/联网搜索等）与独立的运行上下文——子代理看不到主对话历史，因此每个 task 必须自包含（写清背景、目标、路径、期望产出）。agents 为对象数组，每项 {name: 简短中文名, task: 完整任务描述}；单次最多 5 个并行，多给的会被忽略。有依赖关系或需要共享上下文的任务不要用本工具，应分多轮串行处理。",
+    description: "一次性派出多个子代理并行执行相互独立的子任务，全部完成后汇总各子代理结论返回。适用场景：互不依赖的多路调研/扫描/分析（如同时调研多个目录、多个技术方案并行试错、多文件独立审查）。每个子代理拥有与你相同的工具（读文件/执行命令/联网搜索等）与独立的运行上下文——子代理看不到主对话历史，因此每个 task 必须自包含（写清背景、目标、路径、期望产出）。agents 为对象数组，每项 {name: 简短中文名, task: 完整任务描述}；单次最多 5 个并行，多给的会被忽略。有依赖关系或需要共享上下文的任务不要用本工具，应分多轮串行处理。background=true 时这批子代理转为后台任务：调用立刻返回任务编号，你不等结果、可以继续做别的或收口，跑完后系统会把结论作为一条后台任务消息送回给你（右栏任务面板同时给人看）；最多 3 批在跑，结果只在当前页面存活（刷新即终止）。",
     params: {
       agents: { type: "array", description: "子代理定义数组 [{name: 名称, task: 自包含任务描述}]，required: true" },
+      background: { type: "boolean", description: "true=转后台任务，立刻返回任务编号、不等结果；默认 false（等这一批跑完再返回汇总）" },
     },
-    async execute({ agents }, callCtx = {}) {
+    async execute({ agents, background }, callCtx = {}) {
       if (!Array.isArray(agents) || agents.length === 0 || !agents.some(a => a && String(a.task || "").trim())) {
         return "参数错误：agents 必须是非空数组，每项包含 {name, task}，且至少一项 task 非空。请修正后重发调用。";
       }
+      const deps = {
+        detect: detectToolCalls,
+        strip: stripToolCalls,
+        exec: executeTool,
+        toolsPrompt: getToolsSystemPrompt({ compact: true }),
+        // 事件账本 + 父调用 id：子代理的 started/finished 落在这一行账本上，星图据此画 spawn 边
+        ledger: callCtx.ledger || null,
+        parentCallId: callCtx.ledgerCallId || "",
+        // 事件出处：后台批次不该把实时面板画到用户此刻看着的那一场头上
+        scopeConvId: callCtx.convId || "",
+      };
+      if (background === true || background === "true") {
+        const started = startSubAgentJob({ agents, deps, convId: callCtx.convId || "" });
+        if (!started.ok) {
+          return `后台子代理批次未派出：同时最多 ${BG_SUBAGENT_MAX_JOBS} 批在跑。请改为等待其中一批结束（本轮不转后台），或先继续做别的事。`;
+        }
+        return `[已转后台] 任务编号 ${started.jobId}，共 ${agents.filter(a => a && String(a.task || "").trim()).length} 个子代理在跑。`
+          + "现在不要等待、也不要重复派出：可以继续推进别的工作，或直接收口。"
+          + "跑完后系统会以「后台任务消息」的形式把各子代理结论送回，届时再汇总给用户。";
+      }
       try {
-        const { results, skipped } = await runSubAgents(agents, {
-          detect: detectToolCalls,
-          strip: stripToolCalls,
-          exec: executeTool,
-          toolsPrompt: getToolsSystemPrompt({ compact: true }),
-          // 事件账本 + 父调用 id：子代理的 started/finished 落在这一行账本上，星图据此画 spawn 边
-          ledger: callCtx.ledger || null,
-          parentCallId: callCtx.ledgerCallId || "",
-        }, getSubAgentSignal());
+        const { results, skipped } = await runSubAgents(agents, deps, getSubAgentSignal());
 
         const statusText = { done: "完成", failed: "失败", stopped: "已停止", max_rounds: "轮次用尽" };
         const ok = results.filter(r => r.status === "done").length;
@@ -781,7 +795,7 @@ const TOOLS = {
       limit: { type: "number", description: "返回片段数，默认 5" },
     },
     async execute({ query, limit }, callCtx = {}) {
-      // 检索视野＝这一场的项目：项目里那份同名文档要顶掉全局那份
+      // 检索视野＝这一场的项目：项目版本同名文档要顶掉全局版本
       const res = await post("/knowledge/search", { query: query || "", limit: limit || 5, project: scopeProjectParam(callCtx) });
       if (res.code !== 0) return res.message || "知识库检索失败";
       const items = res.data || [];

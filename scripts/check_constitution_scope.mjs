@@ -96,8 +96,8 @@ assert.ok(!/^\s*state\.constitution = /m.test(APP), "app.js 里又直接赋值 s
 assert.match(APP, /toast\(t\("宪法不是合法 JSON，未保存"\)\)/, "非法 JSON 又静默吞掉了");
 
 // ── 5. 双语文案齐备 ───────────────────────────────────────────
-for (const key of ["正在编辑项目「{name}」的宪法：存进该项目的 .slate/config.json，只对这个项目生效",
-  "正在编辑全局宪法：打开带宪法的项目时，以该项目的宪法为准", "宪法不是合法 JSON，未保存", "项目宪法保存失败：{msg}"]) {
+for (const key of ["正在编辑项目「{name}」的宪法：存入该项目 .slate/config.json，只对该项目生效",
+  "正在编辑全局宪法：项目自带宪法时以项目为准", "宪法不是合法 JSON，未保存", "项目宪法保存失败：{msg}"]) {
   assert.ok(DICT.includes(`"${key}"`), `i18n 缺词条：${key}`);
 }
 

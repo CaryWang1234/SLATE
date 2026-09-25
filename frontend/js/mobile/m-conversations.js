@@ -3,11 +3,11 @@
  * 列表 / 切换 / 新建 / 重命名 / 删除（与桌面共享同一后端数据）
  */
 
-import { state, setConversations } from "../store.js?v=20260925-004";
-import { get, patch, del } from "../services/api.js?v=20260925-004";
-import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20260925-004";
-import { mLoadConversation, mNewConversation } from "./m-chat.js?v=20260925-004";
-import { onTab, switchTab } from "./m-app.js?v=20260925-004";
+import { state, setConversations } from "../store.js?v=20260925-007";
+import { get, patch, del } from "../services/api.js?v=20260925-007";
+import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20260925-007";
+import { mLoadConversation, mNewConversation } from "./m-chat.js?v=20260925-007";
+import { onTab, switchTab } from "./m-app.js?v=20260925-007";
 
 function $id(id) { return document.getElementById(id); }
 
@@ -113,7 +113,7 @@ function renderList() {
         else {
           if (state.currentConversationId === conv.id) {
             state.currentConversationId = null;
-            const { setMessages } = await import("../store.js?v=20260925-004");
+            const { setMessages } = await import("../store.js?v=20260925-007");
             setMessages([]);
           }
           await refreshConversations();

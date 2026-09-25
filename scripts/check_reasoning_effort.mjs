@@ -184,8 +184,8 @@ assert.match(CHAT, /echoEffortFallback\(state\.currentModel, dropped\)/,
   "桌面回落档位没回声，用户只会觉得怎么改都不生效");
 assert.match(CHAT, /const justSwitched = !!effortControlModel/,
   "开机带回旧档位也弹提示会变成每次启动一条噪声：要区分是不是刚切了模型");
-for (const key of ["推理强度：{level}", "该端点只分开关，低/中/高都会按「开」下发", "（不下发）",
-  "端点能力未核实，SLATE 不会向它下发该字段", "{model} 不支持「{level}」推理强度，已回落自动"]) {
+for (const key of ["推理强度：{level}", "该端点只区分开关：低/中/高都按「开」下发", "（不下发）",
+  "端点能力未核实，不下发该字段", "{model} 不支持「{level}」推理强度，已回落自动"]) {
   assert.ok(DICT.includes(`"${key}"`), `i18n 缺少词条 ${key}，英文界面会露出中文`);
 }
 
@@ -356,7 +356,11 @@ assert _rejects_reasoning_field({"enable_thinking": True}, "enable_thinking is n
 assert _without_reasoning({"model": "m"})[1] == [], "没加过字段就不该重发"
 print("OK")
 `;
-const run = spawnSync("python", ["-c", PY_TEST], { cwd: ROOT, encoding: "utf8" });
+// PYTHONIOENCODING 必须显式给 utf-8：子进程按控制台代码页写 stderr 时，
+// 中文断言的失败话术会变成乱码，人读不了、变异 harness 的 expect 也匹配不上。
+const run = spawnSync("python", ["-c", PY_TEST], {
+  cwd: ROOT, encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+});
 assert.equal(run.status, 0, `后端构建函数断言失败：\n${run.stdout || ""}${run.stderr || ""}`);
 assert.match(run.stdout, /OK/);
 

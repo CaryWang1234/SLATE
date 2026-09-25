@@ -3,14 +3,14 @@
  * 在设置页中展示已配置的外部 MCP Server，支持添加/删除/连接/断开。
  */
 
-import { get, post, del } from "../services/api.js?v=20260925-004";
-import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260925-004";
-import { refreshSkills } from "./skill_panel.js?v=20260925-004";
-import { iconSvgEl } from "../services/icons.js?v=20260925-004";
-import { mcpIconKey } from "../services/mcp_logos.js?v=20260925-004";
-import { state, subscribe } from "../store.js?v=20260925-004";
-import { t } from "../services/i18n.js?v=20260925-004";
-import { forgetScopeCatalog } from "../services/project_scope.js?v=20260925-004";
+import { get, post, del } from "../services/api.js?v=20260925-007";
+import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260925-007";
+import { refreshSkills } from "./skill_panel.js?v=20260925-007";
+import { iconSvgEl } from "../services/icons.js?v=20260925-007";
+import { mcpIconKey } from "../services/mcp_logos.js?v=20260925-007";
+import { state, subscribe } from "../store.js?v=20260925-007";
+import { t } from "../services/i18n.js?v=20260925-007";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20260925-007";
 
 let serverListEl, btnAdd, btnRefresh;
 
@@ -43,7 +43,7 @@ function renderServerList(servers) {
   if (!servers || !servers.length) {
     const empty = document.createElement("div");
     empty.className = "mcp-server-empty";
-    empty.textContent = "暂未配置外部 MCP Server，点击「+ 添加 MCP Server」开始连接";
+    empty.textContent = "尚未配置外部 MCP Server，点「+ 添加 MCP Server」开始连接";
     serverListEl.appendChild(empty);
     return;
   }
@@ -71,13 +71,13 @@ function renderServerList(servers) {
     nameRow.className = "mcp-server-name";
     nameRow.appendChild(statusDot); // 状态灯贴着名字：头像只说明"是哪一家"，不说明连没连上
     nameRow.appendChild(document.createTextNode(srv.name || srv.id));
-    // 这台在当前项目里到底用不用，取决于掩码还是全局那份——两者关错的代价不同：
+    // 这台在当前项目里到底用不用，取决于掩码还是全局版本——两者关错的代价不同：
     // 关全局会把所有项目共用的服务器停掉，所以这一行必须写在名字旁边。
     if (srv.enableScope === "project") {
       const badge = document.createElement("span");
       badge.className = "mcp-server-scope-badge";
       badge.textContent = srv.effectiveEnabled ? t("本项目单独启用") : t("本项目单独停用");
-      badge.title = t("这条结论来自项目「{name}」的掩码，只影响这个项目", { name: state.project?.name || "" });
+      badge.title = t("来自项目「{name}」的掩码，只影响该项目", { name: state.project?.name || "" });
       nameRow.appendChild(badge);
     } else if (srv.effectiveEnabled === false) {
       const badge = document.createElement("span");
@@ -135,7 +135,7 @@ function renderServerList(servers) {
     btnDelete.addEventListener("click", () => handleRemove(srv.id, srv.name));
     actions.appendChild(btnDelete);
 
-    // 项目掩码：只改"这一项目用不用它"，全局那份配置原样留着（URL 与密钥也绝不进项目目录）
+    // 项目掩码：只改"这一项目用不用它"，全局版本配置原样留着（URL 与密钥也绝不进项目目录）
     const scopeBtn = buildProjectMaskButton(srv);
     if (scopeBtn) actions.appendChild(scopeBtn);
 
@@ -149,19 +149,19 @@ function renderServerList(servers) {
 /**
  * 这一项目在服务器上能做的下一步动作。三种现场各有不同文案，因为"下一步"不等价：
  * 用着 → 停用（写掩码）；项目里已停用 → 摘掉掩码（回到跟全局）；
- * 全局本来就停用 → 单独启用（掩码写回 true，这台在项目里盖过全局那份）。
+ * 全局本来就停用 → 单独启用（掩码写回 true，这台在项目里盖过全局版本）。
  * 没打开项目时返回 null：掩码没有归属，这一列不该出现。
  */
 function projectMaskIntent(srv) {
   const pid = activeProjectId();
   if (!pid) return null;
   if (srv.effectiveEnabled !== false) {
-    return { label: t("在本项目停用"), hint: t("只在这个项目里不用它，别的项目照旧"), mask: { enabled: false }, pid };
+    return { label: t("在本项目停用"), hint: t("只在当前项目停用，其他项目不受影响"), mask: { enabled: false }, pid };
   }
   if (srv.enableScope === "project") {
-    return { label: t("摘掉本项目掩码"), hint: t("摘掉后这台服务器回到跟全局那份"), mask: null, pid };
+    return { label: t("摘掉本项目掩码"), hint: t("摘掉后这台服务器改用全局配置"), mask: null, pid };
   }
-  return { label: t("在本项目单独启用"), hint: t("全局那份是停用；这一项目单独启用它，别的项目不受影响"), mask: { enabled: true }, pid };
+  return { label: t("在本项目单独启用"), hint: t("全局为停用，该项目单独启用，不影响其他项目"), mask: { enabled: true }, pid };
 }
 
 function buildProjectMaskButton(srv) {

@@ -3,13 +3,13 @@
  * + Actions（data/actions/*.yml 流程说明书：可编辑、试校验、删除、留底回滚）。
  */
 
-import { state, subscribe, setSkills, setActions } from "../store.js?v=20260925-004";
-import { get, post, put, del, upload } from "../services/api.js?v=20260925-004";
-import { guardSkillCall } from "../services/riskguard.js?v=20260925-004";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260925-004";
-import { t } from "../services/i18n.js?v=20260925-004";
-import { setIconText } from "../services/icons.js?v=20260925-004";
-import { forgetScopeCatalog } from "../services/project_scope.js?v=20260925-004";
+import { state, subscribe, setSkills, setActions } from "../store.js?v=20260925-007";
+import { get, post, put, del, upload } from "../services/api.js?v=20260925-007";
+import { guardSkillCall } from "../services/riskguard.js?v=20260925-007";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260925-007";
+import { t } from "../services/i18n.js?v=20260925-007";
+import { setIconText } from "../services/icons.js?v=20260925-007";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20260925-007";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -339,8 +339,8 @@ let actionValidateTimer = null;
 let actionDraftSeq = 0;          // 校验是异步的：迟到的旧结果不许覆盖新输入
 
 /*
- * 两份 Action 长得很像，改错一份的代价却不小：全局那份是所有项目共用的，
- * 项目那份只在打开这个项目时顶掉同名全局那份。所以列表上标来源，编辑器里
+ * 两份 Action 长得很像，改错一份的代价却不小：全局版本是所有项目共用的，
+ * 项目那份只在打开这个项目时顶掉同名全局版本。所以列表上标来源，编辑器里
  * 写明"现在改的是哪一份"，保存/删除/历史也都按这一份的落点走——与分项目宪法同一套文案。
  */
 function activeProjectId() {
@@ -350,11 +350,11 @@ function activeProjectId() {
 /** 编辑器上方那行落点说明（没有项目视野时不提项目覆盖）。 */
 function describeActionScope(scope) {
   if (scope === "project") {
-    return t("正在编辑项目「{name}」的 Action：存进该项目的 .slate/actions/，同名时顶掉全局那份", { name: state.project?.name || "" });
+    return t("正在编辑项目「{name}」的 Action：存入该项目 .slate/actions/，同名时优先于全局", { name: state.project?.name || "" });
   }
   return activeProjectId()
-    ? t("正在编辑全局 Action：打开带同名 Action 的项目时，以该项目 .slate/actions/ 里那份为准")
-    : t("正在编辑全局 Action：所有项目共用这一份");
+    ? t("正在编辑全局 Action：项目内同名 Action 优先于这一份")
+    : t("正在编辑全局 Action：所有项目共用");
 }
 
 function renderActionsSection() {
@@ -395,7 +395,7 @@ function createActionItem(action) {
     const scopeBadge = document.createElement("span");
     scopeBadge.className = "skill-kind-badge skill-kind-scope";
     scopeBadge.textContent = t("本项目");
-    scopeBadge.title = t("只在这个项目里生效，同名时顶掉全局那份");
+    scopeBadge.title = t("只在这个项目生效，同名时覆盖全局版本");
     nameRow.appendChild(scopeBadge);
   }
   // 模型代写的流程要显式标出来：它等于模型往自己的系统提示里加过料
@@ -473,7 +473,7 @@ function paintActionScopeHint() {
 }
 
 async function handleCreateAction() {
-  const raw = await dlgPrompt(t("id 会作为文件名（data/actions/<id>.yml）：小写字母开头，可用数字、_ 和 -，不超过 48 字"), {
+  const raw = await dlgPrompt(t("id 即文件名（data/actions/<id>.yml）：小写字母开头，可含数字、_ 和 -，不超过 48 字"), {
     title: t("新建 Action"),
     okText: t("创建"),
     placeholder: "weekly_report",
@@ -492,7 +492,7 @@ async function handleCreateAction() {
   }
   resetActionModalChrome(id, { isNew: true });
   actionModalMeta.textContent = `data/actions/${id}.yml · ${t("尚未创建")}`;
-  setActionNote(t("按 SAY-1 子集书写：缩进只用空格（每层 2 格），列表用「- 」块式写法，禁止 Tab 与行内 {}/[]，首行不要写 ---"), "muted");
+  setActionNote(t("按 SAY-1 子集书写：缩进用空格（每层 2 格），列表用「- 」块式写法，禁止 Tab、行内 {}/[] 与首行 ---"), "muted");
   actionModal.classList.remove("hidden");
   validateActionDraft();
   actionEditor.focus();
@@ -587,7 +587,7 @@ async function saveAction(targetScope = "") {
       currentActionScope = d.scope === "project" ? "project" : "global";
       paintActionScopeHint();
       showToast(currentActionScope === "project"
-        ? t("已保存项目里的 Action {id}（同名时顶掉全局那份）", { id })
+        ? t("已保存到项目：Action {id}（同名时覆盖全局版本）", { id })
         : t("已保存全局 Action {id}", { id }));
       actionExists = true;
       btnActionDelete.classList.remove("hidden");
@@ -595,7 +595,7 @@ async function saveAction(targetScope = "") {
       actionModalMeta.textContent = [
         d.path || `data/actions/${id}.yml`,
         t("流程 {n} 步", { n: d.stepCount }),
-        d.backedUp ? t("原内容已留底 {ts}", { ts: formatHistoryTs(d.backedUp) }) : "",
+        d.backedUp ? t("原内容已存入「历史版本」{ts}", { ts: formatHistoryTs(d.backedUp) }) : "",
       ].filter(Boolean).join(" · ");
       setActionNote((d.warnings || []).length
         ? t("已写入。书写提醒：{msg}", { msg: d.warnings.join("；") })
@@ -614,7 +614,7 @@ async function saveAction(targetScope = "") {
   }
 }
 
-/** 把编辑器里这份另存为当前项目的覆盖版（全局那份原样留着）。 */
+/** 把编辑器里这份另存为当前项目的覆盖版（全局版本原样留着）。 */
 async function saveActionAsProjectOverride() {
   await saveAction("project");
 }
@@ -626,8 +626,8 @@ async function deleteAction() {
   const inProject = currentActionScope === "project" && Boolean(pid);
   const ok = await dlgConfirm(
     inProject
-      ? t("确定摘掉项目里的 Action {id}？摘掉后这一项目回到全局那一份（若存在）。删除前的内容会留底，可在「历史版本」里回滚。", { id })
-      : t("确定删除全局 Action {id}？所有项目共用这一份，删了别的项目也读不到它。删除前的内容会留底，可在「历史版本」里回滚。", { id }),
+      ? t("确定摘掉项目里的 Action {id}？摘掉后该项目改用全局版本。原内容会存入「历史版本」，可随时回滚。", { id })
+      : t("确定删除全局 Action {id}？所有项目共用这一份，删除后各项目都不再读到。原内容会存入「历史版本」，可随时回滚。", { id }),
     { danger: true, okText: inProject ? t("摘掉覆盖") : t("删除"), title: t("删除 Action") });
   if (!ok) return;
   try {
@@ -683,8 +683,8 @@ async function renderActionHistory() {
     }
     const tip = document.createElement("div");
     tip.className = "action-history-tip";
-    tip.textContent = (currentActionScope === "project" ? t("以下是项目那一份的留底。") : t("以下是全局那一份的留底。"))
-      + t("每次覆盖或删除都会留底，每份最多保留 {n} 版。", { n: res.data?.keep || 5 });
+    tip.textContent = (currentActionScope === "project" ? t("以下是项目版本的备份。") : t("以下是全局版本的备份。"))
+      + t("每次覆盖或删除都会存入「历史版本」，每份最多保留 {n} 版。", { n: res.data?.keep || 5 });
     actionHistory.appendChild(tip);
     if (!rows.length) {
       const empty = document.createElement("div");
@@ -732,8 +732,8 @@ function createHistoryRow(version) {
   restoreBtn.textContent = t("回滚");
   restoreBtn.addEventListener("click", async () => {
     const inProject = currentActionScope === "project";
-    const ok = await dlgConfirm(t("回滚{scope} Action {id} 到 {ts}？当前内容会先留底。", {
-      scope: inProject ? t("项目里那份") : t("全局那份"), id: currentActionId, ts: formatHistoryTs(version.ts),
+    const ok = await dlgConfirm(t("回滚{scope} Action {id} 到 {ts}？当前内容会先存入「历史版本」。", {
+      scope: inProject ? t("项目版本") : t("全局版本"), id: currentActionId, ts: formatHistoryTs(version.ts),
     }), { okText: t("回滚"), title: t("回滚 Action") });
     if (!ok) return;
     try {

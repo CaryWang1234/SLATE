@@ -10,7 +10,7 @@
  * 直接 import 真实现（不复制代码），在 Node 侧跑，不依赖浏览器。
  */
 import assert from "node:assert/strict";
-import { BUILTIN, parseCustom } from "../frontend/js/components/typing_game.js?v=20260925-004";
+import { BUILTIN, parseCustom } from "../frontend/js/components/typing_game.js?v=20260925-007";
 
 const ASCII_OK = /^[\x20-\x7e]+$/;
 

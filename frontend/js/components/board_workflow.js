@@ -17,11 +17,11 @@
 import {
   state, subscribe, setChatMode, setReasoningEffort,
   reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS,
-} from "../store.js?v=20260925-004";
-import { get } from "../services/api.js?v=20260925-004";
-import { t } from "../services/i18n.js?v=20260925-004";
-import { iconSvgEl } from "../services/icons.js?v=20260925-004";
-import { renderStarMap, highlightStar, memberHue } from "../services/star_map.js?v=20260925-004";
+} from "../store.js?v=20260925-007";
+import { get } from "../services/api.js?v=20260925-007";
+import { t } from "../services/i18n.js?v=20260925-007";
+import { iconSvgEl } from "../services/icons.js?v=20260925-007";
+import { renderStarMap, highlightStar, memberHue } from "../services/star_map.js?v=20260925-007";
 
 const PREF_KEY = "slate_board_wf_prefs";
 const TICK_MS = 1000;
@@ -223,7 +223,7 @@ function actionCard(action) {
     const list = await loadSteps(action.id);
     if (!list.length) {
       const li = document.createElement("li");
-      li.textContent = t("（这份说明书没有列步骤）");
+      li.textContent = t("（这份说明书没有列出步骤）");
       steps.appendChild(li);
       return;
     }
@@ -339,7 +339,7 @@ function buildRunBar() {
   bar.append(stop, resume, autopilot, modeSel, effortSel);
   bar.append(
     btn(t("去团队"), t("到对话面板的团队模式"), async () => {
-      const { openTeamConversation } = await import("../app.js?v=20260925-004");
+      const { openTeamConversation } = await import("../app.js?v=20260925-007");
       openTeamConversation?.();
     }),
   );
@@ -372,7 +372,7 @@ function syncEffortOptions() {
   sel.title = allowed.length <= 1
     ? t("当前端点不支持下发思考档位")
     : REASONING_COLLAPSED_CAPS.has(cap)
-      ? t("该端点只分开关，低/中/高都会按「开」下发")
+      ? t("该端点只区分开关：低/中/高都按「开」下发")
       : t("思考强度");
 }
 

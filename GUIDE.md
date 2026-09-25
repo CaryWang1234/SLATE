@@ -246,6 +246,12 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 - Windows 下 `terminal` 会隐藏 PowerShell 子窗口，并对 Python / Node / Git / npm / rg 等原生命令做 Unicode-safe 输出捕获
 - Windows 下 `terminal` 一条命令一个 PowerShell 进程：多行块（`foreach` / `if`）直接执行，`&&` / `||` 在 PowerShell 5.1 上自动翻成 `if ($?)` 嵌套，语法错误带非零退出码原样返回；会话保持 `cd` 与 `$env:`（PowerShell 变量不跨命令），裸 `python` / `node` 这类交互式 REPL 拿不到输入会立刻退出
 
+**两类后台活：**
+
+- `bg_task`：终端里的耗时活儿（起服务、编译、训练、长测试）交给它，`action=start` 立刻返回，模型不必守着；结束时（或命中你给的正则）系统带着输出尾巴把模型叫醒。任务活在 SLATE 后端进程里，日志落在 `data/bg_tasks/`
+- `subagent_run` 带 `background=true`：并行子代理这一批也可以转后台，模型拿到任务编号就继续干别的，跑完后各份结论走同一条「后台任务消息」通道回来叫醒模型（唤醒、徽标与终端任务共用一套）。区别只在寿命——这一批活在浏览器页面里，刷新或关掉页面即止
+- 两路后台排在右栏「后台任务」面板的同一张列表里，看状态、看输出/结论、就地停止都在那儿；同时最多 3 批子代理在跑
+
 **Actions 流程说明书：**
 
 上面的工具是「手」，Action 是「步骤约定」——把某件重复任务的必要流程写成一份 yml，模型按它推进，而不是每次重新猜。
@@ -641,6 +647,12 @@ SLATE includes 35 built-in MCP tools. The model decides when to use them during 
 - Chinese, emoji, and full-width symbols are preserved as-is; if a legacy encoding cannot represent a new character, the tool safely upgrades the write encoding instead of losing text
 - On Windows, `terminal` hides PowerShell windows and captures Unicode-safe output for native commands such as Python / Node / Git / npm / rg
 - On Windows `terminal` runs one PowerShell process per command: multi-line blocks (`foreach` / `if`) execute directly, `&&` / `||` are rewritten into `if ($?)` nesting on PowerShell 5.1, and a syntax error comes back verbatim with a failing exit code. The session keeps `cd` and `$env:` (PowerShell variables do not cross commands), and interactive REPLs such as bare `python` / `node` exit at once instead of holding the task open
+
+**Two kinds of background work:**
+
+- `bg_task`: hand the slow terminal jobs (servers, compiles, training, long test suites) over — `action=start` returns at once so the model does not have to sit and watch, and when the task ends (or matches the regex you gave) the system wakes it with an output tail. The task lives in the SLATE backend process; logs land in `data/bg_tasks/`
+- `subagent_run` with `background=true`: a parallel subagent batch can go background too — the model takes a task id and carries on, and when the batch finishes every conclusion arrives through that same background-task message channel (one wake path, one badge system, shared with terminal tasks). The difference is lifetime: a batch lives in the browser page, so reloading or closing the tab ends it
+- Both kinds share one list in the right-rail Background Tasks panel — state, output / conclusions, and the stop button all live there; at most 3 subagent batches run at once
 
 **Action Playbooks:**
 

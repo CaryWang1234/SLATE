@@ -194,7 +194,7 @@ ok("三个取值持久化且越界回落（脏值不该让并行整体失灵）"
   && /backgroundRuns: state\.backgroundRuns !== false/.test(STORE)
   && /function normalizeCount\(value, min, max, fallback\)/.test(REG));
 ok("新文案双语齐全", has(I18N, '"排队中"') && has(I18N, '"去看这一场"')
-  && has(I18N, '"已达并行上限，已排队') && has(I18N, '"切走会话时让它继续跑'));
+  && has(I18N, '"已达并行上限，已排队') && has(I18N, '"切走会话时让它继续运行'));
 ok("旧的布尔单例没被留在别处当第二真源",
   !/state\.generating/.test(CHAT) && !/state\.generating/.test(STORE));
 

@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260925-004">
+  <link rel="stylesheet" href="./css/style.css?v=20260925-007">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -498,7 +498,7 @@
           <div class="settings-block-head">
             <div>
               <h2>用量统计</h2>
-              <p>全部对话的累计 token 用量（随对话发送自动更新）</p>
+              <p>全部对话累计 token 用量（随发送更新）</p>
             </div>
           </div>
           <div id="usage-summary" class="usage-summary">
@@ -516,7 +516,7 @@
           <div class="setting-group">
             <label class="setting-label">上下文 Token 上限</label>
             <input id="setting-max-tokens" type="number" class="setting-input" value="64000">
-            <div class="setting-hint">内置模型的「自动」已经按各自标称窗口取默认上限；这一档是兜底预算，给没有标称窗口的模型（自定义 / 本地）用。想单独调某个模型，用「模型配置」里每行的「最大上下文」滑杆；自动压缩阈值与上下文条都按同一个数算。</div>
+            <div class="setting-hint">内置模型的「自动」已按各自标称窗口取默认上限，这一档只给没有标称窗口的模型（自定义 / 本地）兜底。要单独调某个模型，用「模型配置」里该行的「最大上下文」滑杆；压缩阈值与上下文条按同一个数计算。</div>
           </div>
           <div class="setting-group">
             <label class="setting-label">单次输出 Token 上限</label>
@@ -524,11 +524,11 @@
           </div>
           <label class="setting-check">
             <input id="setting-output-unlimited" type="checkbox" checked>
-            <span>输出文件时不限制输出长度（提升到 65536，防止大文件被截断）</span>
+            <span>输出文件时把长度上限提升到 65536，避免大文件被截断</span>
           </label>
           <label class="setting-check">
             <input id="setting-file-auto-apply" type="checkbox" checked>
-            <span>自动确认文件创建/修改（写入无需手动点「接受」；关闭后恢复预览确认）</span>
+            <span>自动确认文件创建与修改（写入无需点「接受」；关闭后恢复预览确认）</span>
           </label>
           <div class="setting-group">
             <label class="setting-label">项目宪法</label>
@@ -541,7 +541,7 @@
           <div class="settings-block-head">
             <div>
               <h2>自动推进</h2>
-              <p>回复疑似停顿时（过短只表态，或只陈述计划不动手），让审阅模型补出工具或技能调用；Autopilot 用完轮数时还能自动催它继续</p>
+              <p>回复疑似停顿（过短只表态，或只陈述计划而不调用工具）时，由审阅模型补出工具或技能调用；Autopilot 用完轮数时自动提醒模型继续</p>
             </div>
           </div>
           <label class="setting-check">
@@ -550,11 +550,11 @@
           </label>
           <label class="setting-check">
             <input id="setting-auto-review-long-stall" type="checkbox" checked>
-            <span>长回复停顿也审查（回复不短但通篇只描述下一步计划、未调用工具）</span>
+            <span>长回复同样审查（篇幅不短但只描述下一步计划、未调用工具）</span>
           </label>
           <label class="setting-check">
             <input id="setting-continue-autopilot" type="checkbox" checked>
-            <span>Continue Autopilot（Autopilot / 目标模式用完轮数上限时，若任务还没干完就提醒它继续，并追加轮数预算；追加次数有上限，不会无限续跑）</span>
+            <span>Continue Autopilot（Autopilot / 目标模式用完轮数上限而任务未完成时，提醒模型继续并追加轮数预算；追加次数有上限）</span>
           </label>
           <div class="setting-group">
             <label class="setting-label">审阅模型</label>
@@ -571,12 +571,12 @@
           <div class="settings-block-head">
             <div>
               <h2>AI 辅助功能</h2>
-              <p>除对话、团队对话、提示词工厂之外，每一处会自己去找模型要结果的功能都在这里：关掉就不再为它发请求，这里选的模型也只影响这一处</p>
+              <p>除对话、团队讨论、提示词工厂外，所有会自行调用模型的功能都在这里：关闭即不再发请求，所选模型也只影响该项</p>
             </div>
           </div>
           <div id="ai-feature-summary" class="setting-hint" style="margin-bottom: 6px;"></div>
           <div id="ai-feature-list" class="ai-feature-list"></div>
-          <div class="setting-hint" style="margin-top: 8px;">「自动推进」的审阅模型、「后台任务」的自动续跑在各自区块里，这里不重复设。</div>
+          <div class="setting-hint" style="margin-top: 8px;">「自动推进」的审阅模型与「后台任务」的自动续跑在各自区块设置，此处不重复</div>
         </section>
 
         <section class="settings-block" id="settings-notifications">
@@ -615,14 +615,14 @@
           <div class="settings-block-head">
             <div>
               <h2>多任务与项目</h2>
-              <p>切换项目不再打断正在生成的对话：离开的那场继续在后台跑，结局落进右栏任务中心</p>
+              <p>切换项目不再中断正在生成的对话：离开的那场继续后台运行，结果进入右栏任务中心</p>
             </div>
           </div>
           <label class="setting-check">
             <input id="setting-background-runs" type="checkbox" checked>
-            <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.9 4.9l2.9 2.9M16.2 16.2l2.9 2.9M2 12h4M18 12h4M4.9 19.1l2.9-2.9M16.2 7.8l2.9-2.9"/></svg>切走会话时让它继续跑（停止仍是显式按钮）</span>
+            <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.9 4.9l2.9 2.9M16.2 16.2l2.9 2.9M2 12h4M18 12h4M4.9 19.1l2.9-2.9M16.2 7.8l2.9-2.9"/></svg>切走会话时让它继续运行（停止仍用按钮显式触发）</span>
           </label>
-          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">关掉即旧行为：切换会话就中断当前生成。停止按钮在任何一种设置下都只停屏幕上这一场</div>
+          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">关闭后恢复原行为：切换会话即中断当前生成。停止按钮在任何设置下都只停当前这一场</div>
           <label class="setting-row">
             <span>同时最多跑几场</span>
             <select id="setting-max-parallel-runs">
@@ -640,7 +640,7 @@
               <option value="3">3</option>
             </select>
           </label>
-          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">同项目并行意味着两场同时改同一批文件，坏了难查是谁写的；没开工作区隔离前建议保持 1</div>
+          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">同项目并行会让两场同时改同一批文件，出问题难以定位来源；未开启工作区隔离时建议保持 1</div>
         </section>
 
         <section class="settings-block" id="settings-ui">
@@ -736,7 +736,7 @@
           <div class="settings-block-head">
             <div>
               <h2>审批模式</h2>
-              <p>每个对话的默认审批模式。单个对话可在输入框的审批模式选择器里随时改，改过的那一场不再跟着这里变；灾难级命令（rm -rf /、format 等）任何模式下都强制拦截</p>
+              <p>新对话的默认审批模式。单个对话可在输入框的选择器里改，改过后不再跟随这里；灾难级命令（rm -rf /、format 等）任何模式都强制拦截</p>
             </div>
           </div>
           <div class="permission-mode-row">
@@ -751,7 +751,7 @@
           <div class="settings-block-head">
             <div>
               <h2>工具 / 技能</h2>
-              <p>查看内置工具，管理 SKILL.md 技能与 Actions 流程</p>
+              <p>管理内置工具、SKILL.md 技能与 Actions 流程</p>
             </div>
           </div>
           <div id="skill-panel" class="skill-panel">
@@ -769,7 +769,7 @@
           <div class="settings-block-head">
             <div>
               <h2>MCP Server</h2>
-              <p>连接外部 MCP Server，扩展工具能力（SSE 传输协议）</p>
+              <p>连接外部 MCP Server 扩展工具能力（SSE 传输）</p>
             </div>
           </div>
           <div id="mcp-server-list" class="mcp-server-list"></div>
@@ -783,17 +783,17 @@
           <div class="settings-block-head">
             <div>
               <h2>数据备份与恢复</h2>
-              <p>一键导出全部数据（对话、记忆、素材与本地设置），换机或重装后可完整恢复</p>
+              <p>导出全部数据（对话、记忆、素材、设置），用于换机或重装后恢复</p>
             </div>
           </div>
           <div class="about-row">
             <label class="setting-label" style="margin-bottom:0;">备份</label>
-            <span class="setting-hint">导出为单个 JSON 文件，包含后端数据库与本地设置</span>
+            <span class="setting-hint">单个 JSON 文件，含后端数据库与本地设置</span>
             <button id="btn-backup-export" class="send-btn send-btn-sm" type="button"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>下载备份</span></button>
           </div>
           <div class="about-row">
             <label class="setting-label" style="margin-bottom:0;">恢复</label>
-            <span class="setting-hint"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>与 ID 合并导入，已存在的数据不会被覆盖</span></span>
+            <span class="setting-hint"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>按 id 合并导入，不覆盖已有数据</span></span>
             <button id="btn-backup-import" class="send-btn send-btn-sm" type="button">⤣ 导入备份</button>
             <input type="file" id="backup-file-input" accept=".json,application/json" hidden>
           </div>
@@ -801,7 +801,7 @@
           <div class="settings-block-head" style="margin-top:18px;">
             <div>
               <h2>存储空间</h2>
-              <p>查看各部分占用，按需压缩数据库或清理缓存</p>
+              <p>查看各部分占用，可压缩数据库或清理缓存</p>
             </div>
           </div>
           <div id="storage-usage" class="storage-usage">
@@ -814,7 +814,7 @@
           <div class="settings-block-head">
             <div>
               <h2>局域网遥控</h2>
-              <p>同一局域网内的手机 / 平板 / 其他电脑，用浏览器打开下面的地址即可遥控 SLATE，界面与主应用一致</p>
+              <p>局域网内的手机、平板或其他电脑用浏览器打开下方地址即可遥控，界面与主应用一致</p>
             </div>
             <button id="btn-lan-refresh" class="icon-btn" type="button" title="刷新地址"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
           </div>
@@ -827,7 +827,7 @@
           <div class="settings-block-head">
             <div>
               <h2>打字小游戏</h2>
-              <p>随手打一段代码或命令行，看看自己的手速和准确率（仅英文与符号）</p>
+              <p>输入一段代码或命令行，测测手速与准确率（仅英文与符号）</p>
             </div>
             <button id="btn-typing-next" class="send-btn send-btn-sm" type="button">换一句</button>
           </div>
@@ -859,7 +859,7 @@
               <button id="btn-typing-save" class="send-btn send-btn-sm" type="button">保存题库</button>
             </div>
           </details>
-          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">敲第一个字符开始计时，退格可改错，打完或按回车结束本局并换一句。</div>
+          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">首个字符开始计时，退格可改错；打完或按回车结束本局</div>
         </section>
 
         <section class="settings-block" id="settings-about">
@@ -942,7 +942,7 @@
         <div class="setting-group" id="project-registry-group">
           <label class="setting-label">在册项目</label>
           <div id="project-registry-list" class="project-registry-list"></div>
-          <div class="setting-hint">开过的项目都留在这儿，点一下就回去，接着上次的会话和草稿继续。</div>
+          <div class="setting-hint">历史项目都在这里，点击即可回到上次的会话与草稿</div>
         </div>
         <div class="setting-group">
           <label class="setting-label">项目目录路径</label>
@@ -957,7 +957,7 @@
           <input id="workspace-name-input" type="text" class="setting-input" placeholder="my-app">
           <textarea id="workspace-folders-input" class="setting-input workspace-folders-input" rows="3"
             placeholder="C:\Users\...\frontend&#10;C:\Users\...\backend"></textarea>
-          <div class="setting-hint">工作区把多个互不相关的文件夹收进同一个项目。同一时刻只在其中一个上工作，可随时切换当前文件夹。</div>
+          <div class="setting-hint">工作区把多个文件夹收进同一个项目，同一时刻只在其中一个上工作，可随时切换</div>
         </div>
       </div>
       <div class="modal-footer">
@@ -1232,7 +1232,7 @@
           <button id="btn-add-schedule" class="send-btn send-btn-sm">+ 添加任务</button>
         </div>
         <div id="schedule-list" class="schedule-list"></div>
-        <p class="schedule-note">定时/事件任务由本地后端执行：请保证 SLATE 运行，并确保所选模型已配置 API Key（仅支持 OpenAI 兼容模型）。结果将归档到标题带 [定时] 的新会话</p>
+        <p class="schedule-note">定时/事件任务由本地后端执行：需保持 SLATE 运行，且所选模型已配置 API Key（仅支持 OpenAI 兼容模型）。结果归档到标题带 [定时] 的新会话</p>
       </div>
     </div>
   </div>
@@ -1486,7 +1486,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260925-004"></script>
+  <script type="module" src="./js/app.js?v=20260925-007"></script>
 
 </body>
 </html>

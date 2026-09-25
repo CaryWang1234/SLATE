@@ -15,13 +15,13 @@
  * "切过去看"，不是"在这儿接着演"。
  */
 
-import { state, notify } from "../store.js?v=20260925-004";
-import { t } from "../services/i18n.js?v=20260925-004";
-import { iconSvgEl } from "../services/icons.js?v=20260925-004";
-import { get } from "../services/api.js?v=20260925-004";
-import { switchToProject } from "../services/project_scene.js?v=20260925-004";
-import { bgTasks, stopBgTask, clearFinishedBgTasks, peekBgEvents, bgInbox, startBgPolling, refreshBgTasks } from "../services/bg_tasks.js?v=20260925-004";
-import { abortRun } from "../services/run_registry.js?v=20260925-004";
+import { state, notify } from "../store.js?v=20260925-007";
+import { t } from "../services/i18n.js?v=20260925-007";
+import { iconSvgEl } from "../services/icons.js?v=20260925-007";
+import { get } from "../services/api.js?v=20260925-007";
+import { switchToProject } from "../services/project_scene.js?v=20260925-007";
+import { bgTasks, stopBgTask, clearFinishedBgTasks, peekBgEvents, bgInbox, startBgPolling, refreshBgTasks } from "../services/bg_tasks.js?v=20260925-007";
+import { abortRun } from "../services/run_registry.js?v=20260925-007";
 
 /** 展开的输出最多往回看多少行：面板是瞄一眼用的，不是完整日志阅读器 */
 const TAIL_LINES = 200;
@@ -173,7 +173,7 @@ function renderRunRow(run) {
       try {
         const pid = String(run.project_id || "");
         if (pid && pid !== String(state.project?.project_id || "")) await switchToProject(pid);
-        const { openConversation } = await import("./chat.js?v=20260925-004");
+        const { openConversation } = await import("./chat.js?v=20260925-007");
         await openConversation(run.conv_id);
       } finally {
         goBtn.disabled = false;
@@ -289,9 +289,11 @@ function renderRow(task) {
 
   const actions = document.createElement("div");
   actions.className = "bg-task-actions";
+  const isLocal = task.origin === "local";
   const logBtn = document.createElement("button");
   logBtn.className = "bg-icon-btn";
-  logBtn.title = t("看输出（最近 {n} 行）", { n: TAIL_LINES });
+  // 本地任务（后台子代理批次）没有日志文件可看，展开读的是它自己存的结论
+  logBtn.title = t(isLocal ? "看子代理结论" : "看输出（最近 {n} 行）", { n: TAIL_LINES });
   logBtn.appendChild(iconSvgEl("eye"));
   logBtn.addEventListener("click", () => toggleOutput(task.task_id));
   actions.appendChild(logBtn);
@@ -309,7 +311,7 @@ function renderRow(task) {
       try {
         const pid = String(task.project_id || "");
         if (pid && pid !== String(state.project?.project_id || "")) await switchToProject(pid);
-        const { openConversation } = await import("./chat.js?v=20260925-004");
+        const { openConversation } = await import("./chat.js?v=20260925-007");
         await openConversation(owner);
       } finally {
         goBtn.disabled = false;
@@ -320,7 +322,7 @@ function renderRow(task) {
   if (task.state === "running") {
     const stopBtn = document.createElement("button");
     stopBtn.className = "bg-icon-btn bg-icon-danger";
-    stopBtn.title = t("停止任务（杀整棵进程树）");
+    stopBtn.title = t(isLocal ? "停止这批子代理" : "停止任务（杀整棵进程树）");
     stopBtn.appendChild(iconSvgEl("ban"));
     stopBtn.addEventListener("click", async () => {
       stopBtn.disabled = true;
@@ -354,6 +356,12 @@ async function toggleOutput(taskId) {
 }
 
 async function fetchOutput(taskId) {
+  const local = bgTasks().find(x => x.task_id === taskId && x.origin === "local");
+  if (local) {
+    // 后台子代理批次活在页面里，没有 /bg-tasks 那条路由：结论就在任务对象上
+    outputCache[taskId] = String(local.output || "").trim() || t("（这一批还没有结论）");
+    return;
+  }
   try {
     const res = await get(`/bg-tasks/${encodeURIComponent(taskId)}?tail_lines=${TAIL_LINES}`);
     const body = res?.code === 0 ? (res.data?.task?.output || "") : (res?.message || "");

@@ -122,8 +122,8 @@ assert.ok(inputLine && !inputLine.includes("setModelContextCap"),
 
 // ── 5. 双语文案齐备 ────────────────────────────────────────────
 const DICT = read("frontend/js/services/i18n_dict.js");
-for (const key of ["最大上下文", "自动压缩阈值与上下文条都按 {b} 计算", "超出模型标称窗口，已按 {w} 封顶",
-  "自动取该模型的默认上限：标称窗口 {w} 留两成余量，压缩阈值与上下文条都按 {b} 计算",
+for (const key of ["最大上下文", "压缩阈值与上下文条都按 {b} 计算", "超出模型标称窗口，已按 {w} 封顶",
+  "按该模型标称窗口 {w} 留两成余量：压缩阈值与上下文条都按 {b} 计算",
   "预算 {b} · 模型窗口 {w}", "点按调整该模型的上下文预算"]) {
   assert.ok(DICT.includes(`"${key}"`), `i18n 缺词条：${key}`);
 }

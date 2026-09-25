@@ -9,14 +9,14 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260925-004";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260925-004";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260925-004";
-import { t } from "../services/i18n.js?v=20260925-004";
-import { aiModelFor, aiFeatureBlocked, isAiFeatureOn } from "../services/ai_features.js?v=20260925-004";
-import { iconSvgEl } from "../services/icons.js?v=20260925-004";
-import { makeId } from "../services/utils.js?v=20260925-004";
-import { initVaultPanel, openVaultPanel } from "./vault.js?v=20260925-004";
+} from "../store.js?v=20260925-007";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260925-007";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260925-007";
+import { t } from "../services/i18n.js?v=20260925-007";
+import { aiModelFor, aiFeatureBlocked, isAiFeatureOn } from "../services/ai_features.js?v=20260925-007";
+import { iconSvgEl } from "../services/icons.js?v=20260925-007";
+import { makeId } from "../services/utils.js?v=20260925-007";
+import { initVaultPanel, openVaultPanel } from "./vault.js?v=20260925-007";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -236,7 +236,7 @@ function renderMemoryList() {
       const newText = await dlgPrompt("编辑记忆内容：", { title: "编辑记忆", value: mem.content, textarea: true });
       if (newText !== null && newText.trim()) {
         try { await saveMemoryUpdate(mem.id, { content: newText }); }
-        catch (e) { import("../app.js?v=20260925-004").then(({ toast }) => toast(t("保存失败: {msg}", { msg: e.message }))); }
+        catch (e) { import("../app.js?v=20260925-007").then(({ toast }) => toast(t("保存失败: {msg}", { msg: e.message }))); }
       }
     });
     item.appendChild(content);
@@ -253,7 +253,7 @@ function renderMemoryList() {
       const newCat = await dlgPrompt("编辑分类：", { title: "编辑分类", options, value: mem.category });
       if (newCat !== null && newCat.trim()) {
         try { await saveMemoryUpdate(mem.id, { category: newCat }); }
-        catch (e) { import("../app.js?v=20260925-004").then(({ toast }) => toast(t("保存失败: {msg}", { msg: e.message }))); }
+        catch (e) { import("../app.js?v=20260925-007").then(({ toast }) => toast(t("保存失败: {msg}", { msg: e.message }))); }
       }
     });
     actions.appendChild(editBtn);
@@ -277,12 +277,12 @@ function renderMemoryList() {
 async function extractMemoriesFromConversation() {
   if (aiFeatureBlocked("memory_extract")) return;
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260925-004");
+    const { toast } = await import("../app.js?v=20260925-007");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260925-004");
+  const { toast } = await import("../app.js?v=20260925-007");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -517,7 +517,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || overwritten || deleted || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260925-004");
+      const { toast } = await import("../app.js?v=20260925-007");
       let msg = "";
       if (added) msg += t("新增 {n} 条", { n: added });
       if (overwritten) msg += (msg ? "，" : "") + t("覆盖 {n} 条", { n: overwritten });
@@ -545,10 +545,10 @@ async function showAddMemoryDialog() {
 
   try {
     const saved = await saveNewMemory({ category, content });
-    const { toast } = await import("../app.js?v=20260925-004");
+    const { toast } = await import("../app.js?v=20260925-007");
     toast(saved ? t("记忆已添加") : t("已存在相似记忆，已跳过"));
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260925-004");
+    const { toast } = await import("../app.js?v=20260925-007");
     toast(t("保存失败: {msg}", { msg: e.message }));
   }
 }
@@ -557,7 +557,7 @@ function renderKnowledgeList(items = []) {
   if (!knowledgeList) return;
   knowledgeList.innerHTML = "";
   if (!items.length) {
-    knowledgeList.innerHTML = '<div class="memory-empty">暂无知识条目<br><small>可以添加笔记、项目背景、资料摘录等长期可复用内容</small></div>';
+    knowledgeList.innerHTML = '<div class="memory-empty">暂无知识条目<br><small>可添加笔记、项目背景、资料摘录等长期复用内容</small></div>';
     return;
   }
   for (const item of items) {
@@ -577,7 +577,7 @@ function renderKnowledgeList(items = []) {
       const badge = document.createElement("span");
       badge.className = "knowledge-scope-badge";
       badge.textContent = t("本项目");
-      badge.title = t("这条只属于当前项目，同名时会顶掉全局那条");
+      badge.title = t("只属于当前项目，同名时优先于全局那条");
       head.appendChild(badge);
     }
     head.appendChild(meta);
@@ -594,10 +594,10 @@ function renderKnowledgeList(items = []) {
     delBtn.title = "删除";
     delBtn.addEventListener("click", async () => {
       if (!await dlgConfirm(t("删除知识「{title}」？", { title: item.title || item.id }), { danger: true, okText: "删除" })) return;
-      // 点名这一视野：后端会拒绝"在项目视野里删全局那份"（那会带走别的项目共用的文档）
+      // 点名这一视野：后端会拒绝"在项目视野里删全局版本"（那会带走别的项目共用的文档）
       const res = await del(`/knowledge/docs/${item.doc_id || item.id}${knowledgeProjectQuery()}`);
       if (res?.code) {
-        const { toast } = await import("../app.js?v=20260925-004");
+        const { toast } = await import("../app.js?v=20260925-007");
         toast(res.message || t("删除失败"));
       }
       await loadKnowledgeDocs();
@@ -612,7 +612,7 @@ function renderKnowledgeList(items = []) {
 }
 
 /*
- * 知识面板按「屏幕上这个项目」的视野取：项目里那份同名文档顶掉全局那份，
+ * 知识面板按「屏幕上这个项目」的视野取：项目版本同名文档顶掉全局版本，
  * 别的项目的文档不进这一视野（长期记忆是全局的，不会因为进了项目就消失）。
  */
 function knowledgeProjectQuery() {
@@ -654,12 +654,12 @@ async function addKnowledgeDialog() {
   if (title === null) return;
   const content = await dlgPrompt("知识内容：", { title: "添加知识", textarea: true, rows: 8 });
   if (!content || !content.trim()) return;
-  // 开着项目时先问落点：这两份不是同一个东西——全局那份所有项目共用，
-  // 项目那份只在这个项目里生效（同名时还会把全局那份顶掉）。
+  // 开着项目时先问落点：这两份不是同一个东西——全局版本所有项目共用，
+  // 项目那份只在这个项目里生效（同名时还会把全局版本顶掉）。
   let project = "";
   if (state.project?.project_id) {
     const inProject = await dlgConfirm(
-      t("这条知识存哪一份？存进项目「{name}」只在这个项目里可见（同名时顶掉全局那条）；点「存为全局」则所有项目共用。", { name: state.project.name || "" }),
+      t("这条知识存哪里？存进项目「{name}」只在该项目可见（同名时优先于全局）；点「存为全局」则所有项目共用。", { name: state.project.name || "" }),
       { okText: t("存进本项目"), cancelText: t("存为全局"), title: t("添加知识") },
     );
     if (inProject) project = String(state.project.project_id);
@@ -673,7 +673,7 @@ async function addKnowledgeDialog() {
       project,
     });
     if (res.code === 0) {
-      const { toast } = await import("../app.js?v=20260925-004");
+      const { toast } = await import("../app.js?v=20260925-007");
       toast("知识已添加");
       await loadKnowledgeDocs();
     }
@@ -832,7 +832,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260925-004").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260925-007").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗？", { danger: true, okText: "重置" })) {
@@ -982,7 +982,7 @@ async function captureConversationSpark() {
     }
 
     if (count > 0) {
-      const { toast } = await import("../app.js?v=20260925-004");
+      const { toast } = await import("../app.js?v=20260925-007");
       toast(t("已捕获 {n} 条灵光", { n: count }));
     }
   } catch (e) {

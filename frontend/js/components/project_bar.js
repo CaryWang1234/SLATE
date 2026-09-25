@@ -2,17 +2,17 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260925-004";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260925-007";
 import {
   openProject, closeProject, browseFiles, listDrives,
   createWorkspace, switchProjectRoot, editWorkspaceFolders,
   removeRegistry, patchRegistry,
-} from "../services/project.js?v=20260925-004";
-import { refreshRegistry, saveScene, switchToProject, restoreScene } from "../services/project_scene.js?v=20260925-004";
-import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260925-004";
-import { iconSvgEl, setIconText } from "../services/icons.js?v=20260925-004";
-import { t } from "../services/i18n.js?v=20260925-004";
-import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260925-004";
+} from "../services/project.js?v=20260925-007";
+import { refreshRegistry, saveScene, switchToProject, restoreScene } from "../services/project_scene.js?v=20260925-007";
+import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260925-007";
+import { iconSvgEl, setIconText } from "../services/icons.js?v=20260925-007";
+import { t } from "../services/i18n.js?v=20260925-007";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260925-007";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let workspaceNameInput, workspaceFoldersInput;
@@ -78,7 +78,7 @@ function renderProjectBar() {
     understandBtn.appendChild(iconSvgEl("book-open"));
     understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册";
     understandBtn.addEventListener("click", () => {
-      import("./understand.js?v=20260925-004")
+      import("./understand.js?v=20260925-007")
         .then(({ openUnderstandModal }) => openUnderstandModal())
         .catch(() => {});
     });
@@ -89,7 +89,7 @@ function renderProjectBar() {
     reviewBtn.appendChild(iconSvgEl("search"));
     reviewBtn.title = "Code Review\uff1aAI \u4ee3\u7801\u5ba1\u67e5\uff08git diff \u00b7 \u56db\u7ef4\u5ea6 \u00b7 \u884c\u7ea7\u8bc4\u8bba\uff09";
     reviewBtn.addEventListener("click", () => {
-      import("./review.js?v=20260925-004")
+      import("./review.js?v=20260925-007")
         .then(({ openReviewModal }) => openReviewModal())
         .catch(() => {});
     });
@@ -108,7 +108,7 @@ function renderProjectBar() {
     closeBtn.textContent = "×";
     // 这颗 × 不再"关闭项目"，只是把当前视野收起来：项目仍在册，从切换器点回来即可。
     // 文案要是还写"关闭项目"，用户就会以为点下去它的会话/宪法没了，于是不敢点。
-    closeBtn.title = t("收起当前项目（仍在册，可从项目名处切回）");
+    closeBtn.title = t("收起当前项目（仍保留，点项目名可切回）");
     closeBtn.addEventListener("click", handleCloseProject);
     actions.appendChild(closeBtn);
 
@@ -254,7 +254,7 @@ function buildSwitcherRow(entry) {
   // 就会被用户当成"删除项目"而不敢点，或者当成"只是移除"而误删了数据。
   forget.title = t("从最近移除（不删除任何文件与会话）");
   forget.addEventListener("click", async () => {
-    if (!await dlgConfirm(t("从在册清单里移除「{name}」？\n它的会话、宪法、磁盘上的文件都不会被动，只是不再出现在切换器里。", { name: entry.name || entry.id }), { okText: t("移除") })) return;
+    if (!await dlgConfirm(t("从清单移除「{name}」？会话、宪法与磁盘文件都会保留，只是不再出现在切换器里。", { name: entry.name || entry.id }), { okText: t("移除") })) return;
     await removeRegistry(entry.id);
     await refreshRegistry();
     if (state.project?.project_id === entry.id) setProject(null);
@@ -290,7 +290,7 @@ function renderRegistryList() {
   if (!list.length) {
     const empty = document.createElement("span");
     empty.className = "project-registry-empty";
-    empty.textContent = t("还没有在册项目，用下面的路径打开一个目录");
+    empty.textContent = t("暂无在册项目，用下面的路径打开一个目录");
     box.appendChild(empty);
     return;
   }
@@ -376,7 +376,7 @@ async function handleCreateWorkspace() {
 }
 
 async function handleCloseProject() {
-  if (!await dlgConfirm(t("收起当前项目？它仍留在在册清单里，会话、宪法、文件都不动。"), { okText: t("收起") })) return;
+  if (!await dlgConfirm(t("收起当前项目？会话、宪法与文件都不受影响。"), { okText: t("收起") })) return;
   await saveScene();
   await closeProject();
   setProject(null);

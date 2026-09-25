@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260925-004";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260925-004";
+import { makeId } from "./services/utils.js?v=20260925-007";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260925-007";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -1238,7 +1238,7 @@ function setConstitution(data) {
   notify("constitution", data);
 }
 
-// 全局宪法与项目宪法是两份东西，各存各的：state.constitution 永远只表示本机全局那份，
+// 全局宪法与项目宪法是两份东西，各存各的：state.constitution 永远只表示本机全局版本，
 // 生效哪一份由这里现算。以前是"打开项目就把 state.constitution 换成项目的"，于是
 // 关掉项目后它的规则还在给无项目的对话用，切到一个没写宪法的项目又沿用上一个项目的。
 function effectiveConstitution() {

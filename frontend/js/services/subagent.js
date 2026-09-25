@@ -6,10 +6,10 @@
  * tools 相关函数经 deps 注入，避免与 tools.js 循环导入。
  */
 
-import { state, getModelKey } from "../store.js?v=20260925-004";
-import { streamChat } from "./api.js?v=20260925-004";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-004";
-import { aiModelFor } from "./ai_features.js?v=20260925-004";
+import { state, getModelKey } from "../store.js?v=20260925-007";
+import { streamChat } from "./api.js?v=20260925-007";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-007";
+import { aiModelFor } from "./ai_features.js?v=20260925-007";
 
 export const SUBAGENT_MAX_PARALLEL = 5;     // 单次派出的并行上限
 export const SUBAGENT_MAX_ROUNDS = 8;       // 每个子代理的工具轮次预算
@@ -108,6 +108,8 @@ function previewHead(text, max = 120) {
 /** 单个子代理：独立迷你工具循环。任何异常都不外抛，转为 failed/stopped 结果。 */
 async function runOneSubAgent(spec, index, deps, signal) {
   const { detect, strip, exec, toolsPrompt } = deps;
+  // 事件带出处：后台批次跑完时用户可能已经切到别场会话，实时面板不该画到那一场头上
+  const scope = String(deps.scopeConvId || "");
   const target = aiModelFor("subagent", state.currentModel);
   const modelId = target.id;
   const baseUrl = target.base_url;
@@ -128,7 +130,7 @@ async function runOneSubAgent(spec, index, deps, signal) {
   const finish = (status, output) => {
     const result = { name: spec.name, task: spec.task, status, output, toolCalls, rounds };
     spawn.finished(result);
-    subagentEvents.emit("end", { index, status, summary: previewTail(output, 80) });
+    subagentEvents.emit("end", { index, status, summary: previewTail(output, 80), convId: scope });
     return result;
   };
 
@@ -156,7 +158,7 @@ async function runOneSubAgent(spec, index, deps, signal) {
         const now = Date.now();
         if (now - lastEmit > 300) {
           lastEmit = now;
-          subagentEvents.emit("text", { index, text: previewTail(content) });
+          subagentEvents.emit("text", { index, text: previewTail(content), convId: scope });
         }
       }
       lastOutput = strip(content).trim();
@@ -182,7 +184,7 @@ async function runOneSubAgent(spec, index, deps, signal) {
         resultParts.push(`[工具 ${call.name}] ${text.length > 2000 ? text.slice(0, 2000) + "…（已截断）" : text}`);
       }
 
-      subagentEvents.emit("progress", { index, round: rounds, toolCalls });
+      subagentEvents.emit("progress", { index, round: rounds, toolCalls, convId: scope });
 
       messages.push({ role: "assistant", content });
       messages.push({
@@ -212,7 +214,7 @@ export async function runSubAgents(specs, deps, signal = null) {
   const list = all.slice(0, SUBAGENT_MAX_PARALLEL);
   const skipped = Math.max(0, all.length - SUBAGENT_MAX_PARALLEL);
 
-  subagentEvents.emit("start", { specs: list, total: all.length });
+  subagentEvents.emit("start", { specs: list, total: all.length, convId: String(deps?.scopeConvId || "") });
 
   const results = await Promise.all(
     list.map((spec, i) => runOneSubAgent(spec, i, deps, sig)),

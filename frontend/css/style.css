@@ -1032,12 +1032,14 @@ textarea::-webkit-scrollbar-thumb {
   filter: brightness(0) invert(1); /* 深色模式变白 */
 }
 
-/* 模型名可长可短，但这一栏里它是"其中一颗"，不该吃掉左排一半宽度：
-   上限从 320px 收到 232px，超出部分由 select 自己省略，全名走 title 悬浮。 */
+/* 模型名可长可短：宽度由 app.js 按"当前选中的那一个名字"实算（sizeModelSelect），
+   写死宽度要么把名字截了、要么让一颗控件占掉半条工具行。这里只给兜底与天花板：
+   最长 320px，再长仍由 select 自己省略，全名走 title 悬浮。 */
 #model-select {
   padding-left: 28px;
-  width: clamp(132px, 17vw, 232px);
-  max-width: 232px;
+  width: 132px;
+  min-width: 132px;
+  max-width: 320px;
   height: 26px;
   font-size: 11px;
   font-family: var(--font-main);
@@ -3228,7 +3230,7 @@ textarea::-webkit-scrollbar-thumb {
   border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
 }
 
-/* 来源徽标：这一份是项目里的覆盖版（同名时顶掉全局那份），不是本机共用那份 */
+/* 来源徽标：这一份是项目里的覆盖版（同名时顶掉全局版本），不是本机共用那份 */
 .skill-kind-scope {
   margin-left: 4px;
   color: var(--accent);
@@ -3354,7 +3356,7 @@ textarea::-webkit-scrollbar-thumb {
   flex-shrink: 0;
 }
 
-/* 掩码来源标注：这一台"用不用"是项目掩码说的还是全局那份说的，关错的代价不一样 */
+/* 掩码来源标注：这一台"用不用"是项目掩码说的还是全局版本说的，关错的代价不一样 */
 .mcp-server-scope-badge {
   margin-left: 6px;
   padding: 1px 6px;
@@ -3618,7 +3620,7 @@ textarea::-webkit-scrollbar-thumb {
   color: var(--text);
 }
 
-/* 落点说明：告诉用户「现在改的是全局那份还是项目那份」——两份长得很像，代价不同。
+/* 落点说明：告诉用户「现在改的是全局版本还是项目那份」——两份长得很像，代价不同。
    项目那份用主色描边，跟宪法那条同一套视觉。 */
 .action-scope-hint {
   margin: -2px 0 8px;

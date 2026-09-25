@@ -2,34 +2,34 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode } from "./store.js?v=20260925-004";
-import { initI18n, t } from "./services/i18n.js?v=20260925-004";
-import { iconSvgEl } from "./services/icons.js?v=20260925-004";
-import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260925-004";
-import { get, post, put } from "./services/api.js?v=20260925-004";
-import { dlgConfirm } from "./services/dialog.js?v=20260925-004";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260925-004";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260925-004";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260925-004";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260925-004";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260925-004";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260925-004";
-import { initTeamPanel } from "./components/team.js?v=20260925-004";
-import { initProjectBar } from "./components/project_bar.js?v=20260925-004";
-import { initSessionSummary } from "./components/session_summary.js?v=20260925-004";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260925-004";
-import { initTypingGame } from "./components/typing_game.js?v=20260925-004";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260925-004";
-import { initMemoryPanel } from "./components/memory.js?v=20260925-004";
-import { initExpertsPanel } from "./components/experts.js?v=20260925-004";
-import { initSchedule } from "./components/schedule.js?v=20260925-004";
-import { initRiskGuard } from "./services/riskguard.js?v=20260925-004";
-import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20260925-004";
-import { initUnderstandPanel } from "./components/understand.js?v=20260925-004";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260925-004";
-import { setProject, setProjectFileTree } from "./store.js?v=20260925-004";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260925-004";
-import { installErrorSink } from "./services/error_sink.js?v=20260925-004";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode } from "./store.js?v=20260925-007";
+import { initI18n, t } from "./services/i18n.js?v=20260925-007";
+import { iconSvgEl } from "./services/icons.js?v=20260925-007";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260925-007";
+import { get, post, put } from "./services/api.js?v=20260925-007";
+import { dlgConfirm } from "./services/dialog.js?v=20260925-007";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260925-007";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260925-007";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260925-007";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260925-007";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260925-007";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260925-007";
+import { initTeamPanel } from "./components/team.js?v=20260925-007";
+import { initProjectBar } from "./components/project_bar.js?v=20260925-007";
+import { initSessionSummary } from "./components/session_summary.js?v=20260925-007";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260925-007";
+import { initTypingGame } from "./components/typing_game.js?v=20260925-007";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260925-007";
+import { initMemoryPanel } from "./components/memory.js?v=20260925-007";
+import { initExpertsPanel } from "./components/experts.js?v=20260925-007";
+import { initSchedule } from "./components/schedule.js?v=20260925-007";
+import { initRiskGuard } from "./services/riskguard.js?v=20260925-007";
+import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20260925-007";
+import { initUnderstandPanel } from "./components/understand.js?v=20260925-007";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260925-007";
+import { setProject, setProjectFileTree } from "./store.js?v=20260925-007";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260925-007";
+import { installErrorSink } from "./services/error_sink.js?v=20260925-007";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -121,6 +121,26 @@ function getModelIconUrl(model) {
   return "";
 }
 
+let _textMeasureCtx = null;
+
+/**
+ * 下拉宽度按"当前选中的那颗模型名"实算。
+ * 写死宽度是个两难：窄了名字被省略号截掉，宽了这颗控件吃掉半条工具行——
+ * 名字长度本来就是数据，不是布局能预设的。超过天花板仍由 select 自己省略（全名走 title）。
+ */
+function sizeModelSelect() {
+  const sel = document.getElementById("model-select");
+  if (!sel) return;
+  const cs = getComputedStyle(sel);
+  if (!_textMeasureCtx) _textMeasureCtx = document.createElement("canvas").getContext("2d");
+  _textMeasureCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  // 图标占位（padding-left）+ 浏览器画下拉箭头的固定开销
+  const chrome = 28 + (parseFloat(cs.paddingRight) || 0) + 18;
+  const text = sel.selectedOptions[0]?.textContent || sel.options[0]?.textContent || "";
+  const w = Math.ceil(_textMeasureCtx.measureText(text).width + chrome);
+  sel.style.width = `${Math.max(120, Math.min(320, w))}px`;
+}
+
 function updateModelIcon(model) {
   const iconEl = document.getElementById("model-icon");
   if (!iconEl) return;
@@ -131,10 +151,11 @@ function updateModelIcon(model) {
   } else {
     iconEl.style.display = "none";
   }
-  // 下拉收成一颗窄胶囊后，长模型名会被省略号截掉；收起状态下原生 select 不显示 option 的
-  // title，所以把选中那一项的 title 提到控件上（同源，不另写一份文案）。
+  // 长名字：宽度按实算给（sizeModelSelect），超出天花板才由省略号收尾；
+  // 收起状态下原生 select 不显示 option 的 title，所以把选中那一项的 title 提到控件上。
   const sel = document.getElementById("model-select");
   if (sel) sel.title = sel.selectedOptions[0]?.title || "";
+  sizeModelSelect();
 }
 
 function modelNeedsKey(model) {
@@ -388,8 +409,8 @@ function buildContextCapControl(model) {
     readout.title = clamped
       ? t("超出模型标称窗口，已按 {w} 封顶", { w: fmtContextTokens(declared) })
       : perModel
-        ? t("自动取该模型的默认上限：标称窗口 {w} 留两成余量，压缩阈值与上下文条都按 {b} 计算", { w: fmtContextTokens(declared), b: fmtContextTokens(eff) })
-        : t("自动压缩阈值与上下文条都按 {b} 计算", { b: fmtContextTokens(eff) });
+        ? t("按该模型标称窗口 {w} 留两成余量：压缩阈值与上下文条都按 {b} 计算", { w: fmtContextTokens(declared), b: fmtContextTokens(eff) })
+        : t("压缩阈值与上下文条都按 {b} 计算", { b: fmtContextTokens(eff) });
     slider.classList.toggle("is-auto", !stop);
   };
 
@@ -550,8 +571,8 @@ function renderConstitutionSettings() {
   const hint = document.getElementById("constitution-scope");
   if (!hint) return;
   hint.textContent = constitutionScope() === "project"
-    ? t("正在编辑项目「{name}」的宪法：存进该项目的 .slate/config.json，只对这个项目生效", { name: state.project?.name || "" })
-    : t("正在编辑全局宪法：打开带宪法的项目时，以该项目的宪法为准");
+    ? t("正在编辑项目「{name}」的宪法：存入该项目 .slate/config.json，只对该项目生效", { name: state.project?.name || "" })
+    : t("正在编辑全局宪法：项目自带宪法时以项目为准");
 }
 
 function openSettings(options = {}) {
@@ -732,7 +753,7 @@ async function renderLanInfo() {
       <img class="lan-qr" src="/api/lan/qrcode?t=${Date.now()}" alt="遥控地址二维码">
       <div class="lan-qr-tip">手机扫码直接打开<br>（需连入同一局域网）</div>
     </div>
-    <p class="lan-tip">已启用授权链接：只有使用上方地址或二维码进入的设备才能访问。请勿把链接分享给不受信任的人。</p>
+    <p class="lan-tip">已启用授权链接：只有通过上方地址或二维码进入的设备可访问。请勿把链接分享给他人。</p>
   `;
   document.getElementById("btn-lan-copy")?.addEventListener("click", async () => {
     try {
@@ -834,7 +855,7 @@ function initBackupRestore() {
       if (!Array.isArray(backend.conversations) && !Array.isArray(backend.messages)) {
         throw new Error("无法识别的备份文件");
       }
-      if (!await dlgConfirm("导入备份？已存在的数据会跳过，不会覆盖现有内容。导入后页面将重载。", { okText: "导入" })) return;
+      if (!await dlgConfirm("导入备份？已存在的数据会跳过，不覆盖现有内容。导入后页面将重新加载。", { okText: "导入" })) return;
       const res = await post("/chat/import", { backend });
       if (res.code !== 0) throw new Error(res.message || "导入失败");
       if (payload.local && typeof payload.local === "object") {
@@ -888,7 +909,7 @@ async function runStorageCleanup(target, btn) {
     const res = await post("/settings/storage/cleanup", { target });
     if (res.code !== 0) { toast(res.message || "清理失败"); return; }
     const freed = res.data?.freed || 0;
-    if (statusEl) statusEl.textContent = freed > 0 ? t("已释放 {size}", { size: fmtBytes(freed) }) : "无可释放空间（文件可能正被占用，关闭应用后重试）";
+    if (statusEl) statusEl.textContent = freed > 0 ? t("已释放 {size}", { size: fmtBytes(freed) }) : "无可释放空间（文件可能被占用，关闭应用后重试）";
     toast(freed > 0 ? t("已释放 {size}", { size: fmtBytes(freed) }) : "清理完成");
     if (target === "history") {
       // 清空历史后同步侧栏列表
@@ -941,7 +962,7 @@ async function renderStorageUsage() {
         clearBtn.textContent = "清空对话";
         clearBtn.title = "删除全部历史会话与消息";
         clearBtn.addEventListener("click", async () => {
-          if (!await dlgConfirm("清空全部对话历史？此操作不可恢复，建议先在「数据备份」里导出备份。", { danger: true, okText: "清空" })) return;
+          if (!await dlgConfirm("清空全部对话历史？此操作不可恢复，建议先在「数据备份」导出备份。", { danger: true, okText: "清空" })) return;
           await runStorageCleanup("history", clearBtn);
         });
         row.appendChild(clearBtn);
@@ -949,7 +970,7 @@ async function renderStorageUsage() {
         const cleanBtn = document.createElement("button");
         cleanBtn.className = "send-btn send-btn-sm";
         cleanBtn.textContent = "清理缓存";
-        cleanBtn.title = "清理内置浏览器缓存；运行中被占用的文件将在重启后彻底释放";
+        cleanBtn.title = "清理内置浏览器缓存；被占用的文件将在重启后释放";
         cleanBtn.addEventListener("click", () => runStorageCleanup("webview", cleanBtn));
         row.appendChild(cleanBtn);
       }
@@ -1201,7 +1222,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260925-004").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260925-007").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1223,9 +1244,9 @@ function initNotificationPersistence() {
 
 // 默认审批模式：这里定的只是"每个新对话从哪一档起步"，单个对话在输入框的胶囊里随时改
 const PERMISSION_MODE_HINTS = {
-  ask: "默认每个对话都逐条确认：AI 执行命令、访问网络前都会弹窗问你",
-  auto: "默认只在命中高危规则（删除、提权、强制推送等）时弹窗问你，其余直接放行；灾难级命令（rm -rf /、format 等）仍强制拦截",
-  full: "默认什么都不问，命令与联网直接执行；灾难级命令（rm -rf /、format 等）仍强制拦截",
+  ask: "默认逐条确认：AI 执行命令、访问网络前都会弹窗询问",
+  auto: "默认只在命中高危规则（删除、提权、强制推送等）时弹窗询问，其余直接放行；灾难级命令（rm -rf /、format 等）仍强制拦截",
+  full: "默认不询问，命令与联网直接执行；灾难级命令（rm -rf /、format 等）仍强制拦截",
 };
 
 function renderPermissionModeSettings() {
@@ -1646,7 +1667,7 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     open.title = t("切到该项目");
     open.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { switchToProject } = await import("./services/project_scene.js?v=20260925-004");
+      const { switchToProject } = await import("./services/project_scene.js?v=20260925-007");
       const out = await switchToProject(projectId);
       if (!out.ok) toast(out.reason || t("切换失败"));
       await refreshCodexHistory();
@@ -1661,8 +1682,8 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     pin.setAttribute("aria-pressed", entry?.pinned ? "true" : "false");
     pin.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { patchRegistry } = await import("./services/project.js?v=20260925-004");
-      const { refreshRegistry } = await import("./services/project_scene.js?v=20260925-004");
+      const { patchRegistry } = await import("./services/project.js?v=20260925-007");
+      const { refreshRegistry } = await import("./services/project_scene.js?v=20260925-007");
       await patchRegistry(projectId, { pinned: !(entry?.pinned) });
       await refreshRegistry();
       renderCodexHistory();
@@ -1866,8 +1887,8 @@ async function saveSettings() {
     }
     if (constData) {
       if (state.project) {
-        // 打开着项目就写进项目（.slate/config.json，跟着仓库走），全局那份保持不动
-        const { updateProjectConfig } = await import("./services/project.js?v=20260925-004");
+        // 打开着项目就写进项目（.slate/config.json，跟着仓库走），全局版本保持不动
+        const { updateProjectConfig } = await import("./services/project.js?v=20260925-007");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -2117,11 +2138,11 @@ async function init() {
   // lastProjectPath 退成第二道：老数据第一次升级到带注册表的版本时，册子是空的，
   // 拿它补登一次，用户不会感到"项目不见了"。
   try {
-    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20260925-004");
+    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20260925-007");
     const res = await getCurrentProject();
     let project = res.code === 0 ? res.data : null;
     if (!project && state._lastProjectPath) {
-      const { openProject } = await import("./services/project.js?v=20260925-004");
+      const { openProject } = await import("./services/project.js?v=20260925-007");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) project = openRes.data;
     }
