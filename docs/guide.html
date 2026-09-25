@@ -684,7 +684,7 @@ python desktop.py</pre>
               <li>YAML 子集校验（SAY-1）会拒收 Tab 缩进、锚点、多文档、流式 <code>{}</code> / <code>[]</code>、折叠块 <code>&gt;</code>、<code>!!</code> 标签，并报出所在行号；改坏的 yml 在面板里仍然可见并显示原因，不会凭空消失</li>
               <li>编辑入口：设置 → 技能与工具 → Actions 区块，点「＋ 新建 Action」或点条目进编辑器；边写边校验，报错按行号显示，校验不过保存按钮不会写盘</li>
               <li>每次覆盖或删除都会先把原文留底到 <code>data/actions/.history/</code>（每份最多 5 版），编辑器里的「历史版本」可查看某一版原文或直接回滚</li>
-              <li>模型可代写：<code>actions_write</code> 要求 yml 里声明 <code>author: model</code>（面板据此显示「模型代写」徽标），「询问」权限模式下会弹出原文让你审批；「自动 / 越权」不弹窗，但格式校验始终生效</li>
+              <li>模型可代写：<code>actions_write</code> 要求 yml 里声明 <code>author: model</code>（面板据此显示「模型代写」徽标），这一场开着「手动审批」时会弹出原文让你审批；「自动审批 / 完全访问」不弹窗，但格式校验始终生效</li>
               <li>聊天框 <code>@&lt;id&gt;</code> 提及可把整份流程注入这条消息，注入上限 6000 字，超出部分会提示模型用 <code>actions_read</code> 读全文</li>
             </ul>
           </div>
@@ -902,7 +902,7 @@ python desktop.py</pre>
               <tr><th>设置项</th><th>说明</th></tr>
               <tr><td>模型管理</td><td>添加/删除 API Key，配置自定义端点</td></tr>
               <tr><td>输出控制</td><td>最大 Token 数、流式输出开关</td></tr>
-              <tr><td>安全模式</td><td>高危命令审批策略</td></tr>
+              <tr><td>审批模式</td><td>三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 23 类高危）/ 完全访问（都不问）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改</td></tr>
               <tr><td>主题</td><td>深色/浅色切换</td></tr>
               <tr><td>语言</td><td>中文 / English</td></tr>
               <tr><td>上下文压缩</td><td>自动/手动压缩历史对话</td></tr>
@@ -949,7 +949,7 @@ python desktop.py</pre>
               <tr><td>磨墨模式</td><td><code>/grind</code> + 一个粗略想法，三阶段追问（接 → 磨 → 收，最多 10 轮）产出含目标、交付物、验收标准的任务书</td><td><a href="#ch5">5</a></td></tr>
               <tr><td>35 个内置工具</td><td>文件读写编辑、全项目代码检索、Unicode 安全终端、后台终端任务（起了就走，别轮询）、PPT / Word / Excel、PDF 抽取、图表 / 二维码、代码与文档安全扫描、git 信息、联网搜索与抓取、图像视频生成、浏览器与桌面自动化</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>外部 MCP Server</td><td>SSE 传输接入远端 MCP Server，工具自动发现，与内置工具同列展示、同一接口调用；认得出的品牌按 LobeHub 图标显示 logo，认不出的走通用 MCP mark</td><td><a href="#ch8">8</a></td></tr>
-              <tr><td>高危命令审批</td><td>23 类高危操作需你确认，灾难性命令无条件阻止，审批弹窗附带 AI 对这条命令用途的解释</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>审批模式</td><td>三档可逐场切换：手动审批把每条命令与每次联网都拿来问你，自动审批只拦 23 类高危操作，完全访问都不问；灾难性命令在任何档位都无条件阻止，审批弹窗附带 AI 对这条命令用途的解释</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>全沙箱安全</td><td>路径校验 + 高危规则拦截 + 独立数据目录，删除与覆盖前先给看清楚</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>自定义技能体系</td><td>SKILL.md 即插即用，上传或导入后 <code>@</code> 提及自动注入上下文；其他 Agent 生态的技能目录可原样导入</td><td><a href="#ch9">9</a></td></tr>
               <tr><td>Actions 流程说明书</td><td>把「干某件事的必要流程」写成一份 yml，模型只看到目录、按需读全文再照做；严格子集校验带行号报错，改坏的文件不会凭空消失</td><td><a href="#ch8">8</a></td></tr>

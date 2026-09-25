@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260925-001";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260925-001";
+import { makeId } from "./services/utils.js?v=20260925-004";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260925-004";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -166,8 +166,14 @@ const state = {
   // 首次启动引导：跨 localStorage / 桌面共享配置保存，避免 WebView profile 波动后反复弹出
   onboardingSeen: false,
 
-  // 命令权限模式：ask=人工审批（高危命令弹窗询问）auto=自动审批（高危命令自动放行）full=完全访问（跳过高危判定；灾难级命令始终拦截）
+  // 默认审批模式（设置页那三项改的是它）：ask=手动审批（执行命令/访问网络都问）
+  // auto=自动审批（只在命中高危规则时问）full=完全访问（一律不问；灾难级命令始终由后端硬拦）
   permissionMode: "ask",
+
+  // 每一场对话自己的审批档（convId → 档）：没单独选过的场沿用上面那个默认档。
+  // 键 "" 是"还没建起来的这一场"——发送时会搬给新建的会话（adoptConversationPermissionMode）。
+  // 刻意不跨设备同步：审批档是"这台屏幕上谁替我点批准"，手机同步过来只会把桌面的信任档盖到别处。
+  permissionModeByConversation: {},
 
   // 回复模式：agent=智能体（可调用工具、多轮自主循环）| chat=对话（单轮直答，不发工具也不注入工具目录）
   chatMode: "agent",
@@ -263,6 +269,7 @@ function buildPersistentData() {
     useResponses: state.useResponses,
     onboardingSeen: state.onboardingSeen === true,
     permissionMode: normalizePermissionMode(state.permissionMode),
+    permissionModeByConversation: normalizePermissionModeMap(state.permissionModeByConversation),
     chatMode: normalizeChatMode(state.chatMode),
     reasoningEffort: state.reasoningEffort,
     webSearch: normalizeWebSearch(state.webSearch),
@@ -294,6 +301,17 @@ function normalizeTheme(value) {
 
 function normalizePermissionMode(value) {
   return ["ask", "auto", "full"].includes(value) ? value : "ask";
+}
+
+// 每场的审批档：脏值（手改 localStorage、旧版本残留）整条丢掉，让它回落到默认档，
+// 而不是拿一个不认识的档位去做审批判定——判定分支认不出的值必须等于"最严的那档"。
+function normalizePermissionModeMap(value) {
+  const src = value && typeof value === "object" ? value : {};
+  const out = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (["ask", "auto", "full"].includes(v)) out[String(k)] = v;
+  }
+  return out;
 }
 
 // 回复模式取值域：只认 agent / chat，历史脏值一律回落智能体（旧版本行为）
@@ -549,6 +567,7 @@ function loadPersistent() {
     state.useResponses = data.useResponses === true;
     state.onboardingSeen = data.onboardingSeen === true;
     state.permissionMode = normalizePermissionMode(data.permissionMode);
+    state.permissionModeByConversation = normalizePermissionModeMap(data.permissionModeByConversation);
     state.chatMode = normalizeChatMode(data.chatMode);
     state.reasoningEffort = normalizeReasoningEffort(data.reasoningEffort);
     state.webSearch = normalizeWebSearch(data.webSearch);
@@ -658,6 +677,62 @@ function setActiveExpertId(id, detail = null) {
   state.activeExpert = detail || null;
   savePersistent();
   notify("activeExpert", state.activeExpert);
+}
+
+// ── 审批模式：这一场生效哪一档 ────────────────────────────────
+// 三档语义（riskguard 是唯一执行处）：ask 命令/联网都问，auto 只问高危，full 一律不问。
+// 单独选过的场记住自己的档，没选过的跟着设置页那个默认档走。
+
+/** 这一场生效的审批档。convId 传空 = 还没建起来的这一场（键 ""）。 */
+function permissionModeFor(convId = state.currentConversationId) {
+  const picked = state.permissionModeByConversation[String(convId || "")];
+  if (picked === "ask" || picked === "auto" || picked === "full") return picked;
+  return normalizePermissionMode(state.permissionMode);
+}
+
+/** 只给这一场挑一档；不传 convId 就是给"屏幕上这一场"挑。 */
+function setPermissionModeFor(convId, mode) {
+  const key = String(convId || "");
+  const next = normalizePermissionMode(mode);
+  if (state.permissionModeByConversation[key] === next) return;
+  state.permissionModeByConversation = { ...state.permissionModeByConversation, [key]: next };
+  savePersistent();
+  notify("permissionMode", permissionModeFor(key));
+}
+
+/** 设置页改的是默认档：没单独选过的场跟着变，所以订阅者要重画。 */
+function setDefaultPermissionMode(mode) {
+  const next = normalizePermissionMode(mode);
+  if (normalizePermissionMode(state.permissionMode) === next) return;
+  state.permissionMode = next;
+  savePersistent();
+  notify("permissionMode", permissionModeFor(state.currentConversationId));
+}
+
+/**
+ * 发送途中才建出会话：把"还没建起来的这一场"选的档搬给它。
+ * 刻意是搬走而不是复制——下一次新对话该从默认档重新开始，
+ * 否则一次"这轮放开跑"会悄悄一直生效到以后每一场新对话。
+ */
+function adoptConversationPermissionMode(convId) {
+  const key = String(convId || "");
+  if (!key || !Object.prototype.hasOwnProperty.call(state.permissionModeByConversation, "")) return;
+  const pending = state.permissionModeByConversation[""];
+  const rest = { ...state.permissionModeByConversation };
+  delete rest[""];
+  state.permissionModeByConversation = { ...rest, [key]: pending };
+  savePersistent();
+  notify("permissionMode", permissionModeFor(key));
+}
+
+/** 会话删掉了，它那份审批档跟着清掉（不然残留键会一直躺在状态文件里）。 */
+function forgetConversationPermissionMode(convId) {
+  const key = String(convId || "");
+  if (!Object.prototype.hasOwnProperty.call(state.permissionModeByConversation, key)) return;
+  const rest = { ...state.permissionModeByConversation };
+  delete rest[key];
+  state.permissionModeByConversation = rest;
+  savePersistent();
 }
 
 function setChatMode(mode) {
@@ -1349,6 +1424,9 @@ export {
   recordTaskFlag, markTaskSeen, pruneTaskFlags, setTaskListSort, setTodoPanelOpen,
   setBgAutoResume, bgResumeUsedOf, markBgResumeUsed,
   setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns,
+  // 审批模式：这一场生效哪一档的读与写（判口在 services/riskguard.js）
+  permissionModeFor, setPermissionModeFor, setDefaultPermissionMode,
+  adoptConversationPermissionMode, forgetConversationPermissionMode,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage, messagesOf, hasThread, dropThread, bindVisibleThread,
   setConversations, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,

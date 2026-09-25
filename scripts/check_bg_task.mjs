@@ -34,6 +34,7 @@ const TERM = read("backend/skills/terminal.py");
 const STORE = read("frontend/js/store.js");
 const SERVICE = read("frontend/js/services/bg_tasks.js");
 const TOOLS = read("frontend/js/services/tools.js");
+const RISKGUARD = read("frontend/js/services/riskguard.js");
 const CHAT = read("frontend/js/components/chat.js");
 const APPJS = read("frontend/js/app.js");
 const LOOP = read("frontend/js/services/agent_loop.js");
@@ -207,8 +208,11 @@ ok("kernel 把归属会话透给工具执行器（徽标才知道记谁头上）
 ok("bg_task 注入项目 work_dir",
   /if \(!p\.work_dir && skill === "bg_task"\) p\.work_dir = proj\.path/.test(TOOLS)
   && /const proj = callProject\(callCtx\) \|\| state\.project;/.test(TOOLS));
-ok("bg_task 的 start 也要过高危审批弹窗",
-  /skill === "bg_task"[\s\S]{0,300}isHighRiskCommand\(p\.command\)/.test(TOOLS),
+ok("bg_task 的 start 也要过审批门（与 terminal 同一道）",
+  // 判口挪进 riskguard.approvalSubjectOf 了（三档语义要一处算），判据没变松：
+  // 仍钉"tools.js 每笔 skill_run 都走 guardSkillCall"＋"bg_task 只有 start 算一笔命令"。
+  /const verdict = await guardSkillCall\(skill, p, \{ convId: callCtx\.convId \}\);\n\s*if \(!verdict\.ok\) return verdict\.message;/.test(TOOLS)
+  && /skill === "bg_task" && params\?\.command && \(params\.action \|\| "start"\) === "start"/.test(RISKGUARD),
   "后台 ≠ 免审批");
 ok("结果回填面板快照（起完就看得见）", has(TOOLS, "noteBgTaskStarted(data, callCtx.convId"));
 ok("SKILL_PARAM_DEFS 有 bg_task 的参数表",

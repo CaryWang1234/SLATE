@@ -6,12 +6,12 @@
  * - 支持 AbortController 中断
  */
 
-import { get, post } from "./api.js?v=20260925-001";
-import { state, getModelKey } from "../store.js?v=20260925-001";
-import { aiModelFor, isAiFeatureOn } from "./ai_features.js?v=20260925-001";
-import { guardSkillParams } from "./riskguard.js?v=20260925-001";
-import { t } from "./i18n.js?v=20260925-001";
-import { makeId } from "./utils.js?v=20260925-001";
+import { get, post } from "./api.js?v=20260925-004";
+import { state, getModelKey } from "../store.js?v=20260925-004";
+import { aiModelFor, isAiFeatureOn } from "./ai_features.js?v=20260925-004";
+import { guardSkillCall } from "./riskguard.js?v=20260925-004";
+import { t } from "./i18n.js?v=20260925-004";
+import { makeId } from "./utils.js?v=20260925-004";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 
@@ -176,9 +176,9 @@ async function executeNode(node, userInput, outputs, members, rec) {
     rec.modelLabel = `[技能] ${node.skill}`;
     const params = {};
     for (const [key, raw] of Object.entries(node.inputs || {})) params[key] = vars[key] ?? raw;
-    if (!(await guardSkillParams(node.skill, params))) {
-      throw new Error(t("高危命令被用户拒绝执行: {cmd}", { cmd: params.command || node.skill }));
-    }
+    // 工作流跑在屏幕上这一场：命令/联网要不要逐条问，按这一场的审批档
+    const verdict = await guardSkillCall(node.skill, params);
+    if (!verdict.ok) throw new Error(verdict.message);
     const res = await post("/skills/execute", { skill: node.skill, params });
     if (res.code !== 0) throw new Error(res.message || t("技能 {name} 执行失败", { name: node.skill }));
     output = typeof res.data === "string" ? res.data : JSON.stringify(res.data, null, 2);

@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import {
   detectDsmlCalls, hasDsmlMarkup, detectAllCalls, hasToolMarkup, stripToolCalls, detectToolCalls,
-} from "../frontend/js/services/tools.js?v=20260925-001";
+} from "../frontend/js/services/tools.js?v=20260925-004";
 
 const A = "｜";   // U+FF5C 全角竖线：官方 tokenizer 与用户实测粘贴的形态
 const B = "‖";   // U+2016 双竖线：部分端点与复制链路的形态

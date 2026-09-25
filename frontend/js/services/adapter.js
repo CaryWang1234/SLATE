@@ -3,8 +3,9 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20260925-001";
-import { getToolsSystemPrompt } from "./tools.js?v=20260925-001";
+import { state } from "../store.js?v=20260925-004";
+import { getToolsSystemPrompt } from "./tools.js?v=20260925-004";
+import { catalogForScope } from "./project_scope.js?v=20260925-004";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -147,8 +148,10 @@ function getExpertSystemPrompt() {
  */
 const ACTIONS_CATALOG_LIMIT = 20;
 
-function getActionsSystemPrompt() {
-  const list = Array.isArray(state.actions) ? state.actions : [];
+function getActionsSystemPrompt(project = null) {
+  // 目录按「这一场的项目」取：项目里的同名 Action 顶掉全局那份，后台那场
+  // 拿的必须是它自己项目的清单，否则模型看到的是另一个项目的流程。
+  const list = catalogForScope(project).actions;
   if (!list.length) return "";
   const flat = text => String(text || "").replace(/\s+/g, " ").trim();
   const lines = ["[可用 Actions]（用户事先写好的流程说明书。与用户当前要求不符时不要套用，先按用户说的做）"];
@@ -197,7 +200,7 @@ function buildSystemContent(modelId, constitution, opts = {}) {
   } else {
     // Actions 目录贴着工具说明注入：对话态没有 actions_read，
     // 只给目录读不到正文，反而诱导模型声称"已按流程执行"。
-    systemContent += getActionsSystemPrompt();
+    systemContent += getActionsSystemPrompt(opts.project);
     systemContent += getToolsSystemPrompt({ compact: true, project: opts.project || null });
   }
 

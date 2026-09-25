@@ -17,11 +17,11 @@
 import {
   state, subscribe, setChatMode, setReasoningEffort,
   reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS,
-} from "../store.js?v=20260925-001";
-import { get } from "../services/api.js?v=20260925-001";
-import { t } from "../services/i18n.js?v=20260925-001";
-import { iconSvgEl } from "../services/icons.js?v=20260925-001";
-import { renderStarMap, highlightStar, memberHue } from "../services/star_map.js?v=20260925-001";
+} from "../store.js?v=20260925-004";
+import { get } from "../services/api.js?v=20260925-004";
+import { t } from "../services/i18n.js?v=20260925-004";
+import { iconSvgEl } from "../services/icons.js?v=20260925-004";
+import { renderStarMap, highlightStar, memberHue } from "../services/star_map.js?v=20260925-004";
 
 const PREF_KEY = "slate_board_wf_prefs";
 const TICK_MS = 1000;
@@ -34,6 +34,7 @@ let wfPrefs = loadPrefs();
 let wfActions = [];
 let wfActionsBroken = [];
 let wfActionsLoaded = false;
+let wfActionsProject = "";      // 这份缓存属于哪个项目视野（换项目要重取）
 let wfStepsCache = new Map();   // actionId → steps[]（详情按需取，列表摘要里没有正文）
 let wfTeam = { key: "", loading: false, data: null, error: "" };
 let wfSelectedMember = null;
@@ -84,19 +85,24 @@ function chip(text, cls = "") {
 // ── Action 目录与详情 ────────────────────────────────────
 
 async function ensureActions(force = false) {
-  if (wfActionsLoaded && !force) return;
+  // 目录是"全局 + 项目覆盖"合并后的那一份：换项目必须重取，缓存只属于取它时那个视野
+  const pid = String(state.project?.project_id || "");
+  if (wfActionsLoaded && !force && pid === wfActionsProject) return;
   try {
-    const res = await get("/actions");
+    const res = await get(`/actions${pid ? `?project=${encodeURIComponent(pid)}` : ""}`);
     if (res?.code === 0 && res.data) {
       wfActions = Array.isArray(res.data.actions) ? res.data.actions : [];
       wfActionsBroken = Array.isArray(res.data.broken) ? res.data.broken : [];
       wfActionsLoaded = true;
+      wfActionsProject = pid;
+      wfStepsCache.clear();   // 步骤正文也按视野缓存：同 id 在另一个项目里是另一份流程
       return;
     }
     // 后端给了非 0：退到内存快照，至少不空着一面墙
     wfActions = Array.isArray(state.actions) ? state.actions : [];
     wfActionsBroken = [];
     wfActionsLoaded = true;
+    wfActionsProject = pid;
   } catch {
     wfActions = Array.isArray(state.actions) ? state.actions : [];
     wfActionsLoaded = false;
@@ -104,15 +110,17 @@ async function ensureActions(force = false) {
 }
 
 async function loadSteps(actionId) {
-  if (wfStepsCache.has(actionId)) return wfStepsCache.get(actionId);
+  const cacheKey = `${String(state.project?.project_id || "")}|${actionId}`;
+  if (wfStepsCache.has(cacheKey)) return wfStepsCache.get(cacheKey);
   try {
-    const res = await get(`/actions/${encodeURIComponent(actionId)}`);
+    const pid = String(state.project?.project_id || "");
+    const res = await get(`/actions/${encodeURIComponent(actionId)}${pid ? `?project=${encodeURIComponent(pid)}` : ""}`);
     // 详情路由的返回是 {data:{action:完整 spec, raw, warnings}}
     const steps = res?.code === 0 ? (res.data?.action?.steps || []) : [];
-    wfStepsCache.set(actionId, Array.isArray(steps) ? steps : []);
-    return wfStepsCache.get(actionId);
+    wfStepsCache.set(cacheKey, Array.isArray(steps) ? steps : []);
+    return wfStepsCache.get(cacheKey);
   } catch {
-    wfStepsCache.set(actionId, []);
+    wfStepsCache.set(cacheKey, []);
     return [];
   }
 }
@@ -331,7 +339,7 @@ function buildRunBar() {
   bar.append(stop, resume, autopilot, modeSel, effortSel);
   bar.append(
     btn(t("去团队"), t("到对话面板的团队模式"), async () => {
-      const { openTeamConversation } = await import("../app.js?v=20260925-001");
+      const { openTeamConversation } = await import("../app.js?v=20260925-004");
       openTeamConversation?.();
     }),
   );

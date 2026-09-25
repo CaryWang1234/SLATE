@@ -12,17 +12,17 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution } from "../store.js?v=20260925-001";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-001";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260925-001";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-001";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260925-001";
-import { t } from "./i18n.js?v=20260925-001";
-import { makeId } from "./utils.js?v=20260925-001";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260925-001";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20260925-001";
-import { isAiToolOff } from "./ai_features.js?v=20260925-001";
-import { projectScopeOf } from "./project_scope.js?v=20260925-001";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260925-004";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-004";
+import { guardSkillCall } from "./riskguard.js?v=20260925-004";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-004";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260925-004";
+import { t } from "./i18n.js?v=20260925-004";
+import { makeId } from "./utils.js?v=20260925-004";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260925-004";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20260925-004";
+import { isAiToolOff } from "./ai_features.js?v=20260925-004";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260925-004";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -40,6 +40,13 @@ function projectParam(ctx = {}) {
   const activeId = String(state.project?.project_id || "");
   if (!proj?.project_id || String(proj.project_id) === activeId) return "";
   return String(proj.project_id);
+}
+
+// 生效视野的归属参数，与上面那条不同：/actions、/skills、/knowledge 的后端口径是
+// 「不传＝没有项目视野，只看全局那一份」，所以连"屏幕上这个项目"也要点名，
+// 否则项目里的同名 Action 在读路径上就凭空消失了。
+function scopeProjectParam(ctx = {}) {
+  return String(callProject(ctx)?.project_id || "");
 }
 
 function normalizeProjectRelativePath(rawPath, project = state.project) {
@@ -65,10 +72,11 @@ function normalizeProjectRelativePath(rawPath, project = state.project) {
 const ACTION_ID_RE = /^[a-z0-9][a-z0-9_-]{0,47}$/;
 
 /** Action 目录：优先用 store 里的快照，为空时回落接口（磁盘才是真源）。 */
-async function getActionCatalog() {
+async function getActionCatalog(projectId = "") {
   const cached = Array.isArray(state.actions) ? state.actions : [];
-  if (cached.length) return { actions: cached, broken: state.actionsBroken || [] };
-  const res = await get("/actions");
+  const qs = projectId ? `?project=${encodeURIComponent(projectId)}` : "";
+  if (cached.length && !projectId) return { actions: cached, broken: state.actionsBroken || [] };
+  const res = await get(`/actions${qs}`);
   if (res.code !== 0) return { error: res.message || "读取 Action 目录失败" };
   return {
     actions: res.data?.actions || [],
@@ -77,11 +85,17 @@ async function getActionCatalog() {
 }
 
 /** 写入/删除后刷新 store 快照：面板与下一次目录注入都要看到磁盘上的新状态。
- * 刷新失败不改写已成功的写入结果——面板下次打开本就会自取。 */
+ * 刷新失败不改写已成功的写入结果——面板下次打开本就会自取。
+ *
+ * 快照按**屏幕上这一视野**重取（写的是别的项目那份时也不许把别人的清单盖进来）；
+ * 缓存里存的全是"别的项目"那份生效清单，一次写入谁都可能因此变旧，整个丢掉最省事。
+ */
 async function refreshActionSnapshot() {
   try {
-    const res = await get("/actions");
+    const activePid = String(state.project?.project_id || "");
+    const res = await get(activePid ? `/actions?project=${encodeURIComponent(activePid)}` : "/actions");
     if (res.code === 0) setActions(res.data);
+    forgetScopeCatalog("");
   } catch {
     /* 忽略：真源是磁盘，快照丢了只是显示滞后 */
   }
@@ -405,16 +419,19 @@ const TOOLS = {
     params: {
       keyword: { type: "string", description: "搜索关键词（匹配技能名或描述），留空列出全部技能", required: false },
     },
-    async execute({ keyword }) {
+    async execute({ keyword }, callCtx = {}) {
       try {
         let mcp = {}, skills = {}, remoteTools = [];
         if (state.skills) {
           mcp = state.skills.mcp || {};
           skills = state.skills.skills || {};
-          remoteTools = state.skills.remoteTools || [];
         }
+        // 远程那份按「这一场的项目」取：全局清单里被项目掩码关掉的服务器，
+        // 在这一场看来就是不存在——列给模型却调不动，比不列更容易引出幻觉。
+        remoteTools = catalogForScope(callProject(callCtx)).remoteTools;
+        const pid = scopeProjectParam(callCtx);
         if (!Object.keys(mcp).length && !Object.keys(skills).length && !remoteTools.length) {
-          const res = await get("/skills");
+          const res = await get(`/skills${pid ? `?project=${encodeURIComponent(pid)}` : ""}`);
           if (res.code === 0) {
             mcp = res.data.mcp || {};
             skills = res.data.skills || {};
@@ -441,7 +458,7 @@ const TOOLS = {
 
   skill_run: {
     name: "执行工具",
-    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/replace_range按行号范围替换（start_line/end_line/content，推荐先view确认行号）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(终端会话：支持多会话管理、状态保持（cd/$env: 跨命令保持，PowerShell 变量不跨命令）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，Windows 每条命令一个 PowerShell 进程：多行块与 &&/|| 均可用，交互式 REPL（裸 python/node）拿不到输入会拖到超时故别用，高危命令双层拦截), bg_task(后台终端任务：跑长耗时命令（实验服务器后端、编译训练、长测试）不占住对话，action=start起任务（command命令、label任务名、work_dir工作目录、timeout秒数可选，>0到点自动终止、trigger事件传 {on:「exit」结束事件 / on:「match」命中正则，后者必须带 pattern 正则}、notify默认false，置true时命中/结束会把事件送回叫醒你）/status查状态（不传task_id则列全部）/log取输出（since_offset只取新增，tail_lines取最后N行，grep过滤）/stop杀整棵进程树。start 立刻返回不等命令跑完，返回里有 pid、开头一小段输出和 tail；此后不要轮询！要成果就用 status/log 主动问，或靠 trigger+notify 让系统送你消息。进程寿命等于 SLATE 后端寿命，日志落在 data/bg_tasks/<id>.log；宁可开一个后台任务也不要拿 terminal 干等，高危命令同样需要用户批准), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，engine可选auto（Bing+DuckDuckGo并发合并去重，推荐）/bing/ddg，mode=fetch时query为URL), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文Markdown，支持JS渲染页面与PDF，mode=html时返回原始HTML，render_js可选auto（正文过短自动渲染）/on/off，max_chars截断长度默认20000上限60000), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果), image_gen(AI图片生成：prompt描述必填、size尺寸可选如1024x1024、n数量默认1最多4，需先在设置中配置模型与Key，返回preview_url可预览), video_gen(AI视频生成：prompt描述必填、duration时长秒数默认5最多30，需先在设置中配置模型与Key，返回preview_url可预览)。也可传入 SKILL.md 技能名读取其定义内容",
+    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/replace_range按行号范围替换（start_line/end_line/content，推荐先view确认行号）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(终端会话：支持多会话管理、状态保持（cd/$env: 跨命令保持，PowerShell 变量不跨命令）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，Windows 每条命令一个 PowerShell 进程：多行块与 &&/|| 均可用，交互式 REPL（裸 python/node）拿不到输入会拖到超时故别用，高危命令双层拦截；是否每条命令都先征求用户批准，看这一场对话的审批模式（手动=逐条问，自动=只问高危，完全访问=不问）), bg_task(后台终端任务：跑长耗时命令（实验服务器后端、编译训练、长测试）不占住对话，action=start起任务（command命令、label任务名、work_dir工作目录、timeout秒数可选，>0到点自动终止、trigger事件传 {on:「exit」结束事件 / on:「match」命中正则，后者必须带 pattern 正则}、notify默认false，置true时命中/结束会把事件送回叫醒你）/status查状态（不传task_id则列全部）/log取输出（since_offset只取新增，tail_lines取最后N行，grep过滤）/stop杀整棵进程树。start 立刻返回不等命令跑完，返回里有 pid、开头一小段输出和 tail；此后不要轮询！要成果就用 status/log 主动问，或靠 trigger+notify 让系统送你消息。进程寿命等于 SLATE 后端寿命，日志落在 data/bg_tasks/<id>.log；宁可开一个后台任务也不要拿 terminal 干等，命令走的审批档与 terminal 完全一致（后台 ≠ 免审批）), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，engine可选auto（Bing+DuckDuckGo并发合并去重，推荐）/bing/ddg，mode=fetch时query为URL；联网与开浏览器都算「访问网络」，手动审批档下会先征求用户同意，被拒时不要重试，改用本地证据或问用户), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文Markdown，支持JS渲染页面与PDF，mode=html时返回原始HTML，render_js可选auto（正文过短自动渲染）/on/off，max_chars截断长度默认20000上限60000), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果), image_gen(AI图片生成：prompt描述必填、size尺寸可选如1024x1024、n数量默认1最多4，需先在设置中配置模型与Key，返回preview_url可预览), video_gen(AI视频生成：prompt描述必填、duration时长秒数默认5最多30，需先在设置中配置模型与Key，返回preview_url可预览)。也可传入 SKILL.md 技能名读取其定义内容",
     params: {
       skill: { type: "string", description: "工具或技能名称", required: true },
       params: { type: "object", description: "工具参数" },
@@ -465,24 +482,11 @@ const TOOLS = {
             p.file_path = target.abs;
           }
         }
-        // 高危命令审批：写死规则判定，命中后弹框并用模型解释目的
-        // 移动端通过 window.__slateGuardOverride 接管审批 UI（底部 sheet），桌面不受影响
-        if (skill === "terminal" && p.command) {
-
-          const risk = isHighRiskCommand(p.command);
-          const guard = window.__slateGuardOverride || guardSkillParams;
-          if (risk.risk && !(await guard(skill, p))) {
-            return `高危命令被用户拒绝执行（${risk.reason}）：${p.command}`;
-          }
-        }
-        // 后台任务走的也是同一道门：后台 ≠ 免审批。status/log/stop 不改环境，不弹框。
-        if (skill === "bg_task" && p.command && (p.action || "start") === "start") {
-          const risk = isHighRiskCommand(p.command);
-          const guard = window.__slateGuardOverride || guardSkillParams;
-          if (risk.risk && !(await guard(skill, p))) {
-            return `高危命令被用户拒绝执行（${risk.reason}）：${p.command}`;
-          }
-        }
+        // 审批门：命令与联网两类走同一道门，问不问由**这一场**的审批档决定
+        // （ask 逐条问 / auto 只问高危 / full 不问，判定全在 riskguard.approvalNeededFor）。
+        // 手机遥控把 window.__slateGuardUi 换成底部 sheet，判口不变。
+        const verdict = await guardSkillCall(skill, p, { convId: callCtx.convId });
+        if (!verdict.ok) return verdict.message;
         // 后台任务的出处由前端补：模型不该负责记"我在哪个项目、哪场会话"，
         // 而这两样决定了任务结束后那条消息念给谁——不给就只能念给"当时正好开着的那一场"。
         if (skill === "bg_task" && (p.action || "start") === "start") {
@@ -500,9 +504,11 @@ const TOOLS = {
           signal: callCtx.signal,
           callId: callCtx.callId,
           onEvent: callCtx.onEvent,
+          // 远程 MCP 工具要按这一场的项目掩码复验；内置技能读不到这个字段，多传无害。
+          project: skill.startsWith("mcp__") ? scopeProjectParam(callCtx) : "",
         });
         const res = streamed.fallback
-          ? await post("/skills/execute", { skill, params: p })
+          ? await post("/skills/execute", { skill, params: p, project: scopeProjectParam(callCtx) })
           : (streamed.result || { code: -1, data: null, message: t("工具流式执行失败") });
         if (res.code === 0) {
           const data = res.data;
@@ -525,9 +531,9 @@ const TOOLS = {
     params: {
       keyword: { type: "string", description: "搜索关键词，留空列出全部 Action", required: false },
     },
-    async execute({ keyword }) {
+    async execute({ keyword }, callCtx = {}) {
       try {
-        const catalog = await getActionCatalog();
+        const catalog = await getActionCatalog(scopeProjectParam(callCtx));
         if (catalog.error) return `Action 目录读取失败: ${catalog.error}`;
         const kw = String(keyword || "").trim().toLowerCase();
         const hits = kw
@@ -564,13 +570,14 @@ const TOOLS = {
     params: {
       id: { type: "string", description: "Action id（即 yml 文件名，如 weekly_report）", required: true },
     },
-    async execute({ id }) {
+    async execute({ id }, callCtx = {}) {
       try {
         const clean = String(id || "").trim();
         if (!ACTION_ID_RE.test(clean)) {
           return `无效的 Action id: ${id}。id 只能是小写字母开头的 a-z0-9_-，请先用 actions_list 确认。`;
         }
-        const res = await get(`/actions/${clean}`);
+        const pid = scopeProjectParam(callCtx);
+        const res = await get(`/actions/${clean}${pid ? `?project=${encodeURIComponent(pid)}` : ""}`);
         if (res.code !== 0) return `读取 Action ${clean} 失败: ${res.message}`;
         return renderAction(res.data);
       } catch (e) {
@@ -581,12 +588,13 @@ const TOOLS = {
 
   actions_write: {
     name: "写入 Action",
-    description: "创建或整份覆盖一个 Action（data/actions/<id>.yml），把与用户当面确认过的流程固化成以后可复用的说明书。id 是 yml 文件名（小写字母开头的 a-z0-9_-，如 weekly_report）；content 是完整的 SAY-1 YAML 原文（换行写成 \\n），必须含 name/description/steps，并写 author: model 声明由模型代写。格式约束：缩进只用 2 个空格、禁止 Tab，列表用块式写法（- 开头），禁止行内 {}/[]。写入前后端会按行校验，未通过不会落盘；覆盖已有文件前会自动留底（设置 → 技能与工具 里可回滚）。人工审批模式下会弹确认框给用户看原文，用户拒绝即不写入——此时不要反复重试，应把要点讲清楚或改用普通回复。只在用户明确要求「以后都按这套流程」时使用，不要擅自替用户发明流程。",
+    description: "创建或整份覆盖一个 Action（data/actions/<id>.yml），把与用户当面确认过的流程固化成以后可复用的说明书。id 是 yml 文件名（小写字母开头的 a-z0-9_-，如 weekly_report）；content 是完整的 SAY-1 YAML 原文（换行写成 \\n），必须含 name/description/steps，并写 author: model 声明由模型代写。格式约束：缩进只用 2 个空格、禁止 Tab，列表用块式写法（- 开头），禁止行内 {}/[]。写入前后端会按行校验，未通过不会落盘；覆盖已有文件前会自动留底（设置 → 技能与工具 里可回滚）。这一场开着手动审批时会弹确认框给用户看原文，用户拒绝即不写入——此时不要反复重试，应把要点讲清楚或改用普通回复。只在用户明确要求「以后都按这套流程」时使用，不要擅自替用户发明流程。",
     params: {
       id: { type: "string", description: "Action id（yml 文件名，小写字母开头的 a-z0-9_-）", required: true },
       content: { type: "string", description: "完整的 SAY-1 YAML 原文", required: true },
+      scope: { type: "string", description: '写哪一份："global"（默认，本机所有项目共用）或 "project"（只进当前项目的 .slate/actions/，同名时顶掉全局那份）。用户明确说"这个项目里"才用 project', required: false },
     },
-    async execute({ id, content }) {
+    async execute({ id, content, scope }, callCtx = {}) {
       try {
         const clean = String(id || "").trim();
         if (!ACTION_ID_RE.test(clean)) {
@@ -594,6 +602,11 @@ const TOOLS = {
         }
         const text = String(content || "");
         if (!text.trim()) return "缺少 content：需给出完整的 SAY-1 YAML 原文，不是 JSON、也不是字段清单。";
+        const writeScope = String(scope || "").trim() === "project" ? "project" : "global";
+        const pid = scopeProjectParam(callCtx);
+        if (writeScope === "project" && !pid) {
+          return "Action 未写入：scope=project 需要先打开一个项目。请改按 scope=global 写本机共用那一份，或让用户先选项目后重试。";
+        }
         const check = await post("/actions/validate", { content: text });
         if (check.code !== 0) return `Action ${clean} 校验请求失败: ${check.message}`;
         const draft = check.data || {};
@@ -605,9 +618,11 @@ const TOOLS = {
           return `Action ${clean} 未写入：content 里必须写明 author: model（面板要据此标出这份流程由模型代写）。加上后重发即可。`;
         }
         const warnings = draft.warnings || [];
-        if (state.permissionMode !== "auto" && state.permissionMode !== "full") {
+        const targetPath = writeScope === "project" ? `${pid}/.slate/actions/${clean}.yml` : `data/actions/${clean}.yml`;
+        // Action 写入不在审批门的两类里（既不是命令也不是联网），单独问：手动档才弹原文确认
+        if (permissionModeFor(callCtx.convId) === "ask") {
           const approved = await dlgConfirm(
-            `模型要把下面这份流程写成 Action「${clean}」（data/actions/${clean}.yml）。\n\n`
+            `模型要把下面这份流程写成 Action「${clean}」（落在 ${targetPath}）。\n\n`
             + `${text.length > 3000 ? `${text.slice(0, 3000)}\n…（原文过长已截断，完整内容写入后可在 设置 → 技能与工具 查看）` : text}\n\n`
             + (warnings.length ? `书写提醒：${warnings.join("；")}\n` : "")
             + "确认后会覆盖同名 Action（覆盖前自动留底，可回滚）。",
@@ -617,11 +632,12 @@ const TOOLS = {
             return `用户拒绝了本次 Action 写入（${clean} 未改动）。请不要重复调用本工具，可在回复里说明这份流程的要点，或询问用户想改哪里。`;
           }
         }
-        const res = await put(`/actions/${clean}`, { content: text });
+        const res = await put(`/actions/${clean}${pid ? `?project=${encodeURIComponent(pid)}` : ""}`, { content: text, scope: writeScope });
         if (res.code !== 0) return `Action ${clean} 写入失败: ${res.message}`;
         const d = res.data || {};
         await refreshActionSnapshot();
-        const lines = [`已${d.created ? "创建" : "更新"} Action ${clean}（${d.stepCount} 步、${d.inputCount} 个输入项），文件 ${d.path}。`];
+        const lines = [`已${d.created ? "创建" : "更新"} Action ${clean}（${d.stepCount} 步、${d.inputCount} 个输入项），落在 ${targetPath}。`];
+        if (writeScope === "project") lines.push("这一份只属于当前项目，同名时顶掉全局那份；删掉它会自动回落全局。");
         if (d.backedUp) lines.push(`原内容已留底（${d.backedUp}），可在 设置 → 技能与工具 → Actions 的历史里回滚。`);
         if (warnings.length) lines.push(`书写提醒：${warnings.join("；")}`);
         lines.push("Action 只是流程约定，本次任务仍要按步骤实际执行并完成验证。");
@@ -764,14 +780,16 @@ const TOOLS = {
       query: { type: "string", description: "检索问题或关键词, required: true "},
       limit: { type: "number", description: "返回片段数，默认 5" },
     },
-    async execute({ query, limit }) {
-      const res = await post("/knowledge/search", { query: query || "", limit: limit || 5 });
+    async execute({ query, limit }, callCtx = {}) {
+      // 检索视野＝这一场的项目：项目里那份同名文档要顶掉全局那份
+      const res = await post("/knowledge/search", { query: query || "", limit: limit || 5, project: scopeProjectParam(callCtx) });
       if (res.code !== 0) return res.message || "知识库检索失败";
       const items = res.data || [];
       if (!items.length) return "未检索到相关知识";
       return items.map((item, i) => {
         const title = item.title || item.source || "知识";
-        return `${i + 1}. [${title}] score=${item.score}\n${item.content}`;
+        const from = item.scope === "project" ? "（本项目）" : "";
+        return `${i + 1}. [${title}]${from} score=${item.score}\n${item.content}`;
       }).join("\n\n");
     },
   },
@@ -784,17 +802,22 @@ const TOOLS = {
       content: { type: "string", description: "知识正文", required: true },
       source: { type: "string", description: "来源说明" },
       kind: { type: "string", description: "类型，如 note/memory/project/fact" },
+      scope: { type: "string", description: '存哪一份："global"（默认，所有项目共用）或 "project"（只进当前项目，同名时顶掉全局那条）。只在用户明确说"这个项目"时用 project', required: false },
     },
-    async execute({ title, content, source, kind }) {
+    async execute({ title, content, source, kind, scope }, callCtx = {}) {
       if (!content) return "缺少 content";
+      const pid = scopeProjectParam(callCtx);
+      const inProject = String(scope || "").trim() === "project";
+      if (inProject && !pid) return "未写入：scope=project 需要先打开一个项目。可改按默认（全局共用）那份再问用户一次。";
       const res = await post("/knowledge/docs", {
         title: title || "未命名知识",
         content,
         source: source || "assistant",
         kind: kind || "note",
+        project: inProject ? pid : "",
       });
       if (res.code !== 0) return res.message || "添加知识失败";
-      return `已添加知识 ${title || res.data?.id || "未命名知识"}`;
+      return `已添加知识 ${title || res.data?.id || "未命名知识"}${inProject ? "（存进本项目那一份，同名时顶掉全局那条）" : "（全局共用那一份）"}`;
     },
   },
 
@@ -1930,8 +1953,8 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
     }
   }
 
-  // 远程 MCP 工具（动态注入）
-  const remoteTools = state.skills?.remoteTools || [];
+  // 远程 MCP 工具（动态注入）：按这一场的项目取生效那份（掩码关掉的整个不进目录）
+  const remoteTools = catalogForScope(project).remoteTools;
   if (remoteTools.length > 0) {
     s += "### \u8fdc\u7a0b MCP \u5de5\u5177\uff08\u901a\u8fc7 skill_run \u8c03\u7528\uff09\n";
     s += "\u4ee5\u4e0b\u5de5\u5177\u6765\u81ea\u5df2\u8fde\u63a5\u7684\u5916\u90e8 MCP Server\uff0c\u901a\u8fc7 skill_run \u8c03\u7528\uff0cskill \u53c2\u6570\u683c\u5f0f\u4e3a mcp__serverId__toolName\n";

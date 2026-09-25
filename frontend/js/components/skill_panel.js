@@ -3,12 +3,13 @@
  * + Actions（data/actions/*.yml 流程说明书：可编辑、试校验、删除、留底回滚）。
  */
 
-import { state, subscribe, setSkills, setActions } from "../store.js?v=20260925-001";
-import { get, post, put, del, upload } from "../services/api.js?v=20260925-001";
-import { guardSkillParams } from "../services/riskguard.js?v=20260925-001";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260925-001";
-import { t } from "../services/i18n.js?v=20260925-001";
-import { setIconText } from "../services/icons.js?v=20260925-001";
+import { state, subscribe, setSkills, setActions } from "../store.js?v=20260925-004";
+import { get, post, put, del, upload } from "../services/api.js?v=20260925-004";
+import { guardSkillCall } from "../services/riskguard.js?v=20260925-004";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260925-004";
+import { t } from "../services/i18n.js?v=20260925-004";
+import { setIconText } from "../services/icons.js?v=20260925-004";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20260925-004";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
@@ -329,12 +330,32 @@ const ACTION_TEMPLATE = [
   "",
 ].join("\n");
 
-let actionModal, actionModalTitle, actionModalMeta, actionEditor, actionValidateMsg, actionHistory;
-let btnActionSave, btnActionDelete, btnActionHistory;
+let actionModal, actionModalTitle, actionModalMeta, actionScopeHint, actionEditor, actionValidateMsg, actionHistory;
+let btnActionSave, btnActionDelete, btnActionHistory, btnActionOverride;
 let currentActionId = "";        // 编辑器当前对应的 Action（新建时也会赋值，但磁盘上还没有）
+let currentActionScope = "global"; // 编辑器里这一份落在哪儿：global=本机共用，project=当前项目的覆盖版
 let actionExists = false;        // 决定「删除/历史」这两个入口是否有意义
 let actionValidateTimer = null;
 let actionDraftSeq = 0;          // 校验是异步的：迟到的旧结果不许覆盖新输入
+
+/*
+ * 两份 Action 长得很像，改错一份的代价却不小：全局那份是所有项目共用的，
+ * 项目那份只在打开这个项目时顶掉同名全局那份。所以列表上标来源，编辑器里
+ * 写明"现在改的是哪一份"，保存/删除/历史也都按这一份的落点走——与分项目宪法同一套文案。
+ */
+function activeProjectId() {
+  return String(state.project?.project_id || "");
+}
+
+/** 编辑器上方那行落点说明（没有项目视野时不提项目覆盖）。 */
+function describeActionScope(scope) {
+  if (scope === "project") {
+    return t("正在编辑项目「{name}」的 Action：存进该项目的 .slate/actions/，同名时顶掉全局那份", { name: state.project?.name || "" });
+  }
+  return activeProjectId()
+    ? t("正在编辑全局 Action：打开带同名 Action 的项目时，以该项目 .slate/actions/ 里那份为准")
+    : t("正在编辑全局 Action：所有项目共用这一份");
+}
 
 function renderActionsSection() {
   const list = Array.isArray(state.actions) ? state.actions : [];
@@ -369,6 +390,14 @@ function createActionItem(action) {
   badge.className = "skill-kind-badge skill-kind-action";
   badge.textContent = "Action";
   nameRow.appendChild(badge);
+  // 来源徽标：这一份是项目里的覆盖版还是本机共用那份，用户只能从这里看出来
+  if (action.scope === "project") {
+    const scopeBadge = document.createElement("span");
+    scopeBadge.className = "skill-kind-badge skill-kind-scope";
+    scopeBadge.textContent = t("本项目");
+    scopeBadge.title = t("只在这个项目里生效，同名时顶掉全局那份");
+    nameRow.appendChild(scopeBadge);
+  }
   // 模型代写的流程要显式标出来：它等于模型往自己的系统提示里加过料
   if (action.author === "model") {
     const modelBadge = document.createElement("span");
@@ -422,13 +451,25 @@ function setActionNote(text, kind) {
 
 function resetActionModalChrome(id, { isNew }) {
   currentActionId = id;
+  currentActionScope = "global";
   actionExists = !isNew;
   actionDraftSeq += 1; // 作废上一份草稿在途的校验响应
   actionModalTitle.textContent = isNew ? t("新建 Action {id}", { id }) : t("编辑 Action {id}", { id });
   actionHistory.classList.add("hidden");
   btnActionDelete.classList.toggle("hidden", isNew);
   btnActionHistory.classList.toggle("hidden", isNew);
+  paintActionScopeHint();
   if (isNew) actionEditor.value = ACTION_TEMPLATE;
+}
+
+/** 编辑器顶部那行落点说明 + 「在本项目另存一份」的可见性：两者读的都是 currentActionScope。 */
+function paintActionScopeHint() {
+  if (actionScopeHint) {
+    actionScopeHint.textContent = describeActionScope(currentActionScope);
+    actionScopeHint.classList.toggle("action-scope-project", currentActionScope === "project");
+  }
+  // 覆盖版自己有覆盖版，不必再"另存"；没打开项目时更没有落点可言
+  btnActionOverride?.classList.toggle("hidden", !(activeProjectId() && actionExists && currentActionScope === "global"));
 }
 
 async function handleCreateAction() {
@@ -465,12 +506,15 @@ async function openActionEditor(id) {
   actionModal.classList.remove("hidden");
 
   try {
-    const res = await get(`/actions/${encodeURIComponent(id)}`);
+    const pid = activeProjectId();
+    const res = await get(`/actions/${encodeURIComponent(id)}${pid ? `?project=${encodeURIComponent(pid)}` : ""}`);
     if (currentActionId !== id) return; // 用户已切到别的条目，不要把上一份的原文灌进来
     if (res.code !== 0) {
       actionModalMeta.textContent = t("读取失败: {msg}", { msg: res.message || t("未知错误") });
       return;
     }
+    currentActionScope = res.data?.scope === "project" ? "project" : "global";
+    paintActionScopeHint();
     actionEditor.value = res.data?.raw || "";
     const a = res.data?.action || {};
     actionModalMeta.textContent = [
@@ -519,7 +563,7 @@ async function validateActionDraft() {
   }
 }
 
-async function saveAction() {
+async function saveAction(targetScope = "") {
   const id = currentActionId;
   if (!id) return;
   const draft = await validateActionDraft();
@@ -527,13 +571,24 @@ async function saveAction() {
     showToast(t("校验未通过，未写入"));
     return;
   }
+  const scope = targetScope === "project" ? "project" : (currentActionScope || "global");
+  const pid = activeProjectId();
+  if (scope === "project" && !pid) {
+    showToast(t("要先打开一个项目，才能写进项目那一份"));
+    return;
+  }
   btnActionSave.disabled = true;
   btnActionSave.textContent = t("保存中…");
   try {
-    const res = await put(`/actions/${encodeURIComponent(id)}`, { content: actionEditor.value });
+    const qs = scope === "project" ? `?project=${encodeURIComponent(pid)}` : "";
+    const res = await put(`/actions/${encodeURIComponent(id)}${qs}`, { content: actionEditor.value, scope });
     if (res.code === 0) {
       const d = res.data || {};
-      showToast(t("已保存 Action {id}", { id }));
+      currentActionScope = d.scope === "project" ? "project" : "global";
+      paintActionScopeHint();
+      showToast(currentActionScope === "project"
+        ? t("已保存项目里的 Action {id}（同名时顶掉全局那份）", { id })
+        : t("已保存全局 Action {id}", { id }));
       actionExists = true;
       btnActionDelete.classList.remove("hidden");
       btnActionHistory.classList.remove("hidden");
@@ -546,6 +601,7 @@ async function saveAction() {
         ? t("已写入。书写提醒：{msg}", { msg: d.warnings.join("；") })
         : t("已写入"), (d.warnings || []).length ? "warn" : "ok");
       refreshActions();
+      forgetScopeCatalog(pid);   // 后台那场的目录缓存跟着磁盘失效
     } else {
       setActionNote(t("写入失败: {msg}", { msg: res.message || t("未知错误") }), "err");
       showToast(t("写入失败: {msg}", { msg: res.message || t("未知错误") }));
@@ -558,18 +614,32 @@ async function saveAction() {
   }
 }
 
+/** 把编辑器里这份另存为当前项目的覆盖版（全局那份原样留着）。 */
+async function saveActionAsProjectOverride() {
+  await saveAction("project");
+}
+
 async function deleteAction() {
   const id = currentActionId;
   if (!id) return;
-  const ok = await dlgConfirm(t("确定删除 Action {id}？删除前的内容会留底，可在「历史版本」里回滚。", { id }),
-    { danger: true, okText: t("删除"), title: t("删除 Action") });
+  const pid = activeProjectId();
+  const inProject = currentActionScope === "project" && Boolean(pid);
+  const ok = await dlgConfirm(
+    inProject
+      ? t("确定摘掉项目里的 Action {id}？摘掉后这一项目回到全局那一份（若存在）。删除前的内容会留底，可在「历史版本」里回滚。", { id })
+      : t("确定删除全局 Action {id}？所有项目共用这一份，删了别的项目也读不到它。删除前的内容会留底，可在「历史版本」里回滚。", { id }),
+    { danger: true, okText: inProject ? t("摘掉覆盖") : t("删除"), title: t("删除 Action") });
   if (!ok) return;
   try {
-    const res = await del(`/actions/${encodeURIComponent(id)}`);
+    const qs = new URLSearchParams();
+    if (pid) qs.set("project", pid);
+    qs.set("scope", inProject ? "project" : "global");
+    const res = await del(`/actions/${encodeURIComponent(id)}?${qs.toString()}`);
     if (res.code === 0) {
-      showToast(t("已删除 Action {id}", { id }));
+      showToast(res.message || (inProject ? t("已摘掉项目覆盖 {id}", { id }) : t("已删除 Action {id}", { id })));
       actionModal.classList.add("hidden");
       refreshActions();
+      forgetScopeCatalog(pid);
     } else {
       showToast(t("删除失败: {msg}", { msg: res.message || t("未知错误") }));
     }
@@ -585,6 +655,15 @@ function formatHistoryTs(ts) {
   return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6]}${m[7] ? ` #${m[7]}` : ""}`;
 }
 
+/** 留底按落点各存一处：看历史也必须点名是哪一份，否则会把另一份的留底当成这一份的。 */
+function actionScopeQuery() {
+  const qs = new URLSearchParams();
+  const pid = activeProjectId();
+  if (pid) qs.set("project", pid);
+  qs.set("scope", currentActionScope === "project" ? "project" : "global");
+  return `?${qs.toString()}`;
+}
+
 async function renderActionHistory() {
   actionHistory.textContent = "";
   const loading = document.createElement("div");
@@ -592,7 +671,7 @@ async function renderActionHistory() {
   loading.textContent = t("读取中…");
   actionHistory.appendChild(loading);
   try {
-    const res = await get(`/actions/${encodeURIComponent(currentActionId)}/history`);
+    const res = await get(`/actions/${encodeURIComponent(currentActionId)}/history${actionScopeQuery()}`);
     const rows = res.code === 0 ? (res.data?.versions || []) : [];
     actionHistory.textContent = "";
     if (res.code !== 0) {
@@ -604,7 +683,8 @@ async function renderActionHistory() {
     }
     const tip = document.createElement("div");
     tip.className = "action-history-tip";
-    tip.textContent = t("每次覆盖或删除都会留底，每份最多保留 {n} 版。", { n: res.data?.keep || 5 });
+    tip.textContent = (currentActionScope === "project" ? t("以下是项目那一份的留底。") : t("以下是全局那一份的留底。"))
+      + t("每次覆盖或删除都会留底，每份最多保留 {n} 版。", { n: res.data?.keep || 5 });
     actionHistory.appendChild(tip);
     if (!rows.length) {
       const empty = document.createElement("div");
@@ -637,7 +717,7 @@ function createHistoryRow(version) {
   viewBtn.textContent = t("查看");
   viewBtn.addEventListener("click", async () => {
     try {
-      const res = await get(`/actions/${encodeURIComponent(currentActionId)}/history/${encodeURIComponent(version.ts)}`);
+      const res = await get(`/actions/${encodeURIComponent(currentActionId)}/history/${encodeURIComponent(version.ts)}${actionScopeQuery()}`);
       if (res.code !== 0) { showToast(t("读取失败: {msg}", { msg: res.message })); return; }
       actionEditor.value = res.data?.content || "";
       setActionNote(t("正在查看 {ts} 的历史内容（尚未写入）。改完点「保存」即写回磁盘。", { ts: formatHistoryTs(version.ts) }), "muted");
@@ -651,16 +731,21 @@ function createHistoryRow(version) {
   restoreBtn.className = "dlg-btn dlg-btn-primary";
   restoreBtn.textContent = t("回滚");
   restoreBtn.addEventListener("click", async () => {
-    const ok = await dlgConfirm(t("回滚 Action {id} 到 {ts}？当前内容会先留底。", { id: currentActionId, ts: formatHistoryTs(version.ts) }),
-      { okText: t("回滚"), title: t("回滚 Action") });
+    const inProject = currentActionScope === "project";
+    const ok = await dlgConfirm(t("回滚{scope} Action {id} 到 {ts}？当前内容会先留底。", {
+      scope: inProject ? t("项目里那份") : t("全局那份"), id: currentActionId, ts: formatHistoryTs(version.ts),
+    }), { okText: t("回滚"), title: t("回滚 Action") });
     if (!ok) return;
     try {
-      const res = await post(`/actions/${encodeURIComponent(currentActionId)}/history/restore`, { ts: version.ts });
+      const pid = activeProjectId();
+      const qs = pid ? `?project=${encodeURIComponent(pid)}` : "";
+      const res = await post(`/actions/${encodeURIComponent(currentActionId)}/history/restore${qs}`,
+        { ts: version.ts, scope: inProject ? "project" : "global" });
       if (res.code !== 0) { showToast(t("回滚失败: {msg}", { msg: res.message || t("未知错误") })); return; }
       showToast(t("已回滚到 {ts}", { ts: formatHistoryTs(version.ts) }));
       refreshActions();
       renderActionHistory();
-      const detail = await get(`/actions/${encodeURIComponent(currentActionId)}`);
+      const detail = await get(`/actions/${encodeURIComponent(currentActionId)}${pid ? `?project=${encodeURIComponent(pid)}` : ""}`);
       if (detail.code === 0) actionEditor.value = detail.data?.raw || "";
     } catch (e) {
       showToast(t("请求失败: {msg}", { msg: e.message }));
@@ -692,14 +777,17 @@ function initActionModal() {
   actionEditor = document.getElementById("action-editor");
   actionValidateMsg = document.getElementById("action-validate-msg");
   actionHistory = document.getElementById("action-history");
+  actionScopeHint = document.getElementById("action-scope-hint");
   btnActionSave = document.getElementById("btn-action-save");
   btnActionDelete = document.getElementById("btn-action-delete");
   btnActionHistory = document.getElementById("btn-action-history");
+  btnActionOverride = document.getElementById("btn-action-override");
   if (!actionModal || !actionEditor) return;
 
-  btnActionSave.addEventListener("click", saveAction);
+  btnActionSave.addEventListener("click", () => saveAction());
   btnActionDelete.addEventListener("click", deleteAction);
   btnActionHistory.addEventListener("click", toggleActionHistory);
+  btnActionOverride?.addEventListener("click", saveActionAsProjectOverride);
   actionEditor.addEventListener("input", onActionEditorInput);
   actionModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
     el.addEventListener("click", () => actionModal.classList.add("hidden"));
@@ -830,10 +918,11 @@ async function executeSkill() {
   btnRunSkill.textContent = "执行中…";
 
   try {
-    // 高危命令审批：命中写死规则时弹框请求批准
-    if (!(await guardSkillParams(currentSkillName, params))) {
+    // 审批门：面板里这条命令是用户自己填、自己点的，所以只拦高危那一类（manual）
+    const verdict = await guardSkillCall(currentSkillName, params, { manual: true });
+    if (!verdict.ok) {
       skillResult.classList.remove("hidden");
-      skillResult.textContent = "高危命令已被拒绝执行";
+      skillResult.textContent = verdict.message;
       return;
     }
     const res = await post("/skills/execute", { skill: currentSkillName, params });
@@ -1023,8 +1112,18 @@ async function handleGithubImport() {
 
 // ── 刷新技能列表 ────────────────────────────
 
+/*
+ * 这两份快照按「屏幕上这个项目」的视野取：同名 Action 顶掉全局、被项目掩码关掉的
+ * 服务器整个不进清单。换项目时必须重取——留着上一份等于把 A 项目的工具清单画在
+ * B 项目的面板上，而面板是用户判断「这一份从哪来」的唯一依据。
+ */
+function activeProjectQuery() {
+  const pid = String(state.project?.project_id || "");
+  return pid ? `?project=${encodeURIComponent(pid)}` : "";
+}
+
 async function refreshSkills() {
-  const res = await get("/skills");
+  const res = await get(`/skills${activeProjectQuery()}`);
   if (res.code === 0) {
     setSkills(res.data);
   }
@@ -1033,7 +1132,7 @@ async function refreshSkills() {
 /** Action 目录刷新：读不到就保持空态。这是可选能力，不该在每次开面板时弹错误提示。 */
 async function refreshActions() {
   try {
-    const res = await get("/actions");
+    const res = await get(`/actions${activeProjectQuery()}`);
     if (res.code === 0) setActions(res.data);
   } catch (e) {
     /* 静默：无 Action 与读失败对用户等价，面板已有空态提示 */
@@ -1069,6 +1168,8 @@ function initSkillPanel() {
 
   subscribe("skills", renderSkillList);
   subscribe("actions", renderSkillList);
+  // 换项目＝换视野：这两份快照的"生效版"跟着项目走，不重取会留着上一个项目的清单
+  subscribe("project", () => { refreshSkills(); refreshActions(); });
 
   // 加载技能列表 + Action 目录
   refreshSkills();

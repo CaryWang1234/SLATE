@@ -908,6 +908,20 @@ textarea {
   line-height: 1.6;
 }
 
+/* 审批 sheet 现在三种问法共用（高危命令 / 逐条确认的命令 / 逐条确认的联网），
+   字段名和"批准后会发生什么"都得有自己的位置 */
+.m-risk-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.m-risk-note {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
 /* ── Toast ───────────────────────────── */
 #m-toast-root {
   position: fixed;

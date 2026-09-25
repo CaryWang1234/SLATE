@@ -125,6 +125,9 @@ def _project_info(project_dir: Path, config: dict) -> dict:
         "name": project_dir.name,
         "config": config,
         "constitution": config.get("constitution"),
+        # MCP 的项目掩码与宪法同住一份 config.json，同样在这里带出去（P4）：
+        # 前端按 run 的项目现场过滤远程工具，一次 info 请求就够，不必每场再生成一次请求。
+        "mcp": config.get("mcp"),
         "has_slate_dir": (project_dir / ".slate").is_dir(),
         "kind": "workspace" if is_workspace else "folder",
         "roots": roots,

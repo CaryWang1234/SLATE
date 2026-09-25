@@ -67,14 +67,17 @@ assert.match(ROUTER_SRC, /HISTORY_KEEP\s*=\s*5(?!\d)/, "留底要有份数上限
 assert.match(ROUTER_SRC, /HISTORY_TS_RE = re\.compile\(r"\^\\d\{8\}T\\d\{6\}/,
   "历史文件名里的 ts 要先进白名单正则再拼路径，否则 ../ 能从 /history/{ts} 外逃");
 const WRITE_BODY = pyBody(ROUTER_SRC, "def _write_action(", "\ndef _describe", "_write_action");
-assert.match(WRITE_BODY, /size > MAX_FILE_BYTES[\s\S]*?load_action\(text[\s\S]*?_backup\(clean_id, path\)[\s\S]*?atomic_write_text\(path, text\)/,
-  "顺序必须是 体积→校验→留底→原子写：先写后校会把坏文件留在盘上，不先留底就没有回滚的余地");
+// P4 起留底目录按落点算（项目那份的历史留在项目自己的 .slate/actions/.history，
+// 不与全局那份混在同一堆时间戳里）：锚点因此多钉一个参数，比原来更严，不是放宽。
+assert.match(WRITE_BODY, /size > MAX_FILE_BYTES[\s\S]*?load_action\(text[\s\S]*?_backup\(clean_id, path, _history_dir_of\(path\)\)[\s\S]*?atomic_write_text\(path, text\)/,
+  "顺序必须是 体积→校验→留底→原子写：先写后校会把坏文件留在盘上，不先留底就没有回滚的余地（留底还得落在这一份自己的目录）");
 assert.equal((ROUTER_SRC.match(/atomic_write_text\(path, text\)/g) || []).length, 1,
   "全文件只能有一处直接落盘：多一处就多一条绕过校验与留底的后门");
 assert.equal((ROUTER_SRC.match(/return _write_action\(clean_id/g) || []).length, 2,
   "PUT 与回滚要共用 _write_action，写成两遍早晚会有一遍偷偷少做一次校验");
 const DELETE_BODY = pyBody(ROUTER_SRC, "async def delete_action(", "@router.get(\"/{action_id}/history\")", "delete_action");
-assert.match(DELETE_BODY, /backed_up = _backup\(clean_id, path\)[\s\S]*?path\.unlink/,
+// 同上：删除前的留底也必须落在这一份自己的目录里（P4 起 _backup 收三个参数）
+assert.match(DELETE_BODY, /backed_up = _backup\(clean_id, path, history\)[\s\S]*?path\.unlink/,
   "删除要先留底再 unlink：误删一份手写流程是不可逆的");
 const RESTORE_BODY = pyBody(ROUTER_SRC, "async def restore_history(", null, "restore_history");
 assert.match(RESTORE_BODY, /load_action\(source, action_id=clean_id\)[\s\S]*?return _write_action\(clean_id, source/,
@@ -123,12 +126,16 @@ assert.match(WRITE_TOOL, /if \(!draft\.ok\)[\s\S]*?未写入[\s\S]*?return/,
   "校验不过要直接返回错误给模型去改，不能把坏内容写进目录");
 assert.match(WRITE_TOOL, /draft\.action\?\.author !== "model"[\s\S]*?return/,
   "模型代写必须自证 author: model，面板才分得清哪份是用户手写、哪份是模型加的");
-assert.match(WRITE_TOOL, /state\.permissionMode !== "auto" && state\.permissionMode !== "full"[\s\S]*?dlgConfirm\([\s\S]*?\n *const res = await put\(/,
-  "「询问」档位必须先让用户看过原文再落盘；顺序反了就变成先写后问，审批形同虚设");
+// 审批档从"全局那一个值"改成"这一场生效的那一档"（P5 输入框可逐场改）；判据没变松：
+// 仍是"只有手动档弹原文确认"，也仍钉确认排在 put 落盘之前。
+assert.match(WRITE_TOOL, /if \(permissionModeFor\(callCtx\.convId\) === "ask"\)[\s\S]*?dlgConfirm\([\s\S]*?\n *const res = await put\(/,
+  "「手动审批」那一档必须先让用户看过原文再落盘；顺序反了就变成先写后问，审批形同虚设");
 assert.match(WRITE_TOOL, /if \(!approved\)[\s\S]*?不要重复调用[\s\S]*?return/,
   "用户拒绝后要劝退模型重试，否则它会换个说法再弹一次同样的框");
-assert.match(WRITE_TOOL, /await refreshActionSnapshot\(\)/,
-  "写完要刷内存快照，否则同一轮里后续 actions_list 仍看不到这份新流程");
+// P4 起快照按"屏幕上这一视野"重取、生效清单缓存整个丢（写全局会影响所有项目）；
+// 判据没变松：仍钉"刷新排在拼成功文案之前"，少这一步同一轮里 actions_list 还是旧的。
+assert.match(WRITE_TOOL, /await refreshActionSnapshot\(\)[\s\S]*?const lines = \[/,
+  "写完要刷内存快照与生效清单缓存，否则同一轮里后续 actions_list 仍看不到这份新流程");
 assert.doesNotMatch(TOOLS_SRC, /FILE_RAW_TOOLS = new Set\([^)]*actions_write/,
   "actions_write 不进裸文围栏：流式半份 YAML 直接落盘，等于让坏文件常驻目录");
 assert.match(TOOLS_SRC, /\[a-z0-9\]\[a-z0-9_-\]\{0,47\}/,
@@ -138,11 +145,13 @@ assert.match(TOOLS_SRC, /读到流程不等于做过流程|不是已完成的证
   "必须写明「读到流程 ≠ 执行过流程」，否则模型会复述步骤冒充做完");
 
 // ── 4. 系统提示注入：预算 + 纪律句 + 位置 + 对话态不注入 ──
-assert.match(ADAPTER_SRC, /function getActionsSystemPrompt\(\)/, "目录注入要独立成函数，便于估算口径复用");
+// 目录注入的函数与调用点从 P4 起带 project 入参（并行时按"这一场的项目"取覆盖版），
+// needle 跟到括号前为止。判据没变松：仍是"独立成函数"与"整条链路只注入一次"。
+assert.match(ADAPTER_SRC, /function getActionsSystemPrompt\(/, "目录注入要独立成函数，便于估算口径复用");
 assert.match(ADAPTER_SRC, /const ACTIONS_CATALOG_LIMIT = 20/, "目录要有条数上限");
 assert.match(ADAPTER_SRC, /\.slice\(0, 60\)/, "description 要截断，目录只负责说「有没有、叫什么」");
 assert.match(ADAPTER_SRC, /与用户当前要求不符时不要套用/, "抬头要带纪律句：不符的 Action 不许硬套");
-const injectAt = ADAPTER_SRC.indexOf("systemContent += getActionsSystemPrompt();");
+const injectAt = ADAPTER_SRC.indexOf("systemContent += getActionsSystemPrompt(");
 // P2 起这一句多了 project 入参（并行时工具目录要按"这一场的项目"写），needle 跟到括号前为止；
 // 判据没变松：还是"目录注入必须排在工具说明之前"，位置比较照旧。
 const toolsAt = ADAPTER_SRC.indexOf("systemContent += getToolsSystemPrompt({ compact: true,");
@@ -157,7 +166,9 @@ const chatPart = buildBody.slice(buildBody.indexOf("if (opts.withTools === false
 assert.ok(chatPart.length > 50 && !chatPart.includes("getActionsSystemPrompt"),
   "对话态没有 actions_read，注入目录只会诱导模型声称「已按流程执行」");
 assert.ok(buildBody.slice(elseAt).includes("getActionsSystemPrompt"), "智能体分支才注入 Action 目录");
-assert.equal(buildBody.split("systemContent += getActionsSystemPrompt();").length - 1, 1,
+// 同上：入参从 P4 起是 opts.project（按这一场的项目取覆盖版），needle 跟到括号前为止。
+// 判据没变松：仍然只数"注入这一句"出现一次。
+assert.equal(buildBody.split("systemContent += getActionsSystemPrompt(").length - 1, 1,
   "目录只能注入一次，重复注入等于翻倍吃上下文");
 
 // ── 5. store：内存快照，不落 localStorage ──
@@ -174,20 +185,26 @@ assert.ok(persistentBody.length > 100 && !/actions/.test(persistentBody),
 
 // ── 6. 面板：可编辑 + 删除 + 历史回滚，坏文件显式露出 ──
 assert.match(PANEL_SRC, /async function refreshActions\(\)/, "面板要能刷新 Action 目录");
-assert.match(PANEL_SRC, /await get\("\/actions"\)/, "面板读的是 /api/actions");
+// P4 起面板这三个调用都要点名"哪一份"（读带 ?project=、写带 targetScope、删带 ?project=&scope=）。
+// 判据没变松：仍是"读的是 /api/actions""保存先校验再 put""删除走 DELETE /api/actions/{id}"，
+// 只是又多钉一层——不许不问视野就动全局那一份。
+assert.match(PANEL_SRC, /await get\(`\/actions\$\{activeProjectQuery\(\)\}`\)/, "面板读的是 /api/actions（且点名当前项目视野）");
 assert.match(PANEL_SRC, /renderActionsSection\(\);/, "renderSkillList 要带 Actions 段");
 assert.match(PANEL_SRC, /skill-item-broken/, "解析失败的文件要显示出来，不能凭空消失");
 assert.match(PANEL_SRC, /export \{ initSkillPanel, refreshSkills, refreshActions \}/, "refreshActions 要导出");
-const PANEL_SAVE = jsBlock(PANEL_SRC, "async function saveAction() {", "\nasync function deleteAction()", "saveAction");
+const PANEL_SAVE = jsBlock(PANEL_SRC, "async function saveAction(targetScope = \"\") {", "\nasync function saveActionAsProjectOverride()", "saveAction");
 assert.match(PANEL_SAVE, /const draft = await validateActionDraft\(\);\n[\s\S]{0,80}?if \(!draft\?\.ok\)[\s\S]*?return;[\s\S]*?await put\(/,
   "面板这一路也要「先校验、不过就 return」：后端虽然兜底，但少了这一步用户只会收到一句没头没尾的失败");
 assert.match(PANEL_SAVE, /refreshActions\(\);/, "保存成功要刷目录，否则左侧列表还挂着旧的步数");
-assert.match(PANEL_SRC, /await del\(`\/actions\/\$\{encodeURIComponent\(id\)\}`\)/, "面板删除走 DELETE /api/actions/{id}");
+assert.match(PANEL_SRC, /await del\(`\/actions\/\$\{encodeURIComponent\(id\)\}\?\$\{qs\.toString\(\)\}`\)/,
+  "面板删除走 DELETE /api/actions/{id}（带 project/scope 查询串）");
 const PANEL_DEL = jsBlock(PANEL_SRC, "async function deleteAction() {", "\nfunction formatHistoryTs", "deleteAction");
 assert.match(PANEL_DEL, /await dlgConfirm\([\s\S]*?await del\(/,
   "删除要点一次确认：误删的手写流程只能靠留底救回来");
 assert.match(PANEL_DEL, /refreshActions\(\);/, "删完要刷目录，否则列表里还留着一行点不开的条目");
-assert.match(PANEL_SRC, /await post\(`\/actions\/\$\{encodeURIComponent\(currentActionId\)\}\/history\/restore`/,
+// 回滚调用现在在 URL 后面拼了视野查询串（?project=），needle 收到 restore 为止：
+// 判据没变松，仍是"必须显式打 restore 路由"。
+assert.match(PANEL_SRC, /await post\(`\/actions\/\$\{encodeURIComponent\(currentActionId\)\}\/history\/restore/,
   "回滚要显式调 restore，而不是把旧文本塞进编辑器让用户再点一次保存");
 assert.match(PANEL_SRC, /setTimeout\(validateActionDraft, \d+\)/, "边写边校验要节流，不然每个字符打一次后端");
 assert.match(PANEL_SRC, /if \(seq !== actionDraftSeq\) return null/,

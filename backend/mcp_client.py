@@ -18,6 +18,7 @@ from typing import Any
 
 import httpx
 
+from backend import scope_overlay
 from backend.data_io import atomic_write_json, backup_corrupt
 
 logger = logging.getLogger("slate.mcp_client")
@@ -292,44 +293,59 @@ def _save_config(servers: list[dict[str, Any]]):
     atomic_write_json(CONFIG_PATH, servers)
 
 
-def list_servers() -> list[dict[str, Any]]:
-    """列出所有已配置的 MCP Server 及其状态。"""
+def list_servers(project_id: str = "") -> list[dict[str, Any]]:
+    """列出所有已配置的 MCP Server 及其状态。
+
+    带 project 时每条多给两个字段：`effectiveEnabled`（这一项目里到底用不用）与
+    `enableScope`（这条结论来自项目掩码还是全局那一份）。面板要写明"现在关的是哪一份"，
+    光靠一个开关按钮说不清——关错一份会把别的项目共用的服务器一起停掉。
+    """
     configs = _load_config()
     result = []
     for cfg in configs:
         sid = cfg["id"]
         conn = _connections.get(sid)
-        if conn:
-            result.append(conn.to_dict())
-        else:
-            result.append({
-                "id": sid,
-                "name": cfg.get("name", ""),
-                "url": cfg.get("url", ""),
-                "enabled": cfg.get("enabled", True),
-                "status": "disconnected",
-                "error": "",
-                "tools": [],
-                "toolCount": 0,
-            })
+        base = conn.to_dict() if conn else {
+            "id": sid,
+            "name": cfg.get("name", ""),
+            "url": cfg.get("url", ""),
+            "enabled": cfg.get("enabled", True),
+            "status": "disconnected",
+            "error": "",
+            "tools": [],
+            "toolCount": 0,
+        }
+        default_on = bool(base.get("enabled", True))
+        masked = bool(project_id) and str(sid) in scope_overlay.mcp_mask_of(project_id)
+        base["effectiveEnabled"] = scope_overlay.server_enabled(project_id, sid, default=default_on)
+        base["enableScope"] = "project" if masked else "global"
+        result.append(base)
     return result
 
 
-def get_all_remote_tools() -> list[dict[str, Any]]:
-    """获取所有已连接 MCP Server 的工具列表（供技能面板和 AI 工具系统使用）。"""
+def get_all_remote_tools(project_id: str = "") -> list[dict[str, Any]]:
+    """获取所有已连接 MCP Server 的工具列表（供技能面板和 AI 工具系统使用）。
+
+    带 project 时按该项目掩码过滤：整台关掉的不进列表，只给了白名单的只进白名单那几个。
+    """
     tools = []
     for conn in _connections.values():
-        if conn.status == "connected" and conn.enabled:
-            for t in conn.tools:
-                tools.append({
-                    "name": t["name"],
-                    "description": t.get("description", ""),
-                    "server": conn.name,
-                    "serverId": conn.server_id,
-                    # 带 url 才认得出品牌：Server 名是用户手输的任意字符串，
-                    # "My MCP" 指向 mcp.notion.com 时前端也该画 Notion 的 mark。
-                    "url": conn.url,
-                })
+        if conn.status != "connected" or not conn.enabled:
+            continue
+        if not scope_overlay.server_enabled(project_id, conn.server_id, default=True):
+            continue
+        for t in conn.tools:
+            if not scope_overlay.tool_allowed(project_id, conn.server_id, t["name"]):
+                continue
+            tools.append({
+                "name": t["name"],
+                "description": t.get("description", ""),
+                "server": conn.name,
+                "serverId": conn.server_id,
+                # 带 url 才认得出品牌：Server 名是用户手输的任意字符串，
+                # "My MCP" 指向 mcp.notion.com 时前端也该画 Notion 的 mark。
+                "url": conn.url,
+            })
     return tools
 
 
@@ -399,13 +415,21 @@ async def disconnect_server(server_id: str) -> dict[str, Any]:
     return {"ok": True}
 
 
-async def call_remote_tool(server_id: str, tool_name: str, arguments: dict) -> dict[str, Any]:
-    """调用远程 MCP Server 上的工具。"""
+async def call_remote_tool(server_id: str, tool_name: str, arguments: dict, project_id: str = "") -> dict[str, Any]:
+    """调用远程 MCP Server 上的工具。
+
+    带 project 时在门口再验一次掩码：列表已经过滤过一轮，这里是防御性复核——
+    前端拿到的是旧列表、或有人直接打这条路由，都不该绕过项目的收窄。
+    """
     conn = _connections.get(server_id)
     if not conn:
         return {"error": f"服务器未连接: {server_id}"}
     if conn.status != "connected":
         return {"error": f"服务器未连接: {conn.status}"}
+    if project_id and not scope_overlay.server_enabled(project_id, server_id, default=conn.enabled):
+        return {"error": f"这台服务器在该项目里已关闭: {conn.name}"}
+    if project_id and not scope_overlay.tool_allowed(project_id, server_id, tool_name):
+        return {"error": f"工具 {tool_name} 不在该项目允许的清单里（服务器：{conn.name}）"}
     return await conn.call_tool(tool_name, arguments)
 
 

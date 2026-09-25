@@ -287,7 +287,10 @@ data/projects/<project_id>/worktrees/<branch_slug>/   ← git worktree add -b sl
 - **P1 已完成**：事件出处 + 铃铛 + 任务中心 + 按项目 token 视图。证据同上（X1..X5 判据）。
 - **P2 已完成**：`services/run_registry.js`（生成权登记表）+ 每场一份消息数组（`store.threads`）+ 按 run 的项目视野（`services/project_scope.js`、`/projects/registry/{id}/info`）+ 「排队中」可见 + `backgroundRuns` 开关与两条上限（设置页「多任务与项目」）。证据 `scripts/check_parallel_runs.mjs`（44 项）、`.qoder/walk_parallel_runs.py`（31 项真跑）、`.qoder/mutate_parallel_runs.py`（9/9 咬住）。四档可观测判据逐条对上：①两场并行、线程/落库/用量各归各的（J1）；②同项目第二发进队列且被自动接上（J3）；③关掉开关后切走即中断（J5）；④把"切会话不再 abort"下毒回 abort，走查 J1 咬住。
   - 取证补记（P3 沿用）：把流式落点 `threadHostOf()` 下毒成"永远画到屏幕上"，只在**排队那一场于后台自动开跑**的那一刻看得见（走查 J4）——两条流都在自己前台起手时 `msgEl` 早已挂好，那是等价变异，证不出东西。
-- **P3 / P4 待做**：同项目 worktree 隔离与合并审查；actions / 知识库 / MCP 的分项目覆盖。
+- **P4 已完成（作用域收敛）**：`backend/scope_overlay.py` 一处合并三份「全局 + 项目覆盖」——Actions 同 id 顶掉（项目那份在 `<项目>/.slate/actions/`，留底也在项目自己那侧）、知识库同 title 顶掉且**不整体屏蔽**全局其余、MCP 掩码只按服务器 id 记 `{enabled, tools}`（URL 与密钥绝不进项目目录）。读路径全部接 `?project=`：`/actions`、`/knowledge/docs`、`/knowledge/search`、`/mcp-servers`、`/skills`，远程工具在 `call_remote_tool()` 门口再复验一次（拿着旧列表也调不动这一项目关掉的服务器）。前端 `project_scope.js` 加一层「按这一场的项目取生效清单」，`buildMessages` / 工具目录 / 知识检索三处注入点都按 run 的视野取；面板（技能·Action 编辑器、知识列表、MCP 服务器行）都写明现在改的是哪一份，与分项目宪法同一套文案。
+  - 证据：`.qoder/probe_scope_overlay.py`（后端合并层真跑，38 项）、`scripts/check_scope_overlay.mjs`（跨文件契约 + 前端清单链路真跑）、`.qoder/walk_scope_overlay.py`（真浏览器 19 项：注入的是覆盖版、换项目回落全局、摘掉覆盖两边同时改口、URL 不进仓库）、`.qoder/mutate_scope_overlay.py`（10/10 变异咬住：guard 4 + probe 4 + walk 2）。三条 P4 判据逐条对上：①覆盖存在时注入覆盖版（W2）；②删覆盖后回落全局（W5c/W5c2/W5d，Action 与知识各摘一次）；③两处 UI 写明改的是哪一份（W1a/W1b/W4b/W6a）。
+  - 取证补记：「把注入点的 `project` 传丢」这一类在本走查里是**等价变异**——屏幕上就是这一场的项目时两条取值完全相同，只有后台那场才露差别，故不下这种毒（那是并行走查 J4 那一族的活口）。真咬住的两条界面毒是「列表不标来源」和「编辑器不说明改的是哪一份」。
+- **P3 待做**：同项目 worktree 隔离与合并审查。
 
 ---
 
@@ -296,4 +299,4 @@ data/projects/<project_id>/worktrees/<branch_slug>/   ← git worktree add -b sl
 - 老数据零丢失：`project`（名称）列保留，`project_id` 一次性回填，回填不上的显示「未归类」并可手工归到某个在册项目。
 - 第一次启动带注册表的版本：把 `lastProjectPath` 自动入册并置 active（用户不会感到"项目不见了"）。
 - 移动端与桌面共享注册表（走 `settings` 的共享档），但 `active` 是本机视野——两台设备各看各的项目才叫多设备，不是一条状态线牵着走。
-- 现有 26 个守卫里凡钉住 `state.project.path` / `_current_project` 语义的，逐条复核后放宽到新口径，别静默改判据。
+- 现有 30 个守卫里凡钉住 `state.project.path` / `_current_project` 语义的，逐条复核后放宽到新口径，别静默改判据。

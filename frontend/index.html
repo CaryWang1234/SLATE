@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260925-001">
+  <link rel="stylesheet" href="./css/style.css?v=20260925-004">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -141,6 +141,14 @@
                     <option value="agent">智能体</option>
                     <option value="chat">对话</option>
                   </select>
+                  <!-- 审批模式：这一场随时可改，三档语义见 components/approval_picker.js -->
+                  <div class="approval-picker" id="approval-picker">
+                    <button id="btn-approval" class="approval-pill" type="button" title="审批模式：AI 什么时候该停下来问你可不可以" aria-haspopup="dialog" aria-expanded="false" aria-controls="approval-pop">
+                      <span class="approval-pill-icon" id="approval-pill-icon"></span>
+                      <span class="approval-pill-label" id="approval-pill-label">手动审批</span>
+                    </button>
+                    <div id="approval-pop" class="approval-pop hidden" role="dialog" aria-label="审批模式"></div>
+                  </div>
                   <button id="btn-attach-file" class="icon-btn" title="添加附件"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
                   <input type="file" id="file-input" multiple hidden accept=".txt,.md,.csv,.tsv,.json,.py,.js,.html,.css,.yaml,.yml,.xml,.sh,.bat,.docx,.xlsx,.pdf,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg">
                   <select id="expert-select" class="expert-select" title="选择专家包（注入人格与规则）">
@@ -389,7 +397,7 @@
             <a class="settings-nav-item" data-target="settings-web-search">联网搜索</a>
             <a class="settings-nav-item" data-target="settings-image-gen">图片生成</a>
             <a class="settings-nav-item" data-target="settings-video-gen">视频生成</a>
-            <a class="settings-nav-item" data-target="settings-permission">命令权限</a>
+            <a class="settings-nav-item" data-target="settings-permission">审批模式</a>
         <a class="settings-nav-item" data-target="settings-skills">工具 / 技能</a>
           <a class="settings-nav-item" data-target="settings-data">数据备份</a>
           <a class="settings-nav-item" data-target="settings-lan">局域网遥控</a>
@@ -727,14 +735,14 @@
         <section class="settings-block" id="settings-permission">
           <div class="settings-block-head">
             <div>
-              <h2>命令权限</h2>
-              <p>控制 AI 执行终端命令时的审批策略；灾难级命令（rm -rf /、format 等）任何模式下都强制拦截</p>
+              <h2>审批模式</h2>
+              <p>每个对话的默认审批模式。单个对话可在输入框的审批模式选择器里随时改，改过的那一场不再跟着这里变；灾难级命令（rm -rf /、format 等）任何模式下都强制拦截</p>
             </div>
           </div>
           <div class="permission-mode-row">
-            <button class="review-mode-btn" data-mode="ask"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>人工审批</span></button>
+            <button class="review-mode-btn" data-mode="ask"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>手动审批</span></button>
             <button class="review-mode-btn" data-mode="auto"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>自动审批</span></button>
-            <button class="review-mode-btn" data-mode="full"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>完全访问</span></button>
+            <button class="review-mode-btn is-danger" data-mode="full"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>完全访问</span></button>
           </div>
           <div id="permission-mode-hint" class="setting-hint" style="margin-top: 8px; font-size: 12px; color: var(--text-muted);"></div>
         </section>
@@ -908,12 +916,14 @@
       </div>
       <div class="modal-body">
         <div id="action-modal-meta" class="action-modal-meta"></div>
+        <div id="action-scope-hint" class="action-scope-hint"></div>
         <textarea id="action-editor" class="action-editor" rows="16" spellcheck="false"></textarea>
         <div id="action-validate-msg" class="action-validate-msg"></div>
         <div id="action-history" class="action-history hidden"></div>
       </div>
       <div class="modal-footer action-modal-footer">
         <button id="btn-action-history" class="dlg-btn">历史版本</button>
+        <button id="btn-action-override" class="dlg-btn hidden">在本项目另存一份</button>
         <button id="btn-action-delete" class="dlg-btn dlg-btn-danger">删除</button>
         <button id="btn-action-save" class="send-btn">保存</button>
       </div>
@@ -1261,19 +1271,19 @@
     </div>
   </div>
 
-  <!-- ══ 高危命令审批弹窗 ══ -->
+  <!-- ══ 审批弹窗（命令 / 联网共用一扇门，标题与字段名由 riskguard 按这一笔改） ══ -->
   <div id="risk-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <span>高危命令审批</span>
+        <span id="risk-title">高危命令审批</span>
         <button class="modal-close icon-btn">×</button>
       </div>
       <div class="modal-body">
         <div id="risk-reason" class="risk-reason"></div>
-        <label class="setting-label">命令</label>
+        <label class="setting-label" id="risk-command-label">命令</label>
         <pre id="risk-command" class="risk-command"></pre>
-        <label class="setting-label">目的说明（模型分析）</label>
+        <label class="setting-label" id="risk-explain-label">目的说明（模型分析）</label>
         <div id="risk-explain" class="risk-explain">正在分析...</div>
         <p class="risk-note">批准后命令将直接执行，请确认已理解其影响</p>
       </div>
@@ -1476,7 +1486,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260925-001"></script>
+  <script type="module" src="./js/app.js?v=20260925-004"></script>
 
 </body>
 </html>

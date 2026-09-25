@@ -1,13 +1,13 @@
 /**
  * SLATE Mobile — 审批与变更确认
- * 1. mGuardTerminal：移动端高危命令守卫（接管 tools.js 的 window.__slateGuardOverride）
+ * 1. mApprovalSheet：移动端的审批脸（底部 sheet），挂到 window.__slateGuardUi 上替桌面 modal
  * 2. mHandleStructured：file_edit/file_create 的 diff 预览 → 接受/拒绝（file_append 调用时即写入）
  */
 
-import { state, getModelKey } from "../store.js?v=20260925-001";
-import { post } from "../services/api.js?v=20260925-001";
-import { isHighRiskCommand } from "../services/riskguard.js?v=20260925-001";
-import { mShowRiskSheet, mShowDiffSheet, mToast, t } from "./m-ui.js?v=20260925-001";
+import { state, getModelKey } from "../store.js?v=20260925-004";
+import { post } from "../services/api.js?v=20260925-004";
+import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260925-004";
+import { mShowRiskSheet, mShowDiffSheet, mToast, t } from "./m-ui.js?v=20260925-004";
 
 /** 用当前模型解释命令目的（与桌面 explainCommand 同一逻辑，失败返回兜底文案） */
 async function mExplainCommand(command) {
@@ -37,25 +37,24 @@ async function mExplainCommand(command) {
 }
 
 /**
- * 高危命令守卫（与 riskguard.guardSkillParams 同逻辑，审批 UI 换成移动底部 sheet）
- * - full 直放 / auto 注入 approved / ask 弹 sheet
+ * 手机遥控的审批 UI：底部那张 sheet 替桌面那副 modal。
+ * 判口（哪一档问什么）留在 riskguard.approvalNeededFor，这里只管"怎么问"——
+ * 两边各存一份档位判断，迟早出现"手机问得比桌面多"或反过来。
  */
-export async function mGuardTerminal(skill, params) {
-  if (skill !== "terminal" || !params?.command) return true;
-  if (state.permissionMode === "full") return true;
-  const risk = isHighRiskCommand(params.command);
-  if (!risk.risk) return true;
-  if (state.permissionMode === "auto") {
-    params.approved = true;
-    return true;
-  }
-  const explain = await mExplainCommand(params.command);
-  const approved = await mShowRiskSheet({ command: params.command, reason: risk.reason, explain });
-  if (approved) {
-    params.approved = true;
-    return true;
-  }
-  return false;
+export async function mApprovalSheet(subject, risk) {
+  const isCommand = subject.kind === "command";
+  const highRisk = Boolean(risk?.risk);
+  const explain = isCommand ? await mExplainCommand(subject.target) : null;
+  return mShowRiskSheet({
+    title: t(highRisk ? "高危命令确认" : isCommand ? "命令执行确认" : "联网访问确认"),
+    subjectLabel: t(isCommand ? "命令" : "访问目标"),
+    target: subject.target,
+    reason: highRisk
+      ? t("触发规则：{reason}", { reason: t(risk.reason) })
+      : t("当前审批模式：{why}", { why: t(isCommand ? "手动审批下执行命令逐条确认" : "手动审批下访问网络逐条确认") }),
+    explain,
+    note: t(isCommand ? "批准后命令将直接执行，请确认已理解其影响" : "批准后 AI 将访问上面的地址并读取返回内容"),
+  });
 }
 
 /**

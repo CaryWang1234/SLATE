@@ -296,3 +296,14 @@ P0 验收结果：隔离 `SLATE_DATA_DIR`（23 份合法 + 2 份坏文件夹具�
 P1 验收结果：隔离 `SLATE_DATA_DIR`（23 份合法 + 2 份坏文件夹具）+ 真 Edge 会话 + `page.route` 假 SSE 的走查 **共 128 项、失败 0**。HTTP 层覆盖"坏内容上不了盘 / 覆盖与删除必先留底 / 连续覆盖只留 5 版 / 误删凭留底整份捞回 / 编码穿越读不到目录外文件且不 500"；界面层覆盖"书写纪律抬头 → Tab 缩进报第 4 行并拒绝保存 → 保存后转绿并回显留底号 → 历史查看与回滚真的换回磁盘 → 删除二次确认 → `actions_write` 缺 author 与坏 YAML 不弹窗直接退回 → 弹窗内点「拒绝」确实不写盘、点「允许写入」才创建并标出「模型代写」→ `auto`/`full` 两档不弹窗 → `@` 提及命中与 6 000 字截断 → 主链路回归 + 全程零 `js_errors`"。首轮跑出两条真红并已修（① 非法 ts 实际由路由层先挡下返回 404，不是我们的信封；② "改绿"那条按上面第 7 条重写）。契约守卫的顺序不变量做过现场变异验证：把 `_write_action` 里的 `load_action(` 改名，守卫精确报「顺序必须是 体积→校验→留底→原子写」，改回后转绿。14 个守卫全绿；缓存串 `20260913-004`。
 
 未落地，等明确指令：P2（SKILL.md → Action 单向转换、`inputs` 驱动的待办清单、Action 使用次数统计）。
+
+## Actions 分项目覆盖（多项目 P4，2026-09-25）
+
+同一份说明书可以有「全局 + 项目覆盖」两份，合并口径只在一处：`backend/scope_overlay.py::effective_action_files()`。
+
+- **落点**：全局 `data/actions/<id>.yml`；项目 `<项目>/.slate/actions/<id>.yml`。**同 id 时项目那份顶掉全局那份**（目录里一条，标 `scope: "project"`），别的项目看到的仍是全局那份。
+- **留底跟着落点走**：`_backup(clean_id, path, _history_dir_of(path))`——项目那份的历史在项目自己的 `.slate/actions/.history`，不与全局那份混在同一堆时间戳里。`_write_action` 那三道闸的顺序不变（体积 → 校验 → 留底 → 原子写），只是多钉一个"留到底属于哪一份"的实参。
+- **写入必须点名落点**：`PUT /api/actions/{id}?scope=project&project=<id>`。项目不在册就直接拒绝，**绝不"退而写进全局"**（那会连带影响所有别的项目）；`DELETE` 同理必须带 `scope`，摘掉项目那份后回不回落全局写在 `message` 里（`falls_back_to_global`），因为面板那句「摘掉覆盖」要和它同源。
+- **注入按这一场的项目**：`project_scope.js` 的生效清单快照 → `adapter.js::getActionsSystemPrompt(project)`，与分项目宪法同一套口径；`actions_write` 工具多一个 `scope` 参数，写项目那份时把落点回显给用户。
+- **契约守卫**：`check_actions_contract.mjs` 里 5 处锚点跟到新调用形态（读 `/actions${activeProjectQuery()}`、`saveAction(targetScope)`、`del(...?project=&scope=)`、`refreshActionSnapshot(pid)`、restore 带查询串）。每一处都写了对比注释：**判据没变松**，仍是同一件事，只是又多钉一层「不许不问视野就动全局那一份」。
+- **取证**：`.qoder/probe_scope_overlay.py`（A0–A13）、`scripts/check_scope_overlay.mjs`、`.qoder/walk_scope_overlay.py`（W1/W2/W3/W5 都读这条链路的现场）、`.qoder/mutate_scope_overlay.py`（"Actions 同名不顶掉"这条毒由 probe A2 咬住；"列表不标来源"与"编辑器不说明改的是哪一份"两条只有真浏览器看得见）。

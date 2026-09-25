@@ -140,6 +140,10 @@ Name: "{app}\data\webview_profile"; Flags: uninsneveruninstall
 [Files]
 Source: "{#MyAppSourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "desktop_backend.log,*.log,data\*"
 Source: "{#MyAppSourceDir}\data\constitution.json"; DestDir: "{app}\data"; Flags: ignoreversion onlyifdoesntexist skipifsourcedoesntexist
+; 内置 SKILL.md 技能与专家包种子：onlyifdoesntexist 在 recursesubdirs 下按逐文件生效（已实测），
+; 升级安装会把用户目录里没有的新种子补进去，且不覆盖用户改过的同名文件
+Source: "{#MyAppSourceDir}\data\skills\*"; DestDir: "{app}\data\skills"; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist skipifsourcedoesntexist
+Source: "{#MyAppSourceDir}\data\experts\*"; DestDir: "{app}\data\experts"; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"

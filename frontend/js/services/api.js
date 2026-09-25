@@ -2,8 +2,8 @@
  * SLATE API 调用封装：统一 fetch 拦截
  */
 
-import { API_BASE } from "../store.js?v=20260925-001";
-import { t } from "./i18n.js?v=20260925-001";
+import { API_BASE } from "../store.js?v=20260925-004";
+import { t } from "./i18n.js?v=20260925-004";
 
 // 思考内容标记前缀（用于在流式输出中区分 reasoning 与 content）
 export const REASONING_PREFIX = "\x00\x01R\x01\x00";
@@ -342,7 +342,7 @@ async function upload(path, formData, timeoutMs = REQUEST_TIMEOUT_MS) {
  * 超时策略：不设总时长上限（长命令靠事件续命），改为「连续 180s 无任何帧」的活动超时，
  * 与 request() 的 180s 总超时对静默调用等价，对持续输出的流式调用则更宽松。
  */
-async function runSkillStream(skill, params, { signal, onEvent, callId, runId } = {}) {
+async function runSkillStream(skill, params, { signal, onEvent, callId, runId, project } = {}) {
   const controller = new AbortController();
   let idleAborted = false;
   let idleTimer = 0;
@@ -360,7 +360,7 @@ async function runSkillStream(skill, params, { signal, onEvent, callId, runId } 
     resp = await fetch(`${API_BASE}/skills/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ skill, params: params || {}, callId: callId || "", runId: runId || "" }),
+      body: JSON.stringify({ skill, params: params || {}, callId: callId || "", runId: runId || "", project: project || "" }),
       signal: controller.signal,
     });
   } catch (err) {

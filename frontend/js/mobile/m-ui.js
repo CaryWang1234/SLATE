@@ -4,8 +4,8 @@
  * 所有组件挂载到 #m-sheet-root / #m-toast-root
  */
 
-import { t } from "../services/i18n.js?v=20260925-001";
-import { iconSvg } from "../services/icons.js?v=20260925-001";
+import { t } from "../services/i18n.js?v=20260925-004";
+import { iconSvg } from "../services/icons.js?v=20260925-004";
 
 // ── Toast ─────────────────────────────────
 
@@ -242,23 +242,40 @@ export function mShowDiffSheet({ filePath, diff, title }) {
 
 // ── 高危命令确认 sheet ───────────────────
 
-export function mShowRiskSheet({ command, reason, explain }) {
+/**
+ * 审批确认 sheet（手机遥控那侧的"问人"）。
+ * 三种问法共用这张：高危命令、逐条确认的命令、逐条确认的联网——
+ * 差别只在文案，所以标题/字段名/说明行都由调用方给，explain 传 null 表示这一笔没有目的说明可看。
+ */
+export function mShowRiskSheet({ title, subjectLabel, target, reason, explain, note }) {
   return new Promise((resolve) => {
     const body = document.createElement("div");
     const reasonEl = document.createElement("div");
     reasonEl.className = "m-risk-reason";
-    reasonEl.textContent = t("触发规则：{reason}", { reason });
+    reasonEl.textContent = reason;
     body.appendChild(reasonEl);
+
+    const labelEl = document.createElement("div");
+    labelEl.className = "m-risk-label";
+    labelEl.textContent = subjectLabel;
+    body.appendChild(labelEl);
 
     const cmdEl = document.createElement("div");
     cmdEl.className = "m-risk-command";
-    cmdEl.textContent = command;
+    cmdEl.textContent = target;
     body.appendChild(cmdEl);
 
-    const explainEl = document.createElement("div");
-    explainEl.className = "m-risk-explain";
-    explainEl.textContent = explain || t("正在分析命令目的…");
-    body.appendChild(explainEl);
+    if (explain !== null) {
+      const explainEl = document.createElement("div");
+      explainEl.className = "m-risk-explain";
+      explainEl.textContent = explain || t("正在分析命令目的…");
+      body.appendChild(explainEl);
+    }
+
+    const noteEl = document.createElement("div");
+    noteEl.className = "m-risk-note";
+    noteEl.textContent = note || t("批准后该操作将立即执行");
+    body.appendChild(noteEl);
 
     const footer = document.createElement("div");
     const rejectBtn = document.createElement("button");
@@ -271,7 +288,7 @@ export function mShowRiskSheet({ command, reason, explain }) {
     footer.appendChild(approveBtn);
 
     const sheet = mShowSheet({
-      title: t("高危命令确认"),
+      title: title || t("高危命令确认"),
       body,
       footer,
       onClose: () => resolve(false),

@@ -96,10 +96,14 @@ def _list_md_skills() -> dict[str, str]:
 
 
 @router.get("")
-async def list_skills() -> dict[str, Any]:
-    """列出所有可用能力：内置工具 + SKILL.md 技能 + 远程 MCP 工具。"""
+async def list_skills(project: str = "") -> dict[str, Any]:
+    """列出所有可用能力：内置工具 + SKILL.md 技能 + 远程 MCP 工具。
+
+    带 project 时远程那部分按该项目的掩码收窄——面板上看不见的工具，注入给模型的
+    schema 里也不该有。
+    """
     from backend import mcp_client
-    remote_tools = mcp_client.get_all_remote_tools()
+    remote_tools = mcp_client.get_all_remote_tools(project)
     remote_dict: dict[str, str] = {}
     for t in remote_tools:
         # 远程工具名称加 server 前缀防止冲突
@@ -165,7 +169,7 @@ async def execute_skill(body: dict[str, Any]) -> dict[str, Any]:
         if len(parts) == 3:
             from backend import mcp_client
             server_id, tool_name = parts[1], parts[2]
-            result = await mcp_client.call_remote_tool(server_id, tool_name, params)
+            result = await mcp_client.call_remote_tool(server_id, tool_name, params, str(body.get("project") or ""))
             if "error" in result:
                 return {"code": -1, "data": None, "message": result["error"]}
             return {"code": 0, "data": result, "message": "ok"}
@@ -222,6 +226,8 @@ async def stream_skill(request: Request, body: dict[str, Any]) -> Any:
         params = {}
     call_id = str(body.get("callId") or f"cal_{uuid.uuid4().hex[:8]}")
     run_id = str(body.get("runId") or "")
+    # 远程 MCP 工具要按这一场所属项目的掩码复验；不传就是没有项目视野，全放行。
+    project_id = str(body.get("project") or "")
 
     param_error = validate_skill_params(params)
     kind, target, resolve_error = ("", None, "")
@@ -267,7 +273,7 @@ async def stream_skill(request: Request, body: dict[str, Any]) -> Any:
             from backend import mcp_client
 
             server_id, tool_name = target
-            result = await mcp_client.call_remote_tool(server_id, tool_name, params)
+            result = await mcp_client.call_remote_tool(server_id, tool_name, params, project_id)
             if "error" in result:
                 return {"code": -1, "data": None, "message": result["error"]}
             return {"code": 0, "data": result, "message": "ok"}

@@ -959,23 +959,40 @@ textarea::-webkit-scrollbar-thumb {
 
 .input-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
   padding: 4px 8px;
   border-top: 1px solid var(--border);
 }
 
+/* 挤不下时让胶囊整颗折到第二行（而不是溢出压到右侧按钮组上）；
+   右侧语音/发送钉在第一行——align-items 用 flex-start 就是为了这件事，
+   两行时发送按钮跟着垂直居中会浮在半空。 */
 .input-toolbar-left {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  row-gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .input-toolbar-right {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
+}
+
+/* 与左排胶囊同一根基线：26px 高、文字不许折成竖排（窄屏下"发言"曾被压成两字两行） */
+#chat-input-area .send-btn {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  white-space: nowrap;
 }
 
 /* ── 模型选择（带图标）────────────── */
@@ -1015,10 +1032,15 @@ textarea::-webkit-scrollbar-thumb {
   filter: brightness(0) invert(1); /* 深色模式变白 */
 }
 
+/* 模型名可长可短，但这一栏里它是"其中一颗"，不该吃掉左排一半宽度：
+   上限从 320px 收到 232px，超出部分由 select 自己省略，全名走 title 悬浮。 */
 #model-select {
   padding-left: 28px;
-  width: clamp(160px, 24vw, 320px);
-  max-width: 320px;
+  width: clamp(132px, 17vw, 232px);
+  max-width: 232px;
+  height: 26px;
+  font-size: 11px;
+  font-family: var(--font-main);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1228,6 +1250,174 @@ textarea::-webkit-scrollbar-thumb {
   font-size: 10px;
   line-height: 1.5;
   color: var(--text-muted);
+}
+
+/* 审批模式：输入框左下的三档选择器，与推理强度同一族外观。
+   完全访问那一档图标与文字都走 --danger：它什么都不问，得让人一眼看见自己正开着它。 */
+.approval-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.approval-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 7px;
+  font-size: 11px;
+  font-family: var(--font-main);
+  height: 26px;
+  outline: none;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color var(--transition), color var(--transition);
+}
+
+.approval-pill:hover {
+  color: var(--text);
+}
+
+.approval-pill:focus,
+.approval-pill[aria-expanded="true"] {
+  border-color: var(--gold);
+  color: var(--text);
+}
+
+.approval-pill-icon {
+  display: inline-flex;
+  color: inherit;
+}
+
+.approval-pill-icon .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+
+/* 完全访问：胶囊上的图标和文字一起变红（图标是 stroke:currentColor，跟着 color 走） */
+.approval-pill.is-full {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.approval-pill.is-full .approval-pill-icon {
+  color: var(--danger);
+}
+
+.approval-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: 276px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 60;
+}
+
+/* 桌面没有全局 .hidden 工具类：自带 hidden 的元素必须自己声明一次，否则摊在输入框上方收不起来 */
+.approval-pop.hidden { display: none; }
+
+.approval-pop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 7px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.approval-pop-scope {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.approval-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-secondary);
+  font-family: var(--font-main);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.approval-opt:hover {
+  background: var(--bg-input);
+  color: var(--text);
+}
+
+.approval-opt.is-on {
+  border-color: var(--gold);
+  background: var(--gold-dim);
+  color: var(--text);
+}
+
+.approval-opt-icon {
+  display: inline-flex;
+  margin-top: 1px;
+  color: inherit;
+}
+
+.approval-opt-icon .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.approval-opt-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.approval-opt-hint {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* 完全访问那一行同样整行标红（图标 + 文字），与胶囊上的处理同一口径 */
+.approval-opt.is-full,
+.approval-opt.is-full .approval-opt-icon {
+  color: var(--danger);
+}
+
+.approval-opt.is-full .approval-opt-hint {
+  color: color-mix(in srgb, var(--danger) 78%, var(--text-muted));
+}
+
+.approval-opt.is-full.is-on {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: var(--danger-dim);
+}
+
+/* 设置页那三档里"完全访问"也标红，两处的红必须是同一个变量 */
+.permission-mode-row .review-mode-btn.is-danger {
+  color: var(--danger);
+}
+
+.permission-mode-row .review-mode-btn.is-danger .svg-icon {
+  color: var(--danger);
+}
+
+.permission-mode-row .review-mode-btn.is-danger.active {
+  background: var(--danger-dim);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
 }
 
 .chat-input-wrap {
@@ -3038,6 +3228,14 @@ textarea::-webkit-scrollbar-thumb {
   border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
 }
 
+/* 来源徽标：这一份是项目里的覆盖版（同名时顶掉全局那份），不是本机共用那份 */
+.skill-kind-scope {
+  margin-left: 4px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 /* 模型代写的 Action：徽标要跳出来，它等于模型往自己系统提示里加过料 */
 .skill-kind-model {
   margin-left: 4px;
@@ -3154,6 +3352,21 @@ textarea::-webkit-scrollbar-thumb {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+/* 掩码来源标注：这一台"用不用"是项目掩码说的还是全局那份说的，关错的代价不一样 */
+.mcp-server-scope-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.mcp-server-scope-toggle {
+  font-size: 11px;
 }
 
 /* MCP Server 行首的品牌 mark：底留空、只描一圈边，图形本身靠 currentColor 跟随
@@ -3403,6 +3616,25 @@ textarea::-webkit-scrollbar-thumb {
 .skill-section-action:hover {
   border-color: var(--border-hover);
   color: var(--text);
+}
+
+/* 落点说明：告诉用户「现在改的是全局那份还是项目那份」——两份长得很像，代价不同。
+   项目那份用主色描边，跟宪法那条同一套视觉。 */
+.action-scope-hint {
+  margin: -2px 0 8px;
+  padding: 5px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+}
+
+.action-scope-hint.action-scope-project {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .action-modal-meta {
@@ -8311,6 +8543,18 @@ img.file-type-icon {
   background: var(--bg-alt);
 }
 
+/* 这一条是项目里的文档（同名时顶掉全局那条）：列表里必须看得出来，
+   否则用户删掉的会是别的项目共用的那一份。 */
+.knowledge-scope-badge {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
 .knowledge-item-head {
   display: flex;
   align-items: baseline;
@@ -8972,6 +9216,13 @@ img.file-type-icon {
 #risk-modal .modal-content {
   max-width: 520px;
   border: 1px solid rgba(204, 68, 68, 0.4);
+}
+
+/* 联网访问那一笔没有"模型分析命令目的"可说，整块收起。
+   桌面没有全局 .hidden 工具类，加了类还得自己声明一次，否则只是 DOM 在切、像素不动。 */
+#risk-explain-label.hidden,
+#risk-explain.hidden {
+  display: none;
 }
 
 .risk-reason {

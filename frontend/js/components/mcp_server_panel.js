@@ -3,13 +3,21 @@
  * 在设置页中展示已配置的外部 MCP Server，支持添加/删除/连接/断开。
  */
 
-import { get, post, del } from "../services/api.js?v=20260925-001";
-import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260925-001";
-import { refreshSkills } from "./skill_panel.js?v=20260925-001";
-import { iconSvgEl } from "../services/icons.js?v=20260925-001";
-import { mcpIconKey } from "../services/mcp_logos.js?v=20260925-001";
+import { get, post, del } from "../services/api.js?v=20260925-004";
+import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260925-004";
+import { refreshSkills } from "./skill_panel.js?v=20260925-004";
+import { iconSvgEl } from "../services/icons.js?v=20260925-004";
+import { mcpIconKey } from "../services/mcp_logos.js?v=20260925-004";
+import { state, subscribe } from "../store.js?v=20260925-004";
+import { t } from "../services/i18n.js?v=20260925-004";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20260925-004";
 
 let serverListEl, btnAdd, btnRefresh;
+
+/** 面板的视野＝屏幕上这个项目：掩码只对单个项目有意义，没开项目时这一列控件不出现。 */
+function activeProjectId() {
+  return String(state.project?.project_id || "");
+}
 
 function showToast(msg) {
   const container = document.getElementById("toast-container");
@@ -63,6 +71,20 @@ function renderServerList(servers) {
     nameRow.className = "mcp-server-name";
     nameRow.appendChild(statusDot); // 状态灯贴着名字：头像只说明"是哪一家"，不说明连没连上
     nameRow.appendChild(document.createTextNode(srv.name || srv.id));
+    // 这台在当前项目里到底用不用，取决于掩码还是全局那份——两者关错的代价不同：
+    // 关全局会把所有项目共用的服务器停掉，所以这一行必须写在名字旁边。
+    if (srv.enableScope === "project") {
+      const badge = document.createElement("span");
+      badge.className = "mcp-server-scope-badge";
+      badge.textContent = srv.effectiveEnabled ? t("本项目单独启用") : t("本项目单独停用");
+      badge.title = t("这条结论来自项目「{name}」的掩码，只影响这个项目", { name: state.project?.name || "" });
+      nameRow.appendChild(badge);
+    } else if (srv.effectiveEnabled === false) {
+      const badge = document.createElement("span");
+      badge.className = "mcp-server-scope-badge";
+      badge.textContent = t("全局已停用");
+      nameRow.appendChild(badge);
+    }
 
     const urlRow = document.createElement("div");
     urlRow.className = "mcp-server-url";
@@ -113,6 +135,10 @@ function renderServerList(servers) {
     btnDelete.addEventListener("click", () => handleRemove(srv.id, srv.name));
     actions.appendChild(btnDelete);
 
+    // 项目掩码：只改"这一项目用不用它"，全局那份配置原样留着（URL 与密钥也绝不进项目目录）
+    const scopeBtn = buildProjectMaskButton(srv);
+    if (scopeBtn) actions.appendChild(scopeBtn);
+
     item.appendChild(avatar);
     item.appendChild(info);
     item.appendChild(actions);
@@ -120,9 +146,56 @@ function renderServerList(servers) {
   }
 }
 
+/**
+ * 这一项目在服务器上能做的下一步动作。三种现场各有不同文案，因为"下一步"不等价：
+ * 用着 → 停用（写掩码）；项目里已停用 → 摘掉掩码（回到跟全局）；
+ * 全局本来就停用 → 单独启用（掩码写回 true，这台在项目里盖过全局那份）。
+ * 没打开项目时返回 null：掩码没有归属，这一列不该出现。
+ */
+function projectMaskIntent(srv) {
+  const pid = activeProjectId();
+  if (!pid) return null;
+  if (srv.effectiveEnabled !== false) {
+    return { label: t("在本项目停用"), hint: t("只在这个项目里不用它，别的项目照旧"), mask: { enabled: false }, pid };
+  }
+  if (srv.enableScope === "project") {
+    return { label: t("摘掉本项目掩码"), hint: t("摘掉后这台服务器回到跟全局那份"), mask: null, pid };
+  }
+  return { label: t("在本项目单独启用"), hint: t("全局那份是停用；这一项目单独启用它，别的项目不受影响"), mask: { enabled: true }, pid };
+}
+
+function buildProjectMaskButton(srv) {
+  const intent = projectMaskIntent(srv);
+  if (!intent) return null;
+  const btn = document.createElement("button");
+  btn.className = "mcp-server-scope-toggle";
+  btn.textContent = intent.label;
+  btn.title = intent.hint;
+  btn.addEventListener("click", () => handleProjectMask(srv.id, srv.name, intent));
+  return btn;
+}
+
+async function handleProjectMask(serverId, name, intent) {
+  try {
+    const res = await post(`/mcp-servers/${encodeURIComponent(serverId)}/mask`, {
+      project: intent.pid,
+      enabled: intent.mask?.enabled ?? null,
+      tools: null,
+    });
+    if (res.code !== 0) { showToast(t("设置失败: {msg}", { msg: res.message || t("未知错误") })); return; }
+    showToast(intent.mask ? `${name}：${intent.label}` : `${name}：${t("已摘掉本项目掩码，回到跟全局")}`);
+    loadServers();
+    refreshSkills();
+    forgetScopeCatalog(intent.pid);   // 后台那场的工具清单跟着掩码失效
+  } catch (e) {
+    showToast(t("设置失败: {msg}", { msg: e.message }));
+  }
+}
+
 async function loadServers() {
   try {
-    const res = await get("/mcp-servers");
+    const pid = activeProjectId();
+    const res = await get(`/mcp-servers${pid ? `?project=${encodeURIComponent(pid)}` : ""}`);
     if (res.code === 0) {
       renderServerList(res.data);
     }
@@ -218,6 +291,8 @@ function initMcpServerPanel() {
 
   if (btnAdd) btnAdd.addEventListener("click", handleAddServer);
   if (btnRefresh) btnRefresh.addEventListener("click", () => { loadServers(); refreshSkills(); });
+  // 换视野＝换掩码归属：这行的「在本项目停用」标的是哪个项目，全跟着 state.project 走
+  subscribe("project", () => loadServers());
 
   loadServers();
 }
