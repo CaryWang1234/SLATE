@@ -26,6 +26,7 @@ const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "
 const read = (rel) => readFileSync(`${ROOT}${rel}`, "utf8");
 
 const BG = read("backend/skills/bg_task.py");
+const REG = read("backend/project_registry.py");
 const BG_ROUTER = read("backend/routers/bg_tasks.py");
 const MAIN = read("backend/main.py");
 const SKILLS = read("backend/routers/skills.py");
@@ -34,6 +35,7 @@ const STORE = read("frontend/js/store.js");
 const SERVICE = read("frontend/js/services/bg_tasks.js");
 const TOOLS = read("frontend/js/services/tools.js");
 const CHAT = read("frontend/js/components/chat.js");
+const APPJS = read("frontend/js/app.js");
 const LOOP = read("frontend/js/services/agent_loop.js");
 const PANEL = read("frontend/js/components/bg_task_panel.js");
 const HTML = read("frontend/index.html");
@@ -147,7 +149,9 @@ ok("事件先入内存再 ack（中途崩了还能再来一次）",
   "顺序反了就是丢事件的经典写法");
 ok("未读事件池有上限", /BG_EVENTS_KEEP\s*=\s*\d+/.test(SERVICE) && has(SERVICE, "slice(-BG_EVENTS_KEEP)"));
 ok("takeBgEvents 取走即清（消费者即处理者）",
-  /export function takeBgEvents\(\)[\s\S]{0,300}state\.bgTaskEvents = \[\]/.test(SERVICE));
+  // P1 起 takeBgEvents 带上了归属会话：它清空的是整个池子（留下的那些当场转进信箱），
+  // "取走即清"这条判据没变，只是从"全念"变成"只念这一场的"。
+  /export function takeBgEvents\(convId = state\.currentConversationId\)[\s\S]{0,400}state\.bgTaskEvents = \[\]/.test(SERVICE));
 ok("续跑配额有界，且开关能一票否决",
   /BG_RESUME_MAX = \d+/.test(SERVICE)
   && /bgResumeUsedOf\(key\) >= BG_RESUME_MAX/.test(SERVICE)
@@ -161,19 +165,29 @@ ok("任务结束会提醒人（音效/系统通知 + 归属会话徽标）",
   "模型不看的时候，人得看得见");
 
 // ── 9. 前端接线：三层唤醒 ───────────────────────────────────
-ok("空手停笔时注入事件（第一层）",
-  /if \(hasBgEvents\(\)\) \{\s*\n\s*const events = takeBgEvents\(\);/.test(CHAT)
-  && /bgWakeText\(events\)/.test(CHAT));
-ok("末轮触顶时按未读事件放宽轮数（第二层）",
-  /if \(hasBgEvents\(\) && takeBgResumeGrant\(/.test(CHAT));
+// P1 起每一层都只认"归属是这一场"的事件（takeBgEvents / peekBgEventsFor 都带 convId）。
+// 判据从"有事件就念"收紧成"有归属本场的事件才念"，方向是变严不是变松：
+// 别的项目的结局念给当前对话，等于拿 A 的编译结果回答 B 的问题。
+ok("空手停笔时注入事件（第一层，只念归属本场的）",
+  /const bgEvents = takeBgEvents\(state\.currentConversationId\);\s*\n\s*if \(bgEvents\.length\) \{/.test(CHAT)
+  && /bgWakeText\(bgEvents\)/.test(CHAT));
+ok("末轮触顶时按未读事件放宽轮数（第二层，先看归属再花配额）",
+  /if \(peekBgEventsFor\(run\.genConvId \|\| state\.currentConversationId\)\.length\s*\n?\s*&& takeBgResumeGrant\(/.test(CHAT),
+  "先 takeBgResumeGrant 再取事件＝配额会被一条都不该念的消息吃掉");
 ok("空闲时自己接一句（第三层）",
   /function maybeDriveBgEvents\(convId, signal\)/.test(CHAT) && /maybeDriveBgEvents\(genConvId, signal\)/.test(CHAT)
-  && /maybeDriveBgEvents\(state\.currentConversationId, null\)/.test(CHAT),
+  // P2 起这一句先把 conv 取进局部量再用（同一处还要按这一场查队列），传的值仍是当前会话
+  && /const conv = state\.currentConversationId;[\s\S]{0,160}maybeDriveBgEvents\(conv, null\)/.test(CHAT),
   "事件只有轮询这一条来路：不订阅它，第三层就等不到触发，事件只能干等用户开口");
+// 闸门换了一条、没少一条：P2 之前"切走了就别接话"（state.currentConversationId !== convId）
+// 是因为切走即停，那场已经死了；现在后台那场还在跑，接话正是它该有的行为，
+// 换成"这一场自己在跑 / 自己还有排队的消息"——不插自己的队。用户主动停过、开关关掉、
+// 配额用完这三条原样保留。判据没有变松，只是把失效的那条换成了等价的现行为。
 ok("空闲续跑的三道闸门都在",
   /if \(!convId \|\| signal\?\.aborted\) return/.test(CHAT)
-  && /if \(isGenerating \|\| inputQueue\.length > 0\) return/.test(CHAT)
-  && /if \(state\.currentConversationId !== convId\) return/.test(CHAT));
+  && /if \(isGenerating\(convId\) \|\| visibleQueueFor\(convId\)\.length > 0\) return/.test(CHAT)
+  && /if \(!peekBgEventsFor\(convId\)\.length\) return/.test(CHAT)
+  && /if \(!takeBgResumeGrant\(convId\)\) return/.test(CHAT));
 ok("系统自开的场：不进气泡也不入库",
   /hidden: bgResumeTurn \|\| undefined/.test(CHAT) && /if \(genConvId && !bgResumeTurn\)/.test(CHAT));
 ok("系统自开的场不跑「这条像不像任务」的关键词分类",
@@ -181,13 +195,18 @@ ok("系统自开的场不跑「这条像不像任务」的关键词分类",
   && /bgResumeTurn \? "" : buildAgentRuntimeContext/.test(CHAT),
   "事件尾巴里蹦出「命令/项目」就会让系统自己给自己开自主推进");
 ok("移动端只注入事件、不自己开新场",
-  /hasBgEvents\(\)/.test(MCHAT) && /takeBgEvents\(\)/.test(MCHAT) && !/maybeDriveBgEvents/.test(MCHAT));
+  /const events = takeBgEvents\(\);\s*\n\s*if \(events\.length\) \{/.test(MCHAT) && !/maybeDriveBgEvents/.test(MCHAT),
+  "先判池子非空再取会念到别场会话的消息：取完判长度才是对的顺序");
 ok("移动端启动时也起轮询（否则事件没人领）", /startBgPolling\(\)/.test(MCHAT));
 ok("kernel 把归属会话透给工具执行器（徽标才知道记谁头上）",
   /convId: genConvId \|\| state\.currentConversationId/.test(LOOP) && /convId: ctx\.convId \|\| ""/.test(TOOLS));
 
 // ── 10. 工具接线 ───────────────────────────────────────────
-ok("bg_task 注入项目 work_dir", /if \(!p\.work_dir && skill === "bg_task"\) p\.work_dir = state\.project\.path/.test(TOOLS));
+// 默认工作目录取自"这一场的项目"（callProject(callCtx)），不是屏幕上那个：
+// 并行时后台那场属于别的项目，拿 state.project 兜底等于把它的命令开在别人的目录里
+ok("bg_task 注入项目 work_dir",
+  /if \(!p\.work_dir && skill === "bg_task"\) p\.work_dir = proj\.path/.test(TOOLS)
+  && /const proj = callProject\(callCtx\) \|\| state\.project;/.test(TOOLS));
 ok("bg_task 的 start 也要过高危审批弹窗",
   /skill === "bg_task"[\s\S]{0,300}isHighRiskCommand\(p\.command\)/.test(TOOLS),
   "后台 ≠ 免审批");
@@ -197,7 +216,8 @@ ok("SKILL_PARAM_DEFS 有 bg_task 的参数表",
 
 // ── 11. 面板 ───────────────────────────────────────────────
 ok("没任务时整栏隐藏（不留空壳）",
-  /if \(!tasks\.length \|\| state\.bgPanelOpen === false\)[\s\S]{0,120}classList\.add\("hidden"\)/.test(PANEL));
+  // 并行之后的"事"有两类：后台进程与模型生成，两类都没有才收栏（少判一类会让在跑的那场没人看得见）
+  /if \(!tasks\.length && !runs\.length \|\| state\.bgPanelOpen === false\)[\s\S]{0,120}classList\.add\("hidden"\)/.test(PANEL));
 ok("停止按钮只在 running 出现",
   /if \(task\.state === "running"\)[\s\S]{0,400}stopBgTask\(task\.task_id\)/.test(PANEL));
 ok("非 0 退出按「退出码 N」显示（不跟「没跑起来」混成一个词）",
@@ -225,6 +245,53 @@ ok("面板词条有英文（未命中的键会露出中文）",
   && /"看输出（最近 \{n\} 行）":/.test(I18N));
 ok("唤醒话术不走 i18n（模型可见文本）",
   !/"系统 · 后台任务消息":/.test(I18N), "模型提示词不该收进用户可见词表");
+
+// ── 13. P1 出处与归属：事件要念给"起它的那场会话"，不是"当时正好开着的那一场" ──
+ok("后端任务记着出处（project_id / conversation_id 一路带到事件与快照）",
+  /self\.project_id = str\(project_id or ""\)/.test(BG) && /self\.conversation_id = str\(conversation_id or ""\)/.test(BG)
+  && /"project_id": self\.project_id,/.test(BG) && /"conversation_id": self\.conversation_id,/.test(BG),
+  "只存不发的出处等于没有出处：面板分组与回投都读的是 snapshot/事件里这两份");
+ok("start 收 project/conversation_id，认不出时按工作目录反查",
+  /project: str = ""/.test(BG) && /conversation_id: str = ""/.test(BG)
+  && /def _provenance\(project: Any, work_dir: str\)/.test(BG)
+  && /registry\.project_id_for_path\(registry\.load_registry\(\), work_dir\)/.test(BG),
+  "curl / 移动端起的任务没人告诉它归属，按目录反查是唯一的兜底");
+ok("归属反查按最长前缀（工作区宿主与成员目录同时在册时不抢）",
+  /def project_id_for_path\(doc: dict\[str, Any\], path: Any\)/.test(REG)
+  && /if text == norm or text\.startswith\(norm \+ "\/"\):/.test(REG)
+  && /len\(norm\) > best_len/.test(REG),
+  "第一个匹配就返回：宿主目录会把子项目的路径抢走");
+ok("按项目过滤：给了 project 认不出要报错，不许回一堆别人的任务",
+  /return \{"error": f"项目不在册，无法按项目过滤: \{project\}"/.test(BG)
+  && /def list_tasks\(peek: bool = False, project_id: str \| None = None\)/.test(BG)
+  && /async def list_bg_tasks\(peek: bool = True, project_id: str \| None = None\)/.test(BG_ROUTER));
+ok("前端分池：归属当前会话的进唤醒池，别处的进信箱",
+  /bgInbox: \[\]/.test(STORE) && /function addToInbox\(events\)/.test(SERVICE)
+  && /if \(away\.length\) addToInbox\(away\)/.test(SERVICE));
+ok("归属为空的老事件照样念（扣住真结局比念错地方更糟）",
+  /const owner = bgEventOwner\(e\);\s*\n\s*\(owner \&\& owner !== current \? away : here\)\.push\(e\)/.test(SERVICE),
+  "写成 owner === current 才留下的话，没带 conversation_id 的事件会永远躺在信箱里没人读");
+ok("回到那场会话才把消息搬回池子",
+  /export function drainInboxFor\(convId\)/.test(SERVICE) && /if \(drainInboxFor\(convId\)\) maybeDriveBgEvents\(convId, null\)/.test(CHAT));
+ok("信箱只重绘未读，不在这里叫醒当前这场",
+  /subscribe\("bgInbox", \(\) => renderBgTaskPanel\(\)\)/.test(CHAT)
+  && !/subscribe\("bgInbox"[\s\S]{0,120}maybeDriveBgEvents/.test(CHAT),
+  "A 的编译结束把 B 的对话叫醒，就是「消息念错人」的现场");
+ok("工具侧把出处随 start 一起发出去（模型不该负责记这些）",
+  /if \(!p\.project && proj\?\.project_id\) p\.project = proj\.project_id/.test(TOOLS)
+  && /if \(!p\.conversation_id && callCtx\.convId\) p\.conversation_id = callCtx\.convId/.test(TOOLS));
+ok("任务中心按项目分组，别的项目给「切过去」与「回到那场会话」",
+  /function groupByProject\(tasks\)/.test(PANEL) && /switchToProject\(group\.projectId\)/.test(PANEL)
+  && /dataset\.conversationId = owner/.test(PANEL));
+ok("未读徽标记在归属会话头上（不是当前会话）",
+  /const convId = String\(t\.conversation_id \|\| owners\.get\(t\.task_id\) \|\| ""\)/.test(SERVICE)
+  && /recordTaskFlag\(convId, \{ kind: ok \? "done" : "error", seen: false \}\)/.test(SERVICE));
+ok("换视野会重画任务中心（分组头与跳转入口读的是当前视野）",
+  /subscribe\("project", \(\) => renderBgTaskPanel\(\)\)/.test(CHAT),
+  "走查踩过：切到 A 之后 B 那一组仍按「自己项目」画，跳转入口一个都不出");
+ok("用量区给热力图单独的宿主（它清空 host，共用会把总量卡片抹掉）",
+  /renderActivityHeatmap\(heatHost/.test(APPJS) && !/renderActivityHeatmap\(box/.test(APPJS),
+  "renderActivityHeatmap 第一行就是 host.innerHTML=''——递 #usage-summary 进去等于删掉上面的卡片");
 
 const failed = results.filter(([p]) => !p);
 console.log(`后台任务守卫：共 ${results.length} 项，失败 ${failed.length}${failed.length ? "" : " —— 通过"}`);

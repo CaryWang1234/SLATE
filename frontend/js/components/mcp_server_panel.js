@@ -3,11 +3,11 @@
  * 在设置页中展示已配置的外部 MCP Server，支持添加/删除/连接/断开。
  */
 
-import { get, post, del } from "../services/api.js?v=20260922-006";
-import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260922-006";
-import { refreshSkills } from "./skill_panel.js?v=20260922-006";
-import { iconSvgEl } from "../services/icons.js?v=20260922-006";
-import { mcpIconKey } from "../services/mcp_logos.js?v=20260922-006";
+import { get, post, del } from "../services/api.js?v=20260925-001";
+import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260925-001";
+import { refreshSkills } from "./skill_panel.js?v=20260925-001";
+import { iconSvgEl } from "../services/icons.js?v=20260925-001";
+import { mcpIconKey } from "../services/mcp_logos.js?v=20260925-001";
 
 let serverListEl, btnAdd, btnRefresh;
 

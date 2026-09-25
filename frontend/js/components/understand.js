@@ -4,12 +4,13 @@
  * 三档深度：简略/ 平衡 / 详细（扫描预算与输出长度随档位变化）
  */
 
-import { state, setProject, getModelKey } from "../store.js?v=20260922-006";
-import { post, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260922-006";
-import { updateProjectConfig } from "../services/project.js?v=20260922-006";
-import { renderMarkdown } from "../services/markdown.js?v=20260922-006";
-import { t } from "../services/i18n.js?v=20260922-006";
-import { iconSvgEl } from "../services/icons.js?v=20260922-006";
+import { state, setProject, getModelKey } from "../store.js?v=20260925-001";
+import { aiModelFor, aiFeatureBlocked } from "../services/ai_features.js?v=20260925-001";
+import { post, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-001";
+import { updateProjectConfig } from "../services/project.js?v=20260925-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260925-001";
+import { t } from "../services/i18n.js?v=20260925-001";
+import { iconSvgEl } from "../services/icons.js?v=20260925-001";
 
 const LEVELS = {
   brief: { label: "简略", tree: "目录深度 2 层", files: "精读 6 个关键文件", out: "输出约 900 字" },
@@ -37,7 +38,7 @@ function showView(name) {
 function openUnderstandModal() {
   bindUnderstandModal();
   if (!state.project) {
-    import("../app.js?v=20260922-006").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
+    import("../app.js?v=20260925-001").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
     return;
   }
   currentResult = state.project.config?.understanding || null;
@@ -106,10 +107,12 @@ function appendLog(text) {
 
 async function startUnderstanding() {
   if (running) return;
-  const model = state.currentModel;
-  const apiKey = model?.id ? getModelKey(model.id) : "";
-  if (!model?.id || !apiKey) {
-    import("../app.js?v=20260922-006").then(({ toast }) => toast(t("请先选择模型并配置 API Key"))).catch(() => {});
+  if (aiFeatureBlocked("code_understand")) return;
+  const target = aiModelFor("code_understand", state.currentModel);
+  const model = { id: target.id, provider: target.provider };
+  const apiKey = target.key;
+  if (!target.usable) {
+    import("../app.js?v=20260925-001").then(({ toast }) => toast(t("请先选择模型并配置 API Key"))).catch(() => {});
     return;
   }
 
@@ -169,7 +172,7 @@ async function startUnderstanding() {
 
     renderResult();
     showView("result");
-    import("../app.js?v=20260922-006").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
+    import("../app.js?v=20260925-001").then(({ toast }) => toast("项目理解已生成")).catch(() => {});
   } catch (e) {
     if (e.name === "AbortError") {
       appendLog(t("已取消"));
@@ -180,7 +183,7 @@ async function startUnderstanding() {
         if (steps[i].classList.contains("running")) setStepStatus(i, "error");
       }
       appendLog(t("失败: {msg}", { msg: e.message }));
-      import("../app.js?v=20260922-006").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
+      import("../app.js?v=20260925-001").then(({ toast }) => toast(t("项目理解生成失败: {msg}", { msg: e.message }))).catch(() => {});
     }
   } finally {
     running = false;
@@ -315,9 +318,9 @@ async function copyCurrentResult() {
   const text = activeTab === "tour" ? currentResult.tour : currentResult.rules;
   try {
     await navigator.clipboard.writeText(text || "");
-    import("../app.js?v=20260922-006").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
+    import("../app.js?v=20260925-001").then(({ toast }) => toast("已复制到剪贴板")).catch(() => {});
   } catch {
-    import("../app.js?v=20260922-006").then(({ toast }) => toast("复制失败")).catch(() => {});
+    import("../app.js?v=20260925-001").then(({ toast }) => toast("复制失败")).catch(() => {});
   }
 }
 

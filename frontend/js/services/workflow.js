@@ -6,11 +6,12 @@
  * - 支持 AbortController 中断
  */
 
-import { get, post } from "./api.js?v=20260922-006";
-import { state, getModelKey } from "../store.js?v=20260922-006";
-import { guardSkillParams } from "./riskguard.js?v=20260922-006";
-import { t } from "./i18n.js?v=20260922-006";
-import { makeId } from "./utils.js?v=20260922-006";
+import { get, post } from "./api.js?v=20260925-001";
+import { state, getModelKey } from "../store.js?v=20260925-001";
+import { aiModelFor, isAiFeatureOn } from "./ai_features.js?v=20260925-001";
+import { guardSkillParams } from "./riskguard.js?v=20260925-001";
+import { t } from "./i18n.js?v=20260925-001";
+import { makeId } from "./utils.js?v=20260925-001";
 
 const STATUS = { WAITING: "waiting", RUNNING: "running", SUCCESS: "success", FAILED: "failed", SKIPPED: "skipped" };
 
@@ -143,14 +144,20 @@ function findModelName(modelId) {
   return custom?.name || modelId;
 }
 
-/** 优先级：role 绑定团队成员（沿用其模型与人设） > node.model > 当前模型 */
+/** 优先级：role 绑定团队成员（沿用其模型与人设） > node.model > 「AI 辅助功能」指定档 > 当前模型 */
 function resolveBinding(node, members) {
   let member = null;
   if (node.role) {
     member = (members || []).find(m => m.role === node.role || m.name === node.role) || null;
   }
-  const modelId = member?.modelId || node.model || state.currentModel?.id || "";
-  return { member, modelId, modelLabel: findModelName(modelId), persona: member?.persona || "" };
+  const target = aiModelFor("workflow_dag", state.currentModel);
+  const modelId = member?.modelId || node.model || target.id || "";
+  return {
+    member, modelId,
+    modelLabel: findModelName(modelId), persona: member?.persona || "",
+    // 只有落在默认档上时才带 Key 兜底：绑定的人/节点自己指定的模型该由它自己的 Key 说话
+    key: modelId && modelId === target.id ? target.key : "",
+  };
 }
 
 // ── 单节点执行 ────────────────────────────
@@ -179,7 +186,9 @@ async function executeNode(node, userInput, outputs, members, rec) {
     const binding = resolveBinding(node, members);
     rec.modelLabel = binding.modelLabel || binding.modelId;
     if (!binding.modelId) throw new Error(t("节点未绑定可用模型（role/model 均为空且无当前模型）"));
-    const apiKey = getModelKey(binding.modelId);
+    // 绑定/节点自己指定的模型仍按 modelKeys 取 Key；落在默认档上时用解析器给的 Key
+    //（本地模型没有 Key 也能跑，所以这里不能只认 modelKeys 那一份）
+    const apiKey = getModelKey(binding.modelId) || binding.key || "";
     if (!apiKey) throw new Error(t("模型 {name} 未配置 API Key，请先在设置页配置", { name: rec.modelLabel }));
 
     const systemPrompt = binding.persona || "你是 SLATE 工作流的执行成员：认真完成分配的任务，紧扣任务要求作答，只输出结果本身，不要寒暄与前言后语。";
@@ -217,6 +226,8 @@ function makeRunId() {
  * hooks: { onNode(record), onDone(result) }
  */
 async function runWorkflow(wf, userInput, members, hooks = {}) {
+  // 整条链一步模型都要发，所以关在这里判：抛错让面板把这次运行标红，而不是默默产出空结果
+  if (!isAiFeatureOn("workflow_dag")) throw new Error(t("团队工作流已在「设置 → AI 辅助功能」中关闭"));
   const { order, error } = topoSort(wf);
   if (error) throw new Error(error);
 

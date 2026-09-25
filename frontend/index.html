@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260922-006">
+  <link rel="stylesheet" href="./css/style.css?v=20260925-001">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -383,6 +383,7 @@
           <a class="settings-nav-item" data-target="settings-usage">用量统计</a>
           <a class="settings-nav-item" data-target="settings-context">上下文与项目</a>
           <a class="settings-nav-item" data-target="settings-auto-review">自动推进</a>
+          <a class="settings-nav-item" data-target="settings-ai-features">AI 辅助功能</a>
             <a class="settings-nav-item" data-target="settings-notifications">通知</a>
             <a class="settings-nav-item" data-target="settings-ui">通用 UI</a>
             <a class="settings-nav-item" data-target="settings-web-search">联网搜索</a>
@@ -558,6 +559,18 @@
         </section>
 
         
+        <section class="settings-block" id="settings-ai-features">
+          <div class="settings-block-head">
+            <div>
+              <h2>AI 辅助功能</h2>
+              <p>除对话、团队对话、提示词工厂之外，每一处会自己去找模型要结果的功能都在这里：关掉就不再为它发请求，这里选的模型也只影响这一处</p>
+            </div>
+          </div>
+          <div id="ai-feature-summary" class="setting-hint" style="margin-bottom: 6px;"></div>
+          <div id="ai-feature-list" class="ai-feature-list"></div>
+          <div class="setting-hint" style="margin-top: 8px;">「自动推进」的审阅模型、「后台任务」的自动续跑在各自区块里，这里不重复设。</div>
+        </section>
+
         <section class="settings-block" id="settings-notifications">
           <div class="settings-block-head">
             <div>
@@ -588,6 +601,38 @@
             <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 12h-4l-3 8-4-16-3 8h-4"/></svg>任务有消息时自动叫醒模型（不必由你说"继续"）</span>
           </label>
           <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">每个对话最多自动续跑 3 次；关掉后消息仍然保留，下次你说话时一并交给模型</div>
+        </section>
+
+        <section class="settings-block" id="settings-parallel">
+          <div class="settings-block-head">
+            <div>
+              <h2>多任务与项目</h2>
+              <p>切换项目不再打断正在生成的对话：离开的那场继续在后台跑，结局落进右栏任务中心</p>
+            </div>
+          </div>
+          <label class="setting-check">
+            <input id="setting-background-runs" type="checkbox" checked>
+            <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.9 4.9l2.9 2.9M16.2 16.2l2.9 2.9M2 12h4M18 12h4M4.9 19.1l2.9-2.9M16.2 7.8l2.9-2.9"/></svg>切走会话时让它继续跑（停止仍是显式按钮）</span>
+          </label>
+          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">关掉即旧行为：切换会话就中断当前生成。停止按钮在任何一种设置下都只停屏幕上这一场</div>
+          <label class="setting-row">
+            <span>同时最多跑几场</span>
+            <select id="setting-max-parallel-runs">
+              <option value="1">1（退回一次一场）</option>
+              <option value="2" selected>2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </label>
+          <label class="setting-row">
+            <span>同一个项目内最多几场</span>
+            <select id="setting-max-runs-per-project">
+              <option value="1" selected>1（同项目串行）</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>
+          </label>
+          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">同项目并行意味着两场同时改同一批文件，坏了难查是谁写的；没开工作区隔离前建议保持 1</div>
         </section>
 
         <section class="settings-block" id="settings-ui">
@@ -884,6 +929,11 @@
         <button class="modal-close icon-btn">×</button>
       </div>
       <div class="modal-body">
+        <div class="setting-group" id="project-registry-group">
+          <label class="setting-label">在册项目</label>
+          <div id="project-registry-list" class="project-registry-list"></div>
+          <div class="setting-hint">开过的项目都留在这儿，点一下就回去，接着上次的会话和草稿继续。</div>
+        </div>
         <div class="setting-group">
           <label class="setting-label">项目目录路径</label>
           <input id="project-path-input" type="text" class="setting-input" placeholder="C:\Users\...\project / /home/user/project">
@@ -1426,7 +1476,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260922-006"></script>
+  <script type="module" src="./js/app.js?v=20260925-001"></script>
 
 </body>
 </html>

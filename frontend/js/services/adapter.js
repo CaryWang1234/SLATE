@@ -3,8 +3,8 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20260922-006";
-import { getToolsSystemPrompt } from "./tools.js?v=20260922-006";
+import { state } from "../store.js?v=20260925-001";
+import { getToolsSystemPrompt } from "./tools.js?v=20260925-001";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -106,11 +106,13 @@ function getMemorySystemPrompt() {
   return "\n\n以下是用户画像与长期记忆，用于调整回答风格与内容贴合用户，不要向用户复述它们：\n" + parts.join("\n");
 }
 
-function getKnowledgeSystemPrompt() {
-  const items = Array.isArray(state.knowledgeContext) ? state.knowledgeContext.slice(0, 8) : [];
-  if (!items.length) return "";
+function getKnowledgeSystemPrompt(items = null) {
+  // 并行时由调用方把自己那场检索到的片段传进来：读全局那份会把 B 项目的知识库
+  // 片段塞进 A 项目的请求里（后台那场的检索比这行代码晚到或早到都不受控）。
+  const list = (Array.isArray(items) ? items : (Array.isArray(state.knowledgeContext) ? state.knowledgeContext : [])).slice(0, 8);
+  if (!list.length) return "";
   const lines = ["[相关知识库片段]（仅在与当前问题相关时参考，不要生硬引用）"];
-  for (const item of items) {
+  for (const item of list) {
     const title = item.title || item.source || "知识";
     const content = String(item.content || "").slice(0, 700);
     if (content) lines.push(`- ${title}: ${content}`);
@@ -168,6 +170,8 @@ function getActionsSystemPrompt() {
  * 也不注入工具目录（没有工具可调用时注入只会诱导模型伪造 ◈◈◈ 调用块）。
  */
 function buildSystemContent(modelId, constitution, opts = {}) {
+  // opts.knowledge / opts.project：并行时这一场的知识库与项目现场由调用方带进来，
+  // 不带的才读全局——全局那份表示的是"屏幕上那个项目"，后台那场不该共用它。
   const chatMode = opts.withTools === false;
   let systemContent = getSystemPrompt(modelId, chatMode);
 
@@ -181,7 +185,7 @@ function buildSystemContent(modelId, constitution, opts = {}) {
 
   systemContent += getExpertSystemPrompt();
   systemContent += getMemorySystemPrompt();
-  systemContent += getKnowledgeSystemPrompt();
+  systemContent += getKnowledgeSystemPrompt(opts.knowledge);
 
   // 注入工具描述（默认使用精简 Agent 版，避免长工具目录稀释关键指令）
   // 对话模式走互斥分支：不注入目录，同时显式声明"本轮没有工具"，
@@ -194,7 +198,7 @@ function buildSystemContent(modelId, constitution, opts = {}) {
     // Actions 目录贴着工具说明注入：对话态没有 actions_read，
     // 只给目录读不到正文，反而诱导模型声称"已按流程执行"。
     systemContent += getActionsSystemPrompt();
-    systemContent += getToolsSystemPrompt({ compact: true });
+    systemContent += getToolsSystemPrompt({ compact: true, project: opts.project || null });
   }
 
   return systemContent;
@@ -207,12 +211,18 @@ function buildSystemContent(modelId, constitution, opts = {}) {
  *           text=剥离协议（tool 消息降为 user，便于不支持 tools 的端点消费）；
  *           none=对话模式，既不注入工具目录也不序列化任何工具协议。
  */
-function buildMessages(userMessages, constitution, toolMode = "text") {
+function buildMessages(userMessages, constitution, toolMode = "text", opts = {}) {
   const messages = [];
 
   messages.push({
     role: "system",
-    content: buildSystemContent(userMessages._modelId || "", constitution, { withTools: toolMode !== "none" }),
+    content: buildSystemContent(userMessages._modelId || "", constitution, {
+      withTools: toolMode !== "none",
+      // 一条历史数组带上自己的现场（_knowledge / _project）：并行时全局那两份属于
+      // 屏幕上正在看的另一个项目，读全局等于把 B 项目的知识塞进 A 项目的请求。
+      knowledge: opts.knowledge ?? (Array.isArray(userMessages._knowledge) ? userMessages._knowledge : null),
+      project: opts.project || userMessages._project || null,
+    }),
   });
 
   const native = toolMode === "native";

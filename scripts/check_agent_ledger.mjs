@@ -26,7 +26,7 @@ globalThis.fetch = async (url, init) => {
   return { ok: true, status: 200, statusText: "OK", json: async () => ({ code: 0, data: null, message: "ok" }) };
 };
 
-const { openRun, projectChat, projectSteps } = await import("../frontend/js/services/agent_ledger.js?v=20260922-006");
+const { openRun, projectChat, projectSteps } = await import("../frontend/js/services/agent_ledger.js?v=20260925-001");
 
 const lastBody = () => JSON.parse(posts[posts.length - 1].init.body);
 const types = (ledger) => ledger.events.map(e => `${e.type}${e.callId ? ":" + e.callId : ""}`);

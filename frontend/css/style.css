@@ -5461,6 +5461,80 @@ textarea::-webkit-scrollbar-thumb {
   accent-color: var(--gold);
 }
 
+/* ── 设置页「AI 辅助功能」：一行一个功能，开关 + 说明 + 选模型 ── */
+
+.ai-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-feature-row {
+  padding: 6px 0 10px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.ai-feature-row:last-child {
+  border-bottom: none;
+}
+
+.ai-feature-row .setting-check {
+  margin: 4px 0 2px;
+  font-size: 13px;
+}
+
+.ai-feature-name {
+  font-weight: 600;
+}
+
+.ai-feature-mode {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.ai-feature-note {
+  margin: 0 0 6px 22px;
+}
+
+.ai-feature-model {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 22px;
+}
+
+.ai-feature-model .setting-label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ai-feature-model select {
+  max-width: 260px;
+  font-size: 12px;
+}
+
+/* 关掉的功能整行淡下去，一眼看出哪几处不再发请求；模型下拉跟着失效 */
+.ai-feature-row.is-off .ai-feature-note,
+.ai-feature-row.is-off .ai-feature-model {
+  opacity: 0.45;
+}
+
+.ai-feature-row.is-off select {
+  pointer-events: none;
+}
+
+.ai-feature-model-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .setting-section-head {
   display: flex;
   align-items: center;
@@ -6738,6 +6812,242 @@ body.resizing {
   white-space: nowrap;
 }
 
+/* 项目名 = 切换器入口。它是 <button>，得把 UA 样式清掉才和普通标签长一样。 */
+button.project-bar-switch {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  margin-left: -4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  max-width: 100%;
+  text-align: left;
+  transition: background-color var(--transition);
+}
+
+button.project-bar-switch:hover {
+  background: var(--bg-alt);
+}
+
+/* ── 项目切换器下拉 ───────────────────────── */
+.project-switcher {
+  position: fixed;
+  z-index: 1200;
+  min-width: 260px;
+  max-width: 340px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
+}
+
+.project-switcher-head {
+  padding: 4px 8px 6px;
+  font-size: 10px;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+}
+
+.project-switcher-empty {
+  padding: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.project-switcher-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 8px;
+  transition: background-color var(--transition);
+}
+
+.project-switcher-item:hover {
+  background: var(--bg-alt);
+}
+
+.project-switcher-item.active {
+  background: var(--accent-bg);
+}
+
+.project-switcher-item.active .project-switcher-pick {
+  color: var(--accent-fg);
+}
+
+/* 归档项留在清单里但压到后面、淡化——它还在册，只是不抢眼 */
+.project-switcher-item.archived {
+  opacity: .55;
+}
+
+.project-switcher-pick {
+  appearance: none;
+  background: none;
+  border: none;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.project-switcher-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-switcher-kind,
+.project-switcher-pin {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.project-switcher-act {
+  appearance: none;
+  background: none;
+  border: none;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition), background-color var(--transition), color var(--transition);
+}
+
+.project-switcher-item:hover .project-switcher-act,
+.project-switcher-act:focus-visible {
+  opacity: 1;
+}
+
+.project-switcher-act:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.project-switcher-act.danger:hover {
+  color: var(--error);
+}
+
+.project-switcher-open {
+  appearance: none;
+  width: 100%;
+  margin-top: 6px;
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.project-switcher-open:hover {
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+
+/* ── 打开项目弹窗里的"在册项目"一段 ───────────── */
+.project-registry-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 168px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.project-registry-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.project-registry-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 5px 9px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition), background-color var(--transition);
+}
+
+.project-registry-item:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.project-registry-item.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-bg);
+  color: var(--accent-fg);
+}
+
+.project-registry-item.archived {
+  opacity: .55;
+}
+
+.project-registry-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-registry-pin {
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* ── classic 侧栏的项目分组头 ───────────────── */
+.conv-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 4px;
+  font-size: 10px;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+}
+
+.conv-group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.conv-group-count {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: var(--bg-alt);
+  font-size: 10px;
+}
+
 .project-bar-kind {
   flex-shrink: 0;
   font-size: 10px;
@@ -7418,6 +7728,55 @@ img.file-type-icon {
   gap: 8px;
 }
 
+/* 热力图有自己的宿主：它渲染前先清空 host，跟总量卡片共用一个容器会把卡片抹掉 */
+.usage-summary-heat {
+  margin-top: 14px;
+}
+
+/* 任务中心按项目分组：当前视野那一组不画头（少一层噪音），别的项目必须写明是谁的 */
+.bg-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 0 2px 2px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.bg-group-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bg-group-count {
+  flex-shrink: 0;
+  color: var(--text-faint, var(--text-muted));
+  font-size: 10px;
+}
+
+.bg-group-jump {
+  flex-shrink: 0;
+}
+
+/* 未读 = 有别处的消息没看：金点压在图标角上，不挤任务数 */
+#btn-bg-tasks.has-unread::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
 .bg-task-item {
   display: flex;
   flex-direction: column;
@@ -7430,6 +7789,21 @@ img.file-type-icon {
 
 .bg-task-running {
   border-color: var(--gold);
+}
+
+/* 并行的生成行：跑着的与等位置的要一眼分得开——金框是"它正在动"，
+   虚线是"它在等前面的任务腾位置"，两者都没有输出可看，只是状态 */
+.bg-run-item {
+  border-style: solid;
+}
+
+.bg-run-queued {
+  border-style: dashed;
+  opacity: .78;
+}
+
+.bg-run-queued .bg-task-icon {
+  color: var(--text-muted);
 }
 
 .bg-task-head {
@@ -10467,6 +10841,7 @@ html[data-ui="codex"] #codex-dock-history {
   align-items: center;
   gap: 4px;
   width: 100%;
+  min-width: 0;
   margin-top: 6px;
   padding: 4px 6px;
   background: none;
@@ -10476,6 +10851,53 @@ html[data-ui="codex"] #codex-dock-history {
   font-size: 11px;
   cursor: pointer;
   text-align: left;
+}
+
+/* 组头一行 = 折叠按钮 + 悬停才出现的操作。按钮本身 width:100%，所以操作要挤在它右边
+   就得让整行 flex，并把按钮改成 flex:1 + min-width:0，否则名字长的组会把按钮顶出容器。 */
+.codex-hist-group-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.codex-hist-group-row .codex-hist-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.codex-hist-group-acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.codex-hist-group-row:hover .codex-hist-group-acts,
+.codex-hist-group-acts:focus-within {
+  opacity: 1;
+}
+
+.codex-hist-group-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition), background-color var(--transition);
+}
+
+.codex-hist-group-act:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
 }
 
 .codex-hist-group:hover {

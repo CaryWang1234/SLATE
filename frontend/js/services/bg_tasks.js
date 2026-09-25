@@ -11,11 +11,15 @@
  *
  * 事件是"至少一次"投递：后端 GET 返回未读事件，前端入内存后再 ack。
  * 拔线/崩溃时事件仍在后端，下次拉取还会来 —— 丢事件比重复投递严重得多。
+ *
+ * 多项目在册之后多了一层"念给谁"：事件带着 conversation_id 回来，归属是当前会话的
+ * 进唤醒池，归属别的会话（多半是别的项目）的进 bgInbox 等主人回来领。
+ * 没有归属信息的老事件一律就地念 —— 扣住一条真结局不发，比念错地方更糟。
  */
 
-import { get, post } from "./api.js?v=20260922-006";
-import { state, notify, recordTaskFlag, bgResumeUsedOf, markBgResumeUsed } from "../store.js?v=20260922-006";
-import { notifyTaskComplete } from "./notify.js?v=20260922-006";
+import { get, post } from "./api.js?v=20260925-001";
+import { state, notify, recordTaskFlag, bgResumeUsedOf, markBgResumeUsed } from "../store.js?v=20260925-001";
+import { notifyTaskComplete } from "./notify.js?v=20260925-001";
 
 /** 有任务在册时的轮询间隔：够及时，又不至于把 3 秒一次的请求灌满日志 */
 export const POLL_MS = 3000;
@@ -31,6 +35,9 @@ export const BG_WAKE_TAIL_CHARS = 500;
 
 /** 未读事件池的上限：一次唤醒最多念 6 条，攒更多只是涨内存（后端已 ack，丢了不会再来） */
 export const BG_EVENTS_KEEP = 40;
+
+/** 跨会话信箱的上限：不属于当前会话的消息攒在这儿，等用户回到那场会话再念 */
+export const BG_INBOX_KEEP = 60;
 
 /**
  * 每个对话允许系统"自己开口"几次。事件注入本身不花配额——每条事件只能唤醒一次，
@@ -62,14 +69,84 @@ export function hasBgEvents() {
   return peekBgEvents().length > 0;
 }
 
-/** 取走全部未读事件（消费者即"处理者"，取完就清） */
-export function takeBgEvents() {
-  const items = peekBgEvents();
-  if (items.length) {
-    state.bgTaskEvents = [];
-    notify("bgEvents", []);
+/** 不改状态地看一眼"这一场能念几条"（配额要留给真有消息的那一次） */
+export function peekBgEventsFor(convId = state.currentConversationId) {
+  const current = String(convId || "");
+  return peekBgEvents().filter(e => {
+    const owner = bgEventOwner(e);
+    return !owner || owner === current;
+  });
+}
+
+/** 取走属于这场会话的未读事件；认得出但不属于它的，退回跨会话信箱。
+ *
+ * 归属为空 = 起任务时还认不出会话（新对话当场起任务、老版本后端），
+ * 那就沿用旧行为就地念——把没依据的消息扣住不念，比念错地方更难查。
+ */
+export function takeBgEvents(convId = state.currentConversationId) {
+  const here = [];
+  const away = [];
+  for (const e of peekBgEvents()) {
+    const owner = bgEventOwner(e);
+    (owner && owner !== String(convId || "") ? away : here).push(e);
   }
-  return items;
+  state.bgTaskEvents = [];
+  notify("bgEvents", []);
+  if (away.length) addToInbox(away);
+  return here;
+}
+
+/** 事件归谁：后端记的 conversation_id 优先，内存里的 owners 只作兜底（跨重启会失效） */
+export function bgEventOwner(e) {
+  return String(e?.conversation_id || owners.get(String(e?.task_id || "")) || "");
+}
+
+/** 跨会话信箱：别的会话（多半是别的项目）里跑完的任务，消息先躺在这儿等主人回来 */
+export function bgInbox() {
+  return Array.isArray(state.bgInbox) ? state.bgInbox : [];
+}
+
+export function unreadInboxCount() {
+  return bgInbox().length;
+}
+
+function addToInbox(events) {
+  const list = Array.isArray(events) ? events : [];
+  if (!list.length) return;
+  const known = new Set(bgInbox().map(e => e.event_id));
+  const fresh = list.filter(e => e && e.event_id && !known.has(e.event_id));
+  if (!fresh.length) return;
+  state.bgInbox = bgInbox().concat(fresh).slice(-BG_INBOX_KEEP);
+  notify("bgInbox", state.bgInbox);
+  for (const e of fresh) {
+    const owner = bgEventOwner(e);
+    if (!owner) continue;
+    // 徽标是持久化的：用户可能明天才回那场会话看。消息本身只在内存里（后端已 ack），
+    // 所以徽标亮着但详情没了是已知取舍——宁可只留"那场有结局没看"，也不假装有内容。
+    const ok = e.kind === "exit" || e.kind === "match";
+    try { recordTaskFlag(owner, { kind: ok ? "done" : e.kind === "stopped" ? "needs" : "error", seen: false }); } catch (err) { /* 同上 */ }
+  }
+}
+
+/** 回到某场会话时把它名下的消息搬回唤醒池：下一次空轮/空闲续跑就会念给模型 */
+export function drainInboxFor(convId) {
+  const key = String(convId || "");
+  if (!key) return 0;
+  const mine = [], rest = [];
+  for (const e of bgInbox()) (bgEventOwner(e) === key ? mine : rest).push(e);
+  if (!mine.length) return 0;
+  state.bgInbox = rest;
+  notify("bgInbox", state.bgInbox);
+  const known = new Set(peekBgEvents().map(e => e.event_id));
+  state.bgTaskEvents = peekBgEvents().concat(mine.filter(e => !known.has(e.event_id))).slice(-BG_EVENTS_KEEP);
+  notify("bgEvents", state.bgTaskEvents);
+  return mine.length;
+}
+
+export function clearBgInbox() {
+  if (!bgInbox().length) return;
+  state.bgInbox = [];
+  notify("bgInbox", []);
 }
 
 function setTasks(tasks) {
@@ -79,13 +156,23 @@ function setTasks(tasks) {
 
 function pushEvents(events) {
   if (!Array.isArray(events) || !events.length) return;
-  const known = new Set(peekBgEvents().map(e => e.event_id));
+  const known = new Set(peekBgEvents().map(e => e.event_id).concat(bgInbox().map(e => e.event_id)));
   const fresh = events.filter(e => e && e.event_id && !known.has(e.event_id));
   if (!fresh.length) return;
+  // 一到手就先分一次：不属于当前会话的进信箱。等 takeBgEvents 再分太晚——
+  // 中间这段时间面板上显示的"未读"会把别的项目的结局算进当前项目头上。
+  const here = [];
+  const away = [];
+  const current = String(state.currentConversationId || "");
+  for (const e of fresh) {
+    const owner = bgEventOwner(e);
+    (owner && owner !== current ? away : here).push(e);
+  }
+  if (away.length) addToInbox(away);
+  if (!here.length) return;
   // 未读池封顶：配额用完 / 用户迟迟没回来时，后端已经 ack 过这些事件，攒着只会涨内存。
   // 一次唤醒最多也只念 BG_WAKE_MAX_EVENTS 条，留太多没有意义，丢最老的。
-  const merged = peekBgEvents().concat(fresh);
-  state.bgTaskEvents = merged.slice(-BG_EVENTS_KEEP);
+  state.bgTaskEvents = peekBgEvents().concat(here).slice(-BG_EVENTS_KEEP);
   notify("bgEvents", state.bgTaskEvents);
 }
 
@@ -124,9 +211,8 @@ function announceFinished(tasks) {
     const title = ok ? "后台任务已完成" : t.state === "stopped" ? "后台任务已停止" : "后台任务异常结束";
     const body = `${t.label || t.task_id}${t.exit_code === null || t.exit_code === undefined ? "" : `（exit ${t.exit_code}）`}`;
     try { notifyTaskComplete(title, body); } catch (e) { /* 通知不是关键路径 */ }
-    // 归属会话由起任务时登记（见 rememberBgOwner）；跨重启后不知道归属，就不亮徽标，
-    // 总比把结局压到当前正在看的另一个会话上强。
-    const convId = owners.get(t.task_id);
+    // 归属会话：后端记的 conversation_id 优先（重启后还在），内存登记只兜老数据
+    const convId = String(t.conversation_id || owners.get(t.task_id) || "");
     if (convId) {
       try { recordTaskFlag(convId, { kind: ok ? "done" : "error", seen: false }); } catch (e) { /* 同上 */ }
     }
@@ -170,7 +256,9 @@ export function noteBgTaskStarted(data, convId = "") {
   const rest = bgTasks().filter(t => t.task_id !== task.task_id);
   setTasks([task].concat(rest));
   announced.delete(task.task_id);
-  if (convId) owners.set(task.task_id, convId);
+  // 归属以带上的那个为准：convId 是"起它时这一场"，task.conversation_id 是后端记下来的同一条事实
+  const owner = String(convId || task.conversation_id || "");
+  if (owner) owners.set(task.task_id, owner);
   // 新任务一律把面板撑开：模型刚说"我起了个后台任务"，人得立刻看得见它
   state.bgPanelOpen = true;
   notify("bgPanelOpen", true);

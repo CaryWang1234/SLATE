@@ -3,12 +3,12 @@
  * + Actions（data/actions/*.yml 流程说明书：可编辑、试校验、删除、留底回滚）。
  */
 
-import { state, subscribe, setSkills, setActions } from "../store.js?v=20260922-006";
-import { get, post, put, del, upload } from "../services/api.js?v=20260922-006";
-import { guardSkillParams } from "../services/riskguard.js?v=20260922-006";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260922-006";
-import { t } from "../services/i18n.js?v=20260922-006";
-import { setIconText } from "../services/icons.js?v=20260922-006";
+import { state, subscribe, setSkills, setActions } from "../store.js?v=20260925-001";
+import { get, post, put, del, upload } from "../services/api.js?v=20260925-001";
+import { guardSkillParams } from "../services/riskguard.js?v=20260925-001";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260925-001";
+import { t } from "../services/i18n.js?v=20260925-001";
+import { setIconText } from "../services/icons.js?v=20260925-001";
 
 let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 

@@ -3,11 +3,12 @@
  * 读取 git diff（staged/unstaged/commit range），AI 四维度结构化审查 + 行级评论
  */
 
-import { state, getModelKey } from "../store.js?v=20260922-006";
-import { post, streamChat } from "../services/api.js?v=20260922-006";
-import { renderMarkdown } from "../services/markdown.js?v=20260922-006";
-import { t } from "../services/i18n.js?v=20260922-006";
-import { setIconText } from "../services/icons.js?v=20260922-006";
+import { state, getModelKey } from "../store.js?v=20260925-001";
+import { aiModelFor, aiFeatureBlocked } from "../services/ai_features.js?v=20260925-001";
+import { post, streamChat } from "../services/api.js?v=20260925-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260925-001";
+import { t } from "../services/i18n.js?v=20260925-001";
+import { setIconText } from "../services/icons.js?v=20260925-001";
 
 const DIFF_MODES = {
   unstaged: { label: "未暂存变更" },
@@ -48,7 +49,7 @@ function showView(name) {
 function openReviewModal() {
   bindReviewModal();
   if (!state.project) {
-    import("../app.js?v=20260922-006").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
+    import("../app.js?v=20260925-001").then(({ toast }) => toast("请先打开一个项目")).catch(() => {});
     return;
   }
   currentDiff = null;
@@ -91,10 +92,12 @@ function renderDiffSummary(data) {
 
 async function startReview() {
   if (running) return;
-  const model = state.currentModel;
-  const apiKey = model?.id ? getModelKey(model.id) : "";
-  if (!model?.id || !apiKey) {
-    import("../app.js?v=20260922-006").then(({ toast }) => toast("请先选择模型并配置 API Key")).catch(() => {});
+  if (aiFeatureBlocked("code_review")) return;
+  const target = aiModelFor("code_review", state.currentModel);
+  const model = { id: target.id, provider: target.provider };
+  const apiKey = target.key;
+  if (!target.usable) {
+    import("../app.js?v=20260925-001").then(({ toast }) => toast("请先选择模型并配置 API Key")).catch(() => {});
     return;
   }
 
@@ -150,14 +153,14 @@ async function startReview() {
 
     renderReviewResult();
     showView("result");
-    import("../app.js?v=20260922-006").then(({ toast }) => toast(t("代码审查完成"))).catch(() => {});
+    import("../app.js?v=20260925-001").then(({ toast }) => toast(t("代码审查完成"))).catch(() => {});
   } catch (e) {
     if (e.name === "AbortError") {
       appendLog(t("已取消"));
       showView("setup");
     } else {
       appendLog(t("审查失败: {msg}", { msg: e.message }));
-      import("../app.js?v=20260922-006").then(({ toast }) => toast(t("代码审查失败: {msg}", { msg: e.message }))).catch(() => {});
+      import("../app.js?v=20260925-001").then(({ toast }) => toast(t("代码审查失败: {msg}", { msg: e.message }))).catch(() => {});
     }
   } finally {
     running = false;
@@ -395,9 +398,9 @@ function renderDimensionCards() {
 async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
-    import("../app.js?v=20260922-006").then(({ toast }) => toast(t("已复制"))).catch(() => {});
+    import("../app.js?v=20260925-001").then(({ toast }) => toast(t("已复制"))).catch(() => {});
   } catch {
-    import("../app.js?v=20260922-006").then(({ toast }) => toast(t("复制失败"))).catch(() => {});
+    import("../app.js?v=20260925-001").then(({ toast }) => toast(t("复制失败"))).catch(() => {});
   }
 }
 

@@ -6,9 +6,10 @@
  * tools 相关函数经 deps 注入，避免与 tools.js 循环导入。
  */
 
-import { state, getModelKey } from "../store.js?v=20260922-006";
-import { streamChat } from "./api.js?v=20260922-006";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260922-006";
+import { state, getModelKey } from "../store.js?v=20260925-001";
+import { streamChat } from "./api.js?v=20260925-001";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-001";
+import { aiModelFor } from "./ai_features.js?v=20260925-001";
 
 export const SUBAGENT_MAX_PARALLEL = 5;     // 单次派出的并行上限
 export const SUBAGENT_MAX_ROUNDS = 8;       // 每个子代理的工具轮次预算
@@ -107,9 +108,10 @@ function previewHead(text, max = 120) {
 /** 单个子代理：独立迷你工具循环。任何异常都不外抛，转为 failed/stopped 结果。 */
 async function runOneSubAgent(spec, index, deps, signal) {
   const { detect, strip, exec, toolsPrompt } = deps;
-  const modelId = state.currentModel?.id || "gpt-5.6-terra";
-  const baseUrl = state.currentModel?.base_url || undefined;
-  const apiKey = getModelKey(modelId);
+  const target = aiModelFor("subagent", state.currentModel);
+  const modelId = target.id;
+  const baseUrl = target.base_url;
+  const apiKey = target.key;
 
   const spawn = spawnHandle(deps.ledger || null, deps.parentCallId || "", index, spec.name);
   spawn.started(spec.task);
@@ -130,6 +132,9 @@ async function runOneSubAgent(spec, index, deps, signal) {
     return result;
   };
 
+  // 模型没配好就一条请求都不发（子代理可能一次并行五个，静默失败会被当成"任务太难"）
+  if (!target.usable) return finish("failed", "子代理模型不可用：未选择模型或未配置 API Key");
+
   try {
     for (let round = 0; round < SUBAGENT_MAX_ROUNDS; round++) {
       if (signal?.aborted) return finish("stopped", lastOutput);
@@ -139,7 +144,7 @@ async function runOneSubAgent(spec, index, deps, signal) {
       let lastEmit = 0;
       for await (const chunk of streamChat({
         model: modelId,
-        provider: state.currentModel?.provider,
+        provider: target.provider,
         messages,
         api_key: apiKey,
         base_url: baseUrl,

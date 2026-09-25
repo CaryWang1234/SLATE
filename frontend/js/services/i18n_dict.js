@@ -193,6 +193,29 @@ export const EN_DICT = {
   "当前项目不是工作区": "The current project is not a workspace",
   "该目录不在工作区内": "That directory is not part of the workspace",
   "工作区至少要留一个文件夹": "A workspace must keep at least one folder",
+  // ── 多项目：在册清单 / 切换器 / 现场恢复 ──────────────
+  "在册项目": "Registered projects",
+  "还没有在册项目，用下面的路径打开一个目录": "No registered projects yet — open a folder with the path below.",
+  "还没有在册项目，打开一个目录试试": "No registered projects yet — open a folder first.",
+  "开过的项目都留在这儿，点一下就回去，接着上次的会话和草稿继续。":
+    "Every project you have opened stays here. Click one to jump back to its last conversation and draft.",
+  "点击切换在册项目": "Click to switch between registered projects",
+  "打开其他目录…": "Open another folder…",
+  "收起当前项目（仍在册，可从项目名处切回）":
+    "Put the current project out of view (it stays registered — switch back from the project name)",
+  "收起当前项目？它仍留在在册清单里，会话、宪法、文件都不动。":
+    "Put the current project out of view? It stays in the registered list; its conversations, constitution and files are untouched.",
+  "收起": "Put away",
+  "切换失败": "Switch failed",
+  "固定": "Pin",
+  "固定项目": "Pin project",
+  "已固定": "Pinned",
+  "取消固定": "Unpin",
+  "从最近移除": "Remove from list",
+  "从最近移除（不删除任何文件与会话）": "Remove from list (deletes no files or conversations)",
+  "从在册清单里移除「{name}」？\n它的会话、宪法、磁盘上的文件都不会被动，只是不再出现在切换器里。":
+    "Remove “{name}” from the registered list?\nIts conversations, constitution and files on disk stay untouched — it just stops showing up in the switcher.",
+  "切到该项目": "Switch to this project",
   "打开": "Open",
   "记忆与画像": "Memory & Profile",
   "长期记忆": "Long-term Memory",
@@ -513,6 +536,31 @@ export const EN_DICT = {
   "任务清单 {done}/{total}": "Task list {done}/{total}",
   " · 受阻 {n}": " · blocked {n}",
   " · 进行中 {n}": " · in progress {n}",
+  // ── 并行运行（run_registry.js / bg_task_panel.js / chat.js / 设置页） ──
+  "排队中": "Queued",
+  "生成中": "Generating",
+  "新对话": "New chat",
+  "进行中的对话": "Chat in progress",
+  "去看这一场": "Go to this run",
+  "停止这一场生成": "Stop this run",
+  " · 不在屏幕上": " · not on screen",
+  " · 排队中 {n}": " · {n} queued",
+  "已达并行上限，已排队：等当前任务腾出位置自动开始（{n} 个在等）":
+    "Parallel limit reached — queued, it starts on its own when a slot frees ({n} waiting)",
+  "已达并行上限，等当前任务跑完再重新生成":
+    "Parallel limit reached — wait for the current run before regenerating",
+  "项目目录已经不在了，无法开始：{p}": "Project folder is gone, cannot start: {p}",
+  "切走会话时让它继续跑（停止仍是显式按钮）": "Keep a run going when you switch away (stop stays an explicit button)",
+  "同时最多跑几场": "Max concurrent runs",
+  "1（退回一次一场）": "1 (one at a time)",
+  "同一个项目内最多几场": "Max concurrent runs per project",
+  "1（同项目串行）": "1 (serial within a project)",
+  "关掉即旧行为：切换会话就中断当前生成。停止按钮在任何一种设置下都只停屏幕上这一场":
+    "Off restores the old behavior: switching chats aborts the current run. The stop button only ever stops the one on screen.",
+  "切换项目不再打断正在生成的对话：离开的那场继续在后台跑，结局落进右栏任务中心":
+    "Switching projects no longer interrupts a running chat — it keeps going in the background and lands in the task centre",
+  "同项目并行意味着两场同时改同一批文件，坏了难查是谁写的；没开工作区隔离前建议保持 1":
+    "Two runs in one project edit the same files at once, which is hard to untangle; keep this at 1 until worktree isolation exists",
   // ── 后台终端任务（bg_task_panel.js / bg_tasks.js / chat.js） ──
   "后台任务": "Background tasks",
   "后台任务 {n}": "Background tasks {n}",
@@ -533,6 +581,11 @@ export const EN_DICT = {
   "（暂无输出）": "(no output yet)",
   "读取失败：{msg}": "Read failed: {msg}",
   "后台任务已完成": "Background task finished",
+  // 任务中心（跨项目）：分组头、跳转、未读提示
+  "任务中心 {n}": "Task centre {n}",
+  "回到起它的那场会话": "Back to the conversation that started it",
+  " · {n} 条消息在别的会话没看": " · {n} message(s) unread in another conversation",
+  "{tokens} tokens · {n} 条会话": "{tokens} tokens · {n} conversation(s)",
   "后台任务已停止": "Background task stopped",
   "后台任务异常结束": "Background task failed",
   "后台任务有动静 · 已把 {n} 条消息交给模型": "Background task update · handed {n} message(s) to the model",
@@ -1775,5 +1828,70 @@ export const EN_DICT = {
   "已中止": "Aborted",
   "创意者": "Creative lead",
   "回应 {name}": "Replies to {name}",
+
+  // ── AI 辅助功能设置（services/ai_features.js 登记表 + index.html 新区块） ──
+  "AI 辅助功能": "AI Assist Features",
+  "除对话、团队对话、提示词工厂之外，每一处会自己去找模型要结果的功能都在这里：关掉就不再为它发请求，这里选的模型也只影响这一处":
+    "Every place outside chat, team chat and the prompt factory that goes asking a model on its own is listed here — switch one off and it stops sending requests; the model you pick here applies to that one feature only",
+  "「自动推进」的审阅模型、「后台任务」的自动续跑在各自区块里，这里不重复设。":
+    "The review model under \"Auto Advance\" and the auto-resume switch under \"Background Tasks\" live in their own blocks and aren't duplicated here.",
+  "手动": "On demand",
+  "模型调用": "Model-invoked",
+  "模型": "Model",
+  "（未配置 Key）": " (no API key)",
+  "（已不在模型列表）": " (no longer in the model list)",
+  "共 {n} 项，全部开启（关闭即不再为此发模型请求）":
+    "{n} features, all on (switching one off stops its model requests)",
+  "共 {n} 项，已关闭 {off} 项（关闭即不再为此发模型请求）":
+    "{n} features, {off} switched off (a switched-off one sends no model requests)",
+  "{name}已关闭，可在「设置 → AI 辅助功能」中打开":
+    "{name} is switched off — turn it back on in Settings → AI Assist Features",
+  "上下文压缩摘要": "Context compression summary",
+  "每轮回复后判断是否超出上下文预算，超了就把旧消息压成一段历史摘要（手动点「压缩」也走这一档）":
+    "After each reply, checks whether the context budget is exceeded and folds older messages into a summary (the manual \"Compress\" button uses this switch too)",
+  "记忆自动蒸馏": "Automatic memory distillation",
+  "每轮回复后静默读最近对话，沉淀长期记忆与用户资料；45 秒内不重复":
+    "Silently reads the recent turns after each reply to distil long-term memory and your profile; at most once per 45 s",
+  "记忆手动提取": "Manual memory extraction",
+  "记忆面板「从当前对话提取」：把这场对话整理成候选记忆供你挑选":
+    "The memory panel's \"Extract from this conversation\": turns the conversation into candidate memories for you to pick",
+  "对话洞察捕获": "Conversation insight capture",
+  "切换会话时把上一场里值得留的决策、方案提炼成灵光卡片；120 秒内不重复":
+    "When you leave a conversation, distil the decisions and solutions worth keeping into spark cards; at most once per 120 s",
+  "代码理解文档": "Codebase understanding docs",
+  "扫描项目后生成「导览·百科」与「规则手册」两份文档，一次两趟请求，是全表里最贵的一项":
+    "Scans the project then writes a guided tour and a rulebook — two requests per run, the priciest item on this list",
+  "读 git diff 做四维度结构化审查；取 diff 本身不调模型，只有审查那一趟调":
+    "Structured review across four dimensions from a git diff; fetching the diff costs nothing, only the review request does",
+  "黑板 AI 整理": "Whiteboard AI tidy-up",
+  "把黑板现有卡片交给模型重排：改标题、补详情、连依赖、按语义分色":
+    "Hands the current cards to a model to rework: titles, details, dependencies and semantic colours",
+  "子代理并行": "Parallel sub-agents",
+  "主模型一次派出多个子代理并行干活的工具。关闭后该工具不再出现在工具目录里，模型看不到也就不会调":
+    "The tool that dispatches several sub-agents at once. Once off it disappears from the tool catalogue, so the model can't call it",
+  "高危命令目的说明": "High-risk command explanation",
+  "审批弹窗里那句「这条命令是干什么的」由模型生成。关掉后弹窗照常拦，只是不再发请求，只显示规则命中的原因":
+    "The \"what does this command do\" line in the approval dialog comes from the model. Off means the dialog still blocks — it just shows the rule that matched",
+  "（命令目的说明已关闭，可在设置 → AI 辅助功能打开）":
+    "(Command explanations are off — enable them in Settings → AI Assist Features)",
+  "（命令目的说明已关闭，可在桌面端设置 → AI 辅助功能打开）":
+    "(Command explanations are off — enable them in Settings → AI Assist Features on the desktop)",
+  "团队工作流执行": "Team workflow execution",
+  "黑板工作流按 DAG 逐节点调模型。这里选的模型是「节点既没绑定团队成员也没写死模型」时的默认档；绑定了的仍以绑定为准":
+    "The whiteboard workflow calls a model per DAG node. The model here is the default for nodes with neither a team member nor an explicit model bound; bindings still win",
+  "团队工作流已在「设置 → AI 辅助功能」中关闭":
+    "Team workflows are switched off in Settings → AI Assist Features",
+  "定时与事件任务": "Scheduled & event tasks",
+  "到点或命中事件时由后端自己发一次模型请求，结果存成专属会话。关掉后任务不再执行（触发记录仍保留）":
+    "The backend sends one model request when a task fires and archives the answer into its own conversation. Off stops execution (trigger history stays)",
+  "模型在每个任务里各自选": "Each task picks its own model",
+  "AI 图片生成": "AI image generation",
+  "生成图片的技能工具。关闭后不再出现在工具目录里":
+    "The image-generation skill. Once off it disappears from the tool catalogue",
+  "模型与 Key 在下方「图片生成」区块配置": "Model and key are configured in the \"Image Generation\" block below",
+  "AI 视频生成": "AI video generation",
+  "生成短视频的技能工具。关闭后不再出现在工具目录里":
+    "The short-video generation skill. Once off it disappears from the tool catalogue",
+  "模型与 Key 在下方「视频生成」区块配置": "Model and key are configured in the \"Video Generation\" block below",
 
 };

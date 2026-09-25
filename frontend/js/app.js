@@ -2,33 +2,34 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume } from "./store.js?v=20260922-006";
-import { initI18n, t } from "./services/i18n.js?v=20260922-006";
-import { iconSvgEl } from "./services/icons.js?v=20260922-006";
-import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260922-006";
-import { get, post, put } from "./services/api.js?v=20260922-006";
-import { dlgConfirm } from "./services/dialog.js?v=20260922-006";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260922-006";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260922-006";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260922-006";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260922-006";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260922-006";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260922-006";
-import { initTeamPanel } from "./components/team.js?v=20260922-006";
-import { initProjectBar } from "./components/project_bar.js?v=20260922-006";
-import { initSessionSummary } from "./components/session_summary.js?v=20260922-006";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260922-006";
-import { initTypingGame } from "./components/typing_game.js?v=20260922-006";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260922-006";
-import { initMemoryPanel } from "./components/memory.js?v=20260922-006";
-import { initExpertsPanel } from "./components/experts.js?v=20260922-006";
-import { initSchedule } from "./components/schedule.js?v=20260922-006";
-import { initRiskGuard } from "./services/riskguard.js?v=20260922-006";
-import { initUnderstandPanel } from "./components/understand.js?v=20260922-006";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260922-006";
-import { setProject, setProjectFileTree } from "./store.js?v=20260922-006";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260922-006";
-import { installErrorSink } from "./services/error_sink.js?v=20260922-006";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns } from "./store.js?v=20260925-001";
+import { initI18n, t } from "./services/i18n.js?v=20260925-001";
+import { iconSvgEl } from "./services/icons.js?v=20260925-001";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260925-001";
+import { get, post, put } from "./services/api.js?v=20260925-001";
+import { dlgConfirm } from "./services/dialog.js?v=20260925-001";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260925-001";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260925-001";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260925-001";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260925-001";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260925-001";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260925-001";
+import { initTeamPanel } from "./components/team.js?v=20260925-001";
+import { initProjectBar } from "./components/project_bar.js?v=20260925-001";
+import { initSessionSummary } from "./components/session_summary.js?v=20260925-001";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260925-001";
+import { initTypingGame } from "./components/typing_game.js?v=20260925-001";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260925-001";
+import { initMemoryPanel } from "./components/memory.js?v=20260925-001";
+import { initExpertsPanel } from "./components/experts.js?v=20260925-001";
+import { initSchedule } from "./components/schedule.js?v=20260925-001";
+import { initRiskGuard } from "./services/riskguard.js?v=20260925-001";
+import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20260925-001";
+import { initUnderstandPanel } from "./components/understand.js?v=20260925-001";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260925-001";
+import { setProject, setProjectFileTree } from "./store.js?v=20260925-001";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260925-001";
+import { installErrorSink } from "./services/error_sink.js?v=20260925-001";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -564,12 +565,14 @@ function openSettings(options = {}) {
   document.getElementById("setting-notif-sound").checked = state.notifications?.soundEnabled !== false;
   document.getElementById("setting-notif-system").checked = state.notifications?.systemNotifEnabled === true;
   document.getElementById("setting-bg-auto-resume").checked = state.bgAutoResume !== false;
+  renderParallelSettings();
   updateNotifPermissionHint();
   renderPermissionModeSettings();
   document.getElementById("setting-ui-mode").checked = state.uiMode === "codex";
   renderWebSearchSettings();
   renderImageGenSettings();
   renderVideoGenSettings();
+  renderAiFeatureSettings();
   renderConstitutionSettings();
   renderCustomModelManagement();
   renderKeyManagement();
@@ -1078,10 +1081,42 @@ async function renderUsageSummary() {
       box.appendChild(list);
     }
 
+    // 按项目分摊：多项目在册之后"这个月花在哪了"是个按项目问的问题。
+    // 口径和侧栏分组一致——没记 id 的老会话只有在名字唯一时才归到那个项目，
+    // 归不进去的原样落在"未分类"，不猜。
+    const byProject = d.by_project || [];
+    if (byProject.length) {
+      const list = document.createElement("div");
+      list.className = "usage-summary-top usage-summary-project";
+      const head = document.createElement("div");
+      head.className = "usage-summary-top-head";
+      head.textContent = t("按项目");
+      list.appendChild(head);
+      for (const item of byProject) {
+        const row = document.createElement("div");
+        row.className = "usage-summary-top-row";
+        row.dataset.projectId = String(item.project_id || "");
+        const title = document.createElement("span");
+        title.className = "usage-summary-top-title";
+        title.textContent = item.project || t("未分类");
+        const tok = document.createElement("span");
+        tok.className = "usage-summary-top-tokens";
+        tok.textContent = t("{tokens} tokens · {n} 条会话", { tokens: fmtTokens(item.total_tokens), n: item.conversations || 0 });
+        row.append(title, tok);
+        list.appendChild(row);
+      }
+      box.appendChild(list);
+    }
+
     // tokens_recorded_from = 第一条真实按天记账的日期；它之前的热力图 token 是估算值，
-    // 传给组件是为了在界面上如实标注，别把摊出来的数字说得像真的
+    // 传给组件是为了在界面上如实标注，别把摊出来的数字说得像真的。
+    // 注意给组件的是一个自己的宿主：renderActivityHeatmap 进来先 host.innerHTML=""，
+    // 直接把 #usage-summary 递给它，会把上面的总量卡片和两份清单一起抹掉。
     if (Array.isArray(d.daily)) {
-      renderActivityHeatmap(box, d.daily, { recordedFrom: d.tokens_recorded_from || null });
+      const heatHost = document.createElement("div");
+      heatHost.className = "usage-summary-heat";
+      box.appendChild(heatHost);
+      renderActivityHeatmap(heatHost, d.daily, { recordedFrom: d.tokens_recorded_from || null });
     }
   } catch (e) {
     box.innerHTML = "";
@@ -1119,6 +1154,25 @@ function initAutoReviewPersistence() {
   document.getElementById("setting-bg-auto-resume")?.addEventListener("change", (e) => {
     setBgAutoResume(e.target.checked);
   });
+  document.getElementById("setting-background-runs")?.addEventListener("change", (e) => {
+    setBackgroundRuns(e.target.checked);
+  });
+  document.getElementById("setting-max-parallel-runs")?.addEventListener("change", (e) => {
+    setMaxParallelRuns(e.target.value);
+  });
+  document.getElementById("setting-max-runs-per-project")?.addEventListener("change", (e) => {
+    setMaxConcurrentRunsPerProject(e.target.value);
+  });
+}
+
+// 三个控件回显同一份偏好：设置页每次打开都重画，别留着上一次的值骗人
+function renderParallelSettings() {
+  const bg = document.getElementById("setting-background-runs");
+  if (bg) bg.checked = state.backgroundRuns !== false;
+  const mp = document.getElementById("setting-max-parallel-runs");
+  if (mp) mp.value = String(state.maxParallelRuns ?? 2);
+  const mr = document.getElementById("setting-max-runs-per-project");
+  if (mr) mr.value = String(state.maxConcurrentRunsPerProject ?? 1);
 }
 
 // 通知设置：变更后立即持久化
@@ -1143,7 +1197,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260922-006").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260925-001").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1485,7 +1539,14 @@ const cxHistoryCollapsed = new Set();
 let cxActiveConvId = "";
 
 function cxTaskCtx() {
-  return { flags: state.taskFlags, activeConvId: cxActiveConvId };
+  // registry 进来是为了让分组按 project_id 认，不再被"两个同名项目"骗成一堆
+  // runningConvIds 直接读 store 那份快照：两壳同一份真源，各自数一遍迟早数出两个答案
+  return {
+    flags: state.taskFlags,
+    activeConvId: cxActiveConvId,
+    runningConvIds: new Set((state.runs || []).map(r => r.conv_id).filter(Boolean)),
+    registry: state.projects,
+  };
 }
 
 async function refreshCodexHistory() {
@@ -1517,8 +1578,8 @@ function renderCodexHistory() {
   }
   const ctx = cxTaskCtx();
   // 分组顺序、组内条目次序都交给 task_list：换排序时两处列表才不会各排各的
-  for (const [name, convs] of groupConversationsByProject(cxConvsCache, state.taskListSort, ctx)) {
-    box.appendChild(buildCodexHistGroup(name, convs, ctx));
+  for (const [name, convs, meta] of groupConversationsByProject(cxConvsCache, state.taskListSort, ctx)) {
+    box.appendChild(buildCodexHistGroup(name, convs, ctx, meta));
     if (cxHistoryCollapsed.has(name)) continue;
     const list = document.createElement("div");
     list.className = "codex-hist-list";
@@ -1528,7 +1589,10 @@ function renderCodexHistory() {
   cxHistReveal(box);
 }
 
-function buildCodexHistGroup(name, convs, ctx) {
+function buildCodexHistGroup(name, convs, ctx, meta = {}) {
+  const row = document.createElement("div");
+  row.className = "codex-hist-group-row";
+
   const head = document.createElement("button");
   head.type = "button";
   head.className = "codex-hist-group";
@@ -1562,7 +1626,48 @@ function buildCodexHistGroup(name, convs, ctx) {
     else cxHistoryCollapsed.add(name);
     renderCodexHistory();
   });
-  return head;
+  row.appendChild(head);
+
+  // 组头操作：这一组对应一个在册项目时才给（"未分类"与按名称回落的那组没有 id 可操作）
+  const projectId = String(meta?.projectId || "");
+  if (projectId) {
+    const entry = state.projects.find(p => p?.id === projectId);
+    const acts = document.createElement("span");
+    acts.className = "codex-hist-group-acts";
+
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "codex-hist-group-act";
+    open.appendChild(iconSvgEl("folder"));
+    open.title = t("切到该项目");
+    open.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const { switchToProject } = await import("./services/project_scene.js?v=20260925-001");
+      const out = await switchToProject(projectId);
+      if (!out.ok) toast(out.reason || t("切换失败"));
+      await refreshCodexHistory();
+    });
+    acts.appendChild(open);
+
+    const pin = document.createElement("button");
+    pin.type = "button";
+    pin.className = "codex-hist-group-act";
+    pin.appendChild(iconSvgEl("star"));
+    pin.title = entry?.pinned ? t("取消固定") : t("固定项目");
+    pin.setAttribute("aria-pressed", entry?.pinned ? "true" : "false");
+    pin.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const { patchRegistry } = await import("./services/project.js?v=20260925-001");
+      const { refreshRegistry } = await import("./services/project_scene.js?v=20260925-001");
+      await patchRegistry(projectId, { pinned: !(entry?.pinned) });
+      await refreshRegistry();
+      renderCodexHistory();
+    });
+    acts.appendChild(pin);
+
+    row.appendChild(acts);
+  }
+  return row;
 }
 
 function buildCodexHistItem(conv, ctx) {
@@ -1758,7 +1863,7 @@ async function saveSettings() {
     if (constData) {
       if (state.project) {
         // 打开着项目就写进项目（.slate/config.json，跟着仓库走），全局那份保持不动
-        const { updateProjectConfig } = await import("./services/project.js?v=20260922-006");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260925-001");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -1984,6 +2089,7 @@ async function init() {
   initPermissionModePersistence();
   initWebSearchPersistence();
   initGenSettingsPersistence();
+  safeInit("AI 辅助功能设置", initAiFeatureSettings);
   initUiMode();
   safeInit("API 测试", initApiTest);
   safeInit("打字小游戏", initTypingGame);
@@ -2000,23 +2106,32 @@ async function init() {
 
   await loadModels();
 
-  // 自动恢复上次打开的项目（失败不中断启动）
-  if (state._lastProjectPath) {
-    try {
-      const res = await getCurrentProject();
-      if (res.code === 0 && res.data) {
-        setProject(res.data);
-      } else {
-        const { openProject } = await import("./services/project.js?v=20260922-006");
-        const openRes = await openProject(state._lastProjectPath);
-        if (openRes.code === 0) setProject(openRes.data);
-      }
-      // 确保文件树加载
+  // 恢复上次的视野（失败不中断启动）。
+  // 顺序换了：先问服务端"你在看哪个项目"——注册表落在 projects.json 之后，服务端重启
+  // 也能自己把 active 认回来，不再依赖浏览器里那份 lastProjectPath。
+  // lastProjectPath 退成第二道：老数据第一次升级到带注册表的版本时，册子是空的，
+  // 拿它补登一次，用户不会感到"项目不见了"。
+  try {
+    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20260925-001");
+    const res = await getCurrentProject();
+    let project = res.code === 0 ? res.data : null;
+    if (!project && state._lastProjectPath) {
+      const { openProject } = await import("./services/project.js?v=20260925-001");
+      const openRes = await openProject(state._lastProjectPath);
+      if (openRes.code === 0) project = openRes.data;
+    }
+    if (project) {
+      setProject(project);
+      await refreshRegistry();
+      await restoreScene(project);
+      // 确保文件树加载（还原现场可能已经切过会话，这里只补目录视图）
       const browseRes = await browseFiles("");
       if (browseRes.code === 0) setProjectFileTree(browseRes.data);
-    } catch (e) {
-      console.warn("[SLATE] 恢复项目失败:", e);
+    } else {
+      await refreshRegistry();
     }
+  } catch (e) {
+    console.warn("[SLATE] 恢复项目失败:", e);
   }
 
   // 启动时自动检查更新（不阻塞初始化，失败静默）

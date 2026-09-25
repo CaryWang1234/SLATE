@@ -102,21 +102,26 @@ def execute(
     case_sensitive: bool = False,
     glob: str = "",
     limit: int = DEFAULT_LIMIT,
+    project: str = "",
     **_kw: Any,
 ) -> dict[str, Any]:
-    """全局代码搜索：默认搜索当前项目根，scope 可缩小到项目内子目录。"""
+    """全局代码搜索：默认搜索当前项目根，scope 可缩小到项目内子目录。
+
+    project 可以指定别的项目（id/路径/唯一名称）：多项目并行时，后台那一轮
+    不能靠"用户此刻在看哪个目录"来定位代码，否则它会搜到前台项目的文件上。
+    """
     # 延迟导入避免循环依赖（projects.py 仅依赖 backend.skills.text_io，不依赖本模块）
-    from backend.routers.projects import IGNORE_DIRS, TEXT_EXTS, TEXT_NAMES, _current_project
+    from backend.routers.projects import IGNORE_DIRS, TEXT_EXTS, TEXT_NAMES, _resolve_project
 
     q = (query or "").strip()
     if not q:
         return {"error": "缺少搜索关键词 query"}
 
-    project = _current_project
-    if not project or not project.get("path"):
+    project_info = _resolve_project(project)
+    if not project_info or not project_info.get("path"):
         return {"error": "未打开项目，无法确定搜索范围"}
 
-    root = Path(project["path"]).resolve()
+    root = Path(project_info["path"]).resolve()
     root_dir, err = _resolve_scope(root, scope)
     if err:
         return {"error": err}

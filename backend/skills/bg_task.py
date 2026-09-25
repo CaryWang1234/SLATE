@@ -12,6 +12,10 @@ start 立刻返回 task_id，进程由本模块自己管着，输出进环形缓
    跟用户说清楚"关掉 SLATE 任务就没了"，比假装能持久化要诚实；
 ③ 一次性语义与 `terminal` 完全一致（Windows 走同一个 PowerShell 包装脚本），
    唯一区别是"不等它结束"。因此后台任务**不接受交互式输入**，裸 python/node 这类 REPL 在这里没有意义。
+④ 每个任务都记得自己"属于哪个项目、哪场会话"：多项目在册之后，A 的任务在 B 的视野里
+   也看得见、也停得了，但它的结束事件必须回到 A 的那场会话去——把 A 的结局念给 B 听，
+   模型就会拿着一份不相干的输出继续干 B 的活。归属优先按调用方给的 project 认，
+   没给（别的入口起的）就按工作目录落在谁的目录树下反查。
 """
 
 from __future__ import annotations
@@ -41,6 +45,7 @@ from backend.skills.terminal import (
     powershell_wrapper_script,
 )
 from backend.subprocess_utils import hidden_subprocess_kwargs
+from backend import project_registry as registry
 
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
 LOG_DIR = DATA_DIR / "bg_tasks"
@@ -88,13 +93,17 @@ def _kill_task_group(proc: subprocess.Popen) -> None:
 class BgTask:
     """一个后台进程 + 它的输出缓冲、日志与触发事件。"""
 
-    def __init__(self, command: str, work_dir: str, label: str, trigger: dict[str, Any], notify: bool) -> None:
+    def __init__(self, command: str, work_dir: str, label: str, trigger: dict[str, Any], notify: bool,
+                 project_id: str = "", conversation_id: str = "") -> None:
         self.id = "bt_" + uuid.uuid4().hex[:8]
         self.command = command
         self.work_dir = work_dir
         self.label = label or command[:60]
         self.trigger = trigger
         self.notify = bool(notify)
+        # 出处：谁的地盘 + 哪场会话起的。空串表示"认不出来"，前端就不往任何会话里念
+        self.project_id = str(project_id or "")
+        self.conversation_id = str(conversation_id or "")
         self.created_at = time.time()
         self.started_at = self.created_at
         self.ended_at: float | None = None
@@ -305,6 +314,9 @@ class BgTask:
                 "exit_code": self.exit_code,
                 "text": text,
                 "at": time.time(),
+                # 出处随事件走：前端据此决定"念给哪场会话"，而不是顺手念给当前会话
+                "project_id": self.project_id,
+                "conversation_id": self.conversation_id,
                 "tail": self._tail_locked(1500),
             })
 
@@ -361,6 +373,8 @@ class BgTask:
                 "trigger": self.trigger or {},
                 "timed_out": self.timed_out,
                 "pending_event": bool(self._events),
+                "project_id": self.project_id,
+                "conversation_id": self.conversation_id,
                 "log_path": str(LOG_DIR / f"{self.id}.log"),
             }
             if peek:
@@ -419,20 +433,50 @@ def _running_count() -> int:
     return sum(1 for t in _tasks.values() if t.alive())
 
 
+def _owner_project_id(project: Any) -> str:
+    """把调用方给的 project（id / 路径 / 唯一名称）认成注册表里的 id。"""
+    text = str(project or "").strip()
+    if not text:
+        return ""
+    entry = registry.find_entry(registry.load_registry(), text)
+    return str((entry or {}).get("id") or "")
+
+
+def _provenance(project: Any, work_dir: str) -> str:
+    """任务归属：先认调用方给的项目，认不出再按工作目录落在谁的目录树下反查。
+
+    两步都要：调用方（前端）知道"现在看着哪个项目"，但 curl / 移动端 / 工作区外的
+    命令未必带得上；而 work_dir 一直都在，只是它可能压根不在任何在册项目里。
+    """
+    given = _owner_project_id(project)
+    if given:
+        return given
+    return registry.project_id_for_path(registry.load_registry(), work_dir)
+
+
 def get_task(task_id: str) -> BgTask | None:
     return _tasks.get(str(task_id or "").strip())
 
 
-def list_tasks(peek: bool = False) -> list[dict[str, Any]]:
+def list_tasks(peek: bool = False, project_id: str | None = None) -> list[dict[str, Any]]:
     _prune()
     items = sorted(_tasks.values(), key=lambda t: (not t.alive(), -t.started_at))
+    if project_id is not None:
+        # 传空串=只看"认不出归属"的那一批（老任务/工作区外的命令）；None=不过滤
+        items = [t for t in items if t.project_id == str(project_id)]
     return [t.snapshot(peek=peek) for t in items]
 
 
-def pending_events() -> list[dict[str, Any]]:
-    """未被确认的事件（至少一次投递：前端送达/入队后再 ack）。"""
+def pending_events(project_id: str | None = None) -> list[dict[str, Any]]:
+    """未被确认的事件（至少一次投递：前端送达/入队后再 ack）。
+
+    project_id 过滤给"只看当前视野"的调用方；任务中心要跨项目，默认不过滤。
+    """
     out = []
+    wanted = None if project_id is None else str(project_id)
     for task in _tasks.values():
+        if wanted is not None and task.project_id != wanted:
+            continue
         with task._lock:
             out.extend(dict(e) for e in task._events)
     out.sort(key=lambda e: e.get("at") or 0)
@@ -503,6 +547,8 @@ def _execute(
     since_offset: int | None = None,
     grep: str = "",
     approved: bool = False,
+    project: str = "",
+    conversation_id: str = "",
     ctx: Any = None,
     **_: Any,
 ) -> dict[str, Any]:
@@ -519,6 +565,8 @@ def _execute(
         timeout: 秒；>0 时到点终止任务（默认不限）
         tail_lines / since_offset / grep: log 的取用方式
         approved: 高危命令是否已获用户批准
+        project: 这个任务属于哪个在册项目（id / 路径 / 唯一名称都行）；不传就按 work_dir 反查
+        conversation_id: 起它的那场会话（结束事件回哪儿由它决定）
         ctx: 流式上下文（只有 start 用它推开头一小段）
     """
     action = (action or "start").strip().lower()
@@ -531,7 +579,14 @@ def _execute(
             info = target.snapshot(peek=True)
             info.update(target.read(since_offset=since_offset))
             return {"task": info, "hint": _HINT}
-        return {"tasks": list_tasks(peek=True), "count": len(_tasks), "hint": _HINT}
+        wanted: str | None = None
+        if str(project or "").strip():
+            wanted = _owner_project_id(project)
+            if not wanted:
+                # 认不出来就说认不出来：静默回一堆别的项目的任务，比报错更难查
+                return {"error": f"项目不在册，无法按项目过滤: {project}"}
+        tasks = list_tasks(peek=True, project_id=wanted)
+        return {"tasks": tasks, "count": len(tasks), "hint": _HINT}
 
     if action == "log":
         target = get_task(task_id)
@@ -581,7 +636,8 @@ def _execute(
     if _running_count() >= MAX_RUNNING:
         return {"error": f"同时运行的后台任务已达上限 {MAX_RUNNING}，先 stop 掉不用的再开"}
 
-    task = BgTask(command, str(cwd), label, dict(trigger or {}), notify)
+    task = BgTask(command, str(cwd), label, dict(trigger or {}), notify,
+                  project_id=_provenance(project, str(cwd)), conversation_id=str(conversation_id or ""))
     trigger_err = task.trigger_error()
     if trigger_err:
         return {"error": trigger_err}

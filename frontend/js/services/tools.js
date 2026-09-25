@@ -12,17 +12,37 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution } from "../store.js?v=20260922-006";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260922-006";
-import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260922-006";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260922-006";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260922-006";
-import { t } from "./i18n.js?v=20260922-006";
-import { makeId } from "./utils.js?v=20260922-006";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260922-006";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20260922-006";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution } from "../store.js?v=20260925-001";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-001";
+import { isHighRiskCommand, guardSkillParams } from "./riskguard.js?v=20260925-001";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-001";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260925-001";
+import { t } from "./i18n.js?v=20260925-001";
+import { makeId } from "./utils.js?v=20260925-001";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260925-001";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20260925-001";
+import { isAiToolOff } from "./ai_features.js?v=20260925-001";
+import { projectScopeOf } from "./project_scope.js?v=20260925-001";
 
-function normalizeProjectRelativePath(rawPath) {
+// 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
+// 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
+// 用户在 A 项目里点一下鼠标，B 项目的任务就把文件写进了 A 的目录。
+function callProject(ctx = {}) {
+  const given = ctx?.project;
+  if (given?.path) return given;
+  return ctx?.project_id ? (projectScopeOf(ctx.project_id) || state.project) : state.project;
+}
+
+// 传给 /projects/* 的归属参数：视野内那一项不传（保持旧请求体一字不变），
+// 只有确实是"别的项目"才带上 id，由后端按 id 现读现场。
+function projectParam(ctx = {}) {
+  const proj = callProject(ctx);
+  const activeId = String(state.project?.project_id || "");
+  if (!proj?.project_id || String(proj.project_id) === activeId) return "";
+  return String(proj.project_id);
+}
+
+function normalizeProjectRelativePath(rawPath, project = state.project) {
   const raw = String(rawPath || "").trim().replace(/\\/g, "/");
   if (!raw) return { error: "Missing file_path" };
   if (/^[A-Za-z]:\//.test(raw) || raw.startsWith("//")) {
@@ -32,7 +52,7 @@ function normalizeProjectRelativePath(rawPath) {
   if (!parts.length) return { error: "file_path must point to a file" };
   if (parts.includes("..")) return { error: "file_path cannot contain .." };
   const relative = parts.join("/");
-  const projectRoot = String(state.project?.path || "").replace(/\\/g, "/").replace(/\/+$/, "");
+  const projectRoot = String(project?.path || "").replace(/\\/g, "/").replace(/\/+$/, "");
   return {
     relative,
     abs: `${projectRoot}/${relative}`,
@@ -120,8 +140,8 @@ const TOOLS = {
     name: "查看项目",
     description: "查看当前打开的项目信息（路径、配置、宪法）",
     params: {},
-    async execute() {
-      const p = state.project;
+    async execute(params, callCtx = {}) {
+      const p = callProject(callCtx);
       if (!p) return "当前未打开任何项目";
       const lines = [`项目: ${p.name}`, `路径: ${p.path}`];
       if (p.constitution?.rules?.length) {
@@ -138,9 +158,10 @@ const TOOLS = {
     params: {
       path: { type: "string", description: "相对路径（空=根目录）" },
     },
-    async execute({ path }) {
-      if (!state.project) return "未打开项目";
-      const res = await post("/projects/browse", { path: path || "" });
+    async execute({ path }, callCtx = {}) {
+      const p = callProject(callCtx);
+      if (!p) return "未打开项目";
+      const res = await post("/projects/browse", { path: path || "", project: projectParam(callCtx) });
       if (res.code !== 0) return res.message || "浏览失败";
       const d = res.data;
       if (d.type === "file") return `[${d.name}] (${d.size} bytes)\n${d.content?.slice(0, 5000) || ""}`;
@@ -155,9 +176,9 @@ const TOOLS = {
     params: {
       path: { type: "string", description: "文件相对路径", required: true },
     },
-    async execute({ path }) {
-      if (!state.project) return "未打开项目";
-      const res = await post("/projects/browse", { path });
+    async execute({ path }, callCtx = {}) {
+      if (!callProject(callCtx)) return "未打开项目";
+      const res = await post("/projects/browse", { path, project: projectParam(callCtx) });
       if (res.code !== 0) return res.message || "读取失败";
       if (res.data.type !== "file") return "路径不是文件";
       return res.data.content?.slice(0, 10000) || "(空文件)";
@@ -170,10 +191,10 @@ const TOOLS = {
     params: {
       query: { type: "string", description: "文件名或路径片段", required: true },
     },
-    async execute({ query }) {
-      if (!state.project) return "未打开项目";
+    async execute({ query }, callCtx = {}) {
+      if (!callProject(callCtx)) return "未打开项目";
       if (!query) return "缺少 query";
-      const res = await post("/projects/find", { query, limit: 30 });
+      const res = await post("/projects/find", { query, limit: 30, project: projectParam(callCtx) });
       if (res.code !== 0) return res.message || "查找失败";
       const matches = res.data?.matches || [];
       if (!matches.length) return `未找到 ${query}`;
@@ -191,9 +212,9 @@ const TOOLS = {
       glob: { type: "string", description: "文件名过滤，如 *.py / **/*.ts" },
       limit: { type: "integer", description: "结果上限（默认 50）" },
     },
-    async execute(params) {
-      if (!state.project) return "未打开项目";
-      const res = await post("/skills/execute", { skill: "code_search", params: params || {} });
+    async execute(params, callCtx = {}) {
+      if (!callProject(callCtx)) return "未打开项目";
+      const res = await post("/skills/execute", { skill: "code_search", params: { ...(params || {}), project: projectParam(callCtx) } });
       if (res.code !== 0) return res.message || "搜索失败";
       const d = res.data || {};
       if (d.error) return `搜索失败：${d.error}`;
@@ -428,17 +449,18 @@ const TOOLS = {
     async execute({ skill, params }, callCtx = {}) {
       try {
         const p = params || {};
-        // 自动注入项目目录作为默认工作目录
-        if (state.project) {
-          if (!p.directory && ["file_tree", "repo_stats", "todo_scan", "git_tool", "code_scan", "doc_scan"].includes(skill)) p.directory = state.project.path;
-          if (!p.work_dir && (skill === "terminal")) p.work_dir = state.project.path;
-          if (!p.work_dir && skill === "bg_task") p.work_dir = state.project.path;
+        // 自动注入项目目录作为默认工作目录：按**这一场的项目**取，不是按屏幕上那个
+        const proj = callProject(callCtx) || state.project;
+        if (proj) {
+          if (!p.directory && ["file_tree", "repo_stats", "todo_scan", "git_tool", "code_scan", "doc_scan"].includes(skill)) p.directory = proj.path;
+          if (!p.work_dir && (skill === "terminal")) p.work_dir = proj.path;
+          if (!p.work_dir && skill === "bg_task") p.work_dir = proj.path;
           if (!p.file_path && skill === "file_peek" && p.relative_path) {
-            const target = normalizeProjectRelativePath(p.relative_path);
+            const target = normalizeProjectRelativePath(p.relative_path, proj);
             if (target.error) return `Invalid relative_path: ${target.error}`;
             p.file_path = target.abs;
           } else if (p.file_path && ["file_peek", "file_edit", "file_create"].includes(skill)) {
-            const target = normalizeProjectRelativePath(p.file_path);
+            const target = normalizeProjectRelativePath(p.file_path, proj);
             if (target.error) return `Invalid file_path: ${target.error}`;
             p.file_path = target.abs;
           }
@@ -460,6 +482,14 @@ const TOOLS = {
           if (risk.risk && !(await guard(skill, p))) {
             return `高危命令被用户拒绝执行（${risk.reason}）：${p.command}`;
           }
+        }
+        // 后台任务的出处由前端补：模型不该负责记"我在哪个项目、哪场会话"，
+        // 而这两样决定了任务结束后那条消息念给谁——不给就只能念给"当时正好开着的那一场"。
+        if (skill === "bg_task" && (p.action || "start") === "start") {
+          // 后台任务的归属按"这一场的项目"填，不是"现在视野里那个"：并行时两者会不一致，
+          // 记错了项目，任务结束后那条消息就会念给别的对话听
+          if (!p.project && proj?.project_id) p.project = proj.project_id;
+          if (!p.conversation_id && callCtx.convId) p.conversation_id = callCtx.convId;
         }
         // 联网搜索默认配置：模型未显式指定时注入设置面板的默认引擎 / JS 渲染策略
         if (skill === "web_search" && !p.engine && state.webSearch) p.engine = state.webSearch.engine;
@@ -817,8 +847,9 @@ const TOOLS = {
       end_line: { type: "number", description: "结束行号（1-based，用于 replace_range/view/read/delete/copy/cut）" },
       encoding: { type: "string", description: "可选文件编码，如 utf-8、utf-8-sig、gb18030、gbk、utf-16；留空自动检测并保留原编码" },
     },
-    async execute({ file_path, action = "edit", edits, content = "", old_str = "", new_str = "", start_line = 0, end_line = 0, clipboard_name = "default", encoding = "", _truncated }) {
-      if (!state.project) return "未打开项目";
+    async execute({ file_path, action = "edit", edits, content = "", old_str = "", new_str = "", start_line = 0, end_line = 0, clipboard_name = "default", encoding = "", _truncated }, callCtx = {}) {
+      const proj = callProject(callCtx);
+      if (!proj) return "未打开项目";
       if (!file_path) return "缺少 file_path";
       const normalizedAction = String(action || "edit").trim().toLowerCase();
       const editList = Array.isArray(edits) ? edits : [];
@@ -843,7 +874,7 @@ const TOOLS = {
         };
       }
 
-      const target = normalizeProjectRelativePath(file_path);
+      const target = normalizeProjectRelativePath(file_path, proj);
       if (target.error) {
         return {
           _type: "file_edit",
@@ -941,7 +972,7 @@ const TOOLS = {
       // 自动确认：预览无错误时直接写入（部分编辑未命中时保留手动确认，避免半套写入）
       if (fileAutoApplyEnabled() && structured.file && structured.new_content && structured.errors.length === 0) {
         try {
-          const applyRes = await post("/projects/apply-edit", { file_path: structured.file, content: structured.new_content });
+          const applyRes = await post("/projects/apply-edit", { file_path: structured.file, content: structured.new_content, project: projectParam(callCtx) });
           if (applyRes.code === 0) structured.applied = "auto";
           else structured.errors = [t("自动应用失败：{msg}，可手动点「接受」重试", { msg: applyRes.message || t("未知错误") })];
         } catch (e) {
@@ -960,13 +991,14 @@ const TOOLS = {
       content: { type: "string", description: "文件完整内容（原样写入，不经 JSON 转义）", required: true },
     },
     rawContent: true,
-    async execute({ file_path, content, _truncated }) {
-      if (!state.project) return "未打开项目";
+    async execute({ file_path, content, _truncated }, callCtx = {}) {
+      const proj = callProject(callCtx);
+      if (!proj) return "未打开项目";
       if (!file_path) return "缺少 file_path：请按专用格式重发——◈◈◈file_create 后第一行写相对路径（如 src/utils/helper.js），第二行起原样写文件内容，不要 JSON 包裹。";
       if (content === undefined || content === null) return "缺少 content：第一行路径之后应原样输出完整文件内容（不是 JSON、不转义、不加代码围栏）。";
       const truncated = Boolean(_truncated);
 
-      const target = normalizeProjectRelativePath(file_path);
+      const target = normalizeProjectRelativePath(file_path, proj);
       if (target.error) {
         return {
           _type: "file_create",
@@ -1044,7 +1076,7 @@ const TOOLS = {
       if (fileAutoApplyEnabled() && structured.file && structured.errors.length === 0) {
 
         try {
-          const applyRes = await post("/projects/create-file", { file_path: structured.file, content: structured.content });
+          const applyRes = await post("/projects/create-file", { file_path: structured.file, content: structured.content, project: projectParam(callCtx) });
           if (applyRes.code === 0) structured.applied = "auto";
           else structured.errors = [t("自动创建失败：{msg}，可手动点「创建」重试", { msg: applyRes.message || t("未知错误") })];
         } catch (e) {
@@ -1063,13 +1095,14 @@ const TOOLS = {
       content: { type: "string", description: "要追加到文件末尾的内容（原样写入，不经 JSON 转义；从上次写入结束的精确位置接续，不要重复已有内容）", required: true },
     },
     rawContent: true,
-    async execute({ file_path, content, _truncated }) {
-      if (!state.project) return "未打开项目";
+    async execute({ file_path, content, _truncated }, callCtx = {}) {
+      const proj = callProject(callCtx);
+      if (!proj) return "未打开项目";
       if (!file_path) return "缺少 file_path：请按专用格式重发——◈◈◈file_append 后第一行写相对路径，第二行起原样写要追加的内容，不要 JSON 包裹。";
       if (content === undefined || content === null) return "缺少 content：第一行路径之后应原样输出要追加的内容（不是 JSON、不转义、不加代码围栏）。";
       const truncated = Boolean(_truncated);
 
-      const target = normalizeProjectRelativePath(file_path);
+      const target = normalizeProjectRelativePath(file_path, proj);
       if (target.error) {
         return {
           _type: "file_append",
@@ -1087,6 +1120,7 @@ const TOOLS = {
         res = await post("/projects/append-file", {
           file_path: target.abs,
           content,
+          project: projectParam(callCtx),
         });
       } catch (e) {
         return {
@@ -1721,6 +1755,10 @@ async function executeTool(name, params, callCtx = {}) {
   params = normalizeToolParams(name, params || {});
   const tool = TOOLS[name];
   if (!tool) return { success: false, output: `未知工具: ${name}` };
+  // 关掉的工具就算模型凭记忆调了也不执行：给一句明确的停用话术，别让它反复重试烧轮数
+  if (isAiToolOff(name)) {
+    return { success: false, output: `[工具 ${name}] 未执行：该功能已由用户在「设置 → AI 辅助功能」中关闭，本轮请勿再调用。` };
+  }
   const validationError = validateToolCall(name, params);
   if (validationError) {
     return { success: false, output: `[工具 ${name}] 未执行：${validationError}。请按该工具参数说明重发完整调用。` };
@@ -1792,6 +1830,9 @@ async function executeToolCalls(calls, ctx = {}) {
         ledgerCallId: ctx.callIdFor?.(i) || call.id || "",
         ledger: ctx.ledger || null,
         convId: ctx.convId || "",
+        // 归属项目：后台那一场要按它自己的项目落文件/开终端，
+        // 不能拿「屏幕上那个」当根（callProject 读的就是这一项）。
+        project: ctx.project || null,
         onEvent: ctx.onEvent ? (env => ctx.onEvent(env, call, i)) : null,
       });
     } finally {
@@ -1804,7 +1845,7 @@ async function executeToolCalls(calls, ctx = {}) {
 
 // ── 系统提示词工具段 ──────────────────────────
 
-function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
+function getToolsSystemPrompt({ minimal = false, compact = false, project = null } = {}) {
   let s = "\n\n[可用工具]\n";
   s += "你拥有工具，可以直接操作用户的工作环境。\n\n";
   s += "**Agent 调用纪律**\n";
@@ -1817,7 +1858,13 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   s += "6. 工具/技能纪律：优先用工具佐证再回答——事实性、现状性问题默认查项目文件或联网搜索；仅当回答不依赖外部事实（纯闲聊、纯观点、无需佐证的概念解释）时才直接回答。不确定技能是否存在时，先 skill_search 搜索确认，再决定是否 skill_run；搜索到的技能与任务无关时，绝不强行使用。\n";
   s += "7. 收口纪律：任务全部交付且逐项验证通过后，必须显式收口——目标模式调 exit_target_mode、Autopilot 调 exit_autopilot，然后在下一条回复里给出最终汇报。干完了就停，不要继续多读多改来\"再确认一遍\"；反过来，任务没做完时不要靠停发工具、只说\"已完成\"或反复复述计划来结束循环。\n\n";
   s += "**工具选择速查**\n";
-  for (const [scene, route] of TOOL_USE_RECIPES) s += `- ${scene}: ${route}\n`;
+  // 关掉的功能连"速查"都不提：留着配方等于把模型往一个已经摘掉的工具上引，
+  // 模型照着调只会换来一句"该功能已关闭"，白花一轮。
+  const offToolNames = Object.keys(TOOLS).filter(isAiToolOff);
+  for (const [scene, route] of TOOL_USE_RECIPES) {
+    if (offToolNames.some(name => route.includes(name))) continue;
+    s += `- ${scene}: ${route}\n`;
+  }
   for (const rule of AGENT_TOOL_DECISION_RULES) s += `- ${rule}\n`;
   s += "\n";
   s += "**调用格式**：每次调用独占一块，◈◈◈ 与 ◈◆◆ 是固定标记，不可省略；一次回复可多次调用：\n";
@@ -1831,10 +1878,13 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
 
   // 项目上下文（宪法不在这里重复：buildSystemContent 已经把生效的那份按 [项目宪法] 注入了，
   // 两处都写会在同一条系统提示里翻来覆去说同一批规则，还占上下文）
-  if (state.project) {
-    s += `[当前项目] ${state.project.name} (${state.project.path})\n`;
-    const roots = Array.isArray(state.project.roots) ? state.project.roots : [];
-    const otherRoots = roots.filter(r => r !== state.project.path);
+  // 并行时这一行要写「这一场的项目」，不是「屏幕上那个」：提示词写错项目，
+  // 模型就会让 B 项目的任务去读 A 项目的文件。
+  const proj = project || state.project;
+  if (proj) {
+    s += `[当前项目] ${proj.name} (${proj.path})\n`;
+    const roots = Array.isArray(proj.roots) ? proj.roots : [];
+    const otherRoots = roots.filter(r => r !== proj.path);
     if (otherRoots.length) {
       s += `这是一个工作区：除当前根外还含 ${otherRoots.length} 个文件夹（${otherRoots.join("、")}）。`
         + `工具默认的工作目录只是上面那个当前根，碰其他文件夹要传它们的绝对路径。\n`;
@@ -1842,14 +1892,17 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
     s += "\n";
   }
 
-  const toolEntries = compact || minimal
+  const toolEntries = (compact || minimal
     ? CORE_AGENT_TOOLS.filter(key => TOOLS[key]).map(key => [key, TOOLS[key]])
-    : Object.entries(TOOLS);
+    : Object.entries(TOOLS)
+  // 「AI 辅助功能」关掉的那几项（子代理 / 图片 / 视频）连目录里都不出现：
+  // 模型看不到的工具才不会去调，比调完被拒少烧一轮。
+  ).filter(([key]) => !isAiToolOff(key));
 
   s += compact || minimal ? "**核心 Agent 工具**\n" : "**工具目录**\n";
   for (const [key, tool] of toolEntries) {
     const desc = key === "skill_run"
-      ? `调用内置工具/远程 MCP/自定义技能。不确定技能名时先调用 skill_search 搜索。常用内置工具：${SKILL_RUN_QUICK_LIST.join(", ")}。复杂参数按工具名传入 params。`
+      ? `调用内置工具/远程 MCP/自定义技能。不确定技能名时先调用 skill_search 搜索。常用内置工具：${SKILL_RUN_QUICK_LIST.filter(n => !isAiToolOff(n)).join(", ")}。复杂参数按工具名传入 params。`
       : compactDescription(tool.description);
     s += `### ${key} ${desc}\n`;
     if (tool.rawContent) {
@@ -1871,7 +1924,7 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
   }
 
   if (compact || minimal) {
-    const extraNames = Object.keys(TOOLS).filter(key => !CORE_AGENT_TOOLS.includes(key));
+    const extraNames = Object.keys(TOOLS).filter(key => !CORE_AGENT_TOOLS.includes(key) && !isAiToolOff(key));
     if (extraNames.length) {
       s += `其他可用工具名：${extraNames.join(", ")}。不确定参数时优先使用 skill_run 调用内置技能或先读取相关上下文。\n\n`;
     }
@@ -1979,6 +2032,8 @@ function getToolsSystemPrompt({ minimal = false, compact = false } = {}) {
 function buildOpenAITools() {
   const tools = [];
   for (const [key, tool] of Object.entries(TOOLS)) {
+    // 关掉的功能连原生 schema 都不出，否则模型看得到就照样会调
+    if (isAiToolOff(key)) continue;
     const properties = {};
     const required = [];
     for (const [pkey, pval] of Object.entries(tool.params || {})) {

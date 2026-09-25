@@ -9,13 +9,14 @@ import {
   setPromptSnippets, addPromptSnippet, removePromptSnippet,
   getModelKey,
   savePersistent,
-} from "../store.js?v=20260922-006";
-import { get, post, del, patch, streamChat } from "../services/api.js?v=20260922-006";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260922-006";
-import { t } from "../services/i18n.js?v=20260922-006";
-import { iconSvgEl } from "../services/icons.js?v=20260922-006";
-import { makeId } from "../services/utils.js?v=20260922-006";
-import { initVaultPanel, openVaultPanel } from "./vault.js?v=20260922-006";
+} from "../store.js?v=20260925-001";
+import { get, post, del, patch, streamChat } from "../services/api.js?v=20260925-001";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260925-001";
+import { t } from "../services/i18n.js?v=20260925-001";
+import { aiModelFor, aiFeatureBlocked, isAiFeatureOn } from "../services/ai_features.js?v=20260925-001";
+import { iconSvgEl } from "../services/icons.js?v=20260925-001";
+import { makeId } from "../services/utils.js?v=20260925-001";
+import { initVaultPanel, openVaultPanel } from "./vault.js?v=20260925-001";
 
 let memoryModal, snippetModal;
 let memoryList, snippetList, knowledgeList, knowledgeSearchInput;
@@ -235,7 +236,7 @@ function renderMemoryList() {
       const newText = await dlgPrompt("编辑记忆内容：", { title: "编辑记忆", value: mem.content, textarea: true });
       if (newText !== null && newText.trim()) {
         try { await saveMemoryUpdate(mem.id, { content: newText }); }
-        catch (e) { import("../app.js?v=20260922-006").then(({ toast }) => toast(t("保存失败: {msg}", { msg: e.message }))); }
+        catch (e) { import("../app.js?v=20260925-001").then(({ toast }) => toast(t("保存失败: {msg}", { msg: e.message }))); }
       }
     });
     item.appendChild(content);
@@ -252,7 +253,7 @@ function renderMemoryList() {
       const newCat = await dlgPrompt("编辑分类：", { title: "编辑分类", options, value: mem.category });
       if (newCat !== null && newCat.trim()) {
         try { await saveMemoryUpdate(mem.id, { category: newCat }); }
-        catch (e) { import("../app.js?v=20260922-006").then(({ toast }) => toast(t("保存失败: {msg}", { msg: e.message }))); }
+        catch (e) { import("../app.js?v=20260925-001").then(({ toast }) => toast(t("保存失败: {msg}", { msg: e.message }))); }
       }
     });
     actions.appendChild(editBtn);
@@ -274,13 +275,14 @@ function renderMemoryList() {
 // ── 从对话提取记忆 ──────────────────────────────────────────────────────────
 
 async function extractMemoriesFromConversation() {
+  if (aiFeatureBlocked("memory_extract")) return;
   if (state.messages.length < 2) {
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast("对话内容太少，无法提取记忆");
     return;
   }
 
-  const { toast } = await import("../app.js?v=20260922-006");
+  const { toast } = await import("../app.js?v=20260925-001");
   toast("正在分析对话内容…");
 
   // 构建对话文本
@@ -302,18 +304,20 @@ async function extractMemoriesFromConversation() {
       return;
     }
 
-    const modelId = state.currentModel?.id || "gpt-5.6-terra";
-    const apiKey = getModelKey(modelId);
-    const baseUrl = state.currentModel?.base_url || undefined;
+    const target = aiModelFor("memory_extract", state.currentModel);
+    if (!target.usable) {
+      toast(t("请先选择模型并配置 API Key"));
+      return;
+    }
 
     // 调用 LLM 提取
     let result = "";
     for await (const chunk of streamChat({
-      model: modelId,
-      provider: state.currentModel?.provider,
+      model: target.id,
+      provider: target.provider,
       messages: [{ role: "user", content: res.data.prompt }],
-      api_key: apiKey,
-      base_url: baseUrl,
+      api_key: target.key,
+      base_url: target.base_url,
       temperature: 0.3,
       max_tokens: 1024,
       stream: true,
@@ -445,15 +449,16 @@ async function indexMemoryInKnowledge(memory) {
 }
 
 async function autoRefineMemoryAndProfile({ silent = true } = {}) {
+  // 这一档是每轮末尾自己跑的，默认静默跳过；只有用户主动点按钮（silent:false）才说一声
+  if (silent ? !isAiFeatureOn("memory_distill") : aiFeatureBlocked("memory_distill")) return { ...MEMORY_RESULT_EMPTY };
   if (autoRefineRunning) return { ...MEMORY_RESULT_EMPTY };
   if (Date.now() - lastAutoRefineAt < 45000) return { ...MEMORY_RESULT_EMPTY };
   const visibleMessages = state.messages.filter(m => !m.hidden && (m.role === "user" || m.role === "assistant"));
   if (visibleMessages.length < 4) return { ...MEMORY_RESULT_EMPTY };
 
-  const modelId = state.currentModel?.id;
-  if (!modelId) return { ...MEMORY_RESULT_EMPTY };
-  const apiKey = getModelKey(modelId);
-  if (!apiKey && modelId !== "local") return { ...MEMORY_RESULT_EMPTY };
+  const target = aiModelFor("memory_distill", state.currentModel);
+  if (!target.usable) return { ...MEMORY_RESULT_EMPTY };
+  const modelId = target.id;
 
   const recent = visibleMessages.slice(-8)
     .map(m => `[${m.role === "user" ? "用户" : "助手"}]: ${String(m.content || "").slice(0, 1600)}`)
@@ -462,14 +467,13 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
   autoRefineRunning = true;
   lastAutoRefineAt = Date.now();
   try {
-    const baseUrl = state.currentModel?.base_url || undefined;
     let result = "";
     for await (const chunk of streamChat({
       model: modelId,
-      provider: state.currentModel?.provider,
+      provider: target.provider,
       messages: [{ role: "user", content: buildMemoryProfilePrompt(recent) }],
-      api_key: apiKey,
-      base_url: baseUrl,
+      api_key: target.key,
+      base_url: target.base_url,
       temperature: 0.2,
       max_tokens: 1200,
       stream: true,
@@ -513,7 +517,7 @@ async function autoRefineMemoryAndProfile({ silent = true } = {}) {
     const profileUpdated = Object.keys(patch).length > 0;
     if (profileUpdated) setUserProfile(patch);
     if (!silent && (added || overwritten || deleted || profileUpdated)) {
-      const { toast } = await import("../app.js?v=20260922-006");
+      const { toast } = await import("../app.js?v=20260925-001");
       let msg = "";
       if (added) msg += t("新增 {n} 条", { n: added });
       if (overwritten) msg += (msg ? "，" : "") + t("覆盖 {n} 条", { n: overwritten });
@@ -541,10 +545,10 @@ async function showAddMemoryDialog() {
 
   try {
     const saved = await saveNewMemory({ category, content });
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast(saved ? t("记忆已添加") : t("已存在相似记忆，已跳过"));
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast(t("保存失败: {msg}", { msg: e.message }));
   }
 }
@@ -636,7 +640,7 @@ async function addKnowledgeDialog() {
       content: content.trim(),
     });
     if (res.code === 0) {
-      const { toast } = await import("../app.js?v=20260922-006");
+      const { toast } = await import("../app.js?v=20260925-001");
       toast("知识已添加");
       await loadKnowledgeDocs();
     }
@@ -795,7 +799,7 @@ function initMemoryPanel() {
   if (btnAutoRefineMemory) btnAutoRefineMemory.addEventListener("click", () => autoRefineMemoryAndProfile({ silent: false }));
   if (btnSaveProfile) btnSaveProfile.addEventListener("click", () => {
     saveProfileFromForm();
-    import("../app.js?v=20260922-006").then(({ toast }) => toast("资料已保存"));
+    import("../app.js?v=20260925-001").then(({ toast }) => toast("资料已保存"));
   });
   if (btnResetProfile) btnResetProfile.addEventListener("click", async () => {
     if (await dlgConfirm("确定要重置用户资料吗？", { danger: true, okText: "重置" })) {
@@ -883,6 +887,7 @@ ${recent}`;
 }
 
 async function captureConversationSpark() {
+  if (!isAiFeatureOn("conversation_spark")) return;
   if (sparkRunning) return;
   if (Date.now() - lastSparkAt < 120000) return;
   const visible = state.messages.filter(m =>
@@ -890,10 +895,9 @@ async function captureConversationSpark() {
   );
   if (visible.length < 6) return;
 
-  const modelId = state.currentModel?.id;
-  if (!modelId) return;
-  const apiKey = getModelKey(modelId);
-  if (!apiKey && modelId !== "local") return;
+  const target = aiModelFor("conversation_spark", state.currentModel);
+  if (!target.usable) return;
+  const modelId = target.id;
 
   sparkRunning = true;
   lastSparkAt = Date.now();
@@ -903,14 +907,13 @@ async function captureConversationSpark() {
       .map(m => `[${m.role === "user" ? "用户" : "助手"}]: ${String(m.content || "").slice(0, 1200)}`)
       .join("\n\n");
 
-    const baseUrl = state.currentModel?.base_url || undefined;
     let result = "";
     for await (const chunk of streamChat({
       model: modelId,
-      provider: state.currentModel?.provider,
+      provider: target.provider,
       messages: [{ role: "user", content: buildSparkPrompt(recent) }],
-      api_key: apiKey,
-      base_url: baseUrl,
+      api_key: target.key,
+      base_url: target.base_url,
       temperature: 0.3,
       max_tokens: 1024,
       stream: true,
@@ -944,7 +947,7 @@ async function captureConversationSpark() {
     }
 
     if (count > 0) {
-      const { toast } = await import("../app.js?v=20260922-006");
+      const { toast } = await import("../app.js?v=20260925-001");
       toast(t("已捕获 {n} 条灵光", { n: count }));
     }
   } catch (e) {

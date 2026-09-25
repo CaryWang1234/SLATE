@@ -71,11 +71,75 @@ export function projectLabel(conv) {
   return name || UNGROUPED;
 }
 
-/** 会话 → 四态之一；activeConvId 是"此刻正在生成"的会话（没有就传空） */
-export function taskStatusOf(conv, { flags = {}, activeConvId = "" } = {}) {
+/**
+ * 分组身份：优先 project_id，其次名称，都没有才算"未分类"。
+ *
+ * 为什么不能只用名称：两个不同目录的同名项目会被合成一组，历史串成一堆——
+ * 这正是这轮回 id 之后要修掉的毛病。老会话没有 id（刻意没做回填），
+ * 所以读时按名称回落，口径与后端 GET /chat/conversations?project_id= 一致。
+ */
+export function projectGroupKey(conv, registry = []) {
+  const id = typeof conv?.project_id === "string" ? conv.project_id.trim() : "";
+  if (id) return `id:${id}`;
+  const known = (Array.isArray(registry) ? registry : [])
+    .filter(e => e?.name === projectLabel(conv) && e.name !== UNGROUPED);
+  // 名字在册里唯一时按名字归并是安全的（后端 find_entry 也只在唯一时才认名字）；
+  // 一旦重名，没 id 的老会话就只能停在"按名字"这一组，不猜该归哪个。
+  if (known.length === 1 && conv?.project) return `id:${known[0].id}`;
+  const name = projectLabel(conv);
+  return name === UNGROUPED ? "none" : `name:${name}`;
+}
+
+/** 组标签：默认用项目名；两组重名时补上路径尾段，否则界面看上去就是"同一项目被拆成两堆"。 */
+function groupLabels(groups, registry, convsByKey) {
+  const list = Array.isArray(registry) ? registry : [];
+  const byId = new Map(list.filter(e => e?.id).map(e => [e.id, e]));
+  const labelOf = (key) => {
+    if (key === "none") return UNGROUPED;
+    if (key.startsWith("id:")) {
+      const entry = byId.get(key.slice(3));
+      if (entry?.name) return entry.name;
+    }
+    if (key.startsWith("name:")) return key.slice(5);
+    const first = (convsByKey.get(key) || [])[0];
+    return first?.project || UNGROUPED;
+  };
+  const counts = new Map();
+  for (const key of groups) {
+    const label = labelOf(key);
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+  const used = new Map();
+  const out = new Map();
+  for (const key of groups) {
+    let label = labelOf(key);
+    if ((counts.get(label) || 0) > 1 && key.startsWith("id:")) {
+      const entry = byId.get(key.slice(3));
+      const tail = String(entry?.path || "").replace(/[\\/]+$/, "").split(/[\\/]/).slice(-2, -1)[0];
+      if (tail) {
+        label = `${label} · ${tail}`;
+      } else {
+        const n = (used.get(label) || 0) + 1;   // 连路径尾段都一样（极端情况）就编号，绝不重名
+        used.set(label, n);
+        label = `${label} (${n})`;
+      }
+    }
+    out.set(key, label);
+  }
+  return out;
+}
+
+/**
+ * 会话 → 四态之一。
+ * activeConvId 是"此刻屏幕上正在生成"的那一场；runningConvIds 是登记表里全部在跑的
+ * 那些（并行时后台那几场也在跑，只点亮 activeConvId 会让它们看着像已经停了）。
+ * 两者都只来自实时参数，绝不进 taskFlags——进行中是"这一刻"的事实，不是结局。
+ */
+export function taskStatusOf(conv, { flags = {}, activeConvId = "", runningConvIds = null } = {}) {
   const id = conv?.id;
   if (!id) return STATUS.IDLE;
   if (activeConvId && activeConvId === id) return STATUS.RUNNING;
+  if (runningConvIds?.has(id)) return STATUS.RUNNING;
   const flag = normalizeTaskFlag(flags[id]);
   if (!flag) return STATUS.IDLE;
   const updatedS = Number(conv.updated_at) || 0;
@@ -107,12 +171,12 @@ function recencyOf(conv) {
 function compareByMode(a, b, mode, ctx) {
   switch (mode) {
     case "project": {
-      const pa = projectLabel(a), pb = projectLabel(b);
+      const pa = projectGroupKey(a, ctx?.registry), pb = projectGroupKey(b, ctx?.registry);
       if (pa !== pb) {
         // 未分类永远垫底，其余按名称：项目多的时候"没有项目"混在中间最难找
-        if (pa === UNGROUPED) return 1;
-        if (pb === UNGROUPED) return -1;
-        return pa.localeCompare(pb, "zh-Hans-CN");
+        if (pa === "none") return 1;
+        if (pb === "none") return -1;
+        return projectLabel(a).localeCompare(projectLabel(b), "zh-Hans-CN");
       }
       return 0;
     }
@@ -137,24 +201,30 @@ export function sortConversations(convs, mode, ctx = {}) {
   });
 }
 
-/** 项目分组：分组顺序跟随同一排序偏好（组序取组内最佳条目），组内条目同样按偏好排 */
+/**
+ * 项目分组：分组顺序跟随同一排序偏好（组序取组内最佳条目），组内条目同样按偏好排。
+ * 返回 `[[标签, 会话[], {projectId}], …]` —— 第三项是给组头操作用的，
+ * 老调用点解构前两项照样能用，不必一起改。
+ */
 export function groupConversationsByProject(convs, mode, ctx = {}) {
   const key = normalizeTaskListSort(mode);
+  const registry = Array.isArray(ctx?.registry) ? ctx.registry : [];
   const groups = new Map();
   for (const conv of Array.isArray(convs) ? convs : []) {
-    const name = projectLabel(conv);
-    if (!groups.has(name)) groups.set(name, []);
-    groups.get(name).push(conv);
+    const gk = projectGroupKey(conv, registry);
+    if (!groups.has(gk)) groups.set(gk, []);
+    groups.get(gk).push(conv);
   }
   for (const list of groups.values()) list.sort((a, b) => compareByMode(a, b, key, ctx) || (recencyOf(b) - recencyOf(a)));
+  const labels = groupLabels([...groups.keys()], registry, groups);
   // 按项目排时组名即主键；其余模式下组序按"组内最好的那条"跟随偏好
   const ordered = [...groups.entries()];
   if (key === "project") {
     ordered.sort((a, b) => {
       if (a[0] === b[0]) return 0;
-      if (a[0] === UNGROUPED) return 1;
-      if (b[0] === UNGROUPED) return -1;
-      return a[0].localeCompare(b[0], "zh-Hans-CN");
+      if (a[0] === "none") return 1;
+      if (b[0] === "none") return -1;
+      return labels.get(a[0]).localeCompare(labels.get(b[0]), "zh-Hans-CN");
     });
   } else {
     ordered.sort((a, b) => {
@@ -163,5 +233,8 @@ export function groupConversationsByProject(convs, mode, ctx = {}) {
       return head || recencyOf(best(b[1])) - recencyOf(best(a[1]));
     });
   }
-  return ordered;
+  return ordered.map(([gk, list]) => [labels.get(gk) || UNGROUPED, list, {
+    projectId: gk.startsWith("id:") ? gk.slice(3) : "",
+    projectName: labels.get(gk) || UNGROUPED,
+  }]);
 }

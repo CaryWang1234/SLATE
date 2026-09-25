@@ -7,20 +7,21 @@
 
 import {
   state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit, effectiveConstitution,
-} from "../store.js?v=20260922-006";
-import { fmtTokens } from "../services/usage.js?v=20260922-006";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260922-006";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260922-006";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260922-006";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260922-006";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260922-006";
-import { hasBgEvents, takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20260922-006";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260922-006";
-import { toolLabel } from "../services/tool_meta.js?v=20260922-006";
-import { renderMarkdown } from "../services/markdown.js?v=20260922-006";
-import { mToast, t } from "./m-ui.js?v=20260922-006";
-import { mHandleStructured } from "./m-auth.js?v=20260922-006";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260922-006";
+} from "../store.js?v=20260925-001";
+import { fmtTokens } from "../services/usage.js?v=20260925-001";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-001";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260925-001";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260925-001";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260925-001";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260925-001";
+import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20260925-001";
+import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260925-001";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260925-001";
+import { toolLabel } from "../services/tool_meta.js?v=20260925-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260925-001";
+import { mToast, t } from "./m-ui.js?v=20260925-001";
+import { mHandleStructured } from "./m-auth.js?v=20260925-001";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260925-001";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -364,8 +365,9 @@ const mobilePolicy = {
     }
     // 后台任务的消息到了：移动端不自己开新一场（没有空闲续跑），但在跑的循环里
     // 照样把消息交给模型——事件取走即清，一条事件最多唤醒一次，不会自转。
-    if (hasBgEvents()) {
-      const events = takeBgEvents();
+    // takeBgEvents 只给"归属是这一场"的：池子里若只剩别的项目的消息，这里就什么都不念。
+    const events = takeBgEvents();
+    if (events.length) {
       return {
         action: "nudge",
         kind: "bg_event",
@@ -497,20 +499,24 @@ async function mRunToolLoop(wrap, modelId, apiKey, baseUrl, params, signal) {
 // ── 压缩检查（与桌面同逻辑，静默执行） ─────────
 
 async function mCheckCompress(modelId, apiKey, baseUrl) {
+  // 与桌面共用同一档开关：手机上也别在后台偷偷发这一趟
+  if (!isAiFeatureOn("context_compress")) return;
   try {
     const msgs = state.messages.map(m => ({ role: m.role, content: m.content }));
     // 与桌面同一个预算口径：手机和桌面看的是同一个"什么时候压缩"
     const res = await post("/chat/compress", { messages: msgs, keep_recent_rounds: 2, max_tokens: contextBudgetOf(modelId) });
     if (res.code !== 0 || !res.data?.need_compress) return;
     const { compress_prompt, keep_messages, compress_count } = res.data;
+    const target = aiModelFor("context_compress", { id: modelId, base_url: baseUrl, key: apiKey });
+    if (!target.usable) return;
     let summary = "";
     try {
       for await (const chunk of streamChat({
-        model: modelId,
-        provider: mFindProvider(modelId),
+        model: target.id,
+        provider: mFindProvider(target.id) || target.provider,
         messages: [{ role: "user", content: compress_prompt }],
-        api_key: apiKey,
-        base_url: baseUrl,
+        api_key: target.key,
+        base_url: target.base_url,
         temperature: 0.3,
         max_tokens: 1024,
         stream: true,
@@ -570,6 +576,7 @@ export async function mSendMessage(rawText) {
       const res = await post("/chat/conversations", {
         title: text.slice(0, 30),
         project: state.project?.name || "",
+        project_id: state.project?.project_id || "",
       });
       if (res.code === 0) {
         state.currentConversationId = res.data.id;

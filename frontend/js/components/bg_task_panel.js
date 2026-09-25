@@ -1,5 +1,5 @@
 /**
- * 后台终端任务面板（右栏，与 TODOLIST 并列）。
+ * 后台任务中心（右栏，与 TODOLIST 并列）。
  *
  * 这一栏存在的理由：模型被明确要求"起了任务就别轮询"——那模型不看的时候，人得看得见。
  * 面板读的是 services/bg_tasks.js 的快照（它按 3 秒轮询，没任务时退到 20 秒慢探），
@@ -9,13 +9,19 @@
  *   ① 没有任务时整栏隐藏（不留空壳占位），工具栏按钮同步置灰；
  *   ② 停止按钮只在 running 时出现——停一个早就结束的任务是空动作，按钮不该在；
  *   ③ 输出是"按需拉、只拉展开的那一条"，不然面板一显示就把所有任务的日志拉一遍。
+ *
+ * 多项目在册之后它是跨项目的：列表按项目分组，别的项目的任务在这里看得见也停得了
+ * （进程本来就是后端全局管的），但要回到那个项目 / 那场会话才念得对——所以每行给的是
+ * "切过去看"，不是"在这儿接着演"。
  */
 
-import { state, notify } from "../store.js?v=20260922-006";
-import { t } from "../services/i18n.js?v=20260922-006";
-import { iconSvgEl } from "../services/icons.js?v=20260922-006";
-import { get } from "../services/api.js?v=20260922-006";
-import { bgTasks, stopBgTask, clearFinishedBgTasks, peekBgEvents, startBgPolling, refreshBgTasks } from "../services/bg_tasks.js?v=20260922-006";
+import { state, notify } from "../store.js?v=20260925-001";
+import { t } from "../services/i18n.js?v=20260925-001";
+import { iconSvgEl } from "../services/icons.js?v=20260925-001";
+import { get } from "../services/api.js?v=20260925-001";
+import { switchToProject } from "../services/project_scene.js?v=20260925-001";
+import { bgTasks, stopBgTask, clearFinishedBgTasks, peekBgEvents, bgInbox, startBgPolling, refreshBgTasks } from "../services/bg_tasks.js?v=20260925-001";
+import { abortRun } from "../services/run_registry.js?v=20260925-001";
 
 /** 展开的输出最多往回看多少行：面板是瞄一眼用的，不是完整日志阅读器 */
 const TAIL_LINES = 200;
@@ -65,14 +71,17 @@ export function renderBgTaskPanel() {
   if (!panelEl) return;
   syncBgRailButton();
   const tasks = bgTasks();
-  // 没有在册任务就整栏收起来：这一栏是"有事才出现"，不是常驻家具
-  if (!tasks.length || state.bgPanelOpen === false) {
+  const runs = (Array.isArray(state.runs) ? state.runs : []);
+  // 没有在册任务也没有在跑的生成才收起来：这一栏是"有事才出现"，不是常驻家具。
+  // 并行之后的"事"有两类——后台进程（bgTasks）与模型生成（runs），任一样在都得出现。
+  if (!tasks.length && !runs.length || state.bgPanelOpen === false) {
     panelEl.classList.add("hidden");
     panelEl.innerHTML = "";
     return;
   }
-  const running = tasks.filter(x => x.state === "running").length;
-  const unread = peekBgEvents().length;
+  const running = tasks.filter(x => x.state === "running").length
+    + runs.filter(r => r.phase !== "queued").length;
+  const unread = bgInbox().length + peekBgEvents().length;
   panelEl.classList.remove("hidden");
   panelEl.innerHTML = "";
 
@@ -80,7 +89,7 @@ export function renderBgTaskPanel() {
   header.className = "todo-panel-header";
   const title = document.createElement("span");
   title.className = "todo-panel-title";
-  title.textContent = t("后台任务 {n}", { n: tasks.length })
+  title.textContent = t("任务中心 {n}", { n: tasks.length })
     + (running ? t(" · 跑着 {n}", { n: running }) : "")
     + (unread ? t(" · 未读 {n}", { n: unread }) : "");
   const spacer = document.createElement("span");
@@ -109,8 +118,149 @@ export function renderBgTaskPanel() {
 
   const body = document.createElement("div");
   body.className = "todo-panel-body bg-task-body";
-  for (const task of tasks) body.appendChild(renderRow(task));
+  for (const run of runs) body.appendChild(renderRunRow(run));
+  for (const group of groupByProject(tasks)) {
+    if (group.label) body.appendChild(renderGroupHead(group));
+    for (const task of group.tasks) body.appendChild(renderRow(task));
+  }
   panelEl.appendChild(body);
+}
+
+/**
+ * 一场生成（模型正在跑的对话）在面板里占一行。
+ * 它与后台进程的区别写在 label 上：生成是自己会结束的，进程要人管，
+ * 所以排队中的那几行只有"等位置"的意思，没有停止按钮以外的动作。
+ */
+function renderRunRow(run) {
+  const row = document.createElement("div");
+  const queued = run.phase === "queued";
+  row.className = "bg-task-item bg-run-item" + (queued ? " bg-run-queued" : " bg-task-running");
+  row.dataset.runId = run.run_id;
+  row.dataset.projectId = run.project_id || "";
+
+  const head = document.createElement("div");
+  head.className = "bg-task-head";
+  const icon = document.createElement("span");
+  icon.className = "bg-task-icon";
+  icon.appendChild(iconSvgEl(queued ? "clock" : "activity"));
+  const label = document.createElement("span");
+  label.className = "bg-task-label";
+  const conv = (Array.isArray(state.conversations) ? state.conversations : []).find(c => c?.id === run.conv_id);
+  label.textContent = conv?.title || (run.conv_id ? t("进行中的对话") : t("新对话"));
+  label.title = run.conv_id || "";
+  const meta = document.createElement("span");
+  meta.className = "bg-task-meta";
+  meta.textContent = queued
+    ? t("排队中")
+    : t("生成中") + " · " + fmtDuration((Date.now() - (run.started_at || Date.now())) / 1000);
+  head.append(icon, label, meta);
+
+  const proj = document.createElement("div");
+  proj.className = "bg-task-cmd";
+  proj.textContent = `${projectNameOf(run.project_id)}${run.visible ? "" : t(" · 不在屏幕上")}`;
+  head.appendChild(proj);
+
+  const actions = document.createElement("div");
+  actions.className = "bg-task-actions";
+  if (run.conv_id) {
+    const goBtn = document.createElement("button");
+    goBtn.className = "bg-icon-btn bg-row-jump";
+    goBtn.dataset.conversationId = run.conv_id;
+    goBtn.title = t("去看这一场");
+    goBtn.appendChild(iconSvgEl("message-circle"));
+    goBtn.addEventListener("click", async () => {
+      goBtn.disabled = true;
+      try {
+        const pid = String(run.project_id || "");
+        if (pid && pid !== String(state.project?.project_id || "")) await switchToProject(pid);
+        const { openConversation } = await import("./chat.js?v=20260925-001");
+        await openConversation(run.conv_id);
+      } finally {
+        goBtn.disabled = false;
+      }
+    });
+    actions.appendChild(goBtn);
+  }
+  if (!queued) {
+    const stopBtn = document.createElement("button");
+    stopBtn.className = "bg-icon-btn bg-icon-danger";
+    stopBtn.title = t("停止这一场生成");
+    stopBtn.appendChild(iconSvgEl("ban"));
+    stopBtn.addEventListener("click", async () => {
+      stopBtn.disabled = true;
+      abortRun(run.run_id);
+      renderBgTaskPanel();
+    });
+    actions.appendChild(stopBtn);
+  }
+  head.appendChild(actions);
+  row.append(head, proj);
+  return row;
+}
+
+function projectNameOf(projectId) {
+  const pid = String(projectId || "");
+  if (!pid) return t("未分类");
+  const entry = (Array.isArray(state.projects) ? state.projects : []).find(p => p?.id === pid);
+  return entry?.name || pid;
+}
+
+/** 在册项目里查名字；查不到（已移出册）也照 id 上记的那个路径尾巴显示，不让任务变成无主 */
+function projectLabelOf(task) {
+  const pid = String(task?.project_id || "");
+  if (!pid) return "";
+  const entry = (Array.isArray(state.projects) ? state.projects : []).find(p => p?.id === pid);
+  return entry?.name || pid;
+}
+
+/** 按项目分组：当前视野那一组排最前，其余按名字。没有归属的任务单独一组垫底。 */
+function groupByProject(tasks) {
+  const activeId = String(state.project?.project_id || "");
+  const buckets = new Map();
+  for (const task of tasks) {
+    const pid = String(task?.project_id || "");
+    if (!buckets.has(pid)) buckets.set(pid, []);
+    buckets.get(pid).push(task);
+  }
+  const groups = [...buckets.entries()].map(([pid, list]) => ({
+    projectId: pid,
+    label: pid || "__none__",
+    name: projectLabelOf(list[0]) || (pid ? "" : t("未分类")),
+    active: !!pid && pid === activeId,
+    tasks: list,
+  }));
+  groups.sort((a, b) => (b.active - a.active) || String(a.name).localeCompare(String(b.name), "zh"));
+  return groups.map(g => ({ ...g, label: g.active ? "" : g.name }));
+}
+
+function renderGroupHead(group) {
+  const head = document.createElement("div");
+  head.className = "bg-group-head";
+  head.dataset.projectId = group.projectId || "";
+  const name = document.createElement("span");
+  name.className = "bg-group-name";
+  name.textContent = group.name || t("未分类");
+  name.title = group.projectId || "";
+  head.appendChild(name);
+  const count = document.createElement("span");
+  count.className = "bg-group-count";
+  count.textContent = String(group.tasks.length);
+  head.appendChild(count);
+  if (group.projectId) {
+    const jump = document.createElement("button");
+    jump.className = "bg-icon-btn bg-group-jump";
+    jump.dataset.projectId = group.projectId;
+    jump.title = t("切到该项目");
+    jump.appendChild(iconSvgEl("folder"));
+    jump.addEventListener("click", async () => {
+      jump.disabled = true;
+      const out = await switchToProject(group.projectId);
+      if (!out?.ok) notify("bgTasks", bgTasks());
+      await refreshBgTasks();
+    });
+    head.appendChild(jump);
+  }
+  return head;
 }
 
 function renderRow(task) {
@@ -145,6 +295,28 @@ function renderRow(task) {
   logBtn.appendChild(iconSvgEl("eye"));
   logBtn.addEventListener("click", () => toggleOutput(task.task_id));
   actions.appendChild(logBtn);
+  // 归属是别场会话的（多半在别的项目）：给一个"回到那场去看"的入口。
+  // 就地"继续演"是不行的——那条对话的上下文不在这儿。
+  const owner = String(task.conversation_id || "");
+  if (owner && owner !== String(state.currentConversationId || "")) {
+    const goBtn = document.createElement("button");
+    goBtn.className = "bg-icon-btn bg-row-jump";
+    goBtn.dataset.conversationId = owner;
+    goBtn.title = t("回到起它的那场会话");
+    goBtn.appendChild(iconSvgEl("message-circle"));
+    goBtn.addEventListener("click", async () => {
+      goBtn.disabled = true;
+      try {
+        const pid = String(task.project_id || "");
+        if (pid && pid !== String(state.project?.project_id || "")) await switchToProject(pid);
+        const { openConversation } = await import("./chat.js?v=20260925-001");
+        await openConversation(owner);
+      } finally {
+        goBtn.disabled = false;
+      }
+    });
+    actions.appendChild(goBtn);
+  }
   if (task.state === "running") {
     const stopBtn = document.createElement("button");
     stopBtn.className = "bg-icon-btn bg-icon-danger";
@@ -191,19 +363,23 @@ async function fetchOutput(taskId) {
   }
 }
 
-/** 工具栏按钮与面板状态同步（描金=展开、置灰=没事可看） */
+/** 工具栏按钮与面板状态同步（描金=展开、置灰=没事可看、金点=有别处的消息没看） */
 function syncBgRailButton() {
   const btn = document.getElementById("btn-bg-tasks");
   if (!btn) return;
   const count = bgTasks().length;
   const running = bgTasks().filter(x => x.state === "running").length;
+  const unread = bgInbox().length;
   btn.disabled = !count;
   btn.classList.toggle("is-na", !count);
   btn.classList.toggle("rail-toggle-on", count > 0 && state.bgPanelOpen !== false);
+  // 未读是小金点，不抢任务数那个位置：两个数各自有意义，挤成一个就都读不出来了
+  btn.classList.toggle("has-unread", unread > 0);
   btn.setAttribute("aria-pressed", state.bgPanelOpen !== false ? "true" : "false");
-  btn.title = !count ? t("当前没有后台任务")
+  btn.title = (!count ? t("当前没有后台任务")
     : running ? t("后台任务 {n} 个（{m} 个在跑）", { n: count, m: running })
-      : t("后台任务 {n} 个（都结束了）", { n: count });
+      : t("后台任务 {n} 个（都结束了）", { n: count }))
+    + (unread ? t(" · {n} 条消息在别的会话没看", { n: unread }) : "");
   const label = btn.querySelector(".bg-rail-count");
   if (label) label.textContent = count ? String(count) : "";
 }

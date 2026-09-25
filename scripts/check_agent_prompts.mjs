@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import * as common from "../frontend/js/services/agent_common.js";
 // 版本串必须与 tools.js 里的 import 说明符同形：写成 store.js（无 ?v=）会载入第二个 store 实例，
 // 工具改的是那一份 state，守卫读的是这一份 → 永远假红/假绿
-import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20260922-006";
+import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20260925-001";
 
 const NEXT_OK = "Next: use this result to continue the task. Do not repeat the same tool call unless new parameters are needed.";
 const NEXT_FAIL = "Next: fix the parameters or choose a different tool. Do not repeat the identical failing call.";
@@ -314,7 +314,7 @@ assert.equal(effectiveToolMode("local", "openai", "chat"), "none");
   assert.match(kernelSrc, /if \(round === run\.maxRounds - 1\) \{[\s\S]{0,700}?policy\.atCap\?\.\(run\)/,
     "kernel 只在末轮问一次 policy 要不要续跑");
   assert.match(kernelSrc, /run\.maxRounds \+= grant;/, "kernel 要把 atCap 报的 extend 落到循环上限上");
-  assert.match(kernelSrc, /if \(Number\(r\.extend\) > 0\) run\.maxRounds \+= Number\(r\.extend\);[\s\S]{0,200}?if \(r\.hiddenMsg\) addMessage\(r\.hiddenMsg\);/,
+  assert.match(kernelSrc, /if \(Number\(r\.extend\) > 0\) run\.maxRounds \+= Number\(r\.extend\);[\s\S]{0,200}?if \(r\.hiddenMsg\) addMessage\(r\.hiddenMsg, genConvId\);/,
     "emptyRound 的 extend 要先落账再注入提醒：顺序反了这条催办就成了空话");
   assert.ok(!/atCap|continueGrants/.test(mchatSrc), "移动端没有末轮续跑：设置项刻意不同步过去，别在 m-chat 里另起一份");
 

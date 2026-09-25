@@ -24,6 +24,8 @@ from typing import Any
 
 import httpx
 
+from backend.ai_features import feature_enabled
+
 DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
 STATE_PATH = DATA_DIR / "desktop_state.json"
 
@@ -153,6 +155,9 @@ def execute(
     if not prompt:
         return {"message": "缺少 prompt 参数：描述要生成的视频内容"}
 
+    # 关掉就不发请求，也不去读配置里的 Key：给出能照着改回的路径
+    if not feature_enabled("video_gen"):
+        return {"message": "「AI 视频生成」已在设置中关闭（设置 → AI 辅助功能）"}
     cfg = _load_gen_config("videoGen")
     model = (cfg.get("model") or "").strip()
     api_key = (cfg.get("api_key") or "").strip()

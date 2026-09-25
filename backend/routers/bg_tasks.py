@@ -30,10 +30,14 @@ def _err(message: str) -> dict[str, Any]:
 
 
 @router.get("")
-async def list_bg_tasks(peek: bool = True) -> dict[str, Any]:
-    """在册任务 + 未读事件。peek=false 时不带尾巴，给"只想看数量"的调用省字节。"""
-    tasks = bg_task.list_tasks(peek=peek)
-    events = bg_task.pending_events()
+async def list_bg_tasks(peek: bool = True, project_id: str | None = None) -> dict[str, Any]:
+    """在册任务 + 未读事件。peek=false 时不带尾巴，给"只想看数量"的调用省字节。
+
+    project_id 传了就把任务与事件一起过滤到该项目（含传空串=只看认不出归属的那些）；
+    不传就是跨项目全量，任务中心要的是这一份。
+    """
+    tasks = bg_task.list_tasks(peek=peek, project_id=project_id)
+    events = bg_task.pending_events(project_id=project_id)
     return _ok({
         "tasks": tasks,
         "events": events,

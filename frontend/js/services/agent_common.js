@@ -6,6 +6,13 @@
 // 正在工具执行循环中（尚未执行或正在执行）的 assistant 消息。
 // 渲染时对这些消息不合成"历史恢复"卡片，避免把未执行的调用伪装成成功执行。
 const _pendingToolMsgs = new Set();
+// 并行时不能 clear()：先散场的那场会把后面那场还在跑的标记一并清掉，
+// 后者的工具气泡就会被画成「历史恢复」的样子（未执行的调用被装成已执行）。
+// 按一场会话的消息数组释放，才停得这一场自己的那些。
+function releasePendingFor(msgs) {
+  for (const m of msgs || []) _pendingToolMsgs.delete(m);
+}
+
 
 // 上下文压缩写回的摘要消息前缀。这个字符串就是发往模型的载荷本身，
 // 渲染层只据它把摘要折起来，不许因为显示而改格式。
@@ -99,7 +106,7 @@ function buildToolFollowupInstruction({ harnessOn = false, autopilotOn = false, 
 }
 
 export {
-  _pendingToolMsgs, toolCallSignature, dedupeToolCalls, isTruncatedUnexecutable,
+  _pendingToolMsgs, releasePendingFor, toolCallSignature, dedupeToolCalls, isTruncatedUnexecutable,
   HISTORY_SUMMARY_PREFIX, isHistorySummary,
   DESKTOP_TOOL_RESULT_STATUS, MOBILE_TOOL_RESULT_STATUS, formatToolResultForModel,
   DESKTOP_FAILED_LINE, MOBILE_FAILED_LINE, buildToolFollowupInstruction,

@@ -4,22 +4,23 @@
  * 2. mHandleStructured：file_edit/file_create 的 diff 预览 → 接受/拒绝（file_append 调用时即写入）
  */
 
-import { state, getModelKey } from "../store.js?v=20260922-006";
-import { post } from "../services/api.js?v=20260922-006";
-import { isHighRiskCommand } from "../services/riskguard.js?v=20260922-006";
-import { mShowRiskSheet, mShowDiffSheet, mToast, t } from "./m-ui.js?v=20260922-006";
+import { state, getModelKey } from "../store.js?v=20260925-001";
+import { post } from "../services/api.js?v=20260925-001";
+import { isHighRiskCommand } from "../services/riskguard.js?v=20260925-001";
+import { mShowRiskSheet, mShowDiffSheet, mToast, t } from "./m-ui.js?v=20260925-001";
 
 /** 用当前模型解释命令目的（与桌面 explainCommand 同一逻辑，失败返回兜底文案） */
 async function mExplainCommand(command) {
-  const modelId = state.currentModel?.id;
-  const apiKey = modelId ? getModelKey(modelId) : "";
-  if (!modelId || !apiKey) return t("（当前未配置模型 API Key，无法生成目的说明）");
+  // 与桌面同一档：关掉就少发一趟请求，审批照常有
+  if (!isAiFeatureOn("command_explain")) return t("（命令目的说明已关闭，可在桌面端设置 → AI 辅助功能打开）");
+  const target = aiModelFor("command_explain", state.currentModel);
+  if (!target.usable) return t("（当前未配置模型 API Key，无法生成目的说明）");
   try {
     const res = await post("/proxy/chat", {
-      model: modelId,
-      api_key: apiKey,
-      base_url: state.currentModel?.base_url || "",
-      provider: state.currentModel?.provider || "",
+      model: target.id,
+      api_key: target.key,
+      base_url: target.base_url || "",
+      provider: target.provider || "",
       stream: false,
       temperature: 0.2,
       max_tokens: 200,

@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260922-006";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260922-006";
+import { makeId } from "./services/utils.js?v=20260925-001";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260925-001";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -93,8 +93,14 @@ const state = {
   actionsBroken: [],
 
   // 项目
-  project: null,        // { path, name, config, constitution }
+  project: null,        // { path, name, config, constitution, project_id } —— 当前视野那一项的展开
   projectFileTree: [],  // 当前浏览的目录内容
+
+  // 在册项目清单（后端 data/projects.json 的只读快照，见 services/project.js）。
+  // 刻意不落 localStorage：真源在服务端，本地再存一份就会出现"清单比服务端新"的窗口，
+  // 切换器点下去打到一条已经不存在的记录上。
+  projects: [],
+  activeProjectId: "",
 
   // 记忆
   memories: [],
@@ -177,14 +183,34 @@ const state = {
   bgTasks: [],
   // 后端送来但还没被消费的事件（模型唤醒用；消费即清空）
   bgTaskEvents: [],
+  // 认得出但不属于当前会话的消息（多半是别的项目里的任务跑完了）：先进信箱，
+  // 等用户回到那场会话再搬回上面的池子。不落库——后端已经 ack 过，重启后只剩徽标。
+  bgInbox: [],
   // 空闲自动续跑：任务还在跑、模型已经收工时，允许系统自己把话头接回去（每对话有次数上限）
   bgAutoResume: true,
   // 每对话已用掉几次自动续跑（convId → 次数），防"活一直干不完"时无限自转
   bgResumeUsed: {},
 
+  // 并行运行（services/run_registry.js 是唯一真源，这里只是给订阅者看的快照）
+  // 刻意不落盘：run 带着 AbortController 和内存里的气泡引用，刷新后复活成
+  // "看着在跑其实早死了"的假象比不复活更糟。
+  runs: [],
+  // 跨项目同时最多几场（1 = 退回串行）
+  maxParallelRuns: 2,
+  // 同一个项目内同时最多几场。默认 1：同项目并行 = 两个 run 同时改同一批文件，
+  // 坏了都查不出是谁干的；要同项目并行先开 worktree 隔离（P3）。
+  maxConcurrentRunsPerProject: 1,
+  // 关掉就回到 P2 之前的语义：切换会话即中断当前生成
+  backgroundRuns: true,
+
   // 媒体生成配置：未配置 model / api_key 时对应工具（image_gen / video_gen）不可用
   imageGen: { model: "", base_url: "https://api.openai.com/v1", api_key: "" },
   videoGen: { model: "", base_url: "https://api.openai.com/v1", api_key: "" },
+
+  // AI 辅助功能（对话/团队对话/提示词工厂以外那些会自己找模型要结果的）：
+  // 功能 id → { enabled, modelId }，登记表在 services/ai_features.js。
+  // 空对象 = 全用默认值（开 + 跟随主模型），所以老状态文件没这个键也一切照旧。
+  aiHelpers: {},
 };
 
 // ── 订阅者 ──────────────────────────────────
@@ -242,11 +268,24 @@ function buildPersistentData() {
     webSearch: normalizeWebSearch(state.webSearch),
     imageGen: normalizeGenConfig(state.imageGen),
     videoGen: normalizeGenConfig(state.videoGen),
+    aiHelpers: normalizeAiHelpers(state.aiHelpers),
     // 后台任务本身与事件不落盘：任务活在后端进程里，重启后这些快照全无意义
     // （日志文件仍在 data/bg_tasks/）。开关与"已续跑几次"是用户偏好/配额，要跨重启。
     bgAutoResume: state.bgAutoResume !== false,
     bgResumeUsed: normalizeCountMap(state.bgResumeUsed),
+    // 并行运行的三个偏好只存本机（与 continueAutopilot 同一条理由）：
+    // 并行只在桌面循环里实现，同步到手机只会多几个"显示已开启却不兑现"的开关。
+    maxParallelRuns: normalizeCountInt(state.maxParallelRuns, 1, 4, 2),
+    maxConcurrentRunsPerProject: normalizeCountInt(state.maxConcurrentRunsPerProject, 1, 3, 1),
+    backgroundRuns: state.backgroundRuns !== false,
   };
+}
+
+// 计数型偏好取值域收窄：脏值（0、负数、"abc"）回落默认，而不是拿去做除数/上限
+function normalizeCountInt(value, min, max, fallback) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
 }
 
 function normalizeTheme(value) {
@@ -342,6 +381,22 @@ function normalizeGenConfig(value) {
   };
 }
 
+// AI 辅助功能：功能 id → { enabled, modelId }（登记表在 services/ai_features.js）。
+// 刻意不按登记表过滤未知 id：登记表在下游模块，这里 import 会成环，而且多留几个键
+// 无害、少留一个就等于把用户在另一台机器上的偏好悄悄丢了。
+function normalizeAiHelpers(value) {
+  const out = {};
+  if (!value || typeof value !== "object") return out;
+  for (const [key, raw] of Object.entries(value)) {
+    if (!key || !raw || typeof raw !== "object") continue;
+    out[key] = {
+      enabled: raw.enabled !== false,
+      modelId: typeof raw.modelId === "string" ? raw.modelId : "",
+    };
+  }
+  return out;
+}
+
 /** 计数表（convId → 非负整数）：坏值一律丢掉，别让脏数据把配额算成负数 */
 function normalizeCountMap(value) {
   const v = value && typeof value === "object" ? value : {};
@@ -389,6 +444,7 @@ function getSharedPersistentData(data = buildPersistentData()) {
     webSearch: normalizeWebSearch(data.webSearch),
     imageGen: normalizeGenConfig(data.imageGen),
     videoGen: normalizeGenConfig(data.videoGen),
+    aiHelpers: normalizeAiHelpers(data.aiHelpers),
   };
 }
 
@@ -455,6 +511,9 @@ function loadPersistent() {
     state.todoPanelOpen = data.todoPanelOpen !== false;
     state.bgAutoResume = data.bgAutoResume !== false;
     state.bgResumeUsed = normalizeCountMap(data.bgResumeUsed);
+    state.maxParallelRuns = normalizeCountInt(data.maxParallelRuns, 1, 4, 2);
+    state.maxConcurrentRunsPerProject = normalizeCountInt(data.maxConcurrentRunsPerProject, 1, 3, 1);
+    state.backgroundRuns = data.backgroundRuns !== false;
     state.maxTokens = Math.max(1000, parseInt(data.maxTokens) || 64000);
     state.modelContextCaps = normalizeContextCaps(data.modelContextCaps);
     state.autoReview = {
@@ -495,6 +554,7 @@ function loadPersistent() {
     state.webSearch = normalizeWebSearch(data.webSearch);
     state.imageGen = normalizeGenConfig(data.imageGen);
     state.videoGen = normalizeGenConfig(data.videoGen);
+    state.aiHelpers = normalizeAiHelpers(data.aiHelpers);
     migrateModelIds();
   } catch (e) {}
 }
@@ -582,6 +642,9 @@ async function loadSharedPersistent() {
     }
     if (Object.prototype.hasOwnProperty.call(data, "videoGen")) {
       state.videoGen = normalizeGenConfig(data.videoGen);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "aiHelpers")) {
+      state.aiHelpers = normalizeAiHelpers(data.aiHelpers);
     }
     migrateModelIds();
     saveLocalPersistent();
@@ -902,8 +965,22 @@ function setTodoPanelOpen(open) {
   return true;
 }
 
-function addUsage(usage) {
+function addUsage(usage, convId = state.currentConversationId) {
   if (!usage) return;
+  // 后台那场的 token 记在它自己名下：不然用户切到别的项目看用量条，读到的是
+  // "我什么都没干却涨了两千"
+  if (String(convId || "") !== String(state.currentConversationId || "")) {
+    const key = String(convId || "");
+    if (!key) return;
+    const saved = state.conversationUsage[key] || { totalTokens: 0, promptTokens: 0, completionTokens: 0, messageCount: 0 };
+    saved.promptTokens += usage.prompt_tokens || 0;
+    saved.completionTokens += usage.completion_tokens || 0;
+    saved.totalTokens = saved.promptTokens + saved.completionTokens;
+    saved.messageCount += 1;
+    state.conversationUsage[key] = saved;
+    savePersistent();
+    return;
+  }
   state.usage.promptTokens += usage.prompt_tokens || 0;
   state.usage.completionTokens += usage.completion_tokens || 0;
   state.usage.totalTokens = state.usage.promptTokens + state.usage.completionTokens;
@@ -939,27 +1016,114 @@ function markBgResumeUsed(convId) {
   return next;
 }
 
+// ── 并行运行：三个偏好 ──────────────────────────────────────
+// 上限与开关都只写 state 并落盘，判定在 services/run_registry.js 一处做——
+// 两处各判一次的话，设置页改了要等下一次 notify 才生效，队列里那条就可能超发。
+
+function setMaxParallelRuns(value) {
+  const next = normalizeCountInt(value, 1, 4, 2);
+  if (state.maxParallelRuns === next) return false;
+  state.maxParallelRuns = next;
+  savePersistent();
+  notify("maxParallelRuns", next);
+  return true;
+}
+
+function setMaxConcurrentRunsPerProject(value) {
+  const next = normalizeCountInt(value, 1, 3, 1);
+  if (state.maxConcurrentRunsPerProject === next) return false;
+  state.maxConcurrentRunsPerProject = next;
+  savePersistent();
+  notify("maxConcurrentRunsPerProject", next);
+  return true;
+}
+
+/** true = 切走会话时生成继续跑（P2 语义）；false = 切走即停（P2 之前） */
+function setBackgroundRuns(enabled) {
+  const next = enabled !== false;
+  if ((state.backgroundRuns !== false) === next) return false;
+  state.backgroundRuns = next;
+  savePersistent();
+  notify("backgroundRuns", next);
+  return true;
+}
+
 function estimateTokens(text) {
   if (!text) return 0;
   // 粗略估算：中英文混合约 3 字符/token
   return Math.ceil(text.length / 3);
 }
 
-function setMessages(msgs) {
-  state.messages = msgs;
-  notify("messages", msgs);
+// ── 会话现场（每场一份消息数组） ─────────────────────────────
+// 为什么不再共用一个 state.messages：并行时后台那场 run 往共用数组里追加一条，
+// 订阅者就照着"整表重渲染"把可见那一场重画成后台那场的样子——串台。
+// state.messages 保留为"可见那一份的引用"，今天 30 多处读它的代码一行不用改；
+// 后台 run 写的是 threads 里它自己那条数组，切回那一场时复用的还是同一个数组对象
+// （run 正在写的 assistant 气泡因此不会在切回来时消失）。
+const threads = new Map();
+
+function threadKey(convId) {
+  return String(convId || "_scratch");
 }
 
-function addMessage(msg) {
-  state.messages.push(msg);
-  notify("messages", state.messages);
+function messagesOf(convId) {
+  return threads.get(threadKey(convId)) || [];
 }
 
-function updateLastAssistantMessage(content) {
-  for (let i = state.messages.length - 1; i >= 0; i--) {
-    if (state.messages[i].role === "assistant") {
-      state.messages[i].content = content;
-      notify("messages", state.messages);
+function hasThread(convId) {
+  return threads.has(threadKey(convId));
+}
+
+// 会话被删时丢掉它那份现场：内存里少留一条无主数组，也避免同名 id 复用时读到旧内容
+function dropThread(convId) {
+  const key = threadKey(convId);
+  if (key === "_scratch") return;
+  if (threads.delete(key)) notify("messages", state.messages);
+}
+
+function setMessages(msgs, convId = state.currentConversationId) {
+  const list = Array.isArray(msgs) ? msgs : [];
+  threads.set(threadKey(convId), list);
+  if (String(convId || "") === String(state.currentConversationId || "")) {
+    state.messages = list;
+    notify("messages", list);
+  }
+  notify("thread", { convId: String(convId || ""), messages: list });
+}
+
+// 静默绑定：把可见线程指到某场会话自己的数组上，不触发重渲染。
+// 切回一场还在跑的对话时用得上——它那份 DOM 一直活着（在游离节点里挂着），
+// 再通知一次渲染反而把已捕获的气泡引用冲掉，流式光标与砚流条会断。
+function bindVisibleThread(convId) {
+  const key = threadKey(convId);
+  if (!threads.has(key)) threads.set(key, []);
+  state.messages = threads.get(key);
+  return state.messages;
+}
+
+function addMessage(msg, convId = state.currentConversationId) {
+  const key = threadKey(convId);
+  const visible = String(convId || "") === String(state.currentConversationId || "");
+  if (visible) {
+    state.messages.push(msg);
+    notify("messages", state.messages);
+    notify("thread", { convId: String(convId || ""), messages: state.messages });
+    return;
+  }
+  // 后台那场可能从没被打开过（定时任务/手机端发来的会话），数组要先建起来
+  if (!threads.has(key)) threads.set(key, []);
+  threads.get(key).push(msg);
+  notify("thread", { convId: String(convId || ""), messages: threads.get(key) });
+}
+
+function updateLastAssistantMessage(content, convId = state.currentConversationId) {
+  const visible = String(convId || "") === String(state.currentConversationId || "");
+  const list = visible ? state.messages : messagesOf(convId);
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].role === "assistant") {
+      list[i].content = content;
+      if (visible) notify("messages", list);
+      notify("thread", { convId: String(convId || ""), messages: list });
       return;
     }
   }
@@ -1039,6 +1203,27 @@ function setProject(data) {
 function setProjectFileTree(data) {
   state.projectFileTree = data;
   notify("projectFileTree", data);
+}
+
+// ── 在册项目清单（后端 projects.json 的只读快照） ──────────────
+//
+// 现场（上一看在哪条会话、草稿、滚动位置）存在后端注册表的 prefs 里，不在这里：
+// 设计稿原本还打算把它经 settings 的 allowlist 再同步一份到 desktop_state.json，
+// 落地时发现两份都是同一个 DATA_DIR 下的本地文件，"跨设备同步"这个理由并不成立，
+// 多出来的只会有一个会和真源不一致的副本。所以 prefs 单点存 projects.json，
+// 这里只缓存清单本身，切换器/侧栏都从这一份读。
+
+function setProjects(list, activeId = "") {
+  state.projects = Array.isArray(list) ? list : [];
+  state.activeProjectId = activeId || state.projects.find(p => p?.active)?.id || "";
+  notify("projects", state.projects);
+}
+
+/** 从清单里取一条记录（按 id 或名称）；没有就回 null，调用方自己决定怎么降级。 */
+function projectEntryOf(key) {
+  const text = String(key || "").trim();
+  if (!text) return null;
+  return state.projects.find(p => p?.id === text) || state.projects.find(p => p?.name === text) || null;
 }
 
 // ── 记忆管理 ────────────────────────────────
@@ -1163,11 +1348,12 @@ export {
   getConversationTodos, setConversationTodos,
   recordTaskFlag, markTaskSeen, pruneTaskFlags, setTaskListSort, setTodoPanelOpen,
   setBgAutoResume, bgResumeUsedOf, markBgResumeUsed,
+  setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns,
   loadSharedPersistent,
-  setMessages, addMessage, updateLastAssistantMessage,
+  setMessages, addMessage, updateLastAssistantMessage, messagesOf, hasThread, dropThread, bindVisibleThread,
   setConversations, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,
   setConstitution, effectiveConstitution, constitutionScope, setSkills, setActions, setModelRegistry,
-  setProject, setProjectFileTree,
+  setProject, setProjectFileTree, setProjects, projectEntryOf,
   setMemories, addMemory, updateMemory, removeMemory,
   setUserProfile, resetUserProfile,
   setPromptSnippets, addPromptSnippet, removePromptSnippet,

@@ -51,7 +51,8 @@ def _get_db() -> sqlite3.Connection:
             completion_tokens INTEGER DEFAULT 0,
             message_count INTEGER DEFAULT 0,
             context_tokens INTEGER DEFAULT 0,
-            project TEXT DEFAULT ''
+            project TEXT DEFAULT '',
+            project_id TEXT DEFAULT ''
         )
     """)
     # 迁移：为已有表添加用量字段
@@ -61,6 +62,12 @@ def _get_db() -> sqlite3.Connection:
             conn.execute(f"ALTER TABLE conversations ADD COLUMN {col} INTEGER DEFAULT 0")
     if "project" not in cols:
         conn.execute("ALTER TABLE conversations ADD COLUMN project TEXT DEFAULT ''")
+    # 会话归属从"项目名"换成"项目 id"：改名/重名/目录搬家都不该把历史甩出去。
+    # 刻意**不做**回填 UPDATE：67 条历史的名字大多还对得上，读时按名称回落即可
+    # （见 list_conversations 的 or project = ?），错了也不会丢数据，
+    # 而一次性改写全部历史一旦推错就没有回头路。新会话两个字段都写。
+    if "project_id" not in cols:
+        conn.execute("ALTER TABLE conversations ADD COLUMN project_id TEXT DEFAULT ''")
     conn.commit()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS messages (
@@ -83,6 +90,8 @@ def _get_db() -> sqlite3.Connection:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_role ON messages(role)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at DESC)")
+    # 侧栏按项目分组/筛选是每次切项目都要跑的查询，没索引就是全表扫
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_project_id ON conversations(project_id)")
 
     # 按天 token 记账（0.4.2 起）：conversations 只存累计值，热力图要按天看 token
     # 就必须另记一份。每次同步用量时把「相对上次的增量」写到本地当天——
@@ -120,17 +129,94 @@ def _get_db() -> sqlite3.Connection:
     return conn
 
 
+def _name_fallbacks(project_id: str) -> list[str]:
+    """按 id 取该项目可用于"读时回落"的名字串：名称 + 手工归位过的别名。
+
+    为什么需要：老会话只有 project（目录名）这一列，没有 project_id。
+    既然刻意没做回填 UPDATE，分组/筛选就得在读的时候把名字对回 id，
+    否则一上注册表，全部历史就集体变成"未归类"。
+    目录已不在册（被删了/搬家了）也照样返回它的登记名，历史不会因此消失。
+    """
+    if not project_id:
+        return []
+    try:
+        from backend import project_registry as registry
+        entry = registry.entry_of(registry.load_registry(), project_id)
+    except Exception:
+        return []
+    if not entry:
+        return []
+    names = [str(entry.get("name") or "")]
+    names += [str(a) for a in (entry.get("aliases") or [])]
+    return [n for n in names if n]
+
+
+def _usage_by_project(limit: int = 20) -> list[dict[str, Any]]:
+    """按项目分摊的会话用量。
+
+    分组口径与侧栏一致：有 project_id 按 id 归；没有的（没回填的老会话）只有当
+    它记的名字在册上唯一时才归到那个项目，重名或不在册就归"未归类"——
+    宁可少归一个，也不把两个同名项目的 token 加成一堆。
+    """
+    try:
+        from backend import project_registry as registry
+        doc = registry.load_registry()
+        entries = {str(e.get("id") or ""): e for e in (doc.get("projects") or [])}
+    except Exception:
+        entries, doc = {}, {"projects": []}
+    by_name: dict[str, list[str]] = {}
+    for e in (doc.get("projects") or []):
+        for n in [str(e.get("name") or ""), *(str(a) for a in (e.get("aliases") or []))]:
+            if n:
+                by_name.setdefault(n, []).append(str(e.get("id") or ""))
+    conn = _get_db()
+    rows = conn.execute(
+        "SELECT project_id, project, COUNT(*) AS conversations, "
+        "COALESCE(SUM(total_tokens), 0) AS total_tokens, "
+        "COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens, "
+        "COALESCE(SUM(completion_tokens), 0) AS completion_tokens "
+        "FROM conversations GROUP BY project_id, project"
+    ).fetchall()
+    conn.close()
+    buckets: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        pid = str(r["project_id"] or "")
+        if not pid:
+            owners = [x for x in by_name.get(str(r["project"] or ""), []) if x]
+            pid = owners[0] if len(set(owners)) == 1 else ""
+        name = str((entries.get(pid) or {}).get("name") or "") or str(r["project"] or "") or "未分类"
+        b = buckets.setdefault(pid, {
+            "project_id": pid, "project": name, "conversations": 0,
+            "total_tokens": 0, "prompt_tokens": 0, "completion_tokens": 0,
+        })
+        b["conversations"] += int(r["conversations"] or 0)
+        for k in ("total_tokens", "prompt_tokens", "completion_tokens"):
+            b[k] += int(r[k] or 0)
+    return sorted(buckets.values(), key=lambda b: (-b["total_tokens"], b["project"]))[:limit]
+
+
 @router.get("/conversations")
-async def list_conversations() -> dict[str, Any]:
-    """列出所有对话。"""
+async def list_conversations(project_id: str = "", include_unassigned: bool = False) -> dict[str, Any]:
+    """列出对话。给了 project_id 就只列这个项目的（含按名称回落命中的历史会话）。"""
     conn = _get_db()
     rows = conn.execute(
         "SELECT id, title, created_at, updated_at, total_tokens, prompt_tokens, "
-        "completion_tokens, message_count, context_tokens, project "
+        "completion_tokens, message_count, context_tokens, project, project_id "
         "FROM conversations ORDER BY updated_at DESC"
     ).fetchall()
     conn.close()
     conversations = [dict(r) for r in rows]
+    if project_id:
+        fallback = set(_name_fallbacks(project_id))
+        conversations = [
+            c for c in conversations
+            if c.get("project_id") == project_id
+            # 没记 id 的老会话才按名字认；已经归到别的项目的一律不认，
+            # 否则"把 A 项目会话改名后再归位"会被名字重新拽回来。
+            or ((not c.get("project_id")) and str(c.get("project") or "") in fallback)
+        ]
+    elif include_unassigned:
+        conversations = [c for c in conversations if not c.get("project_id")]
     return {"code": 0, "data": conversations, "message": "ok"}
 
 
@@ -218,6 +304,7 @@ async def usage_summary() -> dict[str, Any]:
     }
     estimated = estimate_daily_tokens(per_conv_days, conv_tokens, window_start, cutoff)
     conn.close()
+    by_project = _usage_by_project()
     # 只回有活动的日子（消息、记账、估算三者的并集），空档交给前端补 0
     days = sorted(set(counts) | set(recorded) | set(estimated))
     return {
@@ -241,6 +328,8 @@ async def usage_summary() -> dict[str, Any]:
             "daily_window": ACTIVITY_WINDOW_DAYS,
             # 第一条真实记账日期；它之前是估算。界面据此标注，null 表示全是估算
             "tokens_recorded_from": cutoff,
+            # 按项目分摊的用量：多项目在册后"这个月花了多少"要能分到谁头上
+            "by_project": by_project,
         },
         "message": "ok",
     }
@@ -252,18 +341,22 @@ async def create_conversation(body: dict[str, Any] | None = None) -> dict[str, A
     conv_id = str(uuid.uuid4())[:8]
     title = ""
     project = ""
+    project_id = ""
     if body:
         title = body.get("title", "")
         project = body.get("project", "") or ""
+        project_id = body.get("project_id", "") or ""
     now = time.time()
     conn = _get_db()
     conn.execute(
-        "INSERT INTO conversations (id, title, created_at, updated_at, project) VALUES (?, ?, ?, ?, ?)",
-        (conv_id, title, now, now, project),
+        "INSERT INTO conversations (id, title, created_at, updated_at, project, project_id) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (conv_id, title, now, now, project, project_id),
     )
     conn.commit()
     conn.close()
-    return {"code": 0, "data": {"id": conv_id, "title": title, "project": project}, "message": "ok"}
+    return {"code": 0, "data": {"id": conv_id, "title": title, "project": project,
+                                "project_id": project_id}, "message": "ok"}
 
 
 @router.get("/conversations/{conv_id}/messages")
@@ -493,11 +586,12 @@ async def import_all(body: dict[str, Any]) -> dict[str, Any]:
             continue
         cur = conn.execute(
             "INSERT OR IGNORE INTO conversations (id, title, created_at, updated_at, total_tokens, "
-            "prompt_tokens, completion_tokens, message_count, context_tokens, project) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "prompt_tokens, completion_tokens, message_count, context_tokens, project, project_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (c["id"], c.get("title", ""), c.get("created_at") or time.time(), c.get("updated_at") or time.time(),
              c.get("total_tokens", 0), c.get("prompt_tokens", 0), c.get("completion_tokens", 0),
-             c.get("message_count", 0), c.get("context_tokens", 0), c.get("project", "")),
+             c.get("message_count", 0), c.get("context_tokens", 0), c.get("project", ""),
+             c.get("project_id", "") or ""),
         )
         stats["conversations"] += cur.rowcount
     for m in messages:

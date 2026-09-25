@@ -2,14 +2,15 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260922-006";
-import { get, streamChat } from "../services/api.js?v=20260922-006";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260922-006";
-import { t } from "../services/i18n.js?v=20260922-006";
-import { iconSvgEl } from "../services/icons.js?v=20260922-006";
-import { makeId } from "../services/utils.js?v=20260922-006";
-import { reportError } from "../services/error_sink.js?v=20260922-006";
-import { renderWorkflowView, startWorkflowTick, stopWorkflowTick, initBoardWorkflow } from "./board_workflow.js?v=20260922-006";
+import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20260925-001";
+import { aiModelFor, aiFeatureBlocked } from "../services/ai_features.js?v=20260925-001";
+import { get, streamChat } from "../services/api.js?v=20260925-001";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20260925-001";
+import { t } from "../services/i18n.js?v=20260925-001";
+import { iconSvgEl } from "../services/icons.js?v=20260925-001";
+import { makeId } from "../services/utils.js?v=20260925-001";
+import { reportError } from "../services/error_sink.js?v=20260925-001";
+import { renderWorkflowView, startWorkflowTick, stopWorkflowTick, initBoardWorkflow } from "./board_workflow.js?v=20260925-001";
 
 // 逐元素求极值：把整个数组当实参展开时，笔迹点上万会让 V8 抛
 // RangeError: Maximum call stack size exceeded，所以这里一律不展开。
@@ -2116,22 +2117,19 @@ function toggleMermaid() {
 // ── AI 整理 ──────────────────────────────────
 
 async function aiOrganize() {
+  if (aiFeatureBlocked("whiteboard_organize")) return;
   if (state.boardCards.length === 0) {
     dlgToast(t("黑板是空的，请先添加卡片"));
     return;
   }
 
-  const modelId = state.currentModel?.id;
-  if (!modelId) {
-    dlgToast(t("请先选择模型"));
+  const target = aiModelFor("whiteboard_organize", state.currentModel);
+  if (!target.usable) {
+    dlgToast(t("请先选择模型并配置 API Key"));
     return;
   }
-
-  const apiKey = getModelKey(modelId);
-  if (!apiKey) {
-    dlgToast(t("请先配置模型 API Key"));
-    return;
-  }
+  const modelId = target.id;
+  const apiKey = target.key;
 
   // 构建卡片信息（含颜色）
   const cardsInfo = state.boardCards.map(c => {
@@ -2167,9 +2165,10 @@ async function aiOrganize() {
   try {
     for await (const chunk of streamChat({
       model: modelId,
-      provider: state.currentModel?.provider,
+      provider: target.provider,
       messages,
       api_key: apiKey,
+      base_url: target.base_url,
       temperature: 0.3,
       max_tokens: 4096,
       stream: true,

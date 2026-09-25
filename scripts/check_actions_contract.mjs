@@ -143,7 +143,9 @@ assert.match(ADAPTER_SRC, /const ACTIONS_CATALOG_LIMIT = 20/, "目录要有条�
 assert.match(ADAPTER_SRC, /\.slice\(0, 60\)/, "description 要截断，目录只负责说「有没有、叫什么」");
 assert.match(ADAPTER_SRC, /与用户当前要求不符时不要套用/, "抬头要带纪律句：不符的 Action 不许硬套");
 const injectAt = ADAPTER_SRC.indexOf("systemContent += getActionsSystemPrompt();");
-const toolsAt = ADAPTER_SRC.indexOf("systemContent += getToolsSystemPrompt({ compact: true });");
+// P2 起这一句多了 project 入参（并行时工具目录要按"这一场的项目"写），needle 跟到括号前为止；
+// 判据没变松：还是"目录注入必须排在工具说明之前"，位置比较照旧。
+const toolsAt = ADAPTER_SRC.indexOf("systemContent += getToolsSystemPrompt({ compact: true,");
 assert.ok(injectAt > 0 && toolsAt > 0 && injectAt < toolsAt, "Action 目录要在工具说明之前注入");
 // 只看 buildSystemContent 自己的函数体：整文件切片会把别处的 getActionsSystemPrompt 定义也算进去
 const buildBody = ADAPTER_SRC.slice(

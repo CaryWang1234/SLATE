@@ -3,6 +3,12 @@
 项目有两种：单目录项目（path 就是那个目录）与工作区（一个宿主目录存配置，
 成员是若干彼此无关的文件夹）。工作区任何时刻只"当前"一个根，切根即换 path，
 文件、Git、终端的语义和单目录项目完全一致，不额外发明一套路径口径。
+
+多项目管理的口径（backend/project_registry.py）：**在册**的项目全部留在
+`data/projects.json`，**正在看的那一个**（active）仍是唯一的——所以本模块下面那些
+"取当前根"的文件/Git/终端逻辑一行都不用改语义；变的只是"打开"不再覆盖上一个、
+"关闭"不再抹掉、重启后 active 能自己回来，以及每个路由都能按 project 参数寻址到
+别的项目（缺省＝活动项，老前端不传也照旧）。
 """
 
 from __future__ import annotations
@@ -16,16 +22,22 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from backend import project_registry as registry
 from backend.data_io import atomic_write_json
 from backend.subprocess_utils import hidden_subprocess_kwargs
 from backend.skills.text_io import read_text_file, write_text_file
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
-DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
+# 与其余 routers/*.py 同一个口径（三层 parent.parent.parent＝仓库 data/）。
+# 这里原先写的是 parent.parent，于是开发态跑起来工作区宿主会落到 backend/data/，
+# 而打包态有 SLATE_DATA_DIR 兜着看不出问题——注册表也建在这个路径上，先把它对齐。
+DATA_DIR = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
 WORKSPACE_DIR = DATA_DIR / "workspaces"
 
-# 服务端当前项目状态（内存态，重启丢失）
+# 活动项目的进程内缓存：真源是 projects.json 的 active 字段。
+# 只许通过 _active_info() 读、_set_active() 写（_is_active() 是唯一的例外读）。
+# 多项目之后"当前"只是一个视野，散落各处直接读写它就没法按别的项目寻址了。
 _current_project: dict[str, Any] | None = None
 
 IGNORE_DIRS = {
@@ -122,6 +134,67 @@ def _project_info(project_dir: Path, config: dict) -> dict:
     return info
 
 
+def _host_dir_of(info: dict[str, Any]) -> Path:
+    """配置读写的位置：工作区是宿主目录，单目录项目就是它自己。"""
+    return Path(str(info.get("workspace_dir") or info.get("path") or ""))
+
+
+def _info_for(entry: dict[str, Any] | None) -> dict[str, Any] | None:
+    """按注册表条目现读一份项目对象；目录已经不在了就返回 None（不猜、不重建）。"""
+    if not entry or not entry.get("path"):
+        return None
+    host = Path(str(entry["path"]))
+    if not host.is_dir():
+        return None
+    info = _project_info(host, _read_slate_config(host))
+    info["project_id"] = str(entry.get("id") or "")
+    return info
+
+
+def _set_active(info: dict[str, Any] | None) -> dict[str, Any] | None:
+    global _current_project
+    _current_project = info
+    return info
+
+
+def _active_info() -> dict[str, Any] | None:
+    """当前视野的项目。缓存空了（进程刚起来）就按注册表的 active 自愈一次——
+    以前"重启丢失"就是这么来的：注册表里有记录，内存里没有，前端得重放一遍。"""
+    if _current_project:
+        return _current_project
+    doc = registry.load_registry()
+    info = _info_for(registry.entry_of(doc, str(doc.get("active") or "")))
+    return _set_active(info)
+
+
+def _resolve_project(key: Any = None) -> dict[str, Any] | None:
+    """把 id / 路径 / 唯一名称解析成项目对象；不传就是当前视野的那一个。
+
+    名称只在"册内唯一"时才认（registry.find_entry 里判的）：两个同名项目必须回落到
+    id 或路径，否则历史会被归到一个头上——这正是原来拿项目名当外键的毛病。
+    """
+    text = str(key or "").strip()
+    if not text:
+        return _active_info()
+    doc = registry.load_registry()
+    return _info_for(registry.find_entry(doc, text))
+
+
+def _is_active(info: dict[str, Any]) -> bool:
+    return bool(_current_project) and _current_project.get("project_id") == info.get("project_id")
+
+
+def _register_active(info: dict[str, Any], doc: dict[str, Any]) -> dict[str, Any]:
+    """把一份项目对象登记进册并设为视野，返回带 project_id 的对象。"""
+    kind = str(info.get("kind") or "folder")
+    name = str(info.get("name") or "")
+    entry, _created = registry.register(doc, _host_dir_of(info), kind=kind, name=name)
+    registry.set_active(doc, str(entry.get("id") or ""))
+    registry.save_registry(doc)
+    info["project_id"] = str(entry.get("id") or "")
+    return _set_active(info)
+
+
 def _safe_file_size(path: Path) -> int | None:
     try:
         return path.stat().st_size if path.is_file() else None
@@ -214,19 +287,23 @@ class OpenProjectRequest(BaseModel):
 
 class UpdateConfigRequest(BaseModel):
     config: dict
+    project: str = ""
 
 
 class BrowseRequest(BaseModel):
     path: str = ""
+    project: str = ""
 
 
 class FindRequest(BaseModel):
     query: str
     limit: int = 30
+    project: str = ""
 
 
 class SwitchRootRequest(BaseModel):
     path: str
+    project: str = ""
 
 
 class CreateWorkspaceRequest(BaseModel):
@@ -237,14 +314,39 @@ class CreateWorkspaceRequest(BaseModel):
 class WorkspaceFoldersRequest(BaseModel):
     action: str
     path: str
+    project: str = ""
+
+
+class ActiveProjectRequest(BaseModel):
+    project: str
+
+
+class RegistryPatchRequest(BaseModel):
+    """只认这几个字段：None 表示"这次不动它"，所以布尔字段必须可空。"""
+    pinned: bool | None = None
+    archived: bool | None = None
+    muted: bool | None = None
+    last_conversation_id: str | None = None
+    draft: str | None = None
+    scroll: float | None = None
+    board_id: str | None = None
+    model_id: str | None = None
+    constitution_scope: str | None = None
+
+
+class AddAliasRequest(BaseModel):
+    aliases: list[str] = []
 
 
 # ── 路由 ──────────────────────────────────────
 
 @router.post("/open")
 async def open_project(req: OpenProjectRequest):
-    """打开本地目录作为项目"""
-    global _current_project
+    """打开本地目录作为项目：登记在册 + 设为视野。
+
+    和以前的区别：打开新项目不再把上一个"顶掉"——上一个仍在注册表里，
+    它的会话、宪法、后台任务、上次停在哪一条都还在，一键就能回来。
+    """
     p = Path(req.path).resolve()
     if not p.exists():
         return {"code": 1, "message": f"目录不存在: {p}"}
@@ -252,61 +354,190 @@ async def open_project(req: OpenProjectRequest):
         return {"code": 1, "message": "路径不是目录"}
 
     config = _read_slate_config(p)
-    _current_project = _project_info(p, config)
-
-    return {"code": 0, "data": _current_project}
+    info = _project_info(p, config)
+    info = _register_active(info, registry.load_registry())
+    return {"code": 0, "data": info}
 
 
 @router.get("/current")
 async def get_current_project():
-    """获取当前项目"""
-    if _current_project:
-        return {"code": 0, "data": _current_project}
-    return {"code": 0, "data": None}
+    """获取当前视野里的项目（没有就回 None，语义与以前一致）。"""
+    return {"code": 0, "data": _active_info()}
 
 
 @router.post("/close")
 async def close_project():
-    """关闭当前项目"""
-    global _current_project
-    _current_project = None
-    return {"code": 0}
+    """收起当前视野：项目留在册上，会话 / 宪法 / 后台任务一律不动。
+
+    以前这颗"×"直接把服务端状态抹成 None，于是"关闭"和"丢了"没法区分；
+    现在关闭只是不看了，从切换器点回来即可。
+    """
+    doc = registry.load_registry()
+    if _active_info():
+        doc["active"] = ""
+        registry.save_registry(doc)
+    return {"code": 0, "data": _set_active(None)}
+
+
+@router.get("/registry")
+async def get_registry():
+    """在册清单（含 active 标记与各项目现场），项目切换器与侧栏都读这一份。"""
+    doc = registry.load_registry()
+    return {"code": 0, "data": {"active": doc.get("active") or "", "projects": registry.registry_view(doc)}}
+
+
+@router.get("/registry/{project_id}/info")
+async def get_registry_project_info(project_id: str):
+    """按在册 id 现读一份项目现场（path/name/roots/宪法），**不改视野**。
+
+    为什么需要它：并行时后台那一场属于另一个项目，它的文件、终端、Git 都要落在
+    它自己项目的根上。前端只有注册表清单（id/path/name），拿不到工作区的"当前根"
+    与项目宪法，那两样只有服务端读得到——所以由这里给，而不是让前端猜。
+    """
+    doc = registry.load_registry()
+    entry = registry.entry_of(doc, project_id)
+    if not entry:
+        return {"code": 1, "message": "该项目不在册"}
+    info = _info_for(entry)
+    if not info:
+        return {"code": 1, "message": f"项目目录已经不在了：{entry.get('path') or ''}"}
+    return {"code": 0, "data": info}
+
+
+@router.post("/active")
+async def set_active_project(req: ActiveProjectRequest):
+    """把某个在册项目设为"正在看的那一个"：只改视野，不碰任何在跑的东西。
+
+    路径不在册时按"打开"处理一次（切换器里点最近项目却目录已被登记过别的形态，
+    不该报"找不到项目"）。
+    """
+    doc = registry.load_registry()
+    entry = registry.find_entry(doc, req.project)
+    if not entry and str(req.project or "").strip():
+        wanted = Path(str(req.project)).expanduser()
+        if wanted.is_dir():
+            info = _project_info(wanted, _read_slate_config(wanted))
+            info = _register_active(info, doc)
+            return {"code": 0, "data": {"project": info, "registry": registry.registry_view(doc)}}
+        return {"code": 1, "message": "该项目不在册，请先打开目录"}
+    info = _info_for(entry)
+    if not info:
+        return {"code": 1, "message": f"项目目录已经不在了：{(entry or {}).get('path') or ''}"}
+    registry.set_active(doc, str(entry["id"]))
+    registry.save_registry(doc)
+    _set_active(info)
+    return {"code": 0, "data": {"project": info, "registry": registry.registry_view(doc)}}
+
+
+@router.patch("/registry/{project_id}")
+async def patch_registry_entry(project_id: str, req: RegistryPatchRequest):
+    """改一条在册记录：固定 / 归档 / 静音 / 现场（上次会话、草稿、滚动、看板、默认模型）。"""
+    doc = registry.load_registry()
+    entry = registry.entry_of(doc, project_id)
+    if not entry:
+        return {"code": 1, "message": "该项目不在册"}
+    if req.pinned is not None:
+        entry["pinned"] = bool(req.pinned)
+    if req.archived is not None:
+        entry["archived"] = bool(req.archived)
+    prefs_patch: dict[str, Any] = {}
+    if req.muted is not None:
+        prefs_patch["muted"] = bool(req.muted)
+    for key in ("last_conversation_id", "draft", "scroll", "board_id", "model_id", "constitution_scope"):
+        value = getattr(req, key, None)
+        if value is not None:
+            prefs_patch[key] = value
+    if prefs_patch:
+        registry.patch_prefs(entry, prefs_patch)
+    registry.save_registry(doc)
+    return {"code": 0, "data": registry.public_entry(doc, entry)}
+
+
+@router.delete("/registry/{project_id}")
+async def remove_registry_entry(project_id: str, forget: bool = False):
+    """从册上移除一条记录。
+
+    移除与删数据是两件事，界面上不许合成一个按钮：默认只摘索引，`.slate/config.json`
+    与会话历史都留在原地；只有显式 `?forget=true` 才连带删 SLATE 私有的
+    data/projects/<id>/（worktree 等），且只允许删这个前缀下面的路径。
+    """
+    doc = registry.load_registry()
+    entry = registry.entry_of(doc, project_id)
+    if not entry:
+        return {"code": 1, "message": "该项目不在册"}
+    doc["projects"] = [e for e in doc["projects"] if e.get("id") != project_id]
+    if doc.get("active") == project_id:
+        doc["active"] = ""
+        _set_active(None)
+    registry.save_registry(doc)
+    removed_data = False
+    if forget:
+        target = registry.data_dir_for(project_id).resolve()
+        allowed = registry.PROJECT_DATA_DIR.resolve()
+        if target.is_dir() and str(target).startswith(str(allowed)):
+            import shutil
+            shutil.rmtree(target, ignore_errors=True)
+            removed_data = True
+    return {"code": 0, "data": {"removed": True, "data_removed": removed_data,
+                               "registry": registry.registry_view(doc)}}
+
+
+@router.post("/registry/{project_id}/alias")
+async def add_registry_alias(project_id: str, req: AddAliasRequest):
+    """把一批旧 id 记成别名，用于"把这些未归类会话归到本项目"这类手工归位。"""
+    doc = registry.load_registry()
+    entry = registry.entry_of(doc, project_id)
+    if not entry:
+        return {"code": 1, "message": "该项目不在册"}
+    aliases = list(entry.get("aliases") or [])
+    for raw in req.aliases:
+        text = str(raw or "").strip()
+        if text and text != entry["id"] and text not in aliases:
+            aliases.append(text)
+    entry["aliases"] = aliases
+    registry.save_registry(doc)
+    return {"code": 0, "data": registry.public_entry(doc, entry)}
 
 
 @router.put("/config")
 async def update_project_config(req: UpdateConfigRequest):
     """更新项目配置（写入 .slate/config.json）"""
-    global _current_project
-    if not _current_project:
+    info = _resolve_project(req.project)
+    if not info:
         return {"code": 1, "message": "未打开项目"}
 
     # 工作区的配置写在宿主目录，不写进某个成员仓库：成员各自的 .slate 不该被串改
-    project_dir = Path(_current_project.get("workspace_dir") or _current_project["path"])
+    project_dir = _host_dir_of(info)
     slate_dir = project_dir / ".slate"
     slate_dir.mkdir(parents=True, exist_ok=True)
 
     config_path = slate_dir / "config.json"
     atomic_write_json(config_path, req.config)
 
-    _current_project = _project_info(project_dir, req.config)
-
-    return {"code": 0, "data": _current_project}
+    updated = _project_info(project_dir, req.config)
+    updated["project_id"] = str(info.get("project_id") or "")
+    if not req.project or _is_active(info):
+        _set_active(updated)
+    return {"code": 0, "data": updated}
 
 
 @router.post("/root")
 async def switch_project_root(req: SwitchRootRequest):
     """工作区切当前根：只认成员目录，切完文件/Git/终端都跟着换。"""
-    global _current_project
-    if not _current_project or _current_project.get("kind") != "workspace":
+    info = _resolve_project(req.project)
+    if not info or info.get("kind") != "workspace":
         return {"code": 1, "message": "当前项目不是工作区"}
     wanted = _norm_dir(req.path)
-    if wanted not in _current_project.get("roots", []):
+    if wanted not in info.get("roots", []):
         return {"code": 1, "message": "该目录不在工作区内"}
-    host = Path(_current_project["workspace_dir"])
-    config = {**_current_project.get("config", {}), "root": wanted}
+    host = Path(info["workspace_dir"])
+    config = {**info.get("config", {}), "root": wanted}
     _write_config(host, config)
-    _current_project = _project_info(host, config)
-    return {"code": 0, "data": _current_project}
+    updated = _project_info(host, config)
+    updated["project_id"] = str(info.get("project_id") or "")
+    if not req.project or _is_active(info):
+        _set_active(updated)
+    return {"code": 0, "data": updated}
 
 
 @router.post("/workspace")
@@ -316,7 +547,6 @@ async def create_workspace(req: CreateWorkspaceRequest):
     宿主放本机数据目录而不是让用户另挑一处：他要选的只有"哪些文件夹参与"，
     多一个"这个工作区该存哪"的问题只会变成随手点默认值。
     """
-    global _current_project
     name = (req.name or "").strip()
     if not name or len(name) > 64 or any(sep in name for sep in "\\/:*?\"<>|"):
         return {"code": 1, "message": "工作区名称不能为空，且不能包含路径分隔符或 : ? * \" < > |"}
@@ -340,18 +570,18 @@ async def create_workspace(req: CreateWorkspaceRequest):
         config = {"kind": "workspace", "folders": folders_wanted, "root": folders_wanted[0]}
     host.mkdir(parents=True, exist_ok=True)
     _write_config(host, config)
-    _current_project = _project_info(host, config)
-    return {"code": 0, "data": _current_project}
+    info = _register_active(_project_info(host, config), registry.load_registry())
+    return {"code": 0, "data": info}
 
 
 @router.post("/workspace/folders")
 async def edit_workspace_folders(req: WorkspaceFoldersRequest):
-    """给当前工作区加/减成员目录；减掉正当前的根时，当前根退回第一个成员。"""
-    global _current_project
-    if not _current_project or _current_project.get("kind") != "workspace":
+    """给某个工作区加/减成员目录；减掉正当前的根时，当前根退回第一个成员。"""
+    info = _resolve_project(req.project)
+    if not info or info.get("kind") != "workspace":
         return {"code": 1, "message": "当前项目不是工作区"}
-    host = Path(_current_project["workspace_dir"])
-    config = dict(_current_project.get("config") or {})
+    host = Path(info["workspace_dir"])
+    config = dict(info.get("config") or {})
     folders = list(config.get("folders") or [])
     target = _norm_dir(req.path)
     if req.action == "add":
@@ -370,17 +600,21 @@ async def edit_workspace_folders(req: WorkspaceFoldersRequest):
     if config.get("root") and config["root"] not in folders:
         config.pop("root", None)
     _write_config(host, config)
-    _current_project = _project_info(host, config)
-    return {"code": 0, "data": _current_project}
+    updated = _project_info(host, config)
+    updated["project_id"] = str(info.get("project_id") or "")
+    if not req.project or _is_active(info):
+        _set_active(updated)
+    return {"code": 0, "data": updated}
 
 
 @router.post("/browse")
 async def browse_files(req: BrowseRequest):
     """浏览项目目录（默认根目录）"""
-    if not _current_project:
+    info = _resolve_project(req.project)
+    if not info:
         return {"code": 1, "message": "未打开项目"}
 
-    project_dir = Path(_current_project["path"])
+    project_dir = Path(info["path"])
     sub = _normalize_project_subpath(req.path)
 
     if sub:
@@ -451,6 +685,7 @@ class ReviewDiffRequest(BaseModel):
     from_commit: str = ""            # for mode=commit
     to_commit: str = "HEAD"          # for mode=commit
     max_lines: int = 8000            # safety cap
+    project: str = ""
 
 
 def _parse_unified_diff(diff_text: str) -> list[dict]:
@@ -518,9 +753,10 @@ def _parse_unified_diff(diff_text: str) -> list[dict]:
 @router.post("/review/diff")
 async def review_diff(req: ReviewDiffRequest):
     """Read git diff from project directory and return structured parse result."""
-    if not _current_project:
+    info = _resolve_project(req.project)
+    if not info:
         return {"code": 1, "message": "未打开项目"}
-    project_dir = Path(_current_project["path"])
+    project_dir = Path(info["path"])
 
     # Verify it's a git repo
     try:
@@ -589,11 +825,12 @@ async def review_diff(req: ReviewDiffRequest):
 
 
 @router.get("/git/graph")
-async def git_graph() -> dict[str, Any]:
-    """Return a read-only Git graph for the currently opened project."""
-    if not _current_project:
+async def git_graph(project: str = "") -> dict[str, Any]:
+    """Return a read-only Git graph for a project (default: the one in view)."""
+    info = _resolve_project(project)
+    if not info:
         return {"code": 1, "message": "未打开项目"}
-    project_dir = Path(_current_project["path"])
+    project_dir = Path(info["path"])
 
     try:
         code, root, err = _run_git(project_dir, ["rev-parse", "--show-toplevel"])
@@ -755,14 +992,15 @@ async def git_graph() -> dict[str, Any]:
 @router.post("/find")
 async def find_files(req: FindRequest):
     """按文件名或相对路径查找项目文件"""
-    if not _current_project:
+    info = _resolve_project(req.project)
+    if not info:
         return {"code": 1, "message": "未打开项目"}
 
     query = (req.query or "").strip().lower()
     if not query:
         return {"code": 1, "message": "缺少查询条件"}
 
-    project_dir = Path(_current_project["path"])
+    project_dir = Path(info["path"])
     limit = max(1, min(req.limit or 30, 100))
     matches = []
 
@@ -820,15 +1058,17 @@ async def list_drives():
 class ApplyEditRequest(BaseModel):
     file_path: str
     content: str
+    project: str = ""
 
 
 @router.post("/apply-edit")
 async def apply_file_edit(req: ApplyEditRequest):
     """将编辑后的内容写入文件（用户点击「接受」时调用）"""
-    if not _current_project:
+    info = _resolve_project(req.project)
+    if not info:
         return {"code": 1, "message": "未打开项目"}
 
-    project_dir = Path(_current_project["path"])
+    project_dir = Path(info["path"])
     target = Path(req.file_path)
 
     # 安全检查：确保文件在项目范围内
@@ -861,15 +1101,17 @@ async def apply_file_edit(req: ApplyEditRequest):
 class CreateFileRequest(BaseModel):
     file_path: str
     content: str
+    project: str = ""
 
 
 @router.post("/create-file")
 async def create_file(req: CreateFileRequest):
     """创建新文件（用户点击「接受」时调用）"""
-    if not _current_project:
+    info = _resolve_project(req.project)
+    if not info:
         return {"code": 1, "message": "未打开项目"}
 
-    project_dir = Path(_current_project["path"])
+    project_dir = Path(info["path"])
     target = Path(req.file_path)
 
     # 安全检查：确保文件在项目范围内
@@ -904,15 +1146,17 @@ async def create_file(req: CreateFileRequest):
 class AppendFileRequest(BaseModel):
     file_path: str
     content: str
+    project: str = ""
 
 
 @router.post("/append-file")
 async def append_file(req: AppendFileRequest):
     """向已有文件末尾追加内容（用户点击「接受」时调用）"""
-    if not _current_project:
+    info = _resolve_project(req.project)
+    if not info:
         return {"code": 1, "message": "未打开项目"}
 
-    project_dir = Path(_current_project["path"])
+    project_dir = Path(info["path"])
     target = Path(req.file_path)
 
     # 安全检查：确保文件在项目范围内
@@ -944,6 +1188,7 @@ async def append_file(req: AppendFileRequest):
 
 class ScanRequest(BaseModel):
     level: str = "balanced"  # brief | balanced | detailed
+    project: str = ""
 
 
 # 三档扫描预算（写死）：目录深度 / 树条目上限 / 精读文件数 / 每文件行数
@@ -1009,10 +1254,11 @@ def _file_priority(rel: str, name: str, ext: str) -> int:
 @router.post("/understand/scan")
 async def scan_project(req: ScanRequest):
     """全量扫描项目：目录树 + 关键文件头部内容，供 AI 生成导览与规则"""
-    if not _current_project:
+    info = _resolve_project(req.project)
+    if not info:
         return {"code": 1, "message": "未打开项目"}
     budget = SCAN_LEVELS.get(req.level, SCAN_LEVELS["balanced"])
-    project_dir = Path(_current_project["path"])
+    project_dir = Path(info["path"])
 
     tree_lines: list[str] = []
     files: list[tuple[str, str, str, int]] = []  # (rel, name, ext, size)
@@ -1083,7 +1329,7 @@ async def scan_project(req: ScanRequest):
     return {
         "code": 0,
         "data": {
-            "project": _current_project["name"],
+            "project": info["name"],
             "level": req.level if req.level in SCAN_LEVELS else "balanced",
             "tree": "\n".join(tree_lines),
             "truncated": truncated,

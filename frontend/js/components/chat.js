@@ -1,45 +1,60 @@
 /**
  * SLATE 聊天组件 v4：文件上传、上下文压缩、用量显示、流式输入 */
 
-import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, setConversations, getModelKey, addUsage, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, setChatMode, setReasoningEffort, addBoardCard, estimateTokens, contextBudgetOf, declaredContextWindow, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS, HARNESS_MAX_ROUNDS, setHarnessEnabled, takeLoopExit, recordTaskFlag, markTaskSeen, pruneTaskFlags, setTaskListSort, setTodoPanelOpen, effectiveConstitution } from "../store.js?v=20260922-006";
-import { measureContext } from "../services/context_meter.js?v=20260922-006";
-import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260922-006";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260922-006";
-import { TOOLS, detectToolCalls, detectDsmlCalls, detectAllCalls, hasToolMarkup, hasDsmlMarkup, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt, buildOpenAITools, openAICallsToCalls, setModelToolCapability, effectiveToolMode, renderAction } from "../services/tools.js?v=20260922-006";
-import { renderMarkdown } from "../services/markdown.js?v=20260922-006";
-import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260922-006";
-import { getExpertsCached } from "./experts.js?v=20260922-006";
-import { syncToolStepCards, clearToolStepCards } from "./whiteboard.js?v=20260922-006";
-import { setWorkflowRunApi } from "./board_workflow.js?v=20260922-006";
-import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260922-006";
-import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260922-006";
-import { fileTypeIcon } from "../services/file_icons.js?v=20260922-006";
-import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260922-006";
-import * as grindSvc from "../services/grind.js?v=20260922-006";
-import { t } from "../services/i18n.js?v=20260922-006";
-import { iconSvg, iconSvgEl, iconText, setIconText } from "../services/icons.js?v=20260922-006";
-import { notifyTaskComplete } from "../services/notify.js?v=20260922-006";
-import { startBgPolling, hasBgEvents, takeBgEvents, bgWakeText, takeBgResumeGrant, bgResumeLeft, runningBgTasks, BG_RESUME_MAX } from "../services/bg_tasks.js?v=20260922-006";
-import { mountBgTaskPanel, renderBgTaskPanel, onBgTasksChanged } from "./bg_task_panel.js?v=20260922-006";
-import { subagentEvents, setSubAgentSignal } from "../services/subagent.js?v=20260922-006";
-import { cxEmptyIn } from "../services/cx_motion.js?v=20260922-006";
-import { createInkstream } from "../services/inkstream.js?v=20260922-006";
-import { _pendingToolMsgs, dedupeToolCalls, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260922-006";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260922-006";
-import { openRun as openLedgerRun, projectChat, projectSteps } from "../services/agent_ledger.js?v=20260922-006";
-import { reportError } from "../services/error_sink.js?v=20260922-006";
-import { toolLabel } from "../services/tool_meta.js?v=20260922-006";
-import { sortConversations, taskStatusOf, statusBadge, normalizeTaskListSort, SORT_MODES } from "../services/task_list.js?v=20260922-006";
+import { state, subscribe, addMessage, updateLastAssistantMessage, setMessages, messagesOf, bindVisibleThread, dropThread, setConversations, getModelKey, addUsage, resetUsage, restoreUsageForConversation, setConversationUsage, setKnowledgeContext, savePersistent, getConversationTodos, setConversationTodos, setActiveExpertId, setChatMode, setReasoningEffort, addBoardCard, estimateTokens, contextBudgetOf, declaredContextWindow, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS, HARNESS_MAX_ROUNDS, setHarnessEnabled, takeLoopExit, recordTaskFlag, markTaskSeen, pruneTaskFlags, setTaskListSort, setTodoPanelOpen, effectiveConstitution } from "../store.js?v=20260925-001";
+import { measureContext } from "../services/context_meter.js?v=20260925-001";
+import { get, post, del, patch, streamChat, upload, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-001";
+import { aiModelFor, aiFeatureBlocked, isAiFeatureOn } from "../services/ai_features.js?v=20260925-001";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260925-001";
+import { TOOLS, detectToolCalls, detectDsmlCalls, detectAllCalls, hasToolMarkup, hasDsmlMarkup, stripToolCalls, executeToolCalls, hasTruncatedTail, getToolsSystemPrompt, buildOpenAITools, openAICallsToCalls, setModelToolCapability, effectiveToolMode, renderAction } from "../services/tools.js?v=20260925-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260925-001";
+import { openMemoryModal, openSnippetModal, autoRefineMemoryAndProfile, captureConversationSpark } from "./memory.js?v=20260925-001";
+import { getExpertsCached } from "./experts.js?v=20260925-001";
+import { syncToolStepCards, clearToolStepCards } from "./whiteboard.js?v=20260925-001";
+import { setWorkflowRunApi } from "./board_workflow.js?v=20260925-001";
+import { loadExperts, getExpert, readExpertFile } from "../services/experts.js?v=20260925-001";
+import { fmtTokens, tokenEquivalence } from "../services/usage.js?v=20260925-001";
+import { fileTypeIcon } from "../services/file_icons.js?v=20260925-001";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260925-001";
+import * as grindSvc from "../services/grind.js?v=20260925-001";
+import { t } from "../services/i18n.js?v=20260925-001";
+import { iconSvg, iconSvgEl, iconText, setIconText } from "../services/icons.js?v=20260925-001";
+import { notifyTaskComplete } from "../services/notify.js?v=20260925-001";
+import { startBgPolling, takeBgEvents, peekBgEventsFor, drainInboxFor, bgWakeText, takeBgResumeGrant, bgResumeLeft, runningBgTasks, BG_RESUME_MAX } from "../services/bg_tasks.js?v=20260925-001";
+import { mountBgTaskPanel, renderBgTaskPanel, onBgTasksChanged } from "./bg_task_panel.js?v=20260925-001";
+import { subagentEvents, setSubAgentSignal } from "../services/subagent.js?v=20260925-001";
+import { cxEmptyIn } from "../services/cx_motion.js?v=20260925-001";
+import { createInkstream } from "../services/inkstream.js?v=20260925-001";
+import { _pendingToolMsgs, dedupeToolCalls, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260925-001";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260925-001";
+import { openRun as openLedgerRun, projectChat, projectSteps } from "../services/agent_ledger.js?v=20260925-001";
+import { reportError } from "../services/error_sink.js?v=20260925-001";
+import { toolLabel } from "../services/tool_meta.js?v=20260925-001";
+import { sortConversations, taskStatusOf, statusBadge, normalizeTaskListSort, groupConversationsByProject, SORT_MODES } from "../services/task_list.js?v=20260925-001";
+import {
+  isGenerating as registryIsGenerating, startRun, endRun, runOf, allRuns, abortRun, abortRunFor,
+  canStart, enqueue, dropPendingFor, pendingRuns, touchRun, setRunVisible,
+  registerRunStarter, backgroundRunsOn,
+} from "../services/run_registry.js?v=20260925-001";
+import { ensureProjectScope, constitutionForScope, invalidateProjectScopes } from "../services/project_scope.js?v=20260925-001";
 
 let chatScroll, chatInput, btnSend, btnNewChat, convList, usageBar;
 let filePreviewArea, btnAttachFile, fileInput;
 let btnCompress, btnMemory, btnSnippets, btnDoCompress, compressModal, queueStatus;
 let pendingFiles = []; // { name, size, content, type }
 let brainstormMode = false;
-let isGenerating = false;
-let activeGenerationController = null;
-let activeGenerationConvId = null; // 当前生成的归属会话：切换/新建会话时中断旧生成，防止串写
-let inputQueue = [];
+// P2 之前"有没有在生成"是一个布尔 + 一个控制器：并行时布尔值答不出"哪几场在跑、
+// 各归哪个项目"，所以生成权搬进了 services/run_registry.js 那张表。
+// isGenerating() 保留同名同用法（不传=任一场在跑，传会话 id=这场在跑）。
+function isGenerating(convId = undefined) { return registryIsGenerating(convId); }
+let activeGenerationConvId = null; // 屏幕上这一场的归属会话（进度条/计时器/徽标只认它）
+// 没有在跑的时候按下的发送先进这一份（一按发送就会开跑，那时队列搬到 run 上）
+let idleQueue = [];
+
+function visibleQueue() {
+  const r = runOf(state.currentConversationId);
+  return r ? r.queue : idleQueue;
+}
 
 // ── 磨墨模式：会话状态 / 待启磨的想法 / 墨迹面板 ──
 let grindSession = null;
@@ -50,7 +65,17 @@ let lastInkStatus = null;
 // ── UI 看门狗（防卡死最后防线） ───────────────
 // 生成期间超过 180 秒无任何活动（流式增量或工具执行）→ 强制中断
 let lastActivityAt = 0;
-function markActivity() { lastActivityAt = Date.now(); }
+function markActivity(runOrConv = null) {
+  const at = Date.now();
+  // 传 run 对象时按对象记：一场跑的过程中用户可能已经切走，这时会话 id 查不到东西，
+  // 这条流式增量就被看门狗记成"没活动"，三分钟后好端端的生成会被当成卡死掐掉。
+  const r = runOrConv && typeof runOrConv === "object"
+    ? runOrConv
+    : (runOrConv ? runOf(String(runOrConv)) : null);
+  const convId = r ? r.conv_id : String(runOrConv || "");
+  if (!convId || convId === state.currentConversationId) lastActivityAt = at;
+  if (r) touchRun(r);
+}
 const CHAT_DRAFT_KEY = "slate_chat_draft";
 
 // ── 智能滚动跟随 ──────────────────────────────
@@ -73,6 +98,45 @@ function isNearBottom(threshold = 90) {
 function autoScroll(force = false) {
   if (!chatScroll) return;
   if (force || stickToBottom) chatScroll.scrollTop = chatScroll.scrollHeight;
+}
+
+// ── 并行的画布落点 ───────────────────────────
+// 一场生成画在哪：可见时就是 #chat-messages；用户切走后换成它自己那份游离节点。
+// 游离节点不是"丢掉渲染"，而是把 DOM 写入挪到一个没人看的树上——节点关系、
+// 已捕获的气泡引用、砚流条全部照旧有效，切回来时把子节点搬回屏幕即可（不重渲染，
+// 所以流式光标和 thinking 面板不会在切回来那一刻断掉）。
+function offHostOf(run) {
+  if (!run.off) {
+    run.off = document.createElement("div");
+    run.off.className = "chat-scroll";
+  }
+  return run.off;
+}
+
+function threadHostOf(run) {
+  return run && !run.visible ? offHostOf(run) : chatScroll;
+}
+
+// 只有挂在文档里的那棵树才允许滚动屏幕：后台那场一滚动就把用户正在看的列表拽到底
+function autoScrollIn(host, force = false) {
+  if (!host?.isConnected) return;
+  if (force || stickToBottom) host.scrollTop = host.scrollHeight;
+}
+
+function stashRunThread(run) {
+  if (!run || !chatScroll) return;
+  const off = offHostOf(run);
+  off.innerHTML = "";
+  while (chatScroll.firstChild) off.appendChild(chatScroll.firstChild);
+}
+
+// 搬回屏幕：返回 true 表示屏幕已经是这一场的现场（不必再从消息数组重渲染）
+function adoptRunThread(run) {
+  if (!run?.off || !chatScroll || !run.off.childElementCount) return false;
+  chatScroll.innerHTML = "";
+  while (run.off.firstChild) chatScroll.appendChild(run.off.firstChild);
+  run.off = null;
+  return true;
 }
 
 // ── 目标自主执行（六阶段闭环：目标→计划→执行→验证→汇报→追溯） ──
@@ -217,7 +281,7 @@ let effortPopOpen = false;
 
 // 静默把用户的档位改掉必须让他看见；toast 在 app.js，动态引入避免与 app.js 形成静态环
 async function echoEffortFallback(model, dropped) {
-  const { toast } = await import("../app.js?v=20260922-006");
+  const { toast } = await import("../app.js?v=20260925-001");
   toast(t("{model} 不支持「{level}」推理强度，已回落自动", {
     model: model.name || model.id,
     level: t(EFFORT_LEVEL_LABELS[dropped] || dropped),
@@ -999,15 +1063,18 @@ async function resolveExpertMention(name) {
 
 // ── 用量同步到后端 ──────────────────────────
 
-async function syncUsageToBackend() {
-  if (!state.currentConversationId) return;
-  const ctxTokens = measureContext(state.messages).total;
+async function syncUsageToBackend(convId = state.currentConversationId) {
+  if (!convId) return;
+  const ctxTokens = measureContext(messagesOf(convId)).total;
+  const usage = convId === state.currentConversationId
+    ? state.usage
+    : (state.conversationUsage[convId] || { totalTokens: 0, promptTokens: 0, completionTokens: 0, messageCount: 0 });
   try {
-    await patch(`/chat/conversations/${state.currentConversationId}/usage`, {
-      total_tokens: state.usage.totalTokens,
-      prompt_tokens: state.usage.promptTokens,
-      completion_tokens: state.usage.completionTokens,
-      message_count: state.usage.messageCount,
+    await patch(`/chat/conversations/${convId}/usage`, {
+      total_tokens: usage.totalTokens,
+      prompt_tokens: usage.promptTokens,
+      completion_tokens: usage.completionTokens,
+      message_count: usage.messageCount,
       context_tokens: ctxTokens,
     });
   } catch (e) {
@@ -1332,10 +1399,13 @@ function createEditDeleteActions(actions, msg, msgEl, contentEl) {
 }
 
 // 流式生成中消息先渲染后持久化：id 就绪后为对应 DOM 补建编辑/删除按钮
-function syncMsgActionButtons() {
-  state.messages.forEach((m, i) => {
+function syncMsgActionButtons(convId = state.currentConversationId) {
+  const run = runOf(convId);
+  const host = threadHostOf(run) || chatScroll;
+  if (!host) return;
+  (run ? messagesOf(convId) : state.messages).forEach((m, i) => {
     if (!m.id || m.role === "system") return;
-    const el = chatScroll.querySelector(`.msg[data-index="${i}"]`);
+    const el = host.querySelector(`.msg[data-index="${i}"]`);
     if (!el || el.querySelector(".msg-action-edit")) return;
     const actions = el.querySelector(".msg-actions");
     const contentEl = el.querySelector(".msg-content");
@@ -1344,25 +1414,38 @@ function syncMsgActionButtons() {
 }
 
 function renderAllMessages() {
-  chatScroll.innerHTML = "";
+  renderThreadInto(chatScroll, state.messages);
+}
+
+// 把一份消息数组画进指定的落点（屏幕或某场后台生成的游离节点）
+function renderThreadInto(host, msgs) {
+  if (!host) return;
+  const live = host === chatScroll;
+  host.innerHTML = "";
+  const list = Array.isArray(msgs) ? msgs : [];
   // 无可见消息时展示欢迎页（替代 :empty 占位提示）
-  const hasVisible = state.messages.some(m => !isHiddenContextMessage(m));
+  const hasVisible = list.some(m => !isHiddenContextMessage(m));
 
   if (!hasVisible) {
-    chatScroll.appendChild(buildWelcomeEl());
-    requestAnimationFrame(() => cxEmptyIn());
+    if (live) {
+      host.appendChild(buildWelcomeEl());
+      requestAnimationFrame(() => cxEmptyIn());
+    }
     return;
   }
-  if (convProjectEl) {
-    chatScroll.appendChild(convProjectEl);
+  // 项目 chip 是全站共用的那一个节点：挂到后台那场的游离树上，等于从屏幕上把它搬走
+  if (live && convProjectEl) {
+    host.appendChild(convProjectEl);
     updateConvProjectBadge();
   }
-  state.messages.forEach((msg, i) => {
+  list.forEach((msg, i) => {
     if (isHiddenContextMessage(msg)) return;
-    chatScroll.appendChild(renderMessage(msg, i));
+    host.appendChild(renderMessage(msg, i));
   });
-  stickToBottom = true;
-  chatScroll.scrollTop = chatScroll.scrollHeight;
+  if (live) {
+    stickToBottom = true;
+    host.scrollTop = host.scrollHeight;
+  }
 }
 
 // ── 流式光标 ────────────────────────────────
@@ -1913,23 +1996,30 @@ function isAbortError(err) {
 function updateSendState() {
   if (!btnSend) return;
   btnSend.disabled = false;
-  btnSend.textContent = isGenerating ? "停止" : (inputQueue.length ? t("发言{n})", { n: inputQueue.length }) : "发言");
-  btnSend.classList.toggle("is-stopping", isGenerating);
+  // 三个"有没有在跑"要分清：这一场在跑（按钮变停止）、任一场在跑（别处的进度在任务中心）、
+  // 还有别的项目在排队（计数写进队列状态条，用户按了发送就得看得见它去哪了）
+  const here = isGenerating(state.currentConversationId);
+  const vq = visibleQueue();
+  const waiting = pendingRuns().length;
+  btnSend.textContent = here ? "停止" : (vq.length ? t("发言{n})", { n: vq.length }) : "发言");
+  btnSend.classList.toggle("is-stopping", here);
   if (queueStatus) {
-    queueStatus.classList.toggle("hidden", !isGenerating && inputQueue.length === 0);
+    queueStatus.classList.toggle("hidden", !here && !vq.length && !waiting);
     const statusText = queueStatus.querySelector(".queue-status-text");
     if (statusText) {
-      statusText.textContent = t(isGenerating ? "正在生成" : "待发送") + (inputQueue.length ? t(" · 队列 {n}", { n: inputQueue.length }) : "");
+      statusText.textContent = t(here ? "正在生成" : "待发送")
+        + (vq.length ? t(" · 队列 {n}", { n: vq.length }) : "")
+        + (waiting ? t(" · 排队中 {n}", { n: waiting }) : "");
     }
   }
   if (chatInput) {
-    const queueHint = inputQueue.length ? t(" · 队列 {n}", { n: inputQueue.length }) : "";
+    const queueHint = vq.length ? t(" · 队列 {n}", { n: vq.length }) : "";
     const grindOn = grindSession && ["grinding", "collecting"].includes(grindSession.state);
     const grindDone = grindSession?.state === "done";
     const grindRound = grindOn && grindSession.round
       ? t(" · 第 {x}/{n} 轮", { x: Math.min(grindSession.round, grindSvc.MAX_ROUNDS), n: grindSvc.MAX_ROUNDS })
       : "";
-    chatInput.placeholder = isGenerating
+    chatInput.placeholder = here
       ? t("继续输入可加入队列，点击停止中断输出") + queueHint
       : (grindOn
         ? t("磨墨中") + grindRound + t(" · 直接回复问题即可（输「收墨」立即出墨稿）")
@@ -1941,10 +2031,11 @@ function updateSendState() {
   }
 }
 
-function captureCurrentInputForQueue() {
+/** 把输入框里的内容取走成一份待发载荷（清空输入框与草稿）。取不到返回 null。 */
+function takeCurrentInputPayload() {
   const text = chatInput?.value.trim() || "";
-  if (!text && pendingFiles.length === 0) return false;
-  inputQueue.push({ text, files: [...pendingFiles] });
+  if (!text && pendingFiles.length === 0) return null;
+  const payload = { text, files: [...pendingFiles] };
   chatInput.value = "";
   chatInput.style.height = "auto";
   chatInput.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1952,12 +2043,22 @@ function captureCurrentInputForQueue() {
   pendingFiles = [];
   renderFilePreview();
   updateSendState();
+  return payload;
+}
+
+function captureCurrentInputForQueue() {
+  const payload = takeCurrentInputPayload();
+  if (!payload) return false;
+  visibleQueue().push(payload);
+  updateSendState();
   return true;
 }
 
 function stopGeneration() {
-  if (!isGenerating) return;
-  activeGenerationController?.abort();
+  // 停止只有这一个口，且只停屏幕上这一场：别的项目里在跑的不能跟着遭殃
+  const r = runOf(state.currentConversationId);
+  if (!r) return;
+  abortRun(r.run_id);
   updateSendState();
   // 停止仅中断本次生成：目标开关保持不动，只有手动添加才退出
   showHarnessIdle("本次执行已停止· 目标模式保持开启，下一条消息继续自主执行");
@@ -1965,32 +2066,45 @@ function stopGeneration() {
 }
 
 function clearInputQueue() {
-  if (inputQueue.length === 0) return;
-  inputQueue = [];
+  const q = visibleQueue();
+  if (q.length === 0) return;
+  q.length = 0;
   updateSendState();
 }
 
-async function refreshKnowledgeContext(query) {
+async function refreshKnowledgeContext(query, convId = state.currentConversationId) {
   if (state.knowledgeSettings?.enabled === false) {
-    setKnowledgeContext([]);
+    rememberKnowledge(convId, []);
     return [];
   }
   const text = String(query || "").trim();
   if (!text) {
-    setKnowledgeContext([]);
+    rememberKnowledge(convId, []);
     return [];
   }
   try {
     const limit = Math.max(1, Math.min(12, parseInt(state.knowledgeSettings?.topK) || 5));
     const res = await post("/knowledge/search", { query: text.slice(-4000), limit });
     const items = res.code === 0 ? (res.data || []) : [];
-    setKnowledgeContext(items);
+    rememberKnowledge(convId, items);
     return items;
   } catch (e) {
     console.warn("知识库检索失败", e);
-    setKnowledgeContext([]);
+    rememberKnowledge(convId, []);
     return [];
   }
+}
+
+// 检索结果挂在会话上，不是挂在全局上：并行时后台那场的片段若写进全局那份，
+// 会被下一次前台组装请求当成「前台这场」的知识读走——念错人的知识库比不念更难查。
+// 全局 state.knowledgeContext 只在"这就是屏幕上那场"时跟着更新（上下文条读它）。
+const threadKnowledge = new Map();
+
+function rememberKnowledge(convId, items) {
+  const key = String(convId || "");
+  if (items && items.length) threadKnowledge.set(key, items);
+  else threadKnowledge.delete(key);
+  if (!convId || convId === state.currentConversationId) setKnowledgeContext(items || []);
 }
 
 function isShortReviewCandidate(content) {
@@ -2127,9 +2241,9 @@ function scheduleAutoAdvanceNudge(msgEl, calls, reason = "stalled") {
   return true;
 }
 
-async function autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params) {
+async function autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params, genConvId = state.currentConversationId) {
   if (state.chatMode === "chat") return msgEl; // 对话模式不合成工具调用
-  const lastMsg = state.messages[state.messages.length - 1];
+  const lastMsg = messagesOf(genConvId)[messagesOf(genConvId).length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return msgEl;
   if (state.harness?.enabled === true && getTodoLoopState().closed) return msgEl;
   if (lastMsg.autoAdvanced) return msgEl;
@@ -2159,9 +2273,9 @@ async function autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params) {
   return msgEl;
 }
 
-async function autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal = null) {
+async function autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal = null, genConvId = state.currentConversationId) {
   if (state.chatMode === "chat") return msgEl; // 对话模式不做停顿审查
-  const lastMsg = state.messages[state.messages.length - 1];
+  const lastMsg = messagesOf(genConvId)[messagesOf(genConvId).length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return msgEl;
   if (signal?.aborted) return msgEl;
   if (state.harness?.enabled === true && getTodoLoopState().closed) return msgEl;
@@ -2911,7 +3025,7 @@ function stripOverlap(oldContent, newPart) {
   return newPart;
 }
 
-async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl, params, signal, finishReason = "", out = {}) {
+async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl, params, signal, finishReason = "", out = {}, convId = state.currentConversationId) {
   const contentEl = msgEl?.querySelector(".msg-content");
   const ink = msgEl ? attachInkstream(msgEl) : null;
   let fr = finishReason;
@@ -2921,17 +3035,20 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     if (signal?.aborted || !stuck) break;
     const contPrompt = buildContinuePrompt(content);
     try {
-      const { toast } = await import("../app.js?v=20260922-006");
-      toast(t("输出达到长度上限，自动续写中（{x}/{n}）…", { x: round, n: MAX_CONTINUE_ROUNDS }));
+      // 提示条只报屏幕上这一场：后台那场在续写，前台弹一句"自动续写中"是在说别人的事
+      if (convId === state.currentConversationId) {
+        const { toast } = await import("../app.js?v=20260925-001");
+        toast(t("输出达到长度上限，自动续写中（{x}/{n}）…", { x: round, n: MAX_CONTINUE_ROUNDS }));
+      }
     } catch {}
 
     // 历史 + 被截断的助手消息原文 + 续写指令（模型需看到断点才能接续）
-    const history = buildAdapterHistory();
+    const history = buildAdapterHistory(convId);
     history.push({ role: "assistant", content });
     history.push({ role: "user", content: contPrompt });
     history._modelId = modelId;
     const toolMode = effectiveToolMode(modelId, (findModelById(modelId) || state.currentModel)?.provider, state.chatMode);
-    const messages = buildMessages(history, effectiveConstitution(), toolMode);
+    const messages = buildMessages(history, history._constitution || effectiveConstitution(), toolMode, { project: history._project || null });
 
     const cursor = msgEl ? addStreamingCursor(msgEl) : null;
     const contMeta = {};
@@ -2940,14 +3057,14 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
       for await (const chunk of streamChat({ model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, messages, api_key: apiKey, base_url: baseUrl, temperature: params?.temperature ?? 0.7, max_tokens: params?.max_tokens ?? getOutputMaxTokens(), reasoning_effort: state.reasoningEffort || "auto", stream: true, signal, meta: contMeta, ...(toolMode === "native" ? { tools: buildOpenAITools() } : {}) }, { onToolCall: (calls) => { out.toolCalls = calls; ink?.onCalls(calls); } })) {
         appendStreamChunk(chunk, {
           reasoning() {
-            markActivity();
+            markActivity(convId);
           },
           content(text) {
             part += text;
-            markActivity();
+            markActivity(convId);
             if (contentEl) renderAssistantContent(contentEl, content + part, cursor);
             ink?.onTextContent(content + part);
-            autoScroll();
+            autoScrollIn(msgEl?.parentElement || chatScroll);
           },
         });
       }
@@ -2964,7 +3081,7 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
   // 轮数耗尽仍未闭合：提示用户，后续由工具循环的截断守卫接管（拒执行并要求拆分重试）
   if (!signal?.aborted && hasTruncatedTail(content)) {
     try {
-      const { toast } = await import("../app.js?v=20260922-006");
+      const { toast } = await import("../app.js?v=20260925-001");
       toast("输出仍不完整，已要求模型拆分重试", 3200);
     } catch {}
   }
@@ -2990,8 +3107,16 @@ function mapAdapterMessage(m) {
   };
 }
 
-function buildAdapterHistory() {
-  return state.messages.slice(0, -1).map(mapAdapterMessage);
+function buildAdapterHistory(convId = state.currentConversationId) {
+  const list = messagesOf(convId).slice(0, -1).map(mapAdapterMessage);
+  // 一条历史数组带走它自己的现场（项目 / 宪法 / 知识）：组装请求时不再回读全局，
+  // 否则后台那场会拿屏幕上那个项目的规则与知识去问模型。
+  const r = runOf(convId);
+  const scope = r ? r.scope : state.project;
+  list._project = scope || null;
+  list._constitution = r ? constitutionForScope(scope) : effectiveConstitution();
+  list._knowledge = threadKnowledge.get(String(convId || "")) || null;
+  return list;
 }
 
 // 统一流式入口：按模型能力决定原生（tools 参数）或文本（◈ 协议）模式；
@@ -3000,7 +3125,7 @@ function buildAdapterHistory() {
 async function streamWithNativeFallback({ history, model, provider, api_key, base_url, temperature, max_tokens, use_responses, signal, meta, onToolCall }, onChunk) {
   let toolMode = effectiveToolMode(model, provider, state.chatMode);
   while (true) {
-    const messages = buildMessages(history, effectiveConstitution(), toolMode);
+    const messages = buildMessages(history, history._constitution || effectiveConstitution(), toolMode, { project: history._project || null });
     let produced = false;
     try {
       for await (const chunk of streamChat({
@@ -3020,7 +3145,7 @@ async function streamWithNativeFallback({ history, model, provider, api_key, bas
         toolMode = "text";
         setModelToolCapability(model, "text");
         try {
-          const { toast } = await import("../app.js?v=20260922-006");
+          const { toast } = await import("../app.js?v=20260925-001");
           toast(t("该模型不支持原生工具调用，已自动切换为文本格式"), 3200);
         } catch {}
         continue;
@@ -3116,11 +3241,15 @@ const desktopPolicy = {
     });
   },
   onStart(run) {
+    const deskRun = runOf(run.genConvId);
+    if (deskRun) deskRun.kernelRun = run;   // 黑板按这一场的账本重投时要拿得到它
+    // 画布与提示条是屏幕上这一场的：后台那场开跑不该把前台的步骤链清成它的
+    if (deskRun && !deskRun.visible) return;
     // 新任务开始：清掉上一任务残留的工具步骤卡，画布只保留当前任务的步骤链
     clearToolStepCards(run.ledger?.runId || "");
     hideResumeHint();
   },
-  markActivity() { markActivity(); },
+  markActivity(run) { markActivity(run?.genConvId || null); },
   postExec(run) {
     // 收口工具已经执行完（结果会照常回灌），这里只把请求搬到本场 run 上。
     // 不在 execute 里直接停：那会让模型连"我做完了什么"都还没说出口就被掐断。
@@ -3218,13 +3347,15 @@ const desktopPolicy = {
     }
     // 后台任务的消息到了：模型正空手停笔，正好把"你自己起的那个任务有动静了"交给它。
     // 不花续跑配额——事件被取走就没了，一条事件最多唤醒一次，天然有界。
-    if (hasBgEvents()) {
-      const events = takeBgEvents();
+    // 只取"归属是这一场"的那些：别的项目里跑完的结局要留在信箱里等它自己回来念，
+    // 在这儿念就等于拿 A 的进度去回答 B 的问题。
+    const bgEvents = takeBgEvents(state.currentConversationId);
+    if (bgEvents.length) {
       return {
         action: "nudge",
         kind: "bg_event",
-        progressText: t("后台任务有动静 · 已把 {n} 条消息交给模型", { n: events.length }),
-        hiddenMsg: { role: "user", content: bgWakeText(events), model: "[bg_task]", hidden: true },
+        progressText: t("后台任务有动静 · 已把 {n} 条消息交给模型", { n: bgEvents.length }),
+        hiddenMsg: { role: "user", content: bgWakeText(bgEvents), model: "[bg_task]", hidden: true },
       };
     }
     if (autopilotOn && round < maxRounds - 1) {
@@ -3356,7 +3487,10 @@ const desktopPolicy = {
     // 后台任务的消息刚送到、还没被念到这一轮就先触顶：直接散场等于把消息丢了。
     // 只在"确实有未读事件"时放宽——单纯"任务还在跑"不该换来一轮轮空等，
     // 等它真出结果，空闲续跑那条路会接手。这一段与空闲续跑共用那份配额。
-    if (hasBgEvents() && takeBgResumeGrant(run.genConvId || state.currentConversationId || "")) {
+    // 而且只看"归属是这一场"的那几条：别的项目的消息不该给这一场换来追加轮数，
+    // 否则一场不相干的编译就能把当前对话一直吊着续跑。
+    if (peekBgEventsFor(run.genConvId || state.currentConversationId).length
+        && takeBgResumeGrant(run.genConvId || state.currentConversationId || "")) {
       return {
         extend: BG_CAP_EXTEND,
         kind: "bg_event",
@@ -3472,9 +3606,20 @@ const desktopPolicy = {
 // 账 → 白板：一次 run 的步骤链投影，幂等可重复调用
 function projectBoard(run) {
   if (!run.ledger) return;
+  // 后台那场的步骤不往黑板上投：黑板是"此刻这一场在干什么"的视图，
+  // 两场同时投就变成交替刷新，两边都看不清。切回那一场时按账本重建。
+  if (!runOf(run.genConvId)?.visible) return;
   boardRunLedger = run.ledger;   // 黑板工作流视图读的就是这一份账，不另存一份状态
   boardRunConvId = run.genConvId || state.currentConversationId || "";
   syncToolStepCards(projectSteps(run.ledger), run.ledger.runId);
+}
+
+/** 切回一场还在跑的对话：按它的账本把黑板重投成这一场的步骤链 */
+function resyncBoardForConversation(convId) {
+  const r = runOf(convId);
+  if (!r) return;
+  const kernelRun = r.kernelRun;
+  if (kernelRun) projectBoard(kernelRun);
 }
 
 // ── 黑板工作流视图的现场读取 ────────────────────────────
@@ -3484,7 +3629,7 @@ let boardRunConvId = "";     // 这份账属于哪场对话：换了对话就不
 let boardRunInfo = null;     // 上一场的收尾：{runId, exitReason, exitKind, wallMs}
 
 function boardWorkflowSnapshot() {
-  const busy = Boolean(isGenerating);
+  const busy = isGenerating(state.currentConversationId);
   // 账本跟着对话作废：不然切到没跑过的对话，"当前运行"还在播上一场的步骤
   const mine = !boardRunConvId || boardRunConvId === (state.currentConversationId || "");
   const ledger = mine ? boardRunLedger : null;
@@ -3507,7 +3652,7 @@ function registerBoardWorkflow() {
   setWorkflowRunApi({
     snapshot: boardWorkflowSnapshot,
     conversationId: () => state.currentConversationId || "",
-    canResume: () => !isGenerating
+    canResume: () => !isGenerating(state.currentConversationId)
       && Boolean(resumeHintEl) && !resumeHintEl.classList.contains("hidden"),
     runAction: (id, name) => {
       // 复用 @提及 注入这一条既有链路：Action 的正文由 resolveMentions 取，视图不另造执行器
@@ -3526,7 +3671,10 @@ function registerBoardWorkflow() {
 const desktopView = {
   reanchorBubble(el, index) {
     if (el?.isConnected) return null;
-    const liveEl = chatScroll?.querySelector(`.msg[data-index="${index}"]`);
+    // 回到**它自己那棵树**里找：气泡挂在谁下面就是谁的现场。用全局 #chat-messages
+    // 找的话，后台那场的第 7 条会锚到前台那场的第 7 条上（两条毫不相干的对话）。
+    const host = el?.parentElement || chatScroll;
+    const liveEl = host?.querySelector(`.msg[data-index="${index}"]`);
     if (!liveEl) return null;
     // 砚流条实例随节点迁移，本轮 DOM 写入才不落空
     rehostInkstream(el, liveEl);
@@ -3538,7 +3686,12 @@ const desktopView = {
     contentEl.innerHTML = renderMarkdown(content);
     contentEl.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
   },
-  setProgress(text) { setHarnessProgress(text); },
+  setProgress(text, run = null) {
+    // 进度条只有屏幕上那一条：后台那场的轮数说给它自己（任务中心的行里读 phase/时间），
+    // 前台弹后台的进度等于拿别人的活儿糊在自己的屏幕上
+    if (run && !run.visible) return;
+    setHarnessProgress(text);
+  },
   execProgress(el) {
     const execInk = attachInkstream(el);
     const argKeyOf = (call) => (call?.index != null ? `n${call.index}` : "t0");
@@ -3603,21 +3756,23 @@ const desktopIo = {
   },
   async streamTurn(run) {
     const { signal, genConvId } = run;
+    // run 是 kernel 那一场（不是登记表里的 run）；落点取登记表里这一场的树
+    const deskRun = runOf(genConvId);
     const { modelId, apiKey, baseUrl, params } = run.opts;
     const followUp = { role: "assistant", content: "", model: state.currentModel?.name || "" };
-    addMessage(followUp);
+    addMessage(followUp, genConvId);
     _pendingToolMsgs.add(followUp);
 
     // addMessage 已同步触发全量重渲染，直接复用刚生成的气泡，避免产生重复空气泡
-    const followEl = chatScroll.lastElementChild;
+    const followEl = threadHostOf(deskRun).lastElementChild;
     const followContent = followEl.querySelector(".msg-content");
     const cursor = addStreamingCursor(followEl);
     autoScroll();
 
     // 流式续写
-    await refreshKnowledgeContext(state.messages.slice(-6).map(m => m.content || "").join("\n"));
+    await refreshKnowledgeContext(messagesOf(genConvId).slice(-6).map(m => m.content || "").join("\n"), genConvId);
     if (signal?.aborted) return { bubble: followEl, message: followUp, stop: DESKTOP_EXIT_REASONS.aborted };
-    const history = buildAdapterHistory();
+    const history = buildAdapterHistory(genConvId);
     history._modelId = modelId;
     const nativeCalls = [];
 
@@ -3631,17 +3786,17 @@ const desktopIo = {
         appendStreamChunk(chunk, {
           reasoning(text) {
             followReasoningText += text;
-            markActivity();
+            markActivity(genConvId);
             if (!followThinkingPanel) followThinkingPanel = createThinkingPanel(followEl);
             updateThinkingPanel(followThinkingPanel, followReasoningText);
-            autoScroll();
+            autoScrollIn(threadHostOf(deskRun));
           },
           content(text) {
             followContent2 += text;
-            markActivity();
+            markActivity(genConvId);
             renderAssistantContent(followContent, followContent2, cursor);
             ink.onTextContent(followContent2);
-            autoScroll();
+            autoScrollIn(threadHostOf(deskRun));
           },
         });
       });
@@ -3657,11 +3812,11 @@ const desktopIo = {
     removeStreamingCursor(cursor);
     const contOut = {};
     if (!signal?.aborted && (hasTruncatedTail(followContent2) || followMeta.finishReason === "length")) {
-      followContent2 = await continueTruncatedOutput(followEl, followContent2, modelId, apiKey, baseUrl, params, signal, followMeta.finishReason || "", contOut);
+      followContent2 = await continueTruncatedOutput(followEl, followContent2, modelId, apiKey, baseUrl, params, signal, followMeta.finishReason || "", contOut, genConvId);
     }
     if (contOut.toolCalls || nativeCalls.length) followUp.toolCalls = contOut.toolCalls || nativeCalls;
     // 会话已切换时跳过本地列表更新（内容仍持久化到归属会话，切回后从后端加载可见）
-    if (state.currentConversationId === genConvId) updateLastAssistantMessage(followContent2);
+    updateLastAssistantMessage(followContent2, genConvId);
     renderAssistantContent(followContent, followContent2);
 
     // 持久化（写回归属会话而非当前会话）
@@ -3684,12 +3839,15 @@ async function runToolLoop(
   signal = null,
   maxRounds = 5,
   options = {},
+  run = null,
 ) {
   // 对话模式：只保留刚结束的这一轮流式输出，不进多轮工具循环
   if (state.chatMode === "chat") return null;
-  // 本循环归属会话：之后即使切换到新会话并开始新生成，旧循环也只读写自己的会话。
-  // run 交给调用方：徽标已由 policy.finish 落过，发送链路据此避免再记一遍——
-  // 否则"手动停止/轮数耗尽"会被收尾的 finally 一律改写成"已完成"。
+  // 本循环归属的会话 / 项目 / 消息数组都取自这一场的 run：并行时它们是三套不同的东西，
+  // 再读全局（activeGenerationConvId / state.messages）就等于让后台那场照着前台那场的
+  // 对话往下续写。run 缺省时（旧的移动端与非并行路径）回落到屏幕上的现场。
+  const genConvId = run ? (run.conv_id || null) : activeGenerationConvId;
+  if (run) run.kernelRun = null;   // 每轮由 policy.onStart 重新认领（见 desktopPolicy.onStart）
   return await desktopAgentLoop({
     bubble: msgEl,
     modelId,
@@ -3699,7 +3857,11 @@ async function runToolLoop(
     signal,
     maxRounds,
     options,
-    genConvId: activeGenerationConvId,
+    genConvId,
+    messages: () => (genConvId ? messagesOf(genConvId) : state.messages),
+    project: run?.scope || state.project || null,
+    // 切走会话是否散场：backgroundRuns 开着就不散（这一场在后台继续跑，结局落进任务中心）
+    stopOnSwitch: !backgroundRunsOn(),
   });
 }
 
@@ -3755,29 +3917,43 @@ function stopTaskTimer() {
 function maybeDriveBgEvents(convId, signal) {
   if (!convId || signal?.aborted) return;
   setTimeout(() => {
-    if (isGenerating || inputQueue.length > 0) return;
-    if (state.currentConversationId !== convId) return;   // 已经切走：消息留给归属会话
-    if (!hasBgEvents()) return;
+    // 只看这一场：别的项目在跑不该挡住这里的续跑，这一场自己排队没发完才该挡
+    if (isGenerating(convId) || visibleQueueFor(convId).length > 0) return;
+    // 信箱里属于这一场的先搬回唤醒池（用户切回来时才会有的那一批）
+    drainInboxFor(convId);
+    // 先看有没有可念的，再花配额：配额一旦被"其实没有消息可念"的情况吃掉，
+    // 这一场就少了一次真正的自动续跑机会
+    if (!peekBgEventsFor(convId).length) return;
     if (!takeBgResumeGrant(convId)) return;
-    const events = takeBgEvents();
-    if (!events.length) return;
+    const bgEvents = takeBgEvents(convId);
+    if (!bgEvents.length) return;
     const left = bgResumeLeft(convId);
-    sendMessage({ text: bgWakeText(events), hidden: true, kind: "bg_resume" });
+    sendMessage({ text: bgWakeText(bgEvents), hidden: true, kind: "bg_resume" }, { convId });
     if (left === 0 && runningBgTasks().length > 0) {
       // 与别处同一手法：toast 在 app.js，动态引入避免与 app.js 形成静态环
-      import("../app.js?v=20260922-006")
+      import("../app.js?v=20260925-001")
         .then(({ toast }) => toast(t("后台任务还在跑，但本对话的自动续跑次数已用完（{n} 次），有事请直接问", { n: BG_RESUME_MAX })))
         .catch(() => {});
     }
   }, 0);
 }
 
-async function sendMessage(queuedPayload = null) {
-  if (isGenerating) {
-    if (queuedPayload) inputQueue.push(queuedPayload);
+/** 某个会话的待发队列：跑着的那场挂在 run 上，没跑的先暂存 idle 那份 */
+function visibleQueueFor(convId) {
+  const r = runOf(convId);
+  if (r) return r.queue;
+  return convId === state.currentConversationId ? idleQueue : [];
+}
+
+async function sendMessage(queuedPayload = null, opts = {}) {
+  const targetConvId = opts.convId !== undefined ? opts.convId : state.currentConversationId;
+  const here = runOf(targetConvId);
+  if (here) {
+    // 同一场对话里连按发送：照旧排队，这一场跑完按序发出去（并行≠同场并发）
+    if (queuedPayload) here.queue.push(queuedPayload);
     else if (captureCurrentInputForQueue()) {
-      const { toast } = await import("../app.js?v=20260922-006");
-      toast(t("已加入输入队列（{n}）", { n: inputQueue.length }));
+      const { toast } = await import("../app.js?v=20260925-001");
+      toast(t("已加入输入队列（{n}）", { n: here.queue.length }));
     }
     updateSendState();
     return;
@@ -3786,6 +3962,21 @@ async function sendMessage(queuedPayload = null) {
   const text = queuedPayload?.text ?? chatInput.value.trim();
   const filesForMessage = queuedPayload?.files ?? [...pendingFiles];
   if (!text && filesForMessage.length === 0) return;
+
+  // 上限判定只在一处（canStart）：这里拿到 not-ok 是"槽位满了"，不是"你的请求被拒了"。
+  // 静默吞掉按下发送的那条消息是最坏的一种贴心，所以进队列并明确告诉用户它在等什么。
+  // 队列项带着自己原来的项目：从等待队列交回来时视野可能已经换到别的项目上了
+  const projectId = String(opts.projectId || state.project?.project_id || "");
+  const gate = canStart({ convId: targetConvId, projectId });
+  if (!gate.ok) {
+    const payload = queuedPayload || takeCurrentInputPayload();
+    if (!payload) return;
+    enqueue({ convId: targetConvId, projectId, payload });
+    updateSendState();
+    const { toast } = await import("../app.js?v=20260925-001");
+    toast(t("已达并行上限，已排队：等当前任务腾出位置自动开始（{n} 个在等）", { n: pendingRuns().length }));
+    return;
+  }
 
   // /grind 命令：开启磨墨会话
   const grindMatch = !queuedPayload && text.match(/^\/grind\s+([\s\S]+)/);
@@ -3803,7 +3994,7 @@ async function sendMessage(queuedPayload = null) {
   const grindActive = grindSession && ["grinding", "collecting"].includes(grindSession.state);
   const isFreshConv = !state.currentConversationId || state.messages.length === 0;
   if (!queuedPayload && !grindActive && isFreshConv && isAbstractTask(text)) {
-    const { dlgConfirm } = await import("../services/dialog.js?v=20260922-006");
+    const { dlgConfirm } = await import("../services/dialog.js?v=20260925-001");
     const confirmed = await dlgConfirm(
       t("检测到抽象任务「{text}」，建议先进入磨墨模式细化需求后再执行。是否切换？", { text: text.slice(0, 30) }),
       { title: t("磨墨建议"), okText: t("进入磨墨"), cancelText: t("直接发送") }
@@ -3818,18 +4009,30 @@ async function sendMessage(queuedPayload = null) {
     }
   }
 
-  isGenerating = true;
+  // 项目现场先落地再开跑：拿不到就别跑——退回去用屏幕上那个项目的根干活，
+  // 等于把这条任务的产物写进另一个人的仓库里。
+  const scope = await ensureProjectScope(projectId);
+  if (projectId && !scope) {
+    const { toast } = await import("../app.js?v=20260925-001");
+    toast(t("项目目录已经不在了，无法开始：{p}", { p: projectId }));
+    requeueFromQueue(opts, { text, files: filesForMessage });
+    return;
+  }
+  const run = startRun({ convId: targetConvId || "", projectId });
+  if (!run) { requeueFromQueue(opts, { text, files: filesForMessage }); return; }
+  run.scope = scope || state.project || null;
   hideResumeHint(); // 新的一轮生成开始：上一次的中断提示条使命结束
-  markActivity(); // 看门狗计时基准：从本次生成开始算
-  activeGenerationController = new AbortController();
-  const signal = activeGenerationController.signal;
-  setSubAgentSignal(signal);
+  markActivity(targetConvId); // 看门狗计时基准：从本次生成开始算
+  const signal = run.controller.signal;
   // 生成归属会话：本次生成全程只读写该会话，切换/新建会话后旧回复不会写入新会话
-  let genConvId = state.currentConversationId;
-  activeGenerationConvId = genConvId;
+  let genConvId = targetConvId || null;
+  if (genConvId === state.currentConversationId) activeGenerationConvId = genConvId;
+  // 子代理的中止信号只在屏幕上这一场挂全局：后台那场的 signal 由工具调用上下文带下去
+  // （services/tools.js 的 subagent_run 读 callCtx.signal），否则两场互相顶掉。
+  if (run.visible) setSubAgentSignal(signal);
   updateSendState();
   refreshTaskBadges();  // 「进行中」跟着生成权走：只有实时这一层知道
-  startTaskTimer();
+  if (run.visible) startTaskTimer();
 
   // 这三个标志要在 try 之外声明：finally 里的徽标落点读得到，才轮得到"细粒度结论优先"
   // （侧栏徽标的两条落点：循环跑完由 policy.finish 记，它看得见收口/停止；其余路径由 finally 记）
@@ -3839,14 +4042,18 @@ async function sendMessage(queuedPayload = null) {
 
   try {
   if (!state.currentConversationId) {
-    // 创建对话时记录当前打开的项目（未打开则为空，前端展示为“无项目”）
+    // 创建对话时记录当前打开的项目：project 是给人看的名字，project_id 才是归组依据。
+    // 两个都写是因为历史会话只有名字这一列（没做回填），读时按名字回落才认得出旧数据。
     const res = await post("/chat/conversations", {
       title: (text || filesForMessage[0]?.name || "新对话").slice(0, 30),
       project: state.project?.name || "",
+      project_id: state.project?.project_id || "",
     });
     if (res.code === 0) {
       state.currentConversationId = res.data.id;
       genConvId = res.data.id;
+      // 会话是这趟发送途中才建出来的：run 要改挂到它名下，否则它结束不了也停不下
+      run.conv_id = genConvId;
       activeGenerationConvId = genConvId;
       await refreshConversationList();
       updateConvProjectBadge();
@@ -3912,13 +4119,13 @@ async function sendMessage(queuedPayload = null) {
   const autopilotOn = !chatModeOn && (harnessOn || agentTask.wantsEnv);
   const agentRuntimeContext = bgResumeTurn ? "" : buildAgentRuntimeContext(text, harnessOn);
   const fullText = (harnessOn ? HARNESS_PREFIX : "") + text + agentRuntimeContext + mentionContext + fileContext;
-  await refreshKnowledgeContext(fullText);
+  await refreshKnowledgeContext(fullText, genConvId);
   // display：气泡只展示用户输入的原文；注入的 Skill 定义 / 目标指令 / 文件内容只进模型上下文，与后端持久化的干净文本保持一致。
   // hidden：系统自己开口的那一场不进气泡也不入库（与循环内 nudge 同一口径），否则刷新后会看到
   // 一条用户从没发过的"消息"。
   const userMsg = { role: "user", content: fullText, display: text, model: "", hidden: bgResumeTurn || undefined, files: fileMeta.length > 0 ? fileMeta : undefined };
 
-  addMessage(userMsg);
+  addMessage(userMsg, genConvId);
 
   // 追溯用：把本轮生效的回复模式与推理强度记进消息 metadata（messages 表已有该 JSON 列，无需迁移）
   const turnMeta = { chatMode: chatModeOn ? "chat" : "agent", reasoningEffort: state.reasoningEffort || "auto" };
@@ -3931,24 +4138,24 @@ async function sendMessage(queuedPayload = null) {
       metadata: { ...turnMeta, ...(fileMeta.length > 0 ? { files: fileMeta } : {}) },
     });
     if (saved.code === 0 && saved.data?.id) userMsg.id = saved.data.id;
-    syncMsgActionButtons();
+    syncMsgActionButtons(genConvId);
   }
 
   const assistantMsg = { role: "assistant", content: "", model: state.currentModel?.name || "" };
-  addMessage(assistantMsg);
+  addMessage(assistantMsg, genConvId);
   _pendingToolMsgs.add(assistantMsg);
 
-  // addMessage 已同步触发全量重渲染，直接复用刚生成的气泡，避免流式期间出现两个空气泡
-  let msgEl = chatScroll.lastElementChild;
+  // addMessage 已同步触发全量重渲染，直接复用刚生成的气泡，避免流式期间出现两个空气泡。
+  // 落点是这一场自己的树（可见时是 #chat-messages，切走后是它那份游离节点）。
+  let msgEl = threadHostOf(run).lastElementChild;
   const cursor = addStreamingCursor(msgEl);
-  stickToBottom = true;
-  chatScroll.scrollTop = chatScroll.scrollHeight;
+  if (run.visible) { stickToBottom = true; chatScroll.scrollTop = chatScroll.scrollHeight; }
 
   const modelId = state.currentModel?.id || "gpt-5.6-terra";
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
   const params = getDefaultParams(modelId);
-  const historyForAdapter = buildAdapterHistory();
+  const historyForAdapter = buildAdapterHistory(genConvId);
   // 多模态：上传的图片挂到当前用户消息，由 buildMessages 装配成 image_url 内容真正传给模型。
   const imageDataUrls = filesForMessage
     .filter(f => f.type === "image" && typeof f.content === "string" && f.content.startsWith("data:image"))
@@ -3998,18 +4205,18 @@ async function sendMessage(queuedPayload = null) {
       appendStreamChunk(chunk, {
         reasoning(text) {
           reasoningText += text;
-          markActivity();
+          markActivity(genConvId);
           if (!thinkingPanel) thinkingPanel = createThinkingPanel(msgEl);
           updateThinkingPanel(thinkingPanel, reasoningText);
-          autoScroll();
+          autoScrollIn(threadHostOf(run));
         },
         content(text) {
           fullContent += text;
-          markActivity();
+          markActivity(genConvId);
           const contentEl = msgEl.querySelector(".msg-content");
           renderAssistantContent(contentEl, fullContent, cursor);
           ink0.onTextContent(fullContent);
-          autoScroll();
+          autoScrollIn(threadHostOf(run));
         },
       });
     });
@@ -4029,20 +4236,21 @@ async function sendMessage(queuedPayload = null) {
   // 输出被截断（工具块未闭合或 finish_reason=length）→ 自动续写拼回本条消息
   const contOut0 = {};
   if (!signal.aborted && (hasTruncatedTail(fullContent) || streamMeta.finishReason === "length")) {
-    fullContent = await continueTruncatedOutput(msgEl, fullContent, modelId, apiKey, baseUrl, params, signal, streamMeta.finishReason || "", contOut0);
+    fullContent = await continueTruncatedOutput(msgEl, fullContent, modelId, apiKey, baseUrl, params, signal, streamMeta.finishReason || "", contOut0, genConvId);
   }
   if (contOut0.toolCalls || nativeCalls0.length) assistantMsg.toolCalls = contOut0.toolCalls || nativeCalls0;
   // 会话已切换时不更新新会话的本地消息列表（内容仍会写回 genConvId 对应会话）
-  if (state.currentConversationId === genConvId) updateLastAssistantMessage(fullContent);
+  updateLastAssistantMessage(fullContent, genConvId);
 
   // 估算并记录用户
-  const estimatedPrompt = measureContext(state.messages.slice(0, -1)).total;
+  const estimatedPrompt = measureContext(messagesOf(genConvId).slice(0, -1)).total;
 
   const estimatedCompletion = Math.ceil(fullContent.length / 3);
-  addUsage({ prompt_tokens: estimatedPrompt, completion_tokens: estimatedCompletion });
+  // 用量记到归属会话名下：并行时"屏幕上那场的用量条"不该跟着后台那场涨
+  addUsage({ prompt_tokens: estimatedPrompt, completion_tokens: estimatedCompletion }, genConvId);
 
   // 同步用量到后端
-  syncUsageToBackend();
+  syncUsageToBackend(genConvId);
 
 
   const contentEl = msgEl.querySelector(".msg-content");
@@ -4051,12 +4259,12 @@ async function sendMessage(queuedPayload = null) {
   if (genConvId) {
     const saved = await post(`/chat/conversations/${genConvId}/messages`, { role: "assistant", content: fullContent, model: modelId, metadata: { ...turnMeta, ...(assistantMsg.toolCalls ? { toolCalls: assistantMsg.toolCalls } : {}) } });
     if (saved.code === 0 && saved.data?.id) assistantMsg.id = saved.data.id;
-    syncMsgActionButtons();
+    syncMsgActionButtons(genConvId);
   }
 
   if (!signal.aborted && !streamFailed) {
-    msgEl = await autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params);
-    msgEl = await autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal);
+    msgEl = await autoAdvanceIfStalled(msgEl, modelId, apiKey, baseUrl, params, genConvId);
+    msgEl = await autoReviewIfStalled(msgEl, modelId, apiKey, baseUrl, signal, genConvId);
   }
 
   // 工具调用循环：环境任务默认进入 Autopilot，避免用户反复说“继续”；目标是显式强模式。
@@ -4065,17 +4273,20 @@ async function sendMessage(queuedPayload = null) {
     : (autopilotOn
       ? (agentTask.broad ? AGENT_AUTOPILOT_BROAD_ROUNDS : AGENT_AUTOPILOT_DEFAULT_ROUNDS)
       : 5);
-  if (harnessOn) {
-    setHarnessProgress(t("自主执行已启动 · 最多 {n} 轮 · 仅手动停止 / 轮数用完 / 模型调 exit_target_mode 收口才退出", { n: toolRounds }));
-  } else if (autopilotOn) {
-    setHarnessProgress(t("Autopilot 自主推进已启动 · 最多 {n} 轮", { n: toolRounds }));
+  // 进度条是屏幕上那一条：后台那场的轮数说明写进任务中心的行里，不抢前台的显示
+  if (run.visible) {
+    if (harnessOn) {
+      setHarnessProgress(t("自主执行已启动 · 最多 {n} 轮 · 仅手动停止 / 轮数用完 / 模型调 exit_target_mode 收口才退出", { n: toolRounds }));
+    } else if (autopilotOn) {
+      setHarnessProgress(t("Autopilot 自主推进已启动 · 最多 {n} 轮", { n: toolRounds }));
+    }
   }
-  if (!signal.aborted && !streamFailed) loopOutcome = await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal, toolRounds, { autopilot: autopilotOn });
+  if (!signal.aborted && !streamFailed) loopOutcome = await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal, toolRounds, { autopilot: autopilotOn }, run);
   else if (harnessOn) showHarnessIdle(); // 启动前即被停止：runToolLoop 未运行，保持待机指示
 
   // 后台检查上下文压缩
   if (!signal.aborted && !streamFailed) {
-    checkAndCompress(modelId, apiKey, baseUrl);
+    checkAndCompress(modelId, apiKey, baseUrl, genConvId);
     autoRefineMemoryAndProfile({ silent: true });
   }
 
@@ -4090,11 +4301,11 @@ async function sendMessage(queuedPayload = null) {
     console.error("发送失败", err);
     sendFailed = !isAbortError(err);
     if (!isAbortError(err)) reportError(err, "发送链路");
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast(isAbortError(err) ? (state.harness?.enabled === true ? "已停止输出 · 目标模式保持开启" : "已停止输出") : t("发送失败: {msg}", { msg: err.message }));
   } finally {
-  isGenerating = false;
-  activeGenerationController = null;
+  const wasVisible = run.visible;
+  endRun(run.run_id);                 // 释放槽位并泵等待队列（正常跑完/被停/抛异常都走这里）
   setSubAgentSignal(null);
   // 仅在归属未变时清空：若已切换到新会话并开始了新生成，这里不能抢清新生成的归属
   if (activeGenerationConvId === genConvId) activeGenerationConvId = null;
@@ -4104,15 +4315,15 @@ async function sendMessage(queuedPayload = null) {
     noteTaskOutcome(genConvId, streamFailed || sendFailed ? "error" : signal.aborted ? "needs" : "done");
   }
   updateSendState();
-  stopTaskTimer();
-  chatInput.focus();
+  if (wasVisible) stopTaskTimer();   // 计时器是屏幕上那一条的，后台那场散场不该停它
+  if (wasVisible) chatInput.focus();
   // 未进入工具循环（abort 等）时也可能残留未执行的工具标记，统一清理
   cleanupStaleToolMarkers();
   _pendingToolMsgs.clear();
-  if (inputQueue.length > 0) {
-    const next = inputQueue.shift();
+  if (run.queue.length > 0) {
+    const next = run.queue.shift();
     updateSendState();
-    setTimeout(() => sendMessage(next), 0);
+    setTimeout(() => sendMessage(next, { convId: genConvId }), 0);
     return;
   }
   // 空闲续跑：这一场已经散场，可后台任务刚发回消息还没人念——系统自己接一句话头。
@@ -4124,9 +4335,12 @@ async function sendMessage(queuedPayload = null) {
 
 // ── 上下文压缩──────────────────────────────
 
-async function checkAndCompress(modelId, apiKey, baseUrl) {
+async function checkAndCompress(modelId, apiKey, baseUrl, convId = state.currentConversationId) {
+  // 这一档关掉就整段跳过：连"要不要压"的探测也不发。这里是每轮末尾的静默路径，
+  // 只查开关不弹提示——弹窗那种打扰留给用户主动点的入口。
+  if (!isAiFeatureOn("context_compress")) return;
   try {
-    const msgs = state.messages.map(m => ({ role: m.role, content: m.content, ...(m.display !== undefined ? { display: m.display } : {}) }));
+    const msgs = messagesOf(convId).map(m => ({ role: m.role, content: m.content, ...(m.display !== undefined ? { display: m.display } : {}) }));
     // 阈值跟着「上下文预算」走：以前硬编码 64000，1M 窗口的模型也在 64K 就被压缩，
     // 而且和上下文条各算各的，条子显示 6% 却已经压过一轮
     const res = await post("/chat/compress", { messages: msgs, keep_recent_rounds: 2, max_tokens: contextBudgetOf(modelId) });
@@ -4134,10 +4348,13 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
 
     const { compress_prompt, keep_messages, compress_count } = res.data;
 
-    // 调用 LLM 生成摘要
+    // 调 LLM 生成摘要：用「AI 辅助功能 → 上下文压缩摘要」指定的模型，没指定就跟随主模型。
+    // 注意上面的压缩阈值仍按主模型的上下文预算算——压的是这场对话的窗口，不是摘要模型的窗口。
+    const target = aiModelFor("context_compress", { id: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, base_url: baseUrl, key: apiKey });
+    if (!target.usable) return;
     let summary = "";
     try {
-      for await (const chunk of streamChat({ model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, messages: [{ role: "user", content: compress_prompt }], api_key: apiKey, base_url: baseUrl, temperature: 0.3, max_tokens: 1024, stream: true })) {
+      for await (const chunk of streamChat({ model: target.id, provider: target.provider, messages: [{ role: "user", content: compress_prompt }], api_key: target.key, base_url: target.base_url, temperature: 0.3, max_tokens: 1024, stream: true })) {
         summary += chunk;
       }
     } catch (e) {
@@ -4149,13 +4366,13 @@ async function checkAndCompress(modelId, apiKey, baseUrl) {
     const summaryMsg = { role: "system", content: `[历史摘要]: ${summary}` };
     const newMessages = [summaryMsg, ...keep_messages.map(m => ({ ...m, model: "" }))];
 
-    // 更新前端状态
-    setMessages(newMessages);
+    // 更新前端状态：压缩的是这一场的历史，只能写回这一场（后台那场被压了就找不回来了）
+    setMessages(newMessages, convId);
 
-
-    // 通知用户
-    const { toast } = await import("../app.js?v=20260922-006");
-    toast(t("上下文已压缩：{n} 条消息已摘要", { n: compress_count }));
+    if (convId === state.currentConversationId) {
+      const { toast } = await import("../app.js?v=20260925-001");
+      toast(t("上下文已压缩：{n} 条消息已摘要", { n: compress_count }));
+    }
   } catch (e) {
     console.warn("上下文压缩检查失败", e);
   }
@@ -4172,7 +4389,7 @@ async function toggleHarness() {
   // 开关只经 store 的唯一写入口：exit_target_mode 走的是同一个 setter，
   // 两边各写 state.harness 就会出现"工具关了、菜单还亮着"
   const on = setHarnessEnabled(!(state.harness?.enabled === true));
-  const { toast } = await import("../app.js?v=20260922-006");
+  const { toast } = await import("../app.js?v=20260925-001");
   toast(on ? "目标模式已开启：目标→计划→执行→验证→汇报→追溯，六阶段自主闭环，大任务自动建议 TODOLIST" : "目标模式已关闭");
   showHarnessIdle();
   syncModeMenu();
@@ -4211,8 +4428,10 @@ function isAbstractTask(text) {
 }
 
 async function startGrindConversation(idea) {
-  // 开启磨墨新会话：中断进行中的生成，防止旧回复写入磨墨会话
-  if (isGenerating) activeGenerationController?.abort();
+  // 开启磨墨新会话：中断屏幕上这一场的生成，防止旧回复写入磨墨会话
+  // （只停这一场：别的项目里跑着的与"我要开磨墨"无关）
+  const here = runOf(state.currentConversationId);
+  if (here) abortRun(here.run_id);
   state.currentConversationId = null;
   setMessages([]);
   resetUsage();
@@ -4246,7 +4465,7 @@ async function handleGrindReply(content, msgEl) {
     renderGrindPanel();
     updateSendState();
     appendDraftActions(msgEl, draft);
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast("墨稿已成：可送入目标模式 / 投到白板 / 存为模板");
     return;
   }
@@ -4358,20 +4577,20 @@ function appendDraftActions(msgEl, draft) {
     state.harness.enabled = true;
     syncModeMenu();
     savePersistent();
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast("墨稿已送入目标模式，自主执行中…");
     await sendMessage({ text: grindSvc.draftToHarnessTask(draft), files: [] });
   }));
 
   bar.appendChild(mkBtn("投到白板", "作为白板卡片保存", async () => {
     addBoardCard(grindSvc.draftToBoardCard(draft));
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast("已投到白板");
   }));
 
   bar.appendChild(mkBtn("存为模板", "存入知识库作为可复用任务书模板", async () => {
     const ok = await grindSvc.saveDraftAsTemplate(draft);
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast(ok ? "已存为磨墨模板（知识中心可见）" : "保存失败");
   }));
 
@@ -4381,7 +4600,7 @@ function appendDraftActions(msgEl, draft) {
 function openCompressModal() {
   if (!compressModal) return;
   if (state.messages.length < 4) {
-    import("../app.js?v=20260922-006").then(({ toast }) => toast("当前对话还不需要压缩"));
+    import("../app.js?v=20260925-001").then(({ toast }) => toast("当前对话还不需要压缩"));
     return;
   }
   compressModal.classList.remove("hidden");
@@ -4405,7 +4624,7 @@ async function doManualCompress() {
       keep_recent_rounds: 2,
     });
 
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     if (res.code !== 0) {
       toast("压缩失败: " + (res.message || "未知错误"));
       return;
@@ -4416,16 +4635,20 @@ async function doManualCompress() {
       return;
     }
 
-    const modelId = state.currentModel?.id || "gpt-5.6-terra";
-    const apiKey = getModelKey(modelId);
-    const baseUrl = state.currentModel?.base_url || undefined;
+    // 手动压缩与自动压缩同一档：模型可单独指定，没指定跟随主模型
+    if (aiFeatureBlocked("context_compress")) { btnDoCompress.disabled = false; btnDoCompress.textContent = oldText; return; }
+    const target = aiModelFor("context_compress", state.currentModel);
+    if (!target.usable) {
+      toast("请先选择模型并配置 API Key");
+      return;
+    }
     let summary = "";
     for await (const chunk of streamChat({
-      model: modelId,
-      provider: state.currentModel?.provider,
+      model: target.id,
+      provider: target.provider,
       messages: [{ role: "user", content: res.data.compress_prompt }],
-      api_key: apiKey,
-      base_url: baseUrl,
+      api_key: target.key,
+      base_url: target.base_url,
       temperature: 0.3,
       max_tokens: level === "heavy" ? 512 : 1024,
       stream: true,
@@ -4439,7 +4662,7 @@ async function doManualCompress() {
     closeCompressModal();
     toast(t("上下文已压缩：{n} 条消息已摘要", { n: res.data.compress_count || 0 }));
   } catch (e) {
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast("压缩失败: " + e.message);
   } finally {
     btnDoCompress.disabled = false;
@@ -4459,8 +4682,22 @@ function noteTaskOutcome(convId, kind) {
   if (convId && kind) recordTaskFlag(convId, { kind, seen: isConvInSight(convId) });
 }
 
+/** 从等待队列交回来却没跑成的那一条要放回去：静默丢掉用户按下的发送是不允许的 */
+function requeueFromQueue(opts, payload) {
+  if (!opts?.fromQueue) return;
+  enqueue({ convId: opts.convId || "", projectId: opts.projectId || "", payload });
+  updateSendState();
+}
+
 function taskCtx() {
-  return { flags: state.taskFlags, activeConvId: activeGenerationConvId || "" };
+  // registry 让分组按 project_id 认；两壳共用同一份口径才不会一边按 id、一边按名字
+  // runningConvIds：并行时"进行中"不止屏幕上那一个，侧栏要按登记表全点亮
+  return {
+    flags: state.taskFlags,
+    activeConvId: activeGenerationConvId || "",
+    runningConvIds: new Set(allRuns().map(r => r.conv_id).filter(Boolean)),
+    registry: state.projects,
+  };
 }
 
 // 徽标要同时重绘两处：classic 的 #conv-list 与 Codex 的历史分组。
@@ -4504,6 +4741,9 @@ async function refreshConversationList() {
 // 供通用 UI（Codex）左侧历史分组列表点击切换会话
 async function openConversation(convId) {
   await switchConversation(convId);
+  // 切回来 = 这一场的主人回来了：先把信箱里属于它的后台消息搬回唤醒池。
+  // 不搬的话这些消息会一直躺在池子里，被下一场毫不相干的对话顺手念掉。
+  if (drainInboxFor(convId)) maybeDriveBgEvents(convId, null);
   window.dispatchEvent(new CustomEvent("slate:conv-active-changed", { detail: { id: convId } }));
 }
 
@@ -4511,7 +4751,33 @@ function renderConvList(conversations) {
   if (!convList) return;
   convList.innerHTML = "";
   const ctx = taskCtx();
-  for (const conv of sortConversations(conversations, state.taskListSort, ctx)) {
+  const list = Array.isArray(conversations) ? conversations : [];
+  // 排序偏好为"按项目"时才插分组头：这时两壳（classic / Codex）走同一份分组函数，
+  // 分组口径（project_id，老会话按名称回落）也只有一个版本。
+  // 没另加"按项目/按时间"分段控件——排序下拉里本来就有这一档，再放一个就是两个控件管一件事。
+  if (normalizeTaskListSort(state.taskListSort) === "project") {
+    for (const [name, convs] of groupConversationsByProject(list, state.taskListSort, ctx)) {
+      const head = document.createElement("div");
+      head.className = "conv-group-head";
+      const label = document.createElement("span");
+      label.className = "conv-group-name";
+      label.textContent = name;
+      head.appendChild(label);
+      const count = document.createElement("span");
+      count.className = "conv-group-count";
+      count.textContent = String(convs.length);
+      head.appendChild(count);
+      convList.appendChild(head);
+      for (const conv of convs) convList.appendChild(buildConvItem(conv, ctx));
+    }
+    return;
+  }
+  for (const conv of sortConversations(list, state.taskListSort, ctx)) {
+    convList.appendChild(buildConvItem(conv, ctx));
+  }
+}
+
+function buildConvItem(conv, ctx) {
     const item = document.createElement("div");
     item.className = "conv-item" + (conv.id === state.currentConversationId ? " active" : "");
 
@@ -4591,7 +4857,9 @@ function renderConvList(conversations) {
     delBtn.title = "删除";
     delBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      await del(`/chat/conversations/${conv.id}`);
+      const res = await del(`/chat/conversations/${conv.id}`);
+      if (res?.code !== 0) { dlgToast(res?.message || t("删除失败")); return; }
+      forgetConversationLocal(conv.id);
       if (state.currentConversationId === conv.id) {
         state.currentConversationId = null;
         setMessages([]);
@@ -4602,8 +4870,7 @@ function renderConvList(conversations) {
     item.appendChild(actionsWrap);
 
     item.addEventListener("click", () => switchConversation(conv.id));
-    convList.appendChild(item);
-  }
+    return item;
 }
 
 // 导出单个会话 Markdown 文件
@@ -4717,7 +4984,9 @@ function initConvManage() {
     const ids = [...convManageChecks.entries()].filter(([, cb]) => cb.checked).map(([id]) => id);
     if (ids.length === 0) { dlgToast("请先勾选要删除的会话"); return; }
     if (!await dlgConfirm(t("删除选中 {n} 个会话？删除后不可恢复。", { n: ids.length }), { danger: true, okText: "删除" })) return;
-    await post("/chat/conversations/batch-delete", { ids });
+    const res = await post("/chat/conversations/batch-delete", { ids });
+    if (res?.code !== 0) { dlgToast(res?.message || t("删除失败")); return; }
+    forgetConversationLocal(ids);
     if (ids.includes(state.currentConversationId)) {
       state.currentConversationId = null;
       setMessages([]);
@@ -4729,7 +4998,10 @@ function initConvManage() {
 
   document.getElementById("btn-conv-clear-all")?.addEventListener("click", async () => {
     if (!await dlgConfirm("清空全部历史会话？此操作不可恢复，建议先备份数据", { danger: true, okText: "清空" })) return;
-    await post("/chat/conversations/batch-delete", { clear_all: true });
+    const ids = (state.conversations || []).map(c => c.id);
+    const res = await post("/chat/conversations/batch-delete", { clear_all: true });
+    if (res?.code !== 0) { dlgToast(res?.message || t("清空失败")); return; }
+    forgetConversationLocal(ids);
     state.currentConversationId = null;
     setMessages([]);
     await refreshConversationList();
@@ -4791,10 +5063,76 @@ function updateConvManageCount() {
   countEl.textContent = t("{total} 个会话，已选 {n} 个", { total: convManageChecks.size, n: checked });
 }
 
+/**
+ * 回到"新对话"空态。原来这段只写在 btnNewChat 的点击回调里，
+ * 于是"切到一个从没看过的项目"没法复用它——结果上一个项目的会话和草稿
+ * 还挂在屏幕上，用户以为两个项目共用一条对话（正是这功能要消灭的串台）。
+ */
+function startNewChat() {
+  // 新对话要占用整块屏幕：屏幕上这一场中断掉（别的项目的继续在跑），
+  // 它那份 DOM 收进游离树，切回去还能看见进度
+  const here = runOf(state.currentConversationId);
+  if (here) abortRun(here.run_id);
+  handoffThread(null);
+  hideResumeHint(); // 新会话不该背着上一个会话的"未确认完成"
+  state.currentConversationId = null;
+  setMessages([]);
+  resetUsage();
+  grindSession = null;
+  grindPendingIdea = null;
+  lastInkStatus = null;
+  hideGrindPanel();
+  renderConvList(state.conversations);
+  renderTodoPanel();
+  updateConvProjectBadge();
+  updateSendState();
+}
+
+/**
+ * 屏幕交接：把走的那场的 DOM 搬进它自己的游离树，把进来的那场搬回屏幕。
+ * 返回 true 表示进来的那场有活着的现场（不需要再从后端取一次消息）。
+ */
+function handoffThread(toConvId) {
+  const leaving = runOf(state.currentConversationId);
+  if (leaving && leaving.visible) {
+    stashRunThread(leaving);
+    setRunVisible(leaving.run_id, false);
+  }
+  const arriving = runOf(toConvId);
+  if (!arriving) return false;
+  setRunVisible(arriving.run_id, true);
+  if (!adoptRunThread(arriving)) return false;
+  bindVisibleThread(toConvId);
+  if (convProjectEl && !convProjectEl.isConnected) {
+    chatScroll.insertBefore(convProjectEl, chatScroll.firstChild);
+  }
+  updateConvProjectBadge();
+  return true;
+}
+
+/**
+ * 会话被删掉后要在本机清的三样：那一场还在跑的生成、它排在队里的等待项、它那份消息数组。
+ * 后端删的是库里的记录，这边不清的话——正在跑的还在往一条没有归属的会话里追加，
+ * 排队项会在槽位空出来时被 pump 拿去开新场（开一条已经不存在的会话）。
+ */
+function forgetConversationLocal(convIds) {
+  const ids = (Array.isArray(convIds) ? convIds : [convIds]).map(id => String(id || "")).filter(Boolean);
+  for (const id of ids) {
+    abortRunFor(id);
+    dropPendingFor(id);
+    dropThread(id);
+  }
+}
+
 async function switchConversation(convId) {
   const seq = ++_switchConvSeq; // 递增序列号
-  // 切换会话：中断正在进行的生成，防止旧回复写入目标会话（重复点击当前会话不中断）
-  if (isGenerating && convId !== state.currentConversationId) activeGenerationController?.abort();
+  // 切走会话不再等于停止：这一场的生成继续在后台跑，结局落进任务中心（D3）。
+  // backgroundRuns 关掉时回到旧语义——切走即中断。
+  if (!backgroundRunsOn() && isGenerating() && convId !== state.currentConversationId) {
+    const leaving = runOf(state.currentConversationId);
+    if (leaving) abortRun(leaving.run_id);
+  }
+  const liveThread = handoffThread(convId);
   // 离开当前对话前，捕获灵光（技术洞察归档到知识库）
   captureConversationSpark();
   // 保存当前对话用量
@@ -4805,13 +5143,20 @@ async function switchConversation(convId) {
   hideResumeHint(); // 切会话：上一个会话的中断提示不属于这里
   grindSession = null;
   lastInkStatus = null;
-  const res = await get(`/chat/conversations/${convId}/messages`);
-  if (seq !== _switchConvSeq) return; // 用户已切换到其他会话，丢弃此响应
-  if (res.code === 0) {
-    setMessages((res.data || []).map(normalizeMessageForRender));
-    // 真的看到内容了才清未读：这次切换被更晚的切换作废时（上面已 return），徽标要留着
+  // 这一场还在跑：本地那份数组才是最新的（在跑的 assistant 气泡还没落库），
+  // 去后端取会把"正在生成的那半条回复"读没了
+  if (!liveThread) {
+    const res = await get(`/chat/conversations/${convId}/messages`);
+    if (seq !== _switchConvSeq) return; // 用户已切换到其他会话，丢弃此响应
+    if (res.code === 0) {
+      setMessages((res.data || []).map(normalizeMessageForRender), convId);
+      // 真的看到内容了才清未读：这次切换被更晚的切换作废时（上面已 return），徽标要留着
+      markTaskSeen(convId);
+    }
+  } else {
     markTaskSeen(convId);
   }
+  resyncBoardForConversation(convId);
 
   // 磨墨会话恢复（刷新页面 / 切换对话后重建状态与面板）
   grindSession = await grindSvc.getSession(convId);
@@ -4907,7 +5252,7 @@ function renderUsageBar() {
 
 // 用量条上的上下文段点一下就该到"这个模型的预算"：设置页里逐个滑杆找太费事
 async function openContextSettings() {
-  const { openSettings } = await import("../app.js?v=20260922-006");
+  const { openSettings } = await import("../app.js?v=20260925-001");
   hideUsagePopup();
   openSettings({ focusCtxModelId: state.currentModel?.id || "" });
 }
@@ -5044,7 +5389,7 @@ function renderFilePreview() {
 async function handleFiles(fileList) {
   for (const file of fileList) {
     if (file.size > 10 * 1024 * 1024) {
-      const { toast } = await import("../app.js?v=20260922-006");
+      const { toast } = await import("../app.js?v=20260925-001");
       toast(t("文件过大，已跳过: {name}", { name: file.name }));
       continue;
     }
@@ -5060,11 +5405,11 @@ async function handleFiles(fileList) {
         if (res.code === 0 && res.data?.content) {
           pendingFiles.push({ name: file.name, size: file.size, content: res.data.content, type: "text" });
         } else {
-          const { toast } = await import("../app.js?v=20260922-006");
+          const { toast } = await import("../app.js?v=20260925-001");
           toast(res.message || t("解析失败: {name}", { name: file.name }));
         }
       } catch (e) {
-        const { toast } = await import("../app.js?v=20260922-006");
+        const { toast } = await import("../app.js?v=20260925-001");
         toast(t("解析失败: {name}（{msg}）", { name: file.name, msg: e.message }));
       }
       continue;
@@ -5104,9 +5449,16 @@ async function handleFiles(fileList) {
   * 原地替换内容与工具卡片；完成后照常进入工具调用循环。
   */
 async function regenerateMessage(msg, msgEl) {
-  if (isGenerating) {
-    const { toast } = await import("../app.js?v=20260922-006");
+  // 只挡屏幕上这一场：别的项目在跑不妨碍这里重发一条（并行要的就是这个）
+  if (isGenerating(state.currentConversationId)) {
+    const { toast } = await import("../app.js?v=20260925-001");
     toast("正在生成中，请稍候");
+    return;
+  }
+  const regenGate = canStart({ convId: state.currentConversationId, projectId: state.project?.project_id || "" });
+  if (!regenGate.ok) {
+    const { toast } = await import("../app.js?v=20260925-001");
+    toast(t("已达并行上限，等当前任务跑完再重新生成"));
     return;
   }
   let idx = state.messages.indexOf(msg);
@@ -5126,7 +5478,7 @@ async function regenerateMessage(msg, msgEl) {
   const baseUrl = state.currentModel?.base_url || undefined;
   const apiKey = getModelKey(modelId);
   if (!apiKey) {
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast("请先在设置中配置该模型的 API Key");
     return;
   }
@@ -5136,18 +5488,19 @@ async function regenerateMessage(msg, msgEl) {
     .filter(m => !m.hidden && m.role !== "system")
     .map(mapAdapterMessage);
   if (!history.some(m => m.role === "user")) {
-    const { toast } = await import("../app.js?v=20260922-006");
+    const { toast } = await import("../app.js?v=20260925-001");
     toast("没有可重新生成的上下文");
     return;
   }
   history._modelId = modelId;
 
   const regenConvId = state.currentConversationId;
-  isGenerating = true;
+  const regenRun = startRun({ convId: regenConvId || "", projectId: state.project?.project_id || "" });
+  if (!regenRun) return;
+  regenRun.scope = state.project || null;
   hideResumeHint(); // 新的一轮生成开始：上一次的中断提示条使命结束
-  markActivity(); // 看门狗计时基准：从本次生成开始算
-  activeGenerationController = new AbortController();
-  const signal = activeGenerationController.signal;
+  markActivity(regenRun); // 看门狗计时基准：从本次生成开始算
+  const signal = regenRun.controller.signal;
   setSubAgentSignal(signal);
   activeGenerationConvId = regenConvId;
   updateSendState();
@@ -5212,14 +5565,14 @@ async function regenerateMessage(msg, msgEl) {
   try {
     const contOutR = {};
     if (!signal.aborted && (hasTruncatedTail(fullContent) || regenMeta.finishReason === "length")) {
-      fullContent = await continueTruncatedOutput(msgEl, fullContent, modelId, apiKey, baseUrl, params, signal, regenMeta.finishReason || "", contOutR);
+      fullContent = await continueTruncatedOutput(msgEl, fullContent, modelId, apiKey, baseUrl, params, signal, regenMeta.finishReason || "", contOutR, regenConvId);
     }
     if (contOutR.toolCalls || regenNativeCalls.length) msg.toolCalls = contOutR.toolCalls || regenNativeCalls;
     msg.content = fullContent;
     renderAssistantContent(contentEl, fullContent);
 
-    addUsage({ prompt_tokens: measureContext(state.messages.slice(0, idx)).total, completion_tokens: Math.ceil(fullContent.length / 3) });
-    syncUsageToBackend();
+    addUsage({ prompt_tokens: measureContext(state.messages.slice(0, idx)).total, completion_tokens: Math.ceil(fullContent.length / 3) }, regenConvId);
+    syncUsageToBackend(regenConvId);
 
     if (msg.id) {
       try {
@@ -5231,11 +5584,10 @@ async function regenerateMessage(msg, msgEl) {
 
     // 重新生成同样是"这一场"：徽标要跟着新结局走，而不是留着上一场的旧结论
     regenLoop = !signal.aborted && !streamFailed
-      ? await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal)
+      ? await runToolLoop(msgEl, modelId, apiKey, baseUrl, params, signal, 5, {}, regenRun)
       : null;
   } finally {
-    isGenerating = false;
-    activeGenerationController = null;
+    endRun(regenRun.run_id);
     setSubAgentSignal(null);
     if (activeGenerationConvId === regenConvId) activeGenerationConvId = null;
     if (!regenLoop) {
@@ -5286,14 +5638,19 @@ function initChat() {
 
   // UI 看门狗：生成期间长时间无活动（流挂死/工具挂起）→ 强制中断恢复界面
   setInterval(async () => {
-    if (!isGenerating || !lastActivityAt) return;
-    if (Date.now() - lastActivityAt <= 180000) return;
-    markActivity(); // 防止重复触发
-    try { activeGenerationController?.abort(); } catch {}
-    try {
-      const { toast } = await import("../app.js?v=20260922-006");
-      toast("连接长时间无响应，已自动中断，可重试");
-    } catch {}
+    // 每场自己算静默时长：并行时 A 在流式、B 早就挂住了，共用一个时间戳会谁都不掐
+    for (const r of allRuns()) {
+      const at = r.conv_id === state.currentConversationId ? lastActivityAt : r.last_event_at;
+      if (!at || Date.now() - at <= 180000) continue;
+      markActivity(r);   // 防止下一轮重复触发
+      abortRun(r.run_id);
+      if (r.visible || !r.conv_id) {
+        try {
+          const { toast } = await import("../app.js?v=20260925-001");
+          toast("连接长时间无响应，已自动中断，可重试");
+        } catch {}
+      }
+    }
   }, 15000);
 
   // 智能滚动跟随：用户向上滚动浏览历史时不强制拉回底部
@@ -5303,7 +5660,9 @@ function initChat() {
   });
 
   btnSend.addEventListener("click", () => {
-    if (isGenerating) stopGeneration();
+    // 按钮的"发言/停止"两态是按屏幕上这一场画的（updateSendState），所以这里判的也必须是这一场：
+    // 拿"任一场在跑"去判的话，别的项目后台生成时，这里的发言会被当成停止并无声丢掉那条消息。
+    if (isGenerating(state.currentConversationId)) stopGeneration();
     else sendMessage();
   });
 
@@ -5324,7 +5683,7 @@ function initChat() {
   document.getElementById("row-schedule")?.addEventListener("click", async () => {
     closeModeMenu();
     try {
-      const mod = await import("./schedule.js?v=20260922-006");
+      const mod = await import("./schedule.js?v=20260925-001");
       mod.openScheduleModal?.();
     } catch (e) {
       console.warn("定时任务模块加载失败", e);
@@ -5394,18 +5753,18 @@ function initChat() {
     const id = expertSelect.value;
     if (!id) {
       setActiveExpertId("");
-      const { toast } = await import("../app.js?v=20260922-006");
+      const { toast } = await import("../app.js?v=20260925-001");
       toast("已退出专家模式");
       return;
     }
     try {
-      const { getExpert } = await import("../services/experts.js?v=20260922-006");
+      const { getExpert } = await import("../services/experts.js?v=20260925-001");
       const detail = await getExpert(id, { force: true });
       setActiveExpertId(id, detail);
-      const { toast } = await import("../app.js?v=20260922-006");
+      const { toast } = await import("../app.js?v=20260925-001");
       toast(t("已启用专家包：{name}", { name: detail.name || id }));
     } catch (e) {
-      const { toast } = await import("../app.js?v=20260922-006");
+      const { toast } = await import("../app.js?v=20260925-001");
       toast(t("专家包加载失败: {msg}", { msg: e.message }));
       expertSelect.value = state.activeExpertId || "";
     }
@@ -5468,25 +5827,32 @@ function initChat() {
     }
   } catch (e) {}
 
-  btnNewChat.addEventListener("click", () => {
-    if (isGenerating) activeGenerationController?.abort();
-    hideResumeHint(); // 新会话不该背着上一个会话的"未确认完成"
-    state.currentConversationId = null;
-    setMessages([]);
-    resetUsage();
-    grindSession = null;
-    grindPendingIdea = null;
-    lastInkStatus = null;
-    hideGrindPanel();
-    renderConvList(state.conversations);
-    renderTodoPanel();
-    updateConvProjectBadge();
-    updateSendState();
-  });
+  btnNewChat.addEventListener("click", startNewChat);
 
   subscribe("messages", () => {
     renderAllMessages();
     renderUsageBar();
+  });
+  // 后台那场的消息变了：只重画它自己那棵游离树，屏幕上的一行像素都不动
+  subscribe("thread", ({ convId, messages }) => {
+    const r = runOf(convId);
+    if (!r || r.visible) return;
+    renderThreadInto(offHostOf(r), messages);
+  });
+  // 并行现场一变：徽标的"进行中"与任务中心的在跑/排队行都要跟着重画。
+  // 这里刻意只重绘、不叫醒——醒来那条路在 bgEvents 的订阅里，两件事混在一起
+  // 会让"另一场跑完了"去接当前这场的話。
+  subscribe("runs", () => {
+    refreshTaskBadges();
+    renderBgTaskPanel();
+  });
+  // 槽位空出来时由登记表把等待队列的队首交回来跑（它不认识会话，只管叫）
+  registerRunStarter((item) => {
+    if (item.conv_id && !runOf(item.conv_id)) {
+      sendMessage(item.payload, { convId: item.conv_id, projectId: item.project_id, fromQueue: true });
+      return true;
+    }
+    return false;
   });
   subscribe("conversations", (convs) => renderConvList(convs));
   subscribe("usage", renderUsageBar);
@@ -5503,16 +5869,29 @@ function initChat() {
     // 第三层唤醒的唯一入口：事件是轮询带回来的，而轮询随时可能在一场已经散场之后
     // 才把"任务结束了"送进来。不在这里试着接话头，事件就只能干等用户下次开口
     // （模型早收工了，emptyRound 那条路根本不会再被走到）。
-    if (!isGenerating && inputQueue.length === 0 && state.currentConversationId) {
-      maybeDriveBgEvents(state.currentConversationId, null);
+    const conv = state.currentConversationId;
+    if (conv && !isGenerating(conv) && visibleQueueFor(conv).length === 0) {
+      maybeDriveBgEvents(conv, null);
     }
   });
+  // 信箱里是"别的项目/别的会话"的结局：只重绘未读数，不在这儿叫醒任何人——
+  // 叫醒当前这场就等于拿 A 的编译结果去接 B 的话
+  subscribe("bgInbox", () => renderBgTaskPanel());
+  // 换视野/换会话都要重画：分组头画不画、"回到那场会话"要不要出现，读的都是这两样。
+  // 不订阅就会留着上一份快照——切到 A 之后 B 那一组还按"自己项目"画，没有跳转入口。
+  // 会话这一侧没有 notify 通道（currentConversationId 是各处直接赋值的），
+  // 用 openConversation/startNewChat 都发的那个 DOM 事件。
+  subscribe("project", () => renderBgTaskPanel());
+  window.addEventListener("slate:conv-active-changed", () => renderBgTaskPanel());
   document.getElementById("btn-bg-tasks")?.addEventListener("click", () => {
     state.bgPanelOpen = state.bgPanelOpen === false;
     renderBgTaskPanel();
   });
   // 开关项目时，未保存的新对话徽章实时跟随
   subscribe("project", updateConvProjectBadge);
+  // 换视野要丢掉别的项目的现场快照：磁盘上的宪法与工作区的"当前根"可能已经在
+  // 这一场离开期间被改过。正在跑的那场不受影响——它开工时已经把现场抄在 run.scope 上了。
+  subscribe("project", () => invalidateProjectScopes());
 
   refreshConversationList();
   renderUsageBar();
@@ -5582,7 +5961,7 @@ function startVoice(btn) {
   };
   _voiceRecognition.onerror = (e) => {
     if (e.error !== "aborted" && e.error !== "no-speech") {
-      try { import("../app.js?v=20260922-006").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
+      try { import("../app.js?v=20260925-001").then(m => m.toast(t("语音识别错误: {err}", { err: e.error }))); } catch {}
     }
     stopVoice();
   };
@@ -5601,4 +5980,4 @@ function stopVoice() {
   _voiceRecognition = null;
 }
 
-export { initChat, sendMessage, renderMarkdown, refreshConversationList, openConversation };
+export { initChat, sendMessage, renderMarkdown, refreshConversationList, openConversation, startNewChat };

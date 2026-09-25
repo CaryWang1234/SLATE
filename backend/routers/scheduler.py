@@ -7,6 +7,10 @@
 支持「定时 + 事件」双驱动模式：
 - 定时模式：once / daily / interval（原有）
 - 事件模式：file_change（文件变更）/ git_push（Git 推送）/ webhook（HTTP 回调）
+
+每条任务记着它属于哪个项目（project_id，见 data/projects.json）：跑出来的会话落在
+该项目名下，事件模式没填 watch_paths 时也按这个项目根兜底——多项目在册之后，
+"A 的定时任务"不能再跟着"当前正好打开着的项目"跑。
 """
 
 from __future__ import annotations
@@ -25,6 +29,8 @@ import httpx
 from fastapi import APIRouter, Request
 
 from backend.data_io import atomic_write_json, backup_corrupt
+from backend import project_registry as registry
+from backend.ai_features import feature_enabled
 from backend.routers.chat import _get_db, add_message, create_conversation
 from backend.routers.proxy import _find_model
 from backend.routers.settings import STATE_PATH
@@ -48,6 +54,29 @@ _event_loop_started = False
 
 
 # ── 持久化 ────────────────────────────────────
+
+def _resolve_project_id(key: Any) -> str:
+    """把"归属哪个项目"认成注册表 id；没给就落到当时正在看的那一个。
+
+    认不出来时返回空串而不是硬绑 active：一个挂在废弃目录上的定时任务，
+    被悄悄改到"当前项目"名下，比它没有归属更难查。
+    """
+    doc = registry.load_registry()
+    text = str(key or "").strip()
+    if not text:
+        return str(doc.get("active") or "")
+    entry = registry.find_entry(doc, text)
+    if entry:
+        return str(entry.get("id") or "")
+    return registry.project_id_for_path(doc, text)
+
+
+def _project_of(task: dict[str, Any]) -> tuple[str, str]:
+    """(project_id, 名称)。名称只用于旧数据口径（conversations.project 存的是名字）。"""
+    pid = _resolve_project_id(task.get("project_id"))
+    entry = registry.entry_of(registry.load_registry(), pid) if pid else None
+    return pid, str((entry or {}).get("name") or "")
+
 
 def _load_tasks() -> list[dict[str, Any]]:
     global _tasks_load_error
@@ -130,13 +159,11 @@ def _should_run(task: dict[str, Any], now_ts: float) -> bool:
 
 def _check_file_changes(task: dict[str, Any]) -> bool:
     """检查文件变更事件：比较 mtime 是否更新。"""
-    paths_str = task.get("watch_paths", "")
-    if not paths_str:
+    targets = _default_watch_paths(task)
+    if not targets:
         return False
-    paths = [p.strip() for p in paths_str.split("\n") if p.strip()]
     changed = False
-    for p in paths:
-        fp = Path(p)
+    for fp in targets:
         if not fp.exists():
             continue
         if fp.is_dir():
@@ -164,6 +191,22 @@ def _check_file_changes(task: dict[str, Any]) -> bool:
                 changed = True
             _file_mtimes[key] = mtime
     return changed
+
+
+def _default_watch_paths(task: dict[str, Any]) -> list[Path]:
+    """watch_paths 没填时按项目根兜底。
+
+    多项目在册之前，"项目根"就是当时打开的那一个；现在有了注册表，
+    兜底必须认任务自己记的 project_id——否则 A 的定时任务会在切到 B 之后
+    开始盯 B 的文件改动。
+    """
+    paths = [p.strip() for p in str(task.get("watch_paths") or "").splitlines() if p.strip()]
+    if paths:
+        return [Path(p).expanduser() for p in paths]
+    pid = _resolve_project_id(task.get("project_id"))
+    entry = registry.entry_of(registry.load_registry(), pid) if pid else None
+    host = str((entry or {}).get("path") or "")
+    return [Path(host)] if host else []
 
 
 def _check_git_push(task: dict[str, Any]) -> bool:
@@ -226,9 +269,9 @@ def _init_event_snapshots() -> None:
             continue
         event_type = task.get("event_type", "")
         if event_type == "file_change":
-            paths_str = task.get("watch_paths", "")
-            for p in (x.strip() for x in paths_str.split("\n") if x.strip()):
-                fp = Path(p)
+            # 快照必须按和 _check_file_changes 完全同一套路径来铺（含"没填就按项目根"），
+            # 两边口径一旦不同，启动后第一次 tick 就会把整批文件当成"新建"而误触发
+            for fp in _default_watch_paths(task):
                 if fp.is_file():
                     _file_mtimes[str(fp.resolve())] = fp.stat().st_mtime
                 elif fp.is_dir():
@@ -269,6 +312,12 @@ def _finish_run(task: dict[str, Any], error: str | None = None, conversation_id:
 async def _run_task(task: dict[str, Any]) -> None:
     model_id = task.get("model_id", "")
     prompt = task.get("prompt", "")
+
+    # 这一档关掉就一次模型都不发：把原因写进 last_status，界面上看得见"为什么没跑"，
+    # 而不是让人以为定时任务本身坏了。
+    if not feature_enabled("scheduled_task"):
+        _finish_run(task, error="「定时与事件任务」已在设置中关闭（设置 → AI 辅助功能）")
+        return
 
     # 事件模式：注入触发上下文
     if task.get("mode") == "event":
@@ -348,7 +397,10 @@ async def _run_task(task: dict[str, Any]) -> None:
     stamp = datetime.now().strftime("%m-%d %H:%M")
     prefix = "[事件]" if task.get("mode") == "event" else "[定时]"
     title = f"{prefix} {task.get('name') or '未命名'} · {stamp}"
-    conv = await create_conversation({"title": title})
+    # 会话要落在它自己的项目上：否则 A 的定时任务跑出来的那条，会在按项目筛选时
+    # 出现在"当前正好打开着"的那个项目里（旧版只有单项目，看不出来；多项目下就是假归属）
+    pid, pname = _project_of(task)
+    conv = await create_conversation({"title": title, "project_id": pid, "project": pname})
     conv_id = conv["data"]["id"]
     await add_message(conv_id, {"role": "user", "content": prompt, "model": ""})
     await add_message(conv_id, {"role": "assistant", "content": reply, "model": model_id})
@@ -453,6 +505,9 @@ async def create_task(body: dict[str, Any]) -> dict[str, Any]:
         "last_run": None,
         "last_status": "",
         "last_conversation_id": "",
+        # 归属项目：建任务时认一次（前端给了就用给的，没给就记当时正在看的那一个）。
+        # 存 id 而不是名字——名字可以重、可以改，id 才认得出"这两条属于同一个项目"。
+        "project_id": _resolve_project_id(body.get("project_id")),
     }
     tasks = _load_tasks()
     tasks.append(task)
@@ -470,7 +525,9 @@ async def update_task(task_id: str, body: dict[str, Any]) -> dict[str, Any]:
     if not target:
         return {"code": 1, "message": "任务不存在"}
     allowed = {"name", "prompt", "model_id", "mode", "time", "every_minutes", "enabled",
-               "event_type", "watch_paths", "git_repo", "webhook_secret", "cooldown_seconds"}
+               "event_type", "watch_paths", "git_repo", "webhook_secret", "cooldown_seconds",
+               # 允许把任务改挂到别的项目（重命名/搬家之后手工归位）
+               "project_id"}
     for key in allowed:
         if key in body:
             target[key] = body[key]

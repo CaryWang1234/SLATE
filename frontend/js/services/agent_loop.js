@@ -21,9 +21,9 @@
  * 约定：policy 返回的模型可见字符串不被 t() 包裹（t() 只包用户可见文本）。
  */
 
-import { state, addMessage } from "../store.js?v=20260922-006";
-import { stripToolCalls } from "./tools.js?v=20260922-006";
-import { _pendingToolMsgs } from "./agent_common.js?v=20260922-006";
+import { state, addMessage } from "../store.js?v=20260925-001";
+import { stripToolCalls } from "./tools.js?v=20260925-001";
+import { _pendingToolMsgs, releasePendingFor } from "./agent_common.js?v=20260925-001";
 
 export function createAgentLoop({ policy = {}, view = {}, io }) {
   const reasonOf = (key) => policy.exitReasons?.[key] ?? "";
@@ -44,7 +44,14 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
       exitStatus: "",
       extra: policy.beginRun ? policy.beginRun(opts) : {},
     };
-    const switched = () => genConvId !== null && state.currentConversationId !== genConvId;
+    // 每场会话一份自己的消息数组：并行时后台那场的队尾不在 state.messages 上，
+    // 读错数组等于"照着别的项目的对话往下续写"。宿主没给 messages 时回落 state.messages
+    // （移动端与旧的单场语义都是这个形状）。
+    const thread = () => (typeof opts.messages === "function" ? opts.messages() : state.messages);
+    // 切走会话要不要散场：backgroundRuns 关掉（或移动端）才是"切走即停"。
+    // 开着并行时这一项为 false——后台那场照样按它自己的会话与项目往下跑。
+    const stopOnSwitch = opts.stopOnSwitch !== false;
+    const switched = () => stopOnSwitch && genConvId !== null && state.currentConversationId !== genConvId;
     run.ledger = policy.openRun?.(run) ?? null;
     const ledger = run.ledger;
     const settledIds = new Set();
@@ -79,7 +86,8 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
         if (signal?.aborted) { run.exitReason = reasonOf("aborted"); break; }
         if (switched()) { run.exitReason = reasonOf("switched"); break; }
 
-        const lastMsg = state.messages[state.messages.length - 1];
+        const msgs = thread();
+        const lastMsg = msgs[msgs.length - 1];
         if (!lastMsg || lastMsg.role !== "assistant") {
           // 队尾不是待处理的回复（异常收尾、被外部改写）：如实留痕，
           // 否则 finish() 会把它当成"轮数用尽"报给上层
@@ -91,7 +99,7 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
         runEvent("round.started");
         try {
           // 整表重渲染会让捕获的气泡脱离文档：重新锚定到活节点，本轮 DOM 写入才不落空
-          const live = view.reanchorBubble?.(run.bubble, state.messages.length - 1);
+          const live = view.reanchorBubble?.(run.bubble, thread().length - 1);
           if (live) run.bubble = live;
 
           run.calls = io.detectCalls(lastMsg);
@@ -110,8 +118,8 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
                 if (r?.exitReason !== undefined) run.exitReason = r.exitReason;
                 break;
               }
-              if (r.hiddenMsg) addMessage(r.hiddenMsg);
-              if (r.progressText !== undefined) view.setProgress?.(r.progressText);
+              if (r.hiddenMsg) addMessage(r.hiddenMsg, genConvId);
+              if (r.progressText !== undefined) view.setProgress?.(r.progressText, run);
               run.nudged = true;
             } else {
               run.dupRounds = 0;
@@ -130,14 +138,14 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
             // policy 可以带着 nudge 追加轮数（Continue Autopilot）：先把上限抬高再注入提醒，
             // 顺序反了的话 for 条件仍读旧上限，这条催办就成了没人执行的空话
             if (Number(r.extend) > 0) run.maxRounds += Number(r.extend);
-            if (r.hiddenMsg) addMessage(r.hiddenMsg);
-            if (r.progressText !== undefined) view.setProgress?.(r.progressText);
+            if (r.hiddenMsg) addMessage(r.hiddenMsg, genConvId);
+            if (r.progressText !== undefined) view.setProgress?.(r.progressText, run);
             run.nudged = true;
             run.stallStreak++;
           }
 
           const progressText = policy.progressForRound?.(run);
-          if (progressText !== undefined) view.setProgress?.(progressText);
+          if (progressText !== undefined) view.setProgress?.(progressText, run);
 
           // 剥离工具标记后回显（模型标记不进正文）
           const cleanContent = stripToolCalls(run.lastMsg.content);
@@ -145,7 +153,7 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
           view.renderBubble?.(run.bubble, cleanContent);
 
           if (!run.nudged) {
-            policy.markActivity?.();
+            policy.markActivity?.(run);
             for (let i = 0; i < run.calls.length; i++) {
               if (ledger) readyCalls.push({ callId: ledger.callId(run.round, i), round: run.round, tool: run.calls[i].name });
               callEvent(i, "call.ready");
@@ -157,6 +165,8 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
               // 归属会话：后台任务这类"结果晚于本轮到达"的副作用要记在起它的那个会话名下
               // （徽标按会话亮）。宿主没给 genConvId 时回落当前会话。
               convId: genConvId || state.currentConversationId || "",
+              // 归属项目：后台那场要按它自己的项目根落文件/开终端（见 services/tools.js callProject）
+              project: opts.project || null,
               // 账本 callId 交给执行器透传：派生型工具（subagent_run）据此把 spawn 边
               // 挂到自己的那一行上，星图才认得出谁派生了谁
               callIdFor: (i) => (ledger ? ledger.callId(run.round, i) : ""),
@@ -182,7 +192,7 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
             });
             progress?.endAll?.(run.calls);
             if (run.results.some(result => result.success !== false)) run.successfulTool = true;
-            policy.markActivity?.();
+            policy.markActivity?.(run);
             if (signal?.aborted) { run.exitReason = reasonOf("aborted"); break; }
             if (switched()) { run.exitReason = reasonOf("switched"); break; }
 
@@ -190,7 +200,7 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
             await io.commitResults(run);
             view.toolCards?.finish?.(run);
 
-            for (const msg of policy.buildFeeds(run) || []) addMessage(msg);
+            for (const msg of policy.buildFeeds(run) || []) addMessage(msg, genConvId);
           }
 
           // 新建 assistant 气泡并流式续写（若期间已切换会话，则不向新会话注入幻影气泡）
@@ -220,7 +230,7 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
             if (grant > 0) {
               run.maxRounds += grant;
               runEvent("notice", { kind: c.kind || "cap_extend", text: c.progressText || "" });
-              if (c.progressText !== undefined) view.setProgress?.(c.progressText);
+              if (c.progressText !== undefined) view.setProgress?.(c.progressText, run);
             }
           }
         } finally {
@@ -257,7 +267,7 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
         // 无论以何种方式退出（abort / 去重拦截 / 会话切换 / 轮数上限 / 抛异常），
         // 都要解除渲染抑制，防止残留标记被渲染成伪造的"历史恢复"卡片。
         // 必须在 policy.finish 之后：其重渲染依赖抑制标记仍然生效
-        _pendingToolMsgs.clear();
+        releasePendingFor(thread());
       }
     }
     return run;

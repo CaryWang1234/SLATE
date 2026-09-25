@@ -59,10 +59,15 @@ const setProjectBody = STORE.slice(STORE.indexOf("function setProject(data)"), S
 assert.ok(!/setConstitution\(/.test(setProjectBody), "setProject 又去覆写全局宪法了");
 
 // ── 2. 消费点统一走 effectiveConstitution ──────────────────────
-for (const [rel, src] of [["chat.js", CHAT], ["m-chat.js", MCHAT]]) {
+// 桌面（可并行）：宪法先由 buildAdapterHistory 按"这一场的项目"现算成 history._constitution，
+// 取不到才回落 effectiveConstitution()——后台那场不能拿屏幕上那个项目的规则去问模型。
+assert.match(CHAT, /buildMessages\(history, history\._constitution \|\| effectiveConstitution\(\)/, "chat.js 的系统提示没走生效宪法");
+for (const [rel, src] of [["m-chat.js", MCHAT]]) {
+  // 移动端一次只跑一场，全局那份生效宪法就是它自己的现场
   assert.match(src, /buildMessages\(history, effectiveConstitution\(\)/, `${rel} 的系统提示没走生效宪法`);
   assert.ok(!/buildMessages\(history, state\.constitution/.test(src), `${rel} 还在直接把全局宪法喂给模型`);
 }
+assert.ok(!/buildMessages\(history, effectiveConstitution\(\)[,)]/.test(CHAT), "chat.js 还在直接把屏幕上那个项目的宪法喂给模型");
 assert.match(CHAT, /const rules = effectiveConstitution\(\)\?\.rules/, "自动推进审查的宪法段没走生效宪法");
 assert.match(METER, /buildSystemContent\([^,]+, effectiveConstitution\(\)/, "上下文条估算没按生效宪法算（分桶会和实际载荷不符）");
 assert.match(FACTORY, /function getRules\(\)[\s\S]{0,120}effectiveConstitution\(\)/, "提示词工厂读的不是生效宪法");
@@ -72,7 +77,10 @@ assert.match(TOOLS, /const c = effectiveConstitution\(\);/, "生成提示词工�
 
 // ── 3. 工具目录不再重复注入项目宪法 ────────────────────────────
 assert.doesNotMatch(TOOLS, /s \+= "项目宪法:\\n"/, "工具提示里又注入一遍项目宪法：同一条系统提示会说两遍");
-assert.match(TOOLS, /\[当前项目\] \$\{state\.project\.name\}/, "项目身份还该在工具提示里（只是宪法收敛到一处注入）");
+// P2 起这一行写的是"这一场的项目"（proj = 传入的 project || state.project）：并行时
+// 后台那场的工具目录里若写着屏幕上那个项目，模型就会让它去读别人的文件。
+assert.match(TOOLS, /\[当前项目\] \$\{proj\.name\} \(\$\{proj\.path\}\)/, "项目身份还该在工具提示里（且按这一场的项目取）");
+assert.match(TOOLS, /const proj = project \|\| state\.project;/, "工具目录的项目身份没按这一场的项目取");
 
 // ── 4. 设置页：读的是生效那份，写的目标说清楚 ──────────────────
 assert.match(APP, /function renderConstitutionSettings\(\)/, "宪法设置没有统一的渲染函数");

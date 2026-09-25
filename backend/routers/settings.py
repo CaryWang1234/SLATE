@@ -65,6 +65,9 @@ async def save_shared_state(req: SharedStateRequest):
         "webSearch",
         "imageGen",
         "videoGen",
+        # AI 辅助功能的开关与选模型（前端 services/ai_features.js 是登记表）：
+        # 定时任务与图像/视频生成由后端自己发请求，得能从这份状态里读到同一份偏好。
+        "aiHelpers",
     }
     # 合并式写入：只更新本次提交的字段，避免漏传字段把已存设置抹掉
     existing: dict[str, Any] = {}

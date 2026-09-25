@@ -5,8 +5,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 // 导入必须带与前端一致的 ?v= 串：少了它 Node 里会另起一份模块实例
-import * as tl from "../frontend/js/services/task_list.js?v=20260922-006";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260922-006";
+import * as tl from "../frontend/js/services/task_list.js?v=20260925-001";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20260925-001";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
 const NOW_MS = 1_800_000_000_000;
@@ -125,7 +125,12 @@ for (const [src, label] of [[CHAT, "classic"], [APP, "Codex"]]) {
   assert.match(src, /statusBadge\(taskStatusOf\(/, `${label} 列表的徽标必须由 taskStatusOf 派生`);
   assert.match(src, /dataset\.status = badge\.status/, `${label} 的色调由 data-status 驱动，不能在 JS 里写死颜色`);
 }
-assert.match(CHAT, /sortConversations\(conversations, state\.taskListSort/, "classic 列表没按偏好排序");
+// 这条原本钉的是 `sortConversations(conversations, …)`：classic 列表后来加了"按项目"分组
+// 分支（列表先分流再排序），形参改名成 list。判据没变——仍然是"classic 列表必须按偏好排"，
+// 只是源码形状换了，所以跟着改锚点，不是放宽。
+assert.match(CHAT, /sortConversations\(list, state\.taskListSort/, "classic 列表没按偏好排序");
+assert.match(CHAT, /groupConversationsByProject\(list, state\.taskListSort, ctx\)/,
+  "classic 的按项目分组必须由 task_list 派生：自己算一份就会和 Codex 分组口径不一致");
 assert.match(APP, /groupConversationsByProject\(cxConvsCache, state\.taskListSort/, "Codex 分组没按同一偏好排序");
 assert.match(CHAT, /subscribe\("taskFlags", refreshTaskBadges\)/, "徽标变了不重绘：工具收口/手机侧继续跑之后列表还停在旧状态");
 assert.match(CHAT, /subscribe\("taskListSort", refreshTaskBadges\)/, "排序偏好变了不重绘：换了排序要点开列表才生效");

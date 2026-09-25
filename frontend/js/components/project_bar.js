@@ -2,15 +2,17 @@
  * SLATE 项目栏组件：打开/关闭项目、文件树浏览
  */
 
-import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260922-006";
+import { state, subscribe, setProject, setProjectFileTree } from "../store.js?v=20260925-001";
 import {
   openProject, closeProject, browseFiles, listDrives,
   createWorkspace, switchProjectRoot, editWorkspaceFolders,
-} from "../services/project.js?v=20260922-006";
-import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260922-006";
-import { iconSvgEl, setIconText } from "../services/icons.js?v=20260922-006";
-import { t } from "../services/i18n.js?v=20260922-006";
-import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260922-006";
+  removeRegistry, patchRegistry,
+} from "../services/project.js?v=20260925-001";
+import { refreshRegistry, saveScene, switchToProject, restoreScene } from "../services/project_scene.js?v=20260925-001";
+import { fileTypeIcon, extToLang } from "../services/file_icons.js?v=20260925-001";
+import { iconSvgEl, setIconText } from "../services/icons.js?v=20260925-001";
+import { t } from "../services/i18n.js?v=20260925-001";
+import { dlgConfirm, dlgPrompt, dlgToast } from "../services/dialog.js?v=20260925-001";
 
 let projectBar, projectOpenModal, projectPathInput, projectDrivesList, projectSidebar;
 let workspaceNameInput, workspaceFoldersInput;
@@ -39,16 +41,20 @@ function renderProjectBar() {
     const info = document.createElement("div");
     info.className = "project-bar-info";
 
+    // 项目名是切换器入口：一颗只读的名字标签没法表达"还有别的项目在册"这件事
+    const name = document.createElement("button");
+    name.type = "button";
+    name.className = "project-bar-name project-bar-switch";
+    name.textContent = proj.name;
+    name.title = `${proj.workspace_dir || proj.path}\n${t("点击切换在册项目")}`;
+    name.setAttribute("aria-haspopup", "menu");
+    name.addEventListener("click", (e) => { e.stopPropagation(); toggleProjectSwitcher(name); });
+    info.appendChild(name);
+
     const icon = document.createElement("span");
     icon.className = "project-bar-icon";
     icon.appendChild(iconSvgEl(proj.kind === "workspace" ? "copy" : "folder"));
-    info.appendChild(icon);
-
-    const name = document.createElement("span");
-    name.className = "project-bar-name";
-    name.textContent = proj.name;
-    name.title = proj.workspace_dir || proj.path;
-    info.appendChild(name);
+    info.insertBefore(icon, name);
 
     if (proj.kind === "workspace") {
       const badge = document.createElement("span");
@@ -72,7 +78,7 @@ function renderProjectBar() {
     understandBtn.appendChild(iconSvgEl("book-open"));
     understandBtn.title = "Better Project Understanding：AI 扫描项目生成导览·百科与规则手册";
     understandBtn.addEventListener("click", () => {
-      import("./understand.js?v=20260922-006")
+      import("./understand.js?v=20260925-001")
         .then(({ openUnderstandModal }) => openUnderstandModal())
         .catch(() => {});
     });
@@ -83,7 +89,7 @@ function renderProjectBar() {
     reviewBtn.appendChild(iconSvgEl("search"));
     reviewBtn.title = "Code Review\uff1aAI \u4ee3\u7801\u5ba1\u67e5\uff08git diff \u00b7 \u56db\u7ef4\u5ea6 \u00b7 \u884c\u7ea7\u8bc4\u8bba\uff09";
     reviewBtn.addEventListener("click", () => {
-      import("./review.js?v=20260922-006")
+      import("./review.js?v=20260925-001")
         .then(({ openReviewModal }) => openReviewModal())
         .catch(() => {});
     });
@@ -100,7 +106,9 @@ function renderProjectBar() {
     const closeBtn = document.createElement("button");
     closeBtn.className = "icon-btn";
     closeBtn.textContent = "×";
-    closeBtn.title = "关闭项目";
+    // 这颗 × 不再"关闭项目"，只是把当前视野收起来：项目仍在册，从切换器点回来即可。
+    // 文案要是还写"关闭项目"，用户就会以为点下去它的会话/宪法没了，于是不敢点。
+    closeBtn.title = t("收起当前项目（仍在册，可从项目名处切回）");
     closeBtn.addEventListener("click", handleCloseProject);
     actions.appendChild(closeBtn);
 
@@ -134,6 +142,128 @@ function toggleProjectSidebar() {
   renderProjectBar();
 }
 
+// ── 项目切换器（在册清单一眼可切） ────────────────
+
+let switcherEl = null;
+
+function closeProjectSwitcher() {
+  if (!switcherEl) return;
+  switcherEl.remove();
+  switcherEl = null;
+  document.removeEventListener("click", onDocClickCloseSwitcher, true);
+}
+
+function onDocClickCloseSwitcher(e) {
+  if (switcherEl && !switcherEl.contains(e.target)) closeProjectSwitcher();
+}
+
+function toggleProjectSwitcher(anchor) {
+  if (switcherEl) { closeProjectSwitcher(); return; }
+  void renderSwitcher(anchor);
+}
+
+async function renderSwitcher(anchor) {
+  await refreshRegistry();
+  if (switcherEl) closeProjectSwitcher();
+  const list = Array.isArray(state.projects) ? state.projects : [];
+  switcherEl = document.createElement("div");
+  switcherEl.className = "project-switcher";
+  switcherEl.setAttribute("role", "menu");
+
+  const head = document.createElement("div");
+  head.className = "project-switcher-head";
+  head.textContent = t("在册项目");
+  switcherEl.appendChild(head);
+
+  if (!list.length) {
+    const empty = document.createElement("div");
+    empty.className = "project-switcher-empty";
+    empty.textContent = t("还没有在册项目，打开一个目录试试");
+    switcherEl.appendChild(empty);
+  }
+  for (const entry of list) {
+    switcherEl.appendChild(buildSwitcherRow(entry));
+  }
+
+  const foot = document.createElement("button");
+  foot.type = "button";
+  foot.className = "project-switcher-open";
+  setIconText(foot, "folder-open", t("打开其他目录…"));
+  foot.addEventListener("click", () => { closeProjectSwitcher(); openProjectModal(); });
+  switcherEl.appendChild(foot);
+
+  document.body.appendChild(switcherEl);
+  const rect = anchor.getBoundingClientRect();
+  switcherEl.style.left = `${Math.max(8, rect.left)}px`;
+  switcherEl.style.top = `${rect.bottom + 6}px`;
+  // 捕获阶段监听：菜单里的按钮也有 click 冒泡，冒泡版会把刚点的那一下当成"点外面"
+  document.addEventListener("click", onDocClickCloseSwitcher, true);
+}
+
+function buildSwitcherRow(entry) {
+  const row = document.createElement("div");
+  row.className = "project-switcher-item" + (entry.active ? " active" : "") + (entry.archived ? " archived" : "");
+  // 带 id 上 DOM：在册项目可以重名，按名字找行就会点错（走查踩过）
+  row.dataset.projectId = String(entry.id || "");
+
+  const pick = document.createElement("button");
+  pick.type = "button";
+  pick.className = "project-switcher-pick";
+  pick.title = entry.path;
+  const label = document.createElement("span");
+  label.className = "project-switcher-name";
+  label.textContent = entry.name || entry.id;
+  pick.appendChild(label);
+  if (entry.kind === "workspace") {
+    const k = document.createElement("span");
+    k.className = "project-switcher-kind";
+    k.textContent = t("工作区");
+    pick.appendChild(k);
+  }
+  if (entry.pinned) {
+    const p = document.createElement("span");
+    p.className = "project-switcher-pin";
+    p.textContent = "★";
+    p.title = t("已固定");
+    pick.appendChild(p);
+  }
+  pick.addEventListener("click", async () => {
+    closeProjectSwitcher();
+    const out = await switchToProject(entry.id);
+    if (!out.ok) dlgToast(out.reason || t("切换失败"), 3200);
+  });
+  row.appendChild(pick);
+
+  const pin = document.createElement("button");
+  pin.type = "button";
+  pin.className = "project-switcher-act";
+  setIconText(pin, "star", entry.pinned ? t("取消固定") : t("固定"));
+  pin.title = entry.pinned ? t("取消固定") : t("固定");
+  pin.addEventListener("click", async () => {
+    await patchRegistry(entry.id, { pinned: !entry.pinned });
+    await refreshRegistry();
+    if (state.project?.project_id === entry.id) setProject({ ...state.project });
+  });
+  row.appendChild(pin);
+
+  const forget = document.createElement("button");
+  forget.type = "button";
+  forget.className = "project-switcher-act danger";
+  setIconText(forget, "x", t("从最近移除"));
+  // 移除只摘索引，删数据是另一件事，这里不问也不做——两个动作合并成一个按钮
+  // 就会被用户当成"删除项目"而不敢点，或者当成"只是移除"而误删了数据。
+  forget.title = t("从最近移除（不删除任何文件与会话）");
+  forget.addEventListener("click", async () => {
+    if (!await dlgConfirm(t("从在册清单里移除「{name}」？\n它的会话、宪法、磁盘上的文件都不会被动，只是不再出现在切换器里。", { name: entry.name || entry.id }), { okText: t("移除") })) return;
+    await removeRegistry(entry.id);
+    await refreshRegistry();
+    if (state.project?.project_id === entry.id) setProject(null);
+  });
+  row.appendChild(forget);
+
+  return row;
+}
+
 // ── 打开项目弹窗 ──────────────────────────────
 
 async function openProjectModal() {
@@ -141,10 +271,53 @@ async function openProjectModal() {
   projectOpenModal.classList.remove("hidden");
   projectPathInput.focus();
 
+  // 在册项目排在弹窗最前面：绝大多数时候用户要的是"回到开过的那个"，不是重新找路径
+  await refreshRegistry();
+  renderRegistryList();
+
   // 加载磁盘列表
   const res = await listDrives();
   if (res.code === 0) {
     renderDrivesList(res.data);
+  }
+}
+
+function renderRegistryList() {
+  const box = document.getElementById("project-registry-list");
+  if (!box) return;
+  box.innerHTML = "";
+  const list = Array.isArray(state.projects) ? state.projects : [];
+  if (!list.length) {
+    const empty = document.createElement("span");
+    empty.className = "project-registry-empty";
+    empty.textContent = t("还没有在册项目，用下面的路径打开一个目录");
+    box.appendChild(empty);
+    return;
+  }
+  for (const entry of list) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "project-registry-item" + (entry.active ? " active" : "") + (entry.archived ? " archived" : "");
+    btn.dataset.projectId = entry.id || "";
+    btn.title = entry.path;
+    const label = document.createElement("span");
+    label.className = "project-registry-name";
+    label.textContent = entry.name || entry.id;
+    btn.appendChild(label);
+    if (entry.pinned) {
+      const star = document.createElement("span");
+      star.className = "project-registry-pin";
+      star.textContent = "★";
+      btn.appendChild(star);
+    }
+    btn.addEventListener("click", async () => {
+      const out = await switchToProject(entry.id);
+      if (!out.ok) { dlgToast(out.reason || t("切换失败"), 3200); return; }
+      projectOpenModal.classList.add("hidden");
+      currentBrowsePath = "";
+      await refreshFileTree("");
+    });
+    box.appendChild(btn);
   }
 }
 
@@ -167,10 +340,14 @@ async function handleOpenProject() {
   const path = projectPathInput.value.trim();
   if (!path) return;
 
+  // 先记下旧项目的现场再开新的：不记就等于"打开新项目把上一个的草稿弄丢了"
+  await saveScene();
   const res = await openProject(path);
   if (res.code === 0) {
     setProject(res.data);
     projectOpenModal.classList.add("hidden");
+    await refreshRegistry();
+    await restoreScene(res.data);
     // 自动浏览根目录
     currentBrowsePath = "";
 
@@ -190,6 +367,7 @@ async function handleCreateWorkspace() {
   if (res.code === 0) {
     setProject(res.data);
     projectOpenModal.classList.add("hidden");
+    await refreshRegistry();
     currentBrowsePath = "";
     await refreshFileTree("");
   } else {
@@ -198,10 +376,12 @@ async function handleCreateWorkspace() {
 }
 
 async function handleCloseProject() {
-  if (!await dlgConfirm("关闭当前项目？", { okText: "关闭" })) return;
+  if (!await dlgConfirm(t("收起当前项目？它仍留在在册清单里，会话、宪法、文件都不动。"), { okText: t("收起") })) return;
+  await saveScene();
   await closeProject();
   setProject(null);
   setProjectFileTree([]);
+  await refreshRegistry();
 }
 
 async function handleRefreshProject(button) {
@@ -489,6 +669,23 @@ function openProjectSettings() {
   window.dispatchEvent(new CustomEvent("slate:open-settings", { detail: { focusConstitution: true } }));
 }
 
+// ── 现场自动记录 ──────────────────────────────
+//
+// 只靠"切走之前存一次"是不够的：浏览器被直接关掉时没人调用过切换器。
+// 所以切会话与打字都触发一次防抖写盘。防抖窗口取 1.5s——再短就成了每次击键一个请求，
+// 再长则用户"打完字立刻关窗口"会丢最后一段；丢一段草稿可接受，卡输入不可接受。
+
+let sceneSaveTimer = null;
+
+function queueSceneSave() {
+  if (!state.project?.project_id) return;
+  if (sceneSaveTimer) clearTimeout(sceneSaveTimer);
+  sceneSaveTimer = setTimeout(() => {
+    sceneSaveTimer = null;
+    void saveScene();
+  }, 1500);
+}
+
 // ── 初始化 ───────────────────────────────────
 
 function initProjectBar() {
@@ -530,6 +727,17 @@ function initProjectBar() {
   subscribe("project", renderProjectBar);
 
   subscribe("projectFileTree", renderFileTree);
+
+  // 现场记录挂在两条真实入口上：切会话、打字。都只防抖写服务端 prefs，不重绘任何东西。
+  window.addEventListener("slate:conv-active-changed", queueSceneSave);
+  document.addEventListener("input", (e) => {
+    if (e.target && e.target.id === "chat-input") queueSceneSave();
+  });
+  window.addEventListener("beforeunload", () => {
+    // 关窗口前把定时器兑现成一次真实写入（navigator.sendBeacon 那套对本地后端没必要）
+    if (sceneSaveTimer) { clearTimeout(sceneSaveTimer); sceneSaveTimer = null; void saveScene(); }
+  });
+  void refreshRegistry();
 
   // 初始渲染
   renderProjectBar();

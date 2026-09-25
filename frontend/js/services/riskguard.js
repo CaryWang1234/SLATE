@@ -5,9 +5,10 @@
  * - 用户批准后注入 approved 参数放行；拒绝后返回拒绝结果给模型
  */
 
-import { state, getModelKey } from "../store.js?v=20260922-006";
-import { post } from "./api.js?v=20260922-006";
-import { t } from "./i18n.js?v=20260922-006";
+import { state, getModelKey } from "../store.js?v=20260925-001";
+import { post } from "./api.js?v=20260925-001";
+import { aiModelFor, isAiFeatureOn } from "./ai_features.js?v=20260925-001";
+import { t } from "./i18n.js?v=20260925-001";
 
 // 高危命令规则（写死）：命中任一条即要求批准
 const HIGH_RISK_PATTERNS = [
@@ -61,13 +62,14 @@ function isHighRiskCommand(command) {
  * 用当前模型解释命令目的（失败时返回兜底文案）
  */
 async function explainCommand(command) {
-  const modelId = state.currentModel?.id;
-  const apiKey = modelId ? getModelKey(modelId) : "";
-  if (!modelId || !apiKey) return "（当前未配置模型 API Key，无法生成目的说明）";
+  // 关掉就少发一趟请求：审批照常拦，只是不再解释这条命令
+  if (!isAiFeatureOn("command_explain")) return t("（命令目的说明已关闭，可在设置 → AI 辅助功能打开）");
+  const target = aiModelFor("command_explain", state.currentModel);
+  if (!target.usable) return "（当前未配置模型 API Key，无法生成目的说明）";
   try {
     const res = await post("/proxy/chat", {
-      model: modelId,
-      api_key: apiKey,
+      model: target.id,
+      api_key: target.key,
       stream: false,
       temperature: 0.2,
       max_tokens: 200,
