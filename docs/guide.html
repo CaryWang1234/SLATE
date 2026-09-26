@@ -350,6 +350,7 @@
       <button class="nav-btn" id="btn-lang" onclick="toggleLang()">EN / 中</button>
       <button class="nav-btn" id="btn-theme" onclick="toggleTheme()">☀</button>
       <a class="nav-btn" href="./index.html"><span class="lang-zh">首页</span><span class="lang-en">Home</span></a>
+      <a class="nav-btn" href="https://docs.slate-ai.site/" target="_blank" rel="noopener"><span class="lang-zh">文档站</span><span class="lang-en">Docs</span></a>
     </div>
   </nav>
 
@@ -482,7 +483,9 @@ python desktop.py</pre>
             </ul>
             <div class="ink-note"><strong>快捷键：</strong>Enter 发送 · Shift+Enter 换行 · Ctrl+N 新建对话</div>
             <div class="ink-note"><strong>＋ 模式菜单：</strong>输入框左侧的 <strong>＋</strong> 按钮集中了模式入口 —— 磨墨 / 头脑风暴 / 目标模式 / 定时任务，以及「提及」分组（技能 / 工具 / MCP / 文件），点击行即可启动对应模式或弹出对应候选列表。</div>
-            <div class="ink-note"><strong>思考强度滑杆：</strong>点输入框左侧的档位胶囊弹出滑杆，刻度只列当前模型支持的档位（自动 / 关 / 低 / 中 / 高），每档下方以小字标注对应墨色（随墨 / 清墨 / 淡墨 / 浓墨 / 焦墨），拖动时只预览、松手才生效并落盘。</div>
+            <div class="ink-note"><strong>思考强度滑杆：</strong>点输入框左侧的档位胶囊弹出滑杆，刻度只列当前模型支持的档位（自动 / 关 / 低 / 中 / 高），每档下方以小字标注对应墨色（随墨 / 清墨 / 淡墨 / 浓墨 / 焦墨），拖动时只预览、松手才生效并落盘。刻度不是照抄一份固定表：SLATE 按端点能力分了九类，强制思考的模型没有「关」这一档；只分开关的端点在档位旁注明「低 / 中 / 高都按开」；这个模型接不住的刻度直接置灰并写明原因，切模型那一刻也会在弹窗里提示。上游若以 400 点名该字段，会剥掉它重发一次——最坏是这次档位不生效，而不是模型用不了。</div>
+            <div class="ink-note"><strong>上下文预算滑杆：</strong>设置页「模型配置」里每个模型一行「最大上下文」（自动 / 100K / 200K / 400K / 600K / 800K / 1M）。同一个值肩挑两件事——自动压缩的触发阈值与用量条的分母，所以读数不会和压缩时机各说各话；选「自动」时按模型标称窗口 ×0.8 吸附到最近的档位（1M 窗口落到 800K）。用量条可以直接点，点了跳到对应模型的这一行。</div>
+            <div class="ink-note"><strong>历史摘要折叠条：</strong>超过阈值后，较早的对话会被压成一段摘要。摘要本身仍按原格式完整发给模型，只在消息区折叠成一条——点标题展开才解析 Markdown，长历史不会把当前几轮挤出屏幕。</div>
           </div>
           <div class="lang-en">
             <p>SLATE supports multiple models simultaneously — switch anytime from the top dropdown.</p>
@@ -494,7 +497,9 @@ python desktop.py</pre>
             </ul>
             <div class="ink-note"><strong>Shortcuts:</strong> Enter to send · Shift+Enter for newline · Ctrl+N for new conversation</div>
             <div class="ink-note"><strong>＋ Mode Menu:</strong> The <strong>＋</strong> button left of the chat input centralizes mode entries — Grind / Brainstorm / Target Mode / Scheduled Tasks — plus an @-mention group (Skills / Tools / MCP / Files) that opens a filtered picker.</div>
-            <div class="ink-note"><strong>Reasoning slider:</strong> Click the level pill left of the input to open a slider whose ticks list only what the current model supports (auto / off / low / medium / high). Each tick carries its ink shade in small type (free / clear / light / rich / charred); dragging previews, letting go applies and persists.</div>
+            <div class="ink-note"><strong>Reasoning slider:</strong> Click the level pill left of the input to open a slider whose ticks list only what the current model supports (auto / off / low / medium / high). Each tick carries its ink shade in small type (free / clear / light / rich / charred); dragging previews, letting go applies and persists. Those ticks are not a copied fixed table: SLATE sorts endpoints into nine capability classes, so a model that forces reasoning has no "off" tick, on/off-only endpoints say "low/medium/high are all treated as on", and a tick this model cannot take is greyed out with the reason — switching models says so in the popup too. If upstream answers 400 naming that field, it is stripped and retried once: worst case the level is ignored, not the model unusable.</div>
+            <div class="ink-note"><strong>Context budget slider:</strong> Under Settings → model configuration, every model row carries a "max context" slider (auto / 100K / 200K / 400K / 600K / 800K / 1M). One value does two jobs — the auto-compaction threshold and the usage-bar denominator — so the reading can never disagree with when compression fires. "Auto" takes the model's nominal window × 0.8 and snaps to the nearest tick (a 1M window lands on 800K); the usage bar is clickable and jumps to that model's row.</div>
+            <div class="ink-note"><strong>Collapsible history summary:</strong> once the threshold is passed, earlier turns are compressed into a summary. That summary is still sent to the model in full; in the transcript it folds into a single strip that parses Markdown only when expanded, so a long history does not push the current turns off the screen.</div>
           </div>
         </div>
       </div>
@@ -513,6 +518,7 @@ python desktop.py</pre>
             <p>如果模型只说”我将检查 / 接下来修改 / 是否继续”，系统会自动催它直接调工具；如果没有任何工具记录却口头说完成，系统会要求它先验证或真正动手。</p>
             <p><strong>砚流 · 落笔即所见：</strong>模型正在逐个 token 写工具参数时，SLATE 会按本地工具 schema 解析这份还没写完的参数，实时演成一行预览——哪些字段已经闭合、哪个字段正在写。它只做预览，<strong>半成品参数永不触发执行</strong>；几十 KB 的正文类字段一律折叠成行数与字数，不刷屏。</p>
             <p><strong>停止是真取消：</strong>点击停止会同时关闭模型流与工具调用的流式通道，后端随即终止对应的子进程与在跑任务，不再是“界面停了、活还在干”。被取消的调用会以独立状态记进本地事件账，与正常完成区分开。</p>
+            <p><strong>回答被截断会说清楚：</strong>上游偶尔会让一轮只剩思考、没有正文——思考与正文共用输出上限，思考吃满时正文就没地方写了。这种结局不再被静默咽下去：流收到内容后自然结束、却既没有 <code>[DONE]</code> 也没有 <code>finish_reason</code> 时，这一轮会被标记，收尾时如实报出，原因也分开说（思考占满输出上限 / 上游提前中断）；正文有内容但流提前断的，标注可能不完整。此前这套通知与「继续」入口都挂在 Autopilot / 目标模式上，两种模式都关着时是一点信号都没有，用户只看到“它自己停了”。</p>
             <p><strong>目标模式</strong> 是更强的显式闭环模式。需要 80 轮长任务、明确 TODOLIST 和六阶段约束时，点击输入框左侧 <strong>＋</strong> 菜单里的「目标模式」开关，或在消息中提及「用目标模式执行」。</p>
             <p><strong>六阶段流程：</strong></p>
             <ol>
@@ -533,6 +539,7 @@ python desktop.py</pre>
             <p><strong>Continue Autopilot (on by default; Settings → Auto-Advance):</strong> running out of rounds is not the same as being done. When the last round was still executing tools, the ceiling moves back by 8 rounds (at most 3 top-ups) so the work in flight can finish; when the model stops without doing anything, the open TODOLIST items are read back to it and it is told to keep going or write 【任务完成】 explicitly. Top-ups are capped, so the stop-loss is pushed later rather than erased.</p>
             <p><strong>InkStream — arguments as they are written:</strong> while the model streams a tool call token by token, SLATE parses the half-formed arguments against the local tool schema and shows a live one-line preview of which fields are already closed and which one is still being written. It is preview only — <strong>incomplete arguments never reach execution</strong>; multi-KB text fields fold into line and character counts instead of flooding the screen.</p>
             <p><strong>Stop really cancels:</strong> pressing Stop closes both the model stream and the tool-call stream, so the backend terminates the matching subprocess or running task instead of "UI stopped, work still going". Cancelled calls are recorded in the local event ledger under their own status, kept apart from successful ones.</p>
+            <p><strong>A truncated answer says so:</strong> upstream will occasionally return a round with thinking and no body — the two share one output ceiling, and a long think leaves no room to write. That ending is no longer swallowed: when the stream produced content and then ended naturally with neither <code>[DONE]</code> nor a <code>finish_reason</code>, the round is flagged and reported as it closes, with the cause kept apart (thinking consumed the whole output budget, or upstream cut the stream early); a reply that did produce text but stopped early is labelled possibly incomplete. Both this notice and the "Continue" entry used to hang off Autopilot/target mode, so with both off there was no signal at all — you just watched it stop.</p>
             <p><strong>Target Mode</strong> is the stronger explicit loop. Toggle "Target Mode" in the <strong>＋</strong> menu (left of the chat input), or mention "use Target Mode", when you want 80 rounds, TODOLIST enforcement, and six-phase constraints.</p>
             <p><strong>Six-Phase Flow:</strong></p>
             <ol>
@@ -907,7 +914,8 @@ python desktop.py</pre>
               <tr><td>审批模式</td><td>三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 23 类高危）/ 完全访问（都不问）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改</td></tr>
               <tr><td>主题</td><td>深色/浅色切换</td></tr>
               <tr><td>语言</td><td>中文 / English</td></tr>
-              <tr><td>上下文压缩</td><td>自动/手动压缩历史对话</td></tr>
+              <tr><td>上下文压缩</td><td>自动/手动压缩历史对话；摘要发给模型的是原文，界面上折成一条可展开的折叠条</td></tr>
+              <tr><td>上下文预算</td><td>每个模型一行滑杆（自动 / 100K / 200K / 400K / 600K / 800K / 1M），同时决定自动压缩阈值与用量条分母</td>
               <tr><td>AI 辅助功能</td><td>对话以外的 13 项耗 Token 功能，逐项开关 + 单独选模型</td></tr>
               <tr><td>短回复审阅</td><td>模型回复后自动检查是否需要推进</td></tr>
             </table>
@@ -917,10 +925,11 @@ python desktop.py</pre>
               <tr><th>Setting</th><th>Description</th></tr>
               <tr><td>Model Management</td><td>Add/remove API keys, configure custom endpoints</td></tr>
               <tr><td>Output Control</td><td>Max tokens, streaming toggle</td></tr>
-              <tr><td>Safety Mode</td><td>High-risk command approval policy</td></tr>
+              <tr><td>Safety Mode</td><td>Three tiers: Manual (confirm every command and every network call) / Auto (only the 23 high-risk patterns) / Full Access (ask nothing). This is the default for new conversations; the approval pill in the input bar changes it for one conversation</td></tr>
               <tr><td>Theme</td><td>Dark/Light toggle</td></tr>
               <tr><td>Language</td><td>Chinese / English</td></tr>
-              <tr><td>Context Compression</td><td>Auto/manual history compression</td></tr>
+              <tr><td>Context Compression</td><td>Auto/manual history compression; the model still receives the summary in full, the transcript folds it into an expandable strip</td></tr>
+              <tr><td>Context Budget</td><td>One slider per model (auto / 100K / 200K / 400K / 600K / 800K / 1M); it sets both the auto-compaction threshold and the usage-bar denominator</td>
               <tr><td>AI Assistance</td><td>13 token-spending features outside the chat loop, each with its own switch and model</td></tr>
               <tr><td>Short Reply Review</td><td>Auto-check if reply needs follow-up</td></tr>
             </table>
@@ -1074,7 +1083,8 @@ python desktop.py</pre>
         <p style="font-size:13px; color:var(--ink-faint); margin-top:8px;">
           <a href="https://github.com/CaryWang1234/SLATE" target="_blank">GitHub</a> · 
           <a href="./index.html"><span class="lang-zh">首页</span><span class="lang-en">Home</span></a> · 
-          <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank"><span class="lang-zh">下载</span><span class="lang-en">Download</span></a>
+          <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank"><span class="lang-zh">下载</span><span class="lang-en">Download</span></a> · 
+          <a href="https://docs.slate-ai.site/" target="_blank" rel="noopener"><span class="lang-zh">文档站</span><span class="lang-en">Docs</span></a>
         </p>
       </div>
 

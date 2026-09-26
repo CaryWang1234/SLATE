@@ -25,10 +25,12 @@
         <a href="#limits"><span class="drawer-icon">03</span> Honest Limits</a>
         <a href="#start"><span class="drawer-icon">04</span> Quick Start</a>
         <a href="./guide.html"><span class="drawer-icon">05</span> Guide &amp; Full Tool List</a>
+        <a href="https://docs.slate-ai.site/" target="_blank" rel="noopener"><span class="drawer-icon">06</span> Docs Site</a>
       </div>
       <div class="drawer-footer">
         <a class="drawer-action" href="https://github.com/CaryWang1234/SLATE/releases/latest" target="_blank" rel="noopener">Download the installer</a>
         <a class="drawer-action ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">Read the source</a>
+        <a class="drawer-action ghost" href="https://docs.slate-ai.site/" target="_blank" rel="noopener">Documentation site</a>
         <a class="drawer-lang" href="./zh/index.html">中文 / English</a>
       </div>
     </nav>
@@ -67,6 +69,7 @@
         <a href="#limits">Honest Limits</a>
         <a href="#start">Quick Start</a>
         <a href="./guide.html">Guide</a>
+        <a href="https://docs.slate-ai.site/" target="_blank" rel="noopener">Docs</a>
       </div>
       <div class="nav-right">
         <a class="nav-lang" href="./zh/index.html">中文</a>
@@ -443,6 +446,14 @@
           <h3>LAN Is the Whole App</h3>
           <p>If you turn on remote control, that network can drive everything — terminal included — behind one token and an optional password. Off unless you enable it.</p>
         </div>
+        <div class="scene-card reveal" data-stagger>
+          <h3>Long Work Dies With Its Process</h3>
+          <p>A background terminal task lives inside the SLATE backend; a background subagent batch lives inside the browser page. Reload or quit and that work stops — the log under <code>data/bg_tasks/</code> is the only trace, and nothing resumes after a restart.</p>
+        </div>
+        <div class="scene-card reveal" data-stagger>
+          <h3>Parallelism Is Cross-Project</h3>
+          <p>Two different projects can generate at once, and a send that finds no slot is queued rather than dropped. Two runs inside the <em>same</em> project still serialize — worktree isolation with a merge review is designed, not shipped.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -500,7 +511,8 @@
         <a href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub</a> ·
         <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">Releases</a> ·
         <a href="https://github.com/CaryWang1234/SLATE/issues" target="_blank" rel="noopener">Issues</a> ·
-        <a href="./guide.html">Guide</a>
+        <a href="./guide.html">Guide</a> ·
+        <a href="https://docs.slate-ai.site/" target="_blank" rel="noopener">Documentation</a>
       </p>
       <p style="margin-top: 8px;">SLATE ships no model of its own and is unaffiliated with any provider. · MIT License · © 2026 Cary</p>
     </div>

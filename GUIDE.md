@@ -1,6 +1,8 @@
 # SLATE（砚）使用教程 · User Guide
 
 > [中文](#中文) | [English](#english)
+>
+> 线上入口：官网 [slate-ai.site](https://slate-ai.site/) ｜ 文档站 [docs.slate-ai.site](https://docs.slate-ai.site/) ｜ 本教程网页版 [slate-ai.site/guide.html](https://slate-ai.site/guide.html)
 
 ---
 
@@ -111,6 +113,8 @@ Autopilot 是默认的“少打继续”执行层。只要你的消息明显是�
 **砚流 · 落笔即所见：** 模型正在逐个 token 写工具参数时，SLATE 会按本地工具 schema 解析这份还没写完的参数，实时演成一行预览——哪些字段已经闭合、哪个字段正在写。它只做预览，**半成品参数永不触发执行**；几十 KB 的正文类字段一律折叠成行数与字数，不刷屏。
 
 **停止是真取消：** 点击停止会同时关闭模型流与工具调用的流式通道，后端随即终止对应的子进程与在跑任务，不再是“界面停了、活还在干”。被取消的调用会以独立状态记进本地事件账，与正常完成区分开。
+
+**回答被截断会说清楚：** 思考过程与正文共用同一个输出上限，思考吃满时这一轮就没有正文可写了。这种结局不再被静默咽下去：流收到内容后自然结束、却既没有结束标记也没有结束原因时，这一轮会被标记，收尾时如实报出，原因也分开说（思考占满输出上限 / 上游提前中断），并给出可点的「继续」入口；正文有内容但流提前断掉的标注可能不完整。这套提示在任何模式下都给，不只是自动推进模式。
 
 **什么时候还用 Harness：** 需要更强约束、明确 TODOLIST、长任务 80 轮闭环时，点击输入框左侧 **＋** 菜单里的「目标模式」开关；验证全部通过后模型调用 `exit_target_mode` 收口，目标模式开关随之关闭。
 
@@ -387,15 +391,15 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 | 设置 | 说明 |
 |------|------|
 | 模型管理 | 添加/删除 API Key，配置自定义端点，可选启用 Responses API |
-| 推理强度 | 点输入框左侧胶囊开滑杆弹窗，按模型能力给出可选档位（自动/关/低/中/高），每档下方小字标注对应墨色（随墨/清墨/淡墨/浓墨/焦墨）；上游不认的档位不会出现，拖动松手才落盘 |
-| 上下文预算 | 模型行上的滑杆（自动/100K/200K/400K/600K/800K/1M），同时决定自动压缩阈值与用量条分母 |
+| 推理强度 | 点输入框左侧胶囊开滑杆弹窗，按模型能力给出可选档位（自动/关/低/中/高），每档下方小字标注对应墨色（随墨/清墨/淡墨/浓墨/焦墨）；能力分九类：强制思考的模型没有「关」档，只能整体开关的端点标注「低/中/高都按开」，接不住的档位置灰并写明原因，上游 400 点名该字段时剥掉重发一次；拖动松手才落盘 |
+| 上下文预算 | 模型行上的滑杆（自动/100K/200K/400K/600K/800K/1M），同时决定自动压缩阈值与用量条分母；选「自动」时按标称窗口 ×0.8 吸附到最近的档位 |
 | 输出控制 | 最大 Token 数、流式输出开关 |
 | 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 / Continue Autopilot（末轮续跑） |
 | 审批模式 | 三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 23 类高危）/ 完全访问（都不问）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改 |
 | 局域网遥控 | 查看访问地址与二维码，设置局域网访问密码 |
 | 主题 | 深色/浅色切换 |
 | 语言 | 中文/English |
-| 上下文压缩 | 自动/手动压缩历史对话 |
+| 上下文压缩 | 自动/手动压缩历史对话；摘要发给模型的是完整原文，界面上折成一条可展开的折叠条 |
 | AI 辅助功能 | 对话以外的 13 项耗 Token 功能逐项开关 + 单独选模型；关掉即一次模型都不发，工具类的三项（子代理/图片/视频）还会从工具目录里消失 |
 | 多任务与项目 | 切走会话是否让它继续在跑（关掉即旧语义：切换即中断）、同时最多跑几场（1–4）、同一项目内最多几场（1–3，默认串行）；排队中的任务在右栏任务中心与输入框上方都看得见 |
 
@@ -508,6 +512,8 @@ Autopilot is the default "do not make me type continue" execution layer. When yo
 **InkStream — arguments as they are written:** while the model streams a tool call token by token, SLATE parses the half-formed arguments against the local tool schema and shows a live one-line preview of which fields are already closed and which one is still being written. It is preview only — **incomplete arguments never reach execution**; multi-KB text fields fold into line and character counts instead of flooding the screen.
 
 **Stop really cancels:** pressing Stop closes both the model stream and the tool-call stream, so the backend terminates the matching subprocess or running task instead of "UI stopped, work still going". Cancelled calls are recorded in the local event ledger under their own status, kept apart from successful ones.
+
+**A truncated answer says so:** thinking and the body share one output ceiling, so a long think can leave no room to write. That ending is no longer swallowed: when the stream produced content and then ended naturally with neither a closing marker nor a finish reason, the round is flagged and reported as it closes, with the cause kept apart (thinking consumed the whole output budget / upstream cut the stream early) and the same clickable "Continue" entry; a reply that did produce text but stopped early is labelled possibly incomplete. This notice is given in every mode, not only under Auto-Advance.
 
 **When to use Harness:** use the **Target Mode** toggle in the **＋** menu (left of the chat input) when you want the stronger six-phase mode, explicit TODOLIST enforcement, and an 80-round long-task loop; after verification passes the model closes it with `exit_target_mode`, which also switches Target Mode off.
 
@@ -789,7 +795,7 @@ Let AI automatically execute tasks on schedule or by events.
 | Setting | Description |
 |---------|-------------|
 | Model Management | Add/remove API keys, configure custom endpoints, optionally enable Responses API |
-| Reasoning Effort | Click the pill left of the input to open a slider; levels follow the model's capability (auto/off/low/medium/high), each tick annotated with its ink shade in small type (free/clear/light/rich/charred); unsupported levels never appear, and the value is persisted only when you let go |
+| Reasoning Effort | Click the pill left of the input to open a slider; levels follow the model's capability (auto/off/low/medium/high), each tick annotated with its ink shade in small type (free/clear/light/rich/charred). Nine capability classes decide what appears: a model that forces reasoning has no "off", on/off-only endpoints say "low/medium/high are all treated as on", a tick the model cannot take is greyed out with the reason, and a 400 naming the field causes one retry with it stripped. The value is persisted only when you let go |
 | Context Budget | Per-model slider (auto/100K/200K/400K/600K/800K/1M) driving both the auto-compress threshold and the usage bar |
 | Output Control | Max tokens, streaming toggle |
 | Auto-Advance | Autopilot / short-reply review / long-stall review / Continue Autopilot |
@@ -797,7 +803,7 @@ Let AI automatically execute tasks on schedule or by events.
 | LAN Remote | View LAN URL / QR code, configure remote access password |
 | Theme | Dark/Light toggle |
 | Language | Chinese / English |
-| Context Compression | Auto/manual compression of history |
+| Context Compression | Auto/manual compression of history; the model still receives the summary in full, the transcript folds it into an expandable strip |
 | AI Assistance | 13 token-spending features outside the chat loop, each with its own switch and optional pinned model; off means no request at all, and the three tool-driven ones also disappear from the tool catalogue |
 | Tasks & Projects | Whether a run keeps going when you switch away (off restores the old "switch means stop"), how many runs may go at once (1-4), and how many within one project (1-3, serial by default); queued sends are visible both in the right-hand task centre and above the input box |
 

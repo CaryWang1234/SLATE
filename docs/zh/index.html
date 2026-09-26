@@ -25,10 +25,12 @@
         <a href="#limits"><span class="drawer-icon">03</span> 诚实边界</a>
         <a href="#start"><span class="drawer-icon">04</span> 快速上手</a>
         <a href="../guide.html"><span class="drawer-icon">05</span> 使用手册与工具全表</a>
+        <a href="https://docs.slate-ai.site/" target="_blank" rel="noopener"><span class="drawer-icon">06</span> 文档站（分章阅读）</a>
       </div>
       <div class="drawer-footer">
         <a class="drawer-action" href="https://github.com/CaryWang1234/SLATE/releases/latest" target="_blank" rel="noopener">下载安装包</a>
         <a class="drawer-action ghost" href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">读源码</a>
+        <a class="drawer-action ghost" href="https://docs.slate-ai.site/" target="_blank" rel="noopener">文档站</a>
         <a class="drawer-lang" href="../index.html">中文 / English</a>
       </div>
     </nav>
@@ -67,6 +69,7 @@
         <a href="#limits">诚实边界</a>
         <a href="#start">快速上手</a>
         <a href="../guide.html">使用手册</a>
+        <a href="https://docs.slate-ai.site/" target="_blank" rel="noopener">文档站</a>
       </div>
       <div class="nav-right">
         <a class="nav-lang" href="../index.html">EN</a>
@@ -443,6 +446,14 @@
           <h3>局域网开的是整个应用</h3>
           <p>一旦开启遥控，那个网络上的设备就能驱动包括 terminal 在内的全部功能，只靠一个 token 和可选密码守。默认不开。</p>
         </div>
+        <div class="scene-card reveal" data-stagger>
+          <h3>长活跟它的进程同生共死</h3>
+          <p>后台终端任务活在 SLATE 后端进程里，后台子代理批次活在浏览器页面里。刷新或退出，这些活就停了——只留下 <code>data/bg_tasks/</code> 里的日志，重启不会接着跑。</p>
+        </div>
+        <div class="scene-card reveal" data-stagger>
+          <h3>并行只在跨项目时成立</h3>
+          <p>两个不同项目可以同时生成，找不到槽位的发送会进队列而不是被丢掉。但<em>同一个</em>项目内的两场仍然串行——worktree 隔离加合并审查只是设计，还没落地。</p>
+        </div>
       </div>
     </div>
   </section>
@@ -500,7 +511,8 @@
         <a href="https://github.com/CaryWang1234/SLATE" target="_blank" rel="noopener">GitHub</a> ·
         <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank" rel="noopener">Releases</a> ·
         <a href="https://github.com/CaryWang1234/SLATE/issues" target="_blank" rel="noopener">Issues</a> ·
-        <a href="../guide.html">使用手册</a>
+        <a href="../guide.html">使用手册</a> ·
+        <a href="https://docs.slate-ai.site/" target="_blank" rel="noopener">文档站</a>
       </p>
       <p style="margin-top: 8px;">砚不自带模型，与任何模型厂商无隶属关系。· MIT 协议 · © 2026 Cary</p>
     </div>

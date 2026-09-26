@@ -9,8 +9,9 @@
 *Local AI collaboration studio — turn sparks of ideas into structured plans.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-1a1a1a.svg)](LICENSE)
-[![Website](https://img.shields.io/badge/Website-carywang1234.github.io%2FSLATE-1a1a1a.svg)](https://carywang1234.github.io/SLATE/)
-[![Guide](https://img.shields.io/badge/%E6%95%99%E7%A8%8B-%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97-d4a24e.svg)](https://carywang1234.github.io/SLATE/docs/guide.html)
+[![Website](https://img.shields.io/badge/%E5%AE%98%E7%BD%91-slate--ai.site-1a1a1a.svg)](https://slate-ai.site/zh/)
+[![Docs](https://img.shields.io/badge/%E6%96%87%E6%A1%A3%E7%AB%99-docs.slate--ai.site-1a1a1a.svg)](https://docs.slate-ai.site/)
+[![Guide](https://img.shields.io/badge/%E6%95%99%E7%A8%8B-%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97-d4a24e.svg)](https://slate-ai.site/guide.html)
 [![Python](https://img.shields.io/badge/Python-3.13%2B-1a1a1a.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-1a1a1a.svg)]()
 [![Build](https://img.shields.io/badge/Build-Zero%20npm%20%2F%20Zero%20Bundler-1a1a1a.svg)]()
@@ -33,8 +34,10 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 
 - 🗣️ **多模型统一接入** —— 国内外主流 LLM + 自定义 OpenAI 兼容端点 + 本地模型（Ollama / LM Studio）
 - ⚡ **Agent Autopilot + 目标模式** —— 普通项目任务会自动进入 Agent 循环，不再需要反复发送”继续”；目标模式仍是显式六阶段、80 轮强闭环模式
+- 🎚️ **每模型上下文预算 + 只下发端点认的思考档** —— 设置页每个模型一行上下文滑杆（自动 / 100K / 200K / 400K / 600K / 800K / 1M），同一个值既是自动压缩阈值也是用量条分母，两个口径不会各走各的。思考强度拆成 9 类端点能力词表，覆盖 Kimi / 通义 / GLM / 豆包 / MiniMax / 文心 / Ollama 与自定义端点：强制思考的不给「关」档，只分开关的标注「低 / 中 / 高都按开」，不支持的刻度置灰并写明原因；上游 400 点名该字段时剥掉重发一次——最坏是档位不生效，而不是模型不可用
 - ✒️ **砚流 · 落笔即所见** —— 模型正在逐个 token 写工具参数时，按本地 schema 实时把「已闭合字段 / 正在写字段」演出来；半成品参数永不触发执行，长正文只显示行数字数
 - 🛑 **停止是真取消** —— 点停止即关闭工具调用的流式通道，后端随之终止子进程与在跑任务，不再是「界面停了、活还在干」；取消笔数会记入事件账供回溯
+- 📣 **回答被截断会说清楚** —— 流自然结束却既没有 `[DONE]` 也没有 `finish_reason` 时，这一轮会被标记并在所有模式下如实报出，原因也分开说（思考占满输出上限 / 上游提前中断）；正文有内容但流提前断的标注可能不完整，并复用同一处「继续」入口。此前通知与续跑入口都挂在 Autopilot / 目标模式上，关掉时这种停笔是零信号
 - 🖌️ **磨墨模式** —— `/grind` 一句粗糙想法，AI 三段式追问研磨成结构化任务书，一键送入目标模式
 - 🗂️ **对话与数据管理** —— 历史全文搜索、会话导出 / 改名 / 批量管理、消息编辑删除，一键备份恢复全部数据，存储用量可视可清理
 - 🛠️ **35 个内置 MCP 工具** —— 文件读写编辑追加、全局代码搜索、Unicode-safe 终端、后台终端任务（起了就走，结束会叫醒模型）、PPT / Word / Excel / PDF 工具、SVG 图表与二维码、Python API 文档提取、便携网页打包、代码与文档安全扫描、Git 仓库只读信息、联网搜索与网页抓取、MCP 工厂自生产工具、截图转代码、AI 图片与视频生成、浏览器与桌面自动化等
@@ -57,7 +60,7 @@ SLATE 是一个**轻量级本地 AI 协作工具**，专注于提示词工程、
 - 🗂️ **侧栏任务列表可排序 + 四态标志** —— 「任务」页签与 Codex 历史栏共用一份排序偏好（最近更新 / 按项目 / 按状态 / 创建时间 / 按用量）；每条会话按当下处境给出各自独立的标志：需要操作、出错、进行中（呼吸动画）、已完成未查看。阅读进度只留在本机，排序偏好跨设备同步
 - 🧠 **升级版黑板** —— 卡片 + 连线整理思路，Mermaid 渲染 flowchart / mindmap，支持流程 / 看板 / 纲要 / Git 树 / 工作流等显示模式；工具执行自动记录为带状态颜色的步骤卡片，工作流视图还能就地控制这一场对话怎么跑（启停 / 续跑 / 自动推进 / 回复方式 / 思考强度），并把流程说明书、运行现场、团队星图放在同一屏
 - 💾 **长期记忆 & 知识库** —— 自动沉淀对话要点，跨会话召回；支持 AI 驱动的记忆**覆盖**（修正过时信息）与**删除**（清理废弃记忆）；**✨ 灵光** —— 对话结束时自动捕获技术洞察，归档为知识文档供后续 RAG 注入
-- 🗜️ **上下文智能压缩** —— 超阈值自动摘要，输出截断四层防线自动续写补全，四层超时防线防卡死
+- 🗜️ **上下文智能压缩** —— 超阈值自动摘要；摘要仍按原格式完整发给模型，但在消息区折叠成一条，点开才展开，长历史不会把对话挤出屏幕。输出截断四层防线自动续写补全，四层超时防线防卡死
 - 🎛️ **AI 辅助功能总开关** —— 对话以外的 13 项耗 Token 功能（压缩摘要、记忆蒸馏、对话洞察、代码理解、代码审查、黑板整理、子代理、命令说明、工作流、定时任务、图片/视频生成）在「设置 → AI 辅助功能」逐项可关、可单独指定模型；关掉即一次模型都不发，工具类的三项还会从工具目录里消失
 - 🏭 **提示词工厂** —— 宪法 + 上下文 + 约束一键整合为可交付 Prompt
 - 🎤 **语音输入** —— 点击麦克风按钮即可口述消息，基于 Web Speech API，自动识别中英文，实时转写预览
