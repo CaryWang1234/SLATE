@@ -163,6 +163,12 @@
       transform: translateY(0) scaleY(1);
     }
 
+    /* 减少动效的读者拿不到入场动画，但绝不能拿不到正文：
+       本文件不引 docs/style.css，那条全局降级规则在这儿不生效，得自己写一遍。 */
+    @media (prefers-reduced-motion: reduce) {
+      .scroll-section { opacity: 1; transform: none; }
+    }
+
     /* ── 内容排版 ─────────────────────────── */
     .scroll-title {
       text-align: center;
@@ -337,6 +343,10 @@
       .scroll-roller::before, .scroll-roller::after { width: 20px; }
     }
   </style>
+  <noscript><style>
+    /* 正文靠脚本加 .unfurled 才可见：脚本没跑起来时不该是一片空白 */
+    .scroll-section { opacity: 1 !important; transform: none !important; }
+  </style></noscript>
 </head>
 <body data-lang="zh">
 
@@ -1105,14 +1115,37 @@ python desktop.py</pre>
   <script>
     // ── 卷轴展开动画 ────────────────────────
     const sections = document.querySelectorAll('.scroll-section');
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('unfurled');
-        }
-      });
-    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-    sections.forEach(s => observer.observe(s));
+    const unfurl = (el) => el.classList.add('unfurled');
+    if (!('IntersectionObserver' in window)
+        || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      sections.forEach(unfurl);
+    } else {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            unfurl(entry.target);
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+      sections.forEach(s => observer.observe(s));
+      // IO 只在"相交状态变了"的那一帧派发：一次大滚动 / 拖滚动条 / 按 End / 带位置刷新，
+      // 章节会从视口下方直接跳到上方，回调一次都不来，于是永久停在 opacity:0。
+      // 兜底：滚动时把"已经越过视口上沿却还没展开"的那几节补上。
+      let sweeping = false;
+      const sweep = () => {
+        sweeping = false;
+        sections.forEach(el => {
+          if (el.classList.contains('unfurled')) return;
+          if (el.getBoundingClientRect().bottom < 0) unfurl(el);
+        });
+      };
+      window.addEventListener('scroll', () => {
+        if (!sweeping) { sweeping = true; requestAnimationFrame(sweep); }
+      }, { passive: true });
+      window.addEventListener('load', sweep);
+      sweep();
+    }
 
     // ── 阅读进度条 ──────────────────────────
     const progressFill = document.getElementById('progress-fill');

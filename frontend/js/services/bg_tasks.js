@@ -17,9 +17,9 @@
  * 没有归属信息的老事件一律就地念 —— 扣住一条真结局不发，比念错地方更糟。
  */
 
-import { get, post } from "./api.js?v=20260926-001";
-import { state, notify, recordTaskFlag, bgResumeUsedOf, markBgResumeUsed } from "../store.js?v=20260926-001";
-import { notifyTaskComplete } from "./notify.js?v=20260926-001";
+import { get, post } from "./api.js?v=20260926-002";
+import { state, notify, recordTaskFlag, bgResumeUsedOf, markBgResumeUsed } from "../store.js?v=20260926-002";
+import { notifyTaskComplete } from "./notify.js?v=20260926-002";
 
 /** 有任务在册时的轮询间隔：够及时，又不至于把 3 秒一次的请求灌满日志 */
 export const POLL_MS = 3000;
@@ -264,7 +264,16 @@ export async function refreshBgTasks() {
 }
 
 /** 人向提醒：任务刚结束时响一次（模型唤醒是另一条通道，两边互不影响） */
+let firstSnapshot = true;
+
 function announceFinished(tasks) {
+  // 首帧里"已经跑完"的那批是历史：本页面从没见它们跑过，全announce一遍会变成
+  // 刷新一次就把昨晚的完成提示连同音效、徽标一起重播（后端最长留 20 条）。
+  if (firstSnapshot) {
+    firstSnapshot = false;
+    for (const t of tasks) if (t && t.state !== "running") announced.add(t.task_id);
+    return;
+  }
   for (const t of tasks) {
     if (!t || t.state === "running" || announced.has(t.task_id)) continue;
     announced.add(t.task_id);

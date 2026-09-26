@@ -348,6 +348,12 @@ textarea {
   user-select: text;
 }
 
+/* 手机侧收起思考过程靠切 .m-thinking.collapsed（桌面那套叫 .thinking-panel，样式不共用） */
+.m-thinking.collapsed .m-thinking-body {
+  display: none;
+}
+
+
 /* ── 工具卡片 ────────────────────────── */
 .m-tool-card {
   margin: 8px 0;
@@ -534,6 +540,18 @@ textarea {
   white-space: nowrap;
 }
 
+/* @ 列表里的说明列：没规则时长描述会把整行顶出屏幕（m-chat-input.js 只在有 desc 时建这个节点） */
+.m-mention-desc {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
 /* ── 底部导航 ────────────────────────── */
 #m-tabbar {
   position: fixed;
@@ -625,6 +643,12 @@ textarea {
 .m-list-item:active {
   background: var(--m-touch);
 }
+
+/* 正看着哪一场：JS 给列表项加 .active（state 类，跟上面按下的 :active 是两回事） */
+.m-list-item.active {
+  background: var(--gold-dim);
+}
+
 
 .m-list-item-main {
   flex: 1;

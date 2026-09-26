@@ -12,18 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260926-001";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260926-001";
-import { guardSkillCall } from "./riskguard.js?v=20260926-001";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260926-001";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260926-001";
-import { t } from "./i18n.js?v=20260926-001";
-import { makeId } from "./utils.js?v=20260926-001";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260926-001";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20260926-001";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20260926-001";
-import { isAiToolOff } from "./ai_features.js?v=20260926-001";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260926-001";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260926-002";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260926-002";
+import { guardSkillCall } from "./riskguard.js?v=20260926-002";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260926-002";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260926-002";
+import { t } from "./i18n.js?v=20260926-002";
+import { makeId } from "./utils.js?v=20260926-002";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260926-002";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20260926-002";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20260926-002";
+import { isAiToolOff } from "./ai_features.js?v=20260926-002";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260926-002";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -693,7 +693,9 @@ const TOOLS = {
           + "跑完后系统会以「后台任务消息」的形式把各子代理结论送回，届时再汇总给用户。";
       }
       try {
-        const { results, skipped } = await runSubAgents(agents, deps, getSubAgentSignal());
+        // 用这一场自己的信号：全局那颗只跟着屏幕上那一场，停 B 会连带掐掉 A 的批次，
+        // 停 A 反而没反应（子代理继续跑完，180s 看门狗再弹一句「已自动中断」）
+        const { results, skipped } = await runSubAgents(agents, deps, callCtx.signal || getSubAgentSignal());
 
         const statusText = { done: "完成", failed: "失败", stopped: "已停止", max_rounds: "轮次用尽" };
         const ok = results.filter(r => r.status === "done").length;
@@ -1241,8 +1243,10 @@ const TOOLS = {
       action: { type: "string", description: "init(创建或整体替换清空 / add(追加事项) / update(更新状态或描述) / remove(删除事项) / clear(清空)", required: true },
       items: { type: "array", description: 'init/add: [{"content":"事项描述"}]；update: [{"id":"t1","status":"done"}]（可附 content 改描述）；remove: [{"id":"t1"}]' },
     },
-    async execute({ action, items }) {
-      const convId = state.currentConversationId;
+    async execute({ action, items }, callCtx = {}) {
+      // 清单归"跑这一步的那一场"，不归屏幕上那一场：两场并行时按 currentConversationId
+      // 写会把后台那场的待办画进用户正在看的侧栏，并把已存的清单覆盖掉
+      const convId = callCtx.convId || state.currentConversationId;
       let list = getConversationTodos(convId).map(t => ({ ...t }));
       const input = Array.isArray(items) ? items : [];
       const VALID_STATUS = ["pending", "in_progress", "done", "blocked"];

@@ -51,12 +51,18 @@ ok("一个会话至多一个 run（同会话第二次 startRun 返回 null）",
   /export function startRun\([\s\S]{0,200}if \(id && runOf\(id\)\) return null;/.test(REG)
   && /if \(convId && runOf\(convId\)\) return \{ ok: false, reason: "same_conversation" \}/.test(REG),
   "同一场对话开两个 run：两条流抢同一个 assistant 气泡，落库顺序会乱");
-ok("上限只在 canStart 一处判（跨项目 + 同项目两档）",
-  /if \(runs\.size >= maxParallelRuns\(\)\) return \{ ok: false, reason: "global_cap" \}/.test(REG)
-  && /runsOfProject\(projectId\)\.length >= maxRunsPerProject\(\)/.test(REG)
+ok("上限只在 canStart 一处判（跨项目 + 同项目两档，且算进本趟预定）",
+  // 判据方向没有变松：两档比较仍在 canStart 内各一行，只是各自加上 reserved ——
+  // pump() 一趟同步扫完队列时 starter 还没 await 到 startRun，runs 仍是旧数量，
+  // 不记账就会把整条队列一次性放行（同项目串行被绕过，两场同时改同一批文件）。
+  /if \(runs\.size \+ reserved >= maxParallelRuns\(\)\) return \{ ok: false, reason: "global_cap" \}/.test(REG)
+  && /runsOfProject\(projectId\)\.length \+ reservedProject >= maxRunsPerProject\(\)/.test(REG)
+  // 预定必须真被泵进去（钉调用点，不钉常量名）
+  && /reserved, reservedProject: reservedProject\.get\(pk\) \|\| 0,/.test(REG)
+  && /reserved \+= 1;/.test(REG)
   // 调用方不许自己再数一遍：两处判上限必然分叉（一处放行一处拒绝）
   && !/runs\.size >=|runningCount\(\) >=/.test(CHAT),
-  "chat.js 里另算了一次并行上限");
+  "canStart 之外另算了一次并行上限");
 ok("超限不静默丢：canStart 拒绝后走 enqueue 并给用户回执",
   /const gate = canStart\(\{ convId: targetConvId, projectId \}\);[\s\S]{0,200}enqueue\(\{ convId: targetConvId, projectId, payload \}\)/.test(CHAT)
   && /已达并行上限，已排队/.test(CHAT));
@@ -68,6 +74,9 @@ ok("run 不落盘（刷新后复活成假在跑）",
   && has(STORE, "runs: []"),
   "state.runs 一旦进持久化快照，重启就会留着几条早就死透的在跑");
 ok("endRun 释放槽位后必泵队列", /runs\.delete\(key\);[\s\S]{0,120}pump\(\);/.test(REG));
+ok("放宽上限/重开后台运行也要泵一次（否则等待项要等某场恰好跑完才动）",
+  /subscribe\(key, \(\) => pump\(\)\)/.test(REG)
+  && /"maxParallelRuns", "maxConcurrentRunsPerProject", "backgroundRuns"/.test(REG));
 ok("跑完/被停/抛异常都释放槽位（finally 里 endRun）",
   /finally \{[\s\S]{0,400}endRun\(run\.run_id\)/.test(CHAT)
   && /endRun\(regenRun\.run_id\)/.test(CHAT));

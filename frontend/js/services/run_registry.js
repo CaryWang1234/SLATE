@@ -16,7 +16,7 @@
  *      否则等在前面的任务就永久卡在"排队中"。
  */
 
-import { state, notify } from "../store.js?v=20260926-001";
+import { state, notify, subscribe } from "../store.js?v=20260926-002";
 
 // 与设置页的三个控件一一对应；取值越界一律回落默认，脏值不该让并行整体失灵。
 const PARALLEL_MIN = 1, PARALLEL_MAX = 4;
@@ -82,11 +82,14 @@ function runsOfProject(projectId) {
 /**
  * 能不能开一场。reason 是给人看的短句（守卫钉住"超限不拒绝"这条，所以调用方拿到
  * not-ok 时要进队列，而不是弹个错误了事）。
+ * reserved / reservedProject 是给 pump() 用的"这一趟已经预定了几个坑"：starter 走的是
+ * sendMessage，它要先 await 完作用域与确认才 startRun，同步扫一遍队列时 runs 还没长出来，
+ * 不记账就会把整条队列一次性放行（同项目串行被绕过，两场同时改同一批文件）。
  */
-export function canStart({ convId = "", projectId = "" } = {}) {
+export function canStart({ convId = "", projectId = "", reserved = 0, reservedProject = 0 } = {}) {
   if (convId && runOf(convId)) return { ok: false, reason: "same_conversation" };
-  if (runs.size >= maxParallelRuns()) return { ok: false, reason: "global_cap" };
-  if (projectId && runsOfProject(projectId).length >= maxRunsPerProject()) {
+  if (runs.size + reserved >= maxParallelRuns()) return { ok: false, reason: "global_cap" };
+  if (projectId && runsOfProject(projectId).length + reservedProject >= maxRunsPerProject()) {
     return { ok: false, reason: "project_cap" };
   }
   return { ok: true, reason: "" };
@@ -193,6 +196,12 @@ export function dropPendingFor(convId) {
 
 export function registerRunStarter(fn) { starter = fn; }
 
+// 设置页放宽上限 / 重新打开后台运行：坑一腾出来就该把等待队列放进来。
+// 没有这条订阅，改完设置要等某一场恰好跑完才动，队列一直写着「排队中」。
+for (const key of ["maxParallelRuns", "maxConcurrentRunsPerProject", "backgroundRuns"]) {
+  subscribe(key, () => pump());
+}
+
 /**
  * 有空位就把队首放进run。三条规则：
  *   ① 同项目的等待项要等同项目的槽位（默认同项目串行），所以逐个试而不是只看队首；
@@ -201,11 +210,21 @@ export function registerRunStarter(fn) { starter = fn; }
  */
 export function pump() {
   if (!starter) { publish(); return; }
+  // 这一趟同步放行、但坑要立刻占住：见 canStart 的 reserved 注释
+  const reservedProject = new Map();
+  let reserved = 0;
   for (let i = 0; i < pending.length; i++) {
     const item = pending[i];
-    if (item.conv_id && !runOf(item.conv_id) && canStart({ convId: item.conv_id, projectId: item.project_id }).ok) {
+    const pk = String(item.project_id || "");
+    const room = canStart({
+      convId: item.conv_id, projectId: item.project_id,
+      reserved, reservedProject: reservedProject.get(pk) || 0,
+    });
+    if (item.conv_id && !runOf(item.conv_id) && room.ok) {
       const taken = pending.splice(i, 1)[0];
       publish();
+      reserved += 1;
+      reservedProject.set(pk, (reservedProject.get(pk) || 0) + 1);
       let started = false;
       try {
         started = starter(taken) !== false;

@@ -114,6 +114,7 @@
       entries.forEach(function (entry) {
         if (!entry.isIntersecting) return;
         observer.unobserve(entry.target);
+        entry.target.dataset.lit = "1";
         var el = entry.target;
         if (el.classList.contains("diff-head")) {
           var idx = el.querySelector(".diff-index");
@@ -142,7 +143,39 @@
         }
       });
     }, { threshold: 0.12 });
-    qa(".diff-head, .diff-evidence").forEach(function (el) { observer.observe(el); });
+    var diffBlocks = qa(".diff-head, .diff-evidence");
+    diffBlocks.forEach(function (el) { observer.observe(el); });
+
+    /* 保底：上面那批是被 anime.set 写成行内 opacity:0 的，行内样式连
+       prefers-reduced-motion 那条降级规则都盖不住。而 IntersectionObserver 只在
+       "相交状态变化"的那一帧派发 —— 一次大滚动/拖滚动条/按 End/带位置刷新会让区块
+       从视口下方直接跳到上方，回调一次都不来，序号和证据条就永久看不见。
+       这里按盒子位置补一遍：已经越过的直接落终态，不再补动画。 */
+    var settleBlock = function (el) {
+      var targets = el.classList.contains("diff-head")
+        ? el.querySelectorAll(".diff-index")
+        : el.querySelectorAll("code");
+      Array.prototype.forEach.call(targets, function (t) {
+        t.style.opacity = "1";
+        t.style.transform = "none";
+      });
+    };
+    var sweeping = false;
+    var sweep = function () {
+      sweeping = false;
+      diffBlocks.forEach(function (el) {
+        if (el.dataset.lit) return;
+        if (el.getBoundingClientRect().bottom >= 0) return;
+        el.dataset.lit = "1";
+        observer.unobserve(el);
+        settleBlock(el);
+      });
+    };
+    window.addEventListener("scroll", function () {
+      if (!sweeping) { sweeping = true; requestAnimationFrame(sweep); }
+    }, { passive: true });
+    window.addEventListener("load", function () { requestAnimationFrame(sweep); });
+    requestAnimationFrame(sweep);
   }
 
   /* ── 3. 光标追光：整页共享一团金，跟随指针缓缓跟随 ───────────

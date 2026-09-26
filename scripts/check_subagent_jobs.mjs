@@ -69,8 +69,9 @@ ok("批次自建 controller 并把它的 signal 交给引擎",
 ok("批次不使用主循环的 signal（跟着本轮一起死＝后台是假的）",
   !/getSubAgentSignal/.test(JOBS),
   "把 getSubAgentSignal() 接进来会让后台批次在主循环收口时被取消");
-ok("前台路径仍然用主循环 signal（本轮等待就该能被本轮停止）",
-  /await runSubAgents\(agents, deps, getSubAgentSignal\(\)\)/.test(TOOLS));
+ok("前台路径按这一场自己的 signal 取消（全局那颗只兜底）",
+  /await runSubAgents\(agents, deps, callCtx\.signal \|\| getSubAgentSignal\(\)\)/.test(TOOLS),
+  "callCtx.signal 就是本轮的控制器：换成只用 getSubAgentSignal()，后台那场的批次会挂到屏幕上那场的停止上——停 A 没反应、停 B 却掐了 A");
 ok("停止一批 = abort，且在跑的批次认这个 id",
   /export function stopSubAgentJob\(jobId\)[\s\S]{0,300}job\.controller\.abort\(\)/.test(JOBS));
 

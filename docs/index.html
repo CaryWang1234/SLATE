@@ -7,6 +7,11 @@
   <meta name="description" content="SLATE is an open-source AI agent workbench that runs on your own computer. Bring your own model keys (OpenAI, Anthropic, Gemini, any OpenAI-compatible endpoint, or local Ollama), keep data on disk, read a local event ledger of every tool call, and stop a run that really stops.">
   <link rel="icon" type="image/png" href="./icon.png">
   <link rel="stylesheet" href="./style.css">
+  <noscript><style>
+    /* 入场动画由脚本点亮：脚本没跑起来时，正文绝不能整片停在 opacity:0。 */
+    .reveal { opacity: 1 !important; transform: none !important; filter: none !important; }
+    .scroll-section { opacity: 1 !important; transform: none !important; }
+  </style></noscript>
 </head>
 <body>
 
@@ -595,6 +600,37 @@
     }, { threshold: 0.12 });
     document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
 
+    // ── 被"跳过"的区块兜底 ──
+    // IO 只在相交状态变化的那一帧派发：一次大滚动 / 拖滚动条 / 按 End / 带滚动位置刷新，
+    // 会让区块从视口下方直接变成视口上方，回调一次都不来 —— .reveal 于是永久停在
+    // opacity:0（整段看不见），[data-count] 永久写着 0（把真数说成 0，更糟）。
+    // 兜底口径：谁的盒子已经越过视口上沿，就按它"本来就该看得见"处理。
+    const countEl = (el) => {
+      if (el.dataset.counted) return;
+      el.dataset.counted = "1";
+      animateCount(el);
+    };
+    let rescuing = false;
+    const rescueSkipped = () => {
+      rescuing = false;
+      document.querySelectorAll(".reveal:not(.in), [data-count]").forEach((el) => {
+        if (el.getBoundingClientRect().bottom >= 0) return;
+        if (el.classList.contains("reveal")) {
+          el.classList.add("in");
+          observer.unobserve(el);
+        }
+        if (el.hasAttribute("data-count")) {
+          countObserver.unobserve(el);
+          countEl(el);
+        }
+      });
+    };
+    window.addEventListener("scroll", () => {
+      if (!rescuing) { rescuing = true; requestAnimationFrame(rescueSkipped); }
+    }, { passive: true });
+    window.addEventListener("resize", () => requestAnimationFrame(rescueSkipped));
+    window.addEventListener("load", () => requestAnimationFrame(rescueSkipped));
+
     // ── Number count-up ──
     const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
     function animateCount(el) {
@@ -617,6 +653,9 @@
       }
     }, { threshold: 0.4 });
     document.querySelectorAll("[data-count]").forEach((el) => countObserver.observe(el));
+    // 带滚动位置刷新时，视口上方那批 IO 一次都不会派发 → 起手就按盒子位置补一次
+    // （放在这里而不是上面：countObserver 得先存在）
+    requestAnimationFrame(rescueSkipped);
 
     // ── Hero typewriter ──
     const typeEl = document.getElementById("hero-type");

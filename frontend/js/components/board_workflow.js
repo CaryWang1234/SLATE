@@ -17,11 +17,11 @@
 import {
   state, subscribe, setChatMode, setReasoningEffort,
   reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS,
-} from "../store.js?v=20260926-001";
-import { get } from "../services/api.js?v=20260926-001";
-import { t } from "../services/i18n.js?v=20260926-001";
-import { iconSvgEl } from "../services/icons.js?v=20260926-001";
-import { renderStarMap, highlightStar, memberHue } from "../services/star_map.js?v=20260926-001";
+} from "../store.js?v=20260926-002";
+import { get } from "../services/api.js?v=20260926-002";
+import { t } from "../services/i18n.js?v=20260926-002";
+import { iconSvgEl } from "../services/icons.js?v=20260926-002";
+import { renderStarMap, highlightStar, memberHue } from "../services/star_map.js?v=20260926-002";
 
 const PREF_KEY = "slate_board_wf_prefs";
 const TICK_MS = 1000;
@@ -132,7 +132,7 @@ async function ensureTeamData(conversationId) {
   if (wfTeam.key === key && (wfTeam.data || wfTeam.error || wfTeam.loading)) return;
   wfTeam = { key, loading: true, data: wfTeam.key === key ? wfTeam.data : null, error: "" };
   try {
-    const res = await get("/events/team/latest", conversationId ? { conversationId } : {});
+    const res = await get(`/events/team/latest?conversationId=${encodeURIComponent(conversationId || "")}`);
     if (res?.code === 0 && res.data?.session) {
       wfTeam = { key, loading: false, data: res.data, error: "" };
     } else {
@@ -339,7 +339,7 @@ function buildRunBar() {
   bar.append(stop, resume, autopilot, modeSel, effortSel);
   bar.append(
     btn(t("去团队"), t("到对话面板的团队模式"), async () => {
-      const { openTeamConversation } = await import("../app.js?v=20260926-001");
+      const { openTeamConversation } = await import("../app.js?v=20260926-002");
       openTeamConversation?.();
     }),
   );

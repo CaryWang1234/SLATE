@@ -2316,6 +2316,11 @@ textarea::-webkit-scrollbar-thumb {
   background: var(--bg-alt);
 }
 
+/* 看板/纲要/工作流/Git 视图与画布互斥显示，两边都靠切 hidden 收：
+   放在 .git-mode 之后，同特异性靠后的赢，否则切回黑板时那个空框还占着半块面板。 */
+.board-canvas.hidden,
+.board-view-panel.hidden { display: none; }
+
 .board-view-header {
   display: flex;
   align-items: center;
@@ -3497,6 +3502,10 @@ textarea::-webkit-scrollbar-thumb {
   overflow-y: auto;
   flex: 1;
 }
+
+/* 桌面没有全局 .hidden 工具类：设置/进度/结果三个视图共用 .modal-body 轮流显示，
+   少了这条就会三层同时摊在弹窗里（Code Review、项目理解都是这个形状）。 */
+.modal-body.hidden { display: none; }
 
 .modal-footer {
   padding: 10px 16px;
@@ -9183,6 +9192,9 @@ img.file-type-icon {
   min-height: 0;
 }
 
+/* 没选中专家时表单该让位给空态提示（experts.js 两边互切） */
+.exp-detail-form.hidden { display: none; }
+
 .exp-field-row {
   display: flex;
   gap: 8px;
@@ -9839,6 +9851,9 @@ img.file-type-icon {
   filter: brightness(1.1);
 }
 
+/* Action 编辑器按「有没有存过」收放页脚按钮，切的是 hidden */
+.dlg-btn.hidden { display: none; }
+
 /* 需求输入框（user_ask）：选项 chips + 自由输入 */
 .dlg-options-row {
   display: flex;
@@ -10072,6 +10087,9 @@ img.file-type-icon {
 .api-test-result.is-failed {
   border-left-color: #c0392b;
 }
+
+/* 没跑过测试时这块不该占位（api_test.js 靠切 hidden 开合） */
+.api-test-result.hidden { display: none; }
 
 .at-result-head {
   margin-bottom: 6px;
@@ -10589,6 +10607,14 @@ html.i18n-pending body {
   opacity: 0.85;
 }
 
+/* 这几颗「停止/运行」按钮只在有事可停时才该在（JS 一律切 hidden），
+   少了配套规则就是开局摊在那儿：点了还会写出一句「正在停止…」的假状态。 */
+#btn-wf-stop.hidden,
+#btn-stop-discuss.hidden,
+#btn-api-test-stop.hidden,
+#btn-run-skill.hidden { display: none; }
+
+
 .team_stopped-notice {
   text-align: center;
   padding: 12px 16px;
@@ -10656,6 +10682,9 @@ html.i18n-pending body {
   gap: 8px;
   margin-bottom: 12px;
 }
+
+/* 只有「提交范围」那一档才显示：base 是 display:flex，切 hidden 得自己收 */
+.review-commit-range.hidden { display: none; }
 
 .review-commit-input {
   flex: 1;
@@ -11052,6 +11081,11 @@ html.i18n-pending body {
   flex-direction: column;
   overflow: hidden;
 }
+
+/* 没选笔记时不该有个空编辑器摊在旁边（vault.js 在空态与表单之间互切 hidden） */
+.vault-editor-empty.hidden,
+.vault-editor-active.hidden { display: none; }
+
 
 .vault-editor-header {
   display: flex;
