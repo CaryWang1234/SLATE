@@ -21,3 +21,8 @@ repo-doctor.py
 /.qoder
 /.diag
 /installer/SLATE-Setup-*.exe
+# 一次性的计划 / 设计 / 审查文档：本机留存，不作为仓库内容分发
+/ACTIONS-DESIGN.md
+/PROJECT-TASKS-DESIGN.md
+/DEEP_RESEARCH_AI-AGENT-TOOL-CALLING.md
+/BUG_REPORT.md
