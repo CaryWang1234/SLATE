@@ -3,9 +3,9 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20260925-010";
-import { getToolsSystemPrompt } from "./tools.js?v=20260925-010";
-import { catalogForScope } from "./project_scope.js?v=20260925-010";
+import { state } from "../store.js?v=20260925-011";
+import { getToolsSystemPrompt } from "./tools.js?v=20260925-011";
+import { catalogForScope } from "./project_scope.js?v=20260925-011";
 
 // ── System Prompt 模板 ──────────────────────
 

@@ -12,18 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260925-010";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-010";
-import { guardSkillCall } from "./riskguard.js?v=20260925-010";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-010";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260925-010";
-import { t } from "./i18n.js?v=20260925-010";
-import { makeId } from "./utils.js?v=20260925-010";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260925-010";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20260925-010";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20260925-010";
-import { isAiToolOff } from "./ai_features.js?v=20260925-010";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260925-010";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260925-011";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-011";
+import { guardSkillCall } from "./riskguard.js?v=20260925-011";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-011";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260925-011";
+import { t } from "./i18n.js?v=20260925-011";
+import { makeId } from "./utils.js?v=20260925-011";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260925-011";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20260925-011";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20260925-011";
+import { isAiToolOff } from "./ai_features.js?v=20260925-011";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260925-011";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，

@@ -15,7 +15,7 @@
  * 这里不翻就永远是中文。
  */
 
-import { t } from "./i18n.js?v=20260925-010";
+import { t } from "./i18n.js?v=20260925-011";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 

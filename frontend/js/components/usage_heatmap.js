@@ -29,10 +29,10 @@
  * 不留可见入口，也不写提示文案——这是彩蛋，不是功能按钮。
  */
 
-import { t } from "../services/i18n.js?v=20260925-010";
-import { fmtTokens } from "../services/usage.js?v=20260925-010";
-import { animateNumber, prefersReducedMotion } from "../services/anim.js?v=20260925-010";
-import { mount2048 } from "./game_2048.js?v=20260925-010";
+import { t } from "../services/i18n.js?v=20260925-011";
+import { fmtTokens } from "../services/usage.js?v=20260925-011";
+import { animateNumber, prefersReducedMotion } from "../services/anim.js?v=20260925-011";
+import { mount2048 } from "./game_2048.js?v=20260925-011";
 
 const WEEKS = 53;
 const METRICS = ["count", "tokens"];

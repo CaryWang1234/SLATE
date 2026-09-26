@@ -4021,12 +4021,34 @@ textarea::-webkit-scrollbar-thumb {
   overflow: hidden;
 }
 
-/* 消息区 + TODOLIST 右侧栏的横向容器 */
+/* 消息区 + 右侧竖栏的横向容器 */
 .chat-area-row {
   display: flex;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+/* 右侧竖栏：清单 / 任务中心 / 墨迹三块叠在同一列里。
+   从前三块各自是 .chat-area-row 的直接子元素，两块同时开着就是两根并列的右栏，
+   消息区被挤窄两次。这一层只做归拢，开合仍由各自组件的 .hidden 管。
+   栏本身不写宽度：宽度由可见的那几块定（都 320px），全收起时整栏塌成 0，
+   不会留一条空栏占着位置。 */
+.rail-col {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.rail-col > .todo-panel,
+.rail-col > .grind-panel {
+  /* 同栏两块平分高度、各自内部滚动；只剩一块时它自己占满整栏 */
+  flex: 1 1 0;
+  min-height: 0;
+  /* 统一到 320px：任务中心的命令行最长，三块同宽才不会在栏里参差不齐 */
+  width: 320px;
 }
 
 #chat-area.hidden {
@@ -7963,12 +7985,8 @@ img.file-type-icon {
   color: #c0392b;
 }
 
-/* ── 后台终端任务面板（与 TODOLIST 同栏并列；没任务时整栏不出现） ─── */
-
-.bg-task-panel {
-  /* 比 TODOLIST 宽一点：命令与输出都是长字符串，太窄只能看成一串省略号 */
-  width: 320px;
-}
+/* ── 后台终端任务面板（与 TODOLIST 同栏上下相叠；没任务时整块不出现） ─── */
+/* 宽度不在这里写：同栏三块统一由 .rail-col > .todo-panel / .grind-panel 给 320px */
 
 .bg-task-body {
   gap: 8px;
@@ -9461,7 +9479,7 @@ img.file-type-icon {
   outline-offset: 2px;
 }
 
-/* 右侧墨迹面板：与 todo-panel 同宽同布局 */
+/* 右侧墨迹面板：与 todo-panel 同栏同布局（宽度同由 .rail-col 给） */
 .grind-panel {
   width: 280px;
   flex-shrink: 0;

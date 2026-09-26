@@ -4,9 +4,9 @@
  * 这里只管"屏幕上现在生效的是哪一档"和"改这一场的档"，两边不各存一份判断。
  */
 
-import { state, subscribe, permissionModeFor, setPermissionModeFor } from "../store.js?v=20260925-010";
-import { iconSvgEl } from "../services/icons.js?v=20260925-010";
-import { t } from "../services/i18n.js?v=20260925-010";
+import { state, subscribe, permissionModeFor, setPermissionModeFor } from "../store.js?v=20260925-011";
+import { iconSvgEl } from "../services/icons.js?v=20260925-011";
+import { t } from "../services/i18n.js?v=20260925-011";
 
 const MODES = [
   { id: "ask", icon: "shield", label: "手动审批", hint: "执行命令、访问网络都先问你" },

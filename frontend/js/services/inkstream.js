@@ -5,9 +5,9 @@
  * 让参数成形过程可见。只做预览，绝不参与执行判定（半成品参数永不触发 execute）。
  */
 
-import { TOOLS } from "./tools.js?v=20260925-010";
-import { t } from "./i18n.js?v=20260925-010";
-import { setIconText } from "./icons.js?v=20260925-010";
+import { TOOLS } from "./tools.js?v=20260925-011";
+import { t } from "./i18n.js?v=20260925-011";
+import { setIconText } from "./icons.js?v=20260925-011";
 
 const PAINT_THROTTLE_MS = 150;   // 合并重绘节律（设计 §4.8 规则 3）
 const MAX_FIELDS = 4;            // 单行最多展示的闭合字段数

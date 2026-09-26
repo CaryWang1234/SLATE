@@ -10,10 +10,10 @@
  * 还原成 git commit、npm test 这样的行，单独成组并带品牌图标。
  */
 
-import { state, subscribe } from "../store.js?v=20260925-010";
-import { t } from "../services/i18n.js?v=20260925-010";
-import { toolLabel, toolArgsSummary, toolIcon, fileIcon, commandOf } from "../services/tool_meta.js?v=20260925-010";
-import { iconSvg } from "../services/icons.js?v=20260925-010";
+import { state, subscribe } from "../store.js?v=20260925-011";
+import { t } from "../services/i18n.js?v=20260925-011";
+import { toolLabel, toolArgsSummary, toolIcon, fileIcon, commandOf } from "../services/tool_meta.js?v=20260925-011";
+import { iconSvg } from "../services/icons.js?v=20260925-011";
 
 const FILE_WRITE_OPS = ["file_edit", "file_create", "file_append"];
 const FILE_READ_ACTIONS = ["view", "read"];

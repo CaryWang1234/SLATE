@@ -21,9 +21,9 @@
  * 约定：policy 返回的模型可见字符串不被 t() 包裹（t() 只包用户可见文本）。
  */
 
-import { state, addMessage } from "../store.js?v=20260925-010";
-import { stripToolCalls } from "./tools.js?v=20260925-010";
-import { _pendingToolMsgs, releasePendingFor } from "./agent_common.js?v=20260925-010";
+import { state, addMessage } from "../store.js?v=20260925-011";
+import { stripToolCalls } from "./tools.js?v=20260925-011";
+import { _pendingToolMsgs, releasePendingFor } from "./agent_common.js?v=20260925-011";
 
 export function createAgentLoop({ policy = {}, view = {}, io }) {
   const reasonOf = (key) => policy.exitReasons?.[key] ?? "";
