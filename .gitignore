@@ -7,7 +7,9 @@
 *.pyc
 desktop_backend.log
 /data/chat_history.db
+/data/chat_history.db-*
 /data/knowledge.db
+/data/knowledge.db-*
 repo-doctor.py
 /data/webview_profile
 /uiexample
