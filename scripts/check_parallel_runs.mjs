@@ -88,8 +88,13 @@ ok("后台那场的写入只 notify thread，不触发整表重渲染",
     const body = STORE.slice(i, STORE.indexOf("function updateLastAssistantMessage", i));
     // 可见分支写 state.messages 并发 messages；后台分支只写它自己那份数组、只发 thread。
     // 全函数只允许一次 messages 通知——多发一次就会把屏幕重画成后台那场。
-    return /if \(visible\) \{[\s\S]{0,160}state\.messages\.push\(msg\);[\s\S]{0,120}notify\("messages"/.test(body)
-      && /threads\.get\(key\)\.push\(msg\);\s*\n\s*notify\("thread"/.test(body)
+    // 按分支切片断言，别用「if (visible) { 之后 N 字符内」这种跨度：可见分支里注释一长就假红。
+    const visAt = body.indexOf("if (visible) {");
+    const vis = body.slice(visAt, body.indexOf("return;", visAt));
+    const back = body.slice(body.indexOf("return;", visAt));
+    return /state\.messages\.push\(msg\);[\s\S]{0,120}notify\("messages"/.test(vis)
+      && /threads\.get\(key\)\.push\(msg\);\s*\n\s*notify\("thread"/.test(back)
+      && !/notify\("messages"/.test(back)
       && (body.match(/notify\("messages"/g) || []).length === 1;
   })(),
   "对后台数组也发 messages 的话，订阅者会把屏幕重画成后台那场的样子");

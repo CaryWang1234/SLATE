@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260925-008";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260925-008";
+import { makeId } from "./services/utils.js?v=20260925-010";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260925-010";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -1176,10 +1176,28 @@ function bindVisibleThread(convId) {
   return state.messages;
 }
 
+// 手上这只数组是不是**某一场**的桶（而不是调用方自己摆的一只本场数组）。
+// 用来把两件长得一样、处置相反的事分开：指到别场的桶 = 换过会话没重绑（要让位给本场自己的桶）；
+// 没有主的数组 = 调用方摆的就是本场历史——kernel 起跑前会直接给 state.messages 赋一只数组，
+// 它标记的渲染抑制对象就住在那只数组里，换成别的数组等于标记永远释放不掉。
+function isThreadBucket(list) {
+  for (const arr of threads.values()) if (arr === list) return true;
+  return false;
+}
+
 function addMessage(msg, convId = state.currentConversationId) {
   const key = threadKey(convId);
   const visible = String(convId || "") === String(state.currentConversationId || "");
   if (visible) {
+    // state.messages 的契约是"可见那一份的引用"，这里当场兑现，但只对"别场的桶"让位：
+    // 手上这只已被本场认领、或压根没主，就认它——把它换成别的数组，等于让 kernel 标记的渲染
+    // 抑制对象永远释放不掉（未执行的调用会被画成"历史恢复"卡片），也会把调用方刚摆好的本场
+    // 历史整只丢掉。反过来，手上这只其实是上一场（或 _scratch）的桶时，直接往上推会把上一场
+    // 的历史当成本场发出去——2026-09 实测：新对话首轮上游只收到 system。
+    if (threads.get(key) !== state.messages) {
+      if (isThreadBucket(state.messages)) state.messages = bindVisibleThread(convId);
+      else threads.set(key, state.messages);
+    }
     state.messages.push(msg);
     notify("messages", state.messages);
     notify("thread", { convId: String(convId || ""), messages: state.messages });

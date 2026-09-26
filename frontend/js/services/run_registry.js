@@ -16,7 +16,7 @@
  *      否则等在前面的任务就永久卡在"排队中"。
  */
 
-import { state, notify } from "../store.js?v=20260925-008";
+import { state, notify } from "../store.js?v=20260925-010";
 
 // 与设置页的三个控件一一对应；取值越界一律回落默认，脏值不该让并行整体失灵。
 const PARALLEL_MIN = 1, PARALLEL_MAX = 4;

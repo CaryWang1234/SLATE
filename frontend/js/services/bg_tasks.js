@@ -17,9 +17,9 @@
  * 没有归属信息的老事件一律就地念 —— 扣住一条真结局不发，比念错地方更糟。
  */
 
-import { get, post } from "./api.js?v=20260925-008";
-import { state, notify, recordTaskFlag, bgResumeUsedOf, markBgResumeUsed } from "../store.js?v=20260925-008";
-import { notifyTaskComplete } from "./notify.js?v=20260925-008";
+import { get, post } from "./api.js?v=20260925-010";
+import { state, notify, recordTaskFlag, bgResumeUsedOf, markBgResumeUsed } from "../store.js?v=20260925-010";
+import { notifyTaskComplete } from "./notify.js?v=20260925-010";
 
 /** 有任务在册时的轮询间隔：够及时，又不至于把 3 秒一次的请求灌满日志 */
 export const POLL_MS = 3000;

@@ -7,21 +7,21 @@
 
 import {
   state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit, effectiveConstitution,
-} from "../store.js?v=20260925-008";
-import { fmtTokens } from "../services/usage.js?v=20260925-008";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-008";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260925-008";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260925-008";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260925-008";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260925-008";
-import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20260925-008";
-import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260925-008";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260925-008";
-import { toolLabel } from "../services/tool_meta.js?v=20260925-008";
-import { renderMarkdown } from "../services/markdown.js?v=20260925-008";
-import { mToast, t } from "./m-ui.js?v=20260925-008";
-import { mHandleStructured } from "./m-auth.js?v=20260925-008";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260925-008";
+} from "../store.js?v=20260925-010";
+import { fmtTokens } from "../services/usage.js?v=20260925-010";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-010";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260925-010";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260925-010";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260925-010";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260925-010";
+import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20260925-010";
+import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260925-010";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260925-010";
+import { toolLabel } from "../services/tool_meta.js?v=20260925-010";
+import { renderMarkdown } from "../services/markdown.js?v=20260925-010";
+import { mToast, t } from "./m-ui.js?v=20260925-010";
+import { mHandleStructured } from "./m-auth.js?v=20260925-010";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260925-010";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
