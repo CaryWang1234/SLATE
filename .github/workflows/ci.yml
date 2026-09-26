@@ -3,9 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "**.md"
+    # 曾经忽略 docs/** 与 **.md —— 但 check_docs_site / check_mojibake 就是管文档站的，
+    # 改文档不跑守卫等于把最该拦人的那道门留着。全套静态守卫 ~25s，没有省的必要。
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -27,6 +26,47 @@ jobs:
       # 第一阶段只查会直接导致运行崩溃的问题，跑顺后再逐步收紧规则
       - name: Ruff check
         run: ruff check backend desktop.py --select E9,F63,F7,F82 --output-format=github
+
+  self-checks:
+    name: Self-check guards (scripts/check_*)
+    # 与开发机同一个 OS：这些守卫里有大量路径拼接、行尾与编码判据，
+    # 换到 Linux 上跑出来的红，分不清是产品问题还是平台差异。
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Windows runner 的 git 默认 core.autocrlf=true，checkout 会把 LF 变成 CRLF，
+      # 而守卫里有一批按 `\n` 锚定的判据与"逐行扫"的写法——那样跑出来的红分不清是
+      # 产品问题还是行尾差异。仓库统一 LF，这里就按 LF 取。
+      - name: Keep LF
+        shell: pwsh
+        run: |
+          git config core.autocrlf false
+          git rm --cached -r -q .
+          git checkout -q -- .
+          if ((Get-Content -Raw backend/routers/projects.py) -match "`r") { Write-Error "checkout still has CR in it"; exit 1 }
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Ensure ripgrep on PATH
+        shell: pwsh
+        run: |
+          if (-not (Get-Command rg -ErrorAction SilentlyContinue)) {
+            choco install ripgrep --no-progress -y
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          rg --version | Select-Object -First 1
+
+      # 判绿只看退出码：verify.mjs 内部就这么定，CI 也别去 grep 日志里的"通过"字样
+      - name: Run all static guards
+        run: node scripts/verify.mjs
 
   smoke-test:
     name: Backend smoke test
