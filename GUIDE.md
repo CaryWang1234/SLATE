@@ -116,6 +116,8 @@ Autopilot 是默认的“少打继续”执行层。只要你的消息明显是�
 
 **回答被截断会说清楚：** 思考过程与正文共用同一个输出上限，思考吃满时这一轮就没有正文可写了。这种结局不再被静默咽下去：流收到内容后自然结束、却既没有结束标记也没有结束原因时，这一轮会被标记，收尾时如实报出，原因也分开说（思考占满输出上限 / 上游提前中断），并给出可点的「继续」入口；正文有内容但流提前断掉的标注可能不完整。这套提示在任何模式下都给，不只是自动推进模式。
 
+**本轮写了哪些文件，说完就摆出来：** 这一轮真的往磁盘写过文件（编辑 / 新建 / 追加）时，模型说完最后一句话后，消息末尾挂出一张卡片——改了哪几个文件、各自行数增减，展开可逐文件看 diff。点「撤销」把这一轮写过的文件还原成本轮开始前的样子（本轮新建的一并删掉），执行前过一道红色确认；你在本轮之后又自己改过的文件只跳过并如实写明，撤回不会吃掉你自己的修改。原文快照存在 `data/round_snapshots/`，只留 7 天、超过 2MB 的大文件不存原文（这类同样跳过并写明原因），全部留在本机；移动端只读展示这份清单，撤销留在桌面端。
+
 **什么时候还用 Harness：** 需要更强约束、明确 TODOLIST、长任务 80 轮闭环时，点击输入框左侧 **＋** 菜单里的「目标模式」开关；验证全部通过后模型调用 `exit_target_mode` 收口，目标模式开关随之关闭。
 
 ---
@@ -514,6 +516,8 @@ Autopilot is the default "do not make me type continue" execution layer. When yo
 **Stop really cancels:** pressing Stop closes both the model stream and the tool-call stream, so the backend terminates the matching subprocess or running task instead of "UI stopped, work still going". Cancelled calls are recorded in the local event ledger under their own status, kept apart from successful ones.
 
 **A truncated answer says so:** thinking and the body share one output ceiling, so a long think can leave no room to write. That ending is no longer swallowed: when the stream produced content and then ended naturally with neither a closing marker nor a finish reason, the round is flagged and reported as it closes, with the cause kept apart (thinking consumed the whole output budget / upstream cut the stream early) and the same clickable "Continue" entry; a reply that did produce text but stopped early is labelled possibly incomplete. This notice is given in every mode, not only under Auto-Advance.
+
+**What this round wrote is shown when it stops:** once the round has really written to disk (edit / create / append), the end of the last message carries a card — which files changed, added and removed lines per file, expandable into per-file diffs. "Revert" restores every file the round touched to its state before the round and deletes what the round created, behind a red confirmation step; files you edited yourself afterwards are skipped and reported, never overwritten by a revert. Originals live in `data/round_snapshots/` for 7 days, files over 2MB are never stored (they are skipped with the reason stated), and nothing leaves the machine. On mobile the list is read-only — reverting stays on the desktop.
 
 **When to use Harness:** use the **Target Mode** toggle in the **＋** menu (left of the chat input) when you want the stronger six-phase mode, explicit TODOLIST enforcement, and an 80-round long-task loop; after verification passes the model closes it with `exit_target_mode`, which also switches Target Mode off.
 
