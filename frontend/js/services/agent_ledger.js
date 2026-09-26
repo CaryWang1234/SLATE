@@ -12,8 +12,8 @@
  * 加字节数，落库的是 digest。账本失败绝不影响聊天——上行一律 fire-and-forget，异常只 warn。
  */
 
-import { post } from "./api.js?v=20260925-011";
-import { toolLabel, toolArgsSummary } from "./tool_meta.js?v=20260925-011";
+import { post } from "./api.js?v=20260926-001";
+import { toolLabel, toolArgsSummary } from "./tool_meta.js?v=20260926-001";
 
 const DIGEST_MAX = 2000;
 const MAX_PENDING = 500;
@@ -113,7 +113,11 @@ export function openRun({ conversationId = "", mode = "", budget = 0 } = {}) {
     },
   };
 
-  ledger.runId = `run_${Math.random().toString(16).slice(2, 6)}`;
+  // 一轮一个 id，它同时是「本轮总结 / 撤回」那份清单的键：清单要留 7 天，只靠 4 位
+  // 随机数一旦撞车，两轮的文件就会被并进同一条清单，撤销时连不相干那轮的也一起还原。
+  // 所以时间戳打头、随机位补足 8 位。
+  const rand = String(Math.random().toString(16).slice(2)).padStart(8, "0").slice(0, 8);
+  ledger.runId = `run_${Date.now().toString(36)}_${rand}`;
 
   const onPageHide = () => {
     if (closed) return;

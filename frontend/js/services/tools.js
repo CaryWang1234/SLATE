@@ -12,18 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260925-011";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-011";
-import { guardSkillCall } from "./riskguard.js?v=20260925-011";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260925-011";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260925-011";
-import { t } from "./i18n.js?v=20260925-011";
-import { makeId } from "./utils.js?v=20260925-011";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260925-011";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20260925-011";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20260925-011";
-import { isAiToolOff } from "./ai_features.js?v=20260925-011";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260925-011";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260926-001";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260926-001";
+import { guardSkillCall } from "./riskguard.js?v=20260926-001";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260926-001";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260926-001";
+import { t } from "./i18n.js?v=20260926-001";
+import { makeId } from "./utils.js?v=20260926-001";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260926-001";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20260926-001";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20260926-001";
+import { isAiToolOff } from "./ai_features.js?v=20260926-001";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260926-001";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -48,6 +48,18 @@ function projectParam(ctx = {}) {
 // 否则项目里的同名 Action 在读路径上就凭空消失了。
 function scopeProjectParam(ctx = {}) {
   return String(callProject(ctx)?.project_id || "");
+}
+
+// 本轮标识：三个写端点靠它把「这一轮改了哪些文件」记成一份清单，卡片和撤回都读那一份。
+// 拿不到账本就传空串——端点照常写文件，只是这一项不进清单，宁可少报也不虚报可撤回。
+function roundIdParam(ctx = {}) {
+  return String(ctx.ledger?.runId || "");
+}
+
+// 「哪一轮 + 哪个项目」这一对口径只在这里算一次：写端点、本轮总结卡片、审阅差异、
+// 整轮撤回都要用它。分散各处拼参数，早晚会出现卡片读 A 项目、撤回撤 B 项目。
+export function roundQuery(ctx = {}) {
+  return { run_id: roundIdParam(ctx), project: projectParam(ctx) };
 }
 
 function normalizeProjectRelativePath(rawPath, project = state.project) {
@@ -1009,7 +1021,7 @@ const TOOLS = {
       // 自动确认：预览无错误时直接写入（部分编辑未命中时保留手动确认，避免半套写入）
       if (fileAutoApplyEnabled() && structured.file && structured.new_content && structured.errors.length === 0) {
         try {
-          const applyRes = await post("/projects/apply-edit", { file_path: structured.file, content: structured.new_content, project: projectParam(callCtx) });
+          const applyRes = await post("/projects/apply-edit", { file_path: structured.file, content: structured.new_content, project: projectParam(callCtx), run_id: roundIdParam(callCtx) });
           if (applyRes.code === 0) structured.applied = "auto";
           else structured.errors = [t("自动应用失败：{msg}，可手动点「接受」重试", { msg: applyRes.message || t("未知错误") })];
         } catch (e) {
@@ -1113,7 +1125,7 @@ const TOOLS = {
       if (fileAutoApplyEnabled() && structured.file && structured.errors.length === 0) {
 
         try {
-          const applyRes = await post("/projects/create-file", { file_path: structured.file, content: structured.content, project: projectParam(callCtx) });
+          const applyRes = await post("/projects/create-file", { file_path: structured.file, content: structured.content, project: projectParam(callCtx), run_id: roundIdParam(callCtx) });
           if (applyRes.code === 0) structured.applied = "auto";
           else structured.errors = [t("自动创建失败：{msg}，可手动点「创建」重试", { msg: applyRes.message || t("未知错误") })];
         } catch (e) {
@@ -1158,6 +1170,7 @@ const TOOLS = {
           file_path: target.abs,
           content,
           project: projectParam(callCtx),
+          run_id: roundIdParam(callCtx),
         });
       } catch (e) {
         return {
@@ -1872,6 +1885,9 @@ async function executeToolCalls(calls, ctx = {}) {
         project: ctx.project || null,
         onEvent: ctx.onEvent ? (env => ctx.onEvent(env, call, i)) : null,
       });
+      // 本轮标识随结果走：预览没自动落盘时，「接受」按钮/移动 sheet 手里只有 structured，
+      // 拿不到 callCtx——不捎带这一轮的 id，用户点接受的写入就进不了同一份清单。
+      if (result?._structured) result._structured._runId = roundIdParam(ctx);
     } finally {
       ctx.onCallEnd?.(call, i, result);  // result 为 undefined 表示这次调用抛了异常
     }

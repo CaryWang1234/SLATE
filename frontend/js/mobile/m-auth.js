@@ -4,10 +4,10 @@
  * 2. mHandleStructured：file_edit/file_create 的 diff 预览 → 接受/拒绝（file_append 调用时即写入）
  */
 
-import { state, getModelKey } from "../store.js?v=20260925-011";
-import { post } from "../services/api.js?v=20260925-011";
-import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260925-011";
-import { mShowRiskSheet, mShowDiffSheet, mToast, t } from "./m-ui.js?v=20260925-011";
+import { state, getModelKey } from "../store.js?v=20260926-001";
+import { post } from "../services/api.js?v=20260926-001";
+import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260926-001";
+import { mShowRiskSheet, mShowDiffSheet, mToast, t } from "./m-ui.js?v=20260926-001";
 
 /** 用当前模型解释命令目的（与桌面 explainCommand 同一逻辑，失败返回兜底文案） */
 async function mExplainCommand(command) {
@@ -83,13 +83,16 @@ export async function mHandleStructured(structured) {
   }
 
   try {
+    // run_id 跟着这一轮走：用户在这里点「接受」的写入，也要记进提议它的那一轮清单，
+    // 否则关掉自动应用之后「本轮总结」会一件都不报。
+    const runId = structured._runId || "";
     let res;
     if (type === "file_edit") {
-      res = await post("/projects/apply-edit", { file_path: structured.file, content: structured.new_content });
+      res = await post("/projects/apply-edit", { file_path: structured.file, content: structured.new_content, run_id: runId });
     } else if (type === "file_create") {
-      res = await post("/projects/create-file", { file_path: structured.file, content: structured.content });
+      res = await post("/projects/create-file", { file_path: structured.file, content: structured.content, run_id: runId });
     } else {
-      res = await post("/projects/append-file", { file_path: structured.file, content: structured.content });
+      res = await post("/projects/append-file", { file_path: structured.file, content: structured.content, run_id: runId });
     }
     if (res.code === 0) {
       mToast(t("已写入磁盘"));

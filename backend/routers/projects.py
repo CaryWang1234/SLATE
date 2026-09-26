@@ -23,6 +23,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from backend import project_registry as registry
+from backend import round_snapshots
 from backend.data_io import atomic_write_json
 from backend.subprocess_utils import hidden_subprocess_kwargs
 from backend.skills.text_io import read_text_file, write_text_file
@@ -1062,6 +1063,7 @@ class ApplyEditRequest(BaseModel):
     file_path: str
     content: str
     project: str = ""
+    run_id: str = ""
 
 
 @router.post("/apply-edit")
@@ -1083,9 +1085,12 @@ async def apply_file_edit(req: ApplyEditRequest):
     if not target.is_file():
         return {"code": 1, "message": "文件不存在"}
 
+    # 写之前先取这一轮的原文：拿不到快照也照常写入，只是这一项进不了「本轮总结」。
+    snap = round_snapshots.begin_write(project_dir, req.run_id, target, mode="edit", tool="apply-edit")
     try:
         existing = read_text_file(target)
         written = write_text_file(target, req.content, existing.encoding)
+        round_snapshots.finish_write(snap)
         return {
             "code": 0,
             "data": {
@@ -1105,6 +1110,7 @@ class CreateFileRequest(BaseModel):
     file_path: str
     content: str
     project: str = ""
+    run_id: str = ""
 
 
 @router.post("/create-file")
@@ -1128,8 +1134,10 @@ async def create_file(req: CreateFileRequest):
 
     try:
         # 自动创建父目录
+        snap = round_snapshots.begin_write(project_dir, req.run_id, target, mode="create", tool="create-file")
         target.parent.mkdir(parents=True, exist_ok=True)
         written = write_text_file(target, req.content, "utf-8")
+        round_snapshots.finish_write(snap)
         return {
             "code": 0,
             "data": {
@@ -1150,6 +1158,7 @@ class AppendFileRequest(BaseModel):
     file_path: str
     content: str
     project: str = ""
+    run_id: str = ""
 
 
 @router.post("/append-file")
@@ -1171,9 +1180,11 @@ async def append_file(req: AppendFileRequest):
     if not target.exists():
         return {"code": 1, "message": "文件不存在，请先用 file_create 创建"}
 
+    snap = round_snapshots.begin_write(project_dir, req.run_id, target, mode="append", tool="append-file")
     try:
         existing = read_text_file(target)
         written = write_text_file(target, existing.content + req.content, existing.encoding)
+        round_snapshots.finish_write(snap)
         return {
             "code": 0,
             "data": {
@@ -1185,6 +1196,55 @@ async def append_file(req: AppendFileRequest):
         }
     except Exception as e:
         return {"code": 1, "message": f"追加失败: {e}"}
+
+
+# ── 本轮总结：这一轮改了哪些文件 / 差异 / 整轮撤回 ────────
+#
+# 这三个端点只读上面三个写端点留下的清单，自己一个字节都不写项目。
+# 之所以不走 git：项目可能根本不是仓库，而且在跑的 git 仓库里 `checkout .` 会把
+# 用户自己未提交的修改一起抹掉——撤回只能还原到「这一轮开始之前」，多做一寸都不行。
+
+class RoundRevertRequest(BaseModel):
+    run_id: str
+    project: str = ""
+
+
+def _round_project(project: str = "") -> Path | None:
+    info = _resolve_project(project)
+    return Path(info["path"]) if info and info.get("path") else None
+
+
+@router.get("/round-files")
+async def get_round_files(run_id: str = "", project: str = ""):
+    """本轮被写端点改过的文件与行数合计：「本轮总结」卡片的数据源。"""
+    project_dir = _round_project(project)
+    if project_dir is None:
+        return {"code": 1, "message": "未打开项目"}
+    return {"code": 0, "data": round_snapshots.round_files(project_dir, run_id)}
+
+
+@router.get("/round-diff")
+async def get_round_diff(run_id: str = "", path: str = "", project: str = ""):
+    """单个文件的差异（本轮首次原文 ↔ 当前内容）。当前内容以磁盘为准，
+    所以本轮之后用户又改过的文件，这里看到的是「包括自己改动」的差异。"""
+    project_dir = _round_project(project)
+    if project_dir is None:
+        return {"code": 1, "message": "未打开项目"}
+    if not path:
+        return {"code": 1, "message": "缺少 path"}
+    return {"code": 0, "data": round_snapshots.round_diff(project_dir, run_id, path)}
+
+
+@router.post("/round-revert")
+async def post_round_revert(req: RoundRevertRequest):
+    """整轮撤回：还原本轮写端点改过的文件。现场对不上的一律跳过并在 data.skipped 里回报。"""
+    project_dir = _round_project(req.project)
+    if project_dir is None:
+        return {"code": 1, "message": "未打开项目"}
+    result = round_snapshots.revert(project_dir, req.run_id)
+    if not result.get("ok"):
+        return {"code": 1, "message": result.get("reason") or "撤回失败", "data": result}
+    return {"code": 0, "data": result, "message": "ok"}
 
 
 # ── Better Project Understanding：项目扫描 ─────

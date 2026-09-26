@@ -121,6 +121,7 @@ html, body {
 .tool-call-output,
 .tool-call-input,
 .file-edit-diff,
+.round-summary,
 .file-preview,
 .file-preview-content,
 .project-file-tree,
@@ -6616,6 +6617,147 @@ textarea::-webkit-scrollbar-thumb {
 .file-edit-rejected .file-edit-diff-pre {
   text-decoration: line-through;
   opacity: 0.5;
+}
+
+/* ── 本轮总结：模型说完最后一句后，报这一轮改了哪些文件（可审阅 / 可撤回） ── */
+
+.round-summary {
+  width: min(680px, 100%);
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.round-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+}
+
+.round-summary-icon { flex: none; opacity: 0.75; }
+
+.round-summary-title { flex: none; color: var(--text); }
+
+.round-summary-stats {
+  flex: none;
+  display: flex;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.round-add { color: #1a7f37; }
+.round-del { color: #cf222e; }
+[data-theme="dark"] .round-add { color: #3fb950; }
+[data-theme="dark"] .round-del { color: #f85149; }
+
+.round-summary-state {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.round-btn {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
+}
+
+.round-btn + .round-btn { margin-left: 0; }
+.round-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--text); }
+.round-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.round-btn:disabled { opacity: 0.45; cursor: default; }
+.round-btn-icon { flex: none; opacity: 0.8; }
+
+.round-btn-revert:hover:not(:disabled) { border-color: #c44; color: #c44; }
+
+.round-files {
+  border-top: 1px solid var(--border);
+}
+
+.round-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.round-file:last-child { border-bottom: none; }
+.round-file-icon { flex: none; display: inline-flex; }
+.round-file-icon img { display: block; }
+
+.round-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.round-file-stats {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.round-file-note {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px dashed var(--border-hover);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.round-file-diff {
+  flex: 1 1 100%;
+  margin: 2px 0 4px;
+}
+
+.round-more {
+  display: block;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--gold-strong);
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.round-more:hover { text-decoration: underline; }
+.round-more:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+
+/* 窄屏（移动只读视图）：按钮换行不挤压文件名 */
+@media (max-width: 520px) {
+  .round-summary-head { flex-wrap: wrap; }
+  .round-btn { margin-left: 0; }
 }
 
 /* 文件创建标记 */

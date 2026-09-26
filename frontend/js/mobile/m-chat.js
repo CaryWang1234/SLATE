@@ -7,21 +7,22 @@
 
 import {
   state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit, effectiveConstitution,
-} from "../store.js?v=20260925-011";
-import { fmtTokens } from "../services/usage.js?v=20260925-011";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260925-011";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260925-011";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260925-011";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260925-011";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260925-011";
-import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20260925-011";
-import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260925-011";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260925-011";
-import { toolLabel } from "../services/tool_meta.js?v=20260925-011";
-import { renderMarkdown } from "../services/markdown.js?v=20260925-011";
-import { mToast, t } from "./m-ui.js?v=20260925-011";
-import { mHandleStructured } from "./m-auth.js?v=20260925-011";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260925-011";
+} from "../store.js?v=20260926-001";
+import { fmtTokens } from "../services/usage.js?v=20260926-001";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260926-001";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260926-001";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260926-001";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260926-001";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260926-001";
+import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20260926-001";
+import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260926-001";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260926-001";
+import { toolLabel } from "../services/tool_meta.js?v=20260926-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260926-001";
+import { mToast, t } from "./m-ui.js?v=20260926-001";
+import { mountRoundSummary, renderRoundSummary } from "../components/round_summary.js?v=20260926-001";
+import { mHandleStructured } from "./m-auth.js?v=20260926-001";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260926-001";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -396,6 +397,11 @@ const mobilePolicy = {
       }
     }
   },
+  finish(run) {
+    // 本轮总结：移动侧只给读（卡片上不出现「撤销」）。kernel 的 finish 不被 await，
+    // 所以挂载完成后自己重排一次，不能等外层 finally 那一趟全量渲染。
+    mountRoundSummary(run, () => mRenderAllMessages());
+  },
   buildFeeds(run) {
     const { calls, results, round, maxRounds } = run;
     // 工具结果回灌模型（hidden user 消息，不渲染）
@@ -714,6 +720,8 @@ export function mRenderAllMessages() {
         const card = addToolCard(wrap, tr.call, tr.result?.success === false ? "error" : "done", toolSummary(tr.result));
         card.querySelector("pre").textContent += `\n\n--- 输出 ---\n${String(tr.result?.output || "")}`;
       }
+      // 本轮总结：手机上只看，撤回回到桌面做
+      if (msg.roundSummary?.runId) wrap.appendChild(renderRoundSummary(msg.roundSummary, { readOnly: true }));
     }
     el.appendChild(wrap);
   }

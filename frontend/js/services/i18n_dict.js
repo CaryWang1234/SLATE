@@ -1936,4 +1936,33 @@ export const EN_DICT = {
     "The short-video generation skill. Once off it disappears from the tool catalogue",
   "模型与 Key 在下方「视频生成」区块配置": "Model and key are configured in the \"Video Generation\" block below",
 
+  // ── 本轮总结（components/round_summary.js 卡片） ───────
+  "已编辑 {n} 个文件": "{n} file(s) edited",
+  "再显示 {n} 个文件": "Show {n} more file(s)",
+  "收起文件列表": "Collapse file list",
+  "审阅": "Review",
+  "收起审阅": "Close review",
+  "撤销": "Undo",
+  "撤回": "Revert",
+  "已撤回": "Reverted",
+  "撤回本轮改动": "Revert this round",
+  "把这些文件还原到本轮开始前": "Restore these files to how they looked before this round",
+  "撤回本轮的 {n} 个文件改动？这些文件会回到本轮开始前的内容，本轮新建的文件会被删除。本轮之后你自己改过的文件会跳过，不会被覆盖。":
+    "Revert the {n} file change(s) from this round? Edited files go back to how they were before the round and files it created are deleted. Files you changed afterwards are skipped, never overwritten.",
+  "已撤回 {done} 项，{skipped} 项已跳过": "{done} reverted, {skipped} skipped",
+  "已撤回 {done} 项": "{done} file(s) reverted",
+  "撤回失败：{msg}": "Revert failed: {msg}",
+  "文件过大，未快照": "Too large to snapshot",
+  "原文无法读取，未快照": "Original unreadable, not snapshotted",
+  "本轮之后文件已不存在": "File disappeared after this round",
+  "本轮之后又被改过": "Changed again after this round",
+  "文件已经不在了": "File is gone",
+  "快照已清理": "Snapshot pruned",
+  "无法撤回": "Not revertible",
+  "还原失败": "Restore failed",
+  "加载差异…": "Loading diff…",
+  "差异不可用": "Diff unavailable",
+  "差异读取失败": "Failed to load diff",
+  "没有可显示的差异": "Nothing to show",
+
 };
