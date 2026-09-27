@@ -1512,6 +1512,20 @@ function renderThreadInto(host, msgs, options = {}) {
     items.push({ msg, sig: renderSignature(msg), el });
   }
   threadViews.set(host, view);
+  // 台账之外落进这块画布的元素要清走。今天靠整表 innerHTML 清空顺手带走，改成增量重绘后
+  // 不点名就会跟着跨场留下来（实测：子代理实时面板跑到别人那场的屏幕上继续报"运行中"）。
+  // 本项目 chip 是全站共用的那一只，本场的砚台面板归这块画布，其余一律不留。
+  if (host.isConnected) {
+    const kept = new Set(items.map(it => it.el));
+    const conv = String(state.currentConversationId || "");
+    for (const node of [...host.children]) {
+      if (kept.has(node) || node === convProjectEl) continue;
+      if (node === subAgentPanel && (node.dataset.conv || "") === conv) continue;
+      host.removeChild(node);
+      // 引用留着只会让下一次更新往一只已离场的节点上写（isConnected 一假就全丢）
+      if (node === subAgentPanel) subAgentPanel = null;
+    }
+  }
   if (live) {
     stickToBottom = true;
     host.scrollTop = host.scrollHeight;
@@ -1786,6 +1800,7 @@ subagentEvents.on((event) => {
     subAgentTotalCount = event.specs.length;
     // 直接追加到聊天滚动区域末尾，不依赖消息气泡结构
     if (chatScroll) {
+      subAgentPanel.dataset.conv = String(event.convId || state.currentConversationId || "");
       chatScroll.appendChild(subAgentPanel);
       autoScroll();
     }

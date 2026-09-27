@@ -126,6 +126,18 @@ ok("搬去游离树时台账跟着走", (STASH.match(/threadViews\.set/g) || [])
 ok("搬回屏幕时台账跟着回", (ADOPT.match(/threadViews\.set/g) || []).length === 2);
 ok("墨痕样式那处点名整棵重绘", has("renderAllMessages({ force: true })"));
 
+// ── ③ 台账之外的子节点 ────────────────────────
+// 增量重绘不再整表清空，宿主里"不是消息、也没被认账"的节点就没人管了：子代理实时面板
+// 是 chatScroll.appendChild 进去的，实测会跟着跨场留在别人那台的屏幕上。
+ok("重绘尾扫会清走台账之外的子节点", INTO.includes("new Set(items.map") && /for \(const node of \[\.\.\.host\.children\]\)/.test(INTO));
+ok("面板挂上时记下归属会话（尾扫靠它认场）", has("subAgentPanel.dataset.conv ="));
+ok("本场砚台面板是白名单里的例外（其余不留）",
+  INTO.includes("node === subAgentPanel") && /node\.dataset\.conv/.test(INTO) && INTO.includes("node === convProjectEl"));
+ok("面板挂上时记下归属会话（尾扫靠它认场）",
+  /subAgentPanel\.dataset\.conv = String\(event\.convId \|\| state\.currentConversationId \|\| ""\)/.test(CHAT));
+ok("离场的面板同时清掉模块引用（否则更新写进已离场的节点）",
+  /host\.removeChild\(node\);[\s\S]{0,200}subAgentPanel = null;/.test(INTO));
+
 // ── 结果 ──────────────────────────────────────
 const failed = results.filter(([p]) => !p);
 for (const [p, name, detail] of results) {
