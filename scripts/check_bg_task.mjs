@@ -148,7 +148,12 @@ ok("起完任务立刻重排轮询（否则要等最多 20 秒的空闲慢探）
 ok("事件先入内存再 ack（中途崩了还能再来一次）",
   SERVICE.indexOf("pushEvents(data.events)") < SERVICE.indexOf('post("/bg-tasks/events/ack"'),
   "顺序反了就是丢事件的经典写法");
-ok("未读事件池有上限", /BG_EVENTS_KEEP\s*=\s*\d+/.test(SERVICE) && has(SERVICE, "slice(-BG_EVENTS_KEEP)"));
+// 上限得"真是个上限"：只钉"有个数字常量"是假牙——把它写成 10 万照样过，
+// 而池子无界的后果就是用户离开一会儿就涨内存（这条判据原本看着有牙，其实没有）。
+const BG_KEEP = Number((SERVICE.match(/export const BG_EVENTS_KEEP = (\d+);/) || [])[1]);
+ok("未读事件池有上限（且是个真上限）",
+  BG_KEEP > 0 && BG_KEEP <= 200 && has(SERVICE, "slice(-BG_EVENTS_KEEP)"),
+  `BG_EVENTS_KEEP=${BG_KEEP}（要求 1..200）且赋值处真的按它截断`);
 ok("takeBgEvents 取走即清（消费者即处理者）",
   // P1 起 takeBgEvents 带上了归属会话：它清空的是整个池子（留下的那些当场转进信箱），
   // "取走即清"这条判据没变，只是从"全念"变成"只念这一场的"。
@@ -193,7 +198,7 @@ ok("系统自开的场：不进气泡也不入库",
   /hidden: bgResumeTurn \|\| undefined/.test(CHAT) && /if \(genConvId && !bgResumeTurn\)/.test(CHAT));
 ok("系统自开的场不跑「这条像不像任务」的关键词分类",
   /bgResumeTurn = queuedPayload\?\.kind === "bg_resume"/.test(CHAT)
-  && /bgResumeTurn \? "" : buildAgentRuntimeContext/.test(CHAT),
+  && /bgResumeTurn[\s\S]{0,40}?\?\s*""\s*:\s*buildAgentRuntimeContext/.test(CHAT),
   "事件尾巴里蹦出「命令/项目」就会让系统自己给自己开自主推进");
 ok("移动端只注入事件、不自己开新场",
   /const events = takeBgEvents\(\);\s*\n\s*if \(events\.length\) \{/.test(MCHAT) && !/maybeDriveBgEvents/.test(MCHAT),

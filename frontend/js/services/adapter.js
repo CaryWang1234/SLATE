@@ -3,9 +3,9 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20260926-002";
-import { getToolsSystemPrompt } from "./tools.js?v=20260926-002";
-import { catalogForScope } from "./project_scope.js?v=20260926-002";
+import { state } from "../store.js?v=20260926-003";
+import { getToolsSystemPrompt } from "./tools.js?v=20260926-003";
+import { catalogForScope } from "./project_scope.js?v=20260926-003";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -169,8 +169,9 @@ function getActionsSystemPrompt(project = null) {
 /**
  * 组装发往模型的完整系统提示：角色定义 → 项目宪法 → 专家包/记忆/知识 → 工具目录。
  * 上下文估算与实际载荷共用此函数，避免两处口径漂移。
- * opts.withTools === false：对话模式，基底换成不含 Agent 协议与工具纪律的版本，
- * 也不注入工具目录（没有工具可调用时注入只会诱导模型伪造 ◈◈◈ 调用块）。
+ * opts.withTools === false：本轮没有工具（对话模式或磨墨轮），基底换成不含 Agent 协议
+ * 与工具纪律的版本，也不注入工具目录（没有工具可调用时注入只会诱导模型伪造 ◈◈◈ 调用块）。
+ * opts.grindTurn：withTools 为 false 时改说磨墨那套禁令（产出是墨迹与墨稿，不是"改用智能体模式"）。
  */
 function buildSystemContent(modelId, constitution, opts = {}) {
   // opts.knowledge / opts.project：并行时这一场的知识库与项目现场由调用方带进来，
@@ -194,9 +195,15 @@ function buildSystemContent(modelId, constitution, opts = {}) {
   // 对话模式走互斥分支：不注入目录，同时显式声明"本轮没有工具"，
   // 否则模型会照旧伪造 ◈◈◈ 块，或谎称已经读过文件、已经跑过命令。
   if (opts.withTools === false) {
-    systemContent += "\n\n[对话模式] 本轮没有任何可调用工具：不要输出 ◈◈◈ 或其它工具调用块，"
-      + "也不要把“我已查看文件”“我已执行命令”“我搜索过”当作既成事实。"
-      + "缺少事实依据时直接说明你不知道，并告诉用户怎样提供信息或改用智能体模式。\n";
+    // 同为"本轮无工具"，磨墨与对话要的下一步不一样：对话态该劝用户补信息或改用智能体，
+    // 磨墨轮本身就有产出（追问 / 墨迹 / 墨稿），叫它改用智能体等于把它从正确分支上推开。
+    systemContent += opts.grindTurn
+      ? "\n\n[磨墨模式] 本轮只研磨需求，没有任何可调用工具：不要输出 ◈◈◈ 或其它工具调用块，"
+        + "不要改文件、跑命令或开始实现，也不要把“我已查看文件”“我已执行命令”当作既成事实。"
+        + "产出只有追问、【墨迹】状态与（收墨时）墨稿；要动工等用户点「送入目标模式」。\n"
+      : "\n\n[对话模式] 本轮没有任何可调用工具：不要输出 ◈◈◈ 或其它工具调用块，"
+        + "也不要把“我已查看文件”“我已执行命令”“我搜索过”当作既成事实。"
+        + "缺少事实依据时直接说明你不知道，并告诉用户怎样提供信息或改用智能体模式。\n";
   } else {
     // Actions 目录贴着工具说明注入：对话态没有 actions_read，
     // 只给目录读不到正文，反而诱导模型声称"已按流程执行"。
@@ -212,7 +219,8 @@ function buildSystemContent(modelId, constitution, opts = {}) {
  * 顺序：角色定义、项目宪法、专家/记忆/知识上下文、工具说明（贴近对话，降低遗忘）。
  * toolMode：native=序列化原生工具协议（assistant.tool_calls + role:"tool"）；
  *           text=剥离协议（tool 消息降为 user，便于不支持 tools 的端点消费）；
- *           none=对话模式，既不注入工具目录也不序列化任何工具协议。
+ *           none=本轮没有工具（对话模式 / 磨墨轮），既不注入工具目录也不序列化任何工具协议。
+ * opts.grindTurn：none 的原因是磨墨，系统提示改说 [磨墨模式] 那段禁令。
  */
 function buildMessages(userMessages, constitution, toolMode = "text", opts = {}) {
   const messages = [];
@@ -221,6 +229,7 @@ function buildMessages(userMessages, constitution, toolMode = "text", opts = {})
     role: "system",
     content: buildSystemContent(userMessages._modelId || "", constitution, {
       withTools: toolMode !== "none",
+      grindTurn: opts.grindTurn === true,
       // 一条历史数组带上自己的现场（_knowledge / _project）：并行时全局那两份属于
       // 屏幕上正在看的另一个项目，读全局等于把 B 项目的知识塞进 A 项目的请求。
       knowledge: opts.knowledge ?? (Array.isArray(userMessages._knowledge) ? userMessages._knowledge : null),

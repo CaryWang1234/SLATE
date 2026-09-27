@@ -12,18 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260926-002";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260926-002";
-import { guardSkillCall } from "./riskguard.js?v=20260926-002";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260926-002";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260926-002";
-import { t } from "./i18n.js?v=20260926-002";
-import { makeId } from "./utils.js?v=20260926-002";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260926-002";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20260926-002";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20260926-002";
-import { isAiToolOff } from "./ai_features.js?v=20260926-002";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260926-002";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260926-003";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260926-003";
+import { guardSkillCall } from "./riskguard.js?v=20260926-003";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20260926-003";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260926-003";
+import { t } from "./i18n.js?v=20260926-003";
+import { makeId } from "./utils.js?v=20260926-003";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260926-003";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20260926-003";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20260926-003";
+import { isAiToolOff } from "./ai_features.js?v=20260926-003";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260926-003";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -1395,7 +1395,6 @@ const AGENT_TOOL_DECISION_RULES = [
   "桌面/浏览器操作：优先 browser_automation；必须操作系统 UI 时再 computer_use。",
   "复杂多步任务：用 todo_manage 维护状态；完成一批就更新，不等最后。",
   "可视化梳理：用 board_batch 一次性组织卡片和依赖。",
-  "干完了就停：自主推进（Autopilot / 目标模式）下，全部交付已验证后必须调 exit_autopilot / exit_target_mode 收口；没做完继续动手，不要靠停发工具或复述计划来结束循环。",
 ];
 
 function compactDescription(text, limit = 260) {
@@ -1913,7 +1912,7 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
   s += "4. 工具失败后换参数、换工具或读取更多上下文；不要重复完全相同的失败调用。\n";
   s += "5. 等待用户选择、确认、补充隐私信息或许可时，不调用工具；但任务缺少用户必须提供的关键条件（如生成风格、目标受众、输出格式、尺寸、语言）且无法合理假设时，调用 user_ask 以选择题形式询问，拿到回答后继续。\n";
   s += "6. 工具/技能纪律：优先用工具佐证再回答——事实性、现状性问题默认查项目文件或联网搜索；仅当回答不依赖外部事实（纯闲聊、纯观点、无需佐证的概念解释）时才直接回答。不确定技能是否存在时，先 skill_search 搜索确认，再决定是否 skill_run；搜索到的技能与任务无关时，绝不强行使用。\n";
-  s += "7. 收口纪律：任务全部交付且逐项验证通过后，必须显式收口——目标模式调 exit_target_mode、Autopilot 调 exit_autopilot，然后在下一条回复里给出最终汇报。干完了就停，不要继续多读多改来\"再确认一遍\"；反过来，任务没做完时不要靠停发工具、只说\"已完成\"或反复复述计划来结束循环。\n\n";
+  s += "7. 收口纪律（循环何时结束以本条为准，其他地方提到收口都按这里）：干完活的标志是回复首行写【任务完成】，再逐项列出交付内容与验证方式——既不调收口工具也不写这个标记，系统判定为仍在推进并自动续跑。写标记之前先按模式显式收口：目标模式调 exit_target_mode、Autopilot 调 exit_autopilot（summary 写清交付了什么、怎么验证、结果如何），然后在下一条回复里给出那份最终汇报。干完了就停，不要继续多读多改来“再确认一遍”；反过来，任务没做完时不要靠停发工具、只说“已完成”或反复复述计划来结束循环。\n\n";
   s += "**工具选择速查**\n";
   // 关掉的功能连"速查"都不提：留着配方等于把模型往一个已经摘掉的工具上引，
   // 模型照着调只会换来一句"该功能已关闭"，白花一轮。
@@ -2154,8 +2153,9 @@ function setModelToolCapability(modelId, mode) {
 // 本轮实际生效的工具模式：对话态一律 "none"（请求不带 tools、系统提示不带工具目录），
 // 智能体态才按模型能力判定。"none" 不写入能力记忆——那是用户的选择，不是模型的限制，
 // 写进去会让切回智能体后白白丢掉原生工具能力。
-function effectiveToolMode(modelId, provider, chatMode = "agent") {
-  return chatMode === "chat" ? "none" : getModelToolCapability(modelId, provider);
+// noTools：磨墨轮——只研磨需求，目录与协议都不下发（少了目录，模型才不会顺手发调用块）。
+function effectiveToolMode(modelId, provider, chatMode = "agent", noTools = false) {
+  return (chatMode === "chat" || noTools) ? "none" : getModelToolCapability(modelId, provider);
 }
 
 function _example(params) {

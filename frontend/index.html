@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260926-002">
+  <link rel="stylesheet" href="./css/style.css?v=20260926-003">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -389,26 +389,17 @@
         </div>
       </div>
       <div class="settings-page">
-        <!-- 左侧锚点导航（滚动高亮，由 app.js initSettingsNav） -->
-        <nav class="settings-nav" id="settings-nav">
-          <a class="settings-nav-item active" data-target="settings-models">模型配置</a>
-          <a class="settings-nav-item" data-target="settings-api-test">API 测试</a>
-          <a class="settings-nav-item" data-target="settings-usage">用量统计</a>
-          <a class="settings-nav-item" data-target="settings-context">上下文与项目</a>
-          <a class="settings-nav-item" data-target="settings-auto-review">自动推进</a>
-          <a class="settings-nav-item" data-target="settings-ai-features">AI 辅助功能</a>
-            <a class="settings-nav-item" data-target="settings-notifications">通知</a>
-            <a class="settings-nav-item" data-target="settings-ui">通用 UI</a>
-            <a class="settings-nav-item" data-target="settings-web-search">联网搜索</a>
-            <a class="settings-nav-item" data-target="settings-image-gen">图片生成</a>
-            <a class="settings-nav-item" data-target="settings-video-gen">视频生成</a>
-            <a class="settings-nav-item" data-target="settings-permission">审批模式</a>
-        <a class="settings-nav-item" data-target="settings-skills">工具 / 技能</a>
-          <a class="settings-nav-item" data-target="settings-data">数据备份</a>
-          <a class="settings-nav-item" data-target="settings-lan">局域网遥控</a>
-          <a class="settings-nav-item" data-target="settings-typing">打字小游戏</a>
-          <a class="settings-nav-item" data-target="settings-about">关于</a>
-        </nav>
+        <!-- 左侧：搜索 + 锚点导航。导航条目由 app.js 从 .settings-block 现读生成——
+             手写清单一定会漏（曾经漏了后台任务/多任务与项目/MCP Server 三块）。 -->
+        <aside class="settings-side">
+          <div class="settings-search">
+            <input id="settings-search" class="setting-input settings-search-input" type="text"
+                   placeholder="搜索设置项" autocomplete="off" spellcheck="false">
+            <button id="btn-settings-search-clear" class="settings-search-clear hidden" type="button" title="清除">×</button>
+          </div>
+          <div id="settings-search-status" class="settings-search-status" role="status" aria-live="polite"></div>
+          <nav class="settings-nav" id="settings-nav"></nav>
+        </aside>
         <div class="settings-main">
         <section class="settings-block" id="settings-models">
           <div class="settings-block-head">
@@ -470,7 +461,7 @@
               <input id="setting-use-responses" type="checkbox">
               <span>可选启用 Responses API 模式（仅部分模型支持，开启后使用新版 API 格式）</span>
             </label>
-            <div id="responses-models-hint" class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);"></div>
+            <div id="responses-models-hint" class="setting-hint"></div>
           </div>
         </section>
 
@@ -579,9 +570,9 @@
               <p>除对话、团队讨论、提示词工厂外，所有会自行调用模型的功能都在这里：关闭即不再发请求，所选模型也只影响该项</p>
             </div>
           </div>
-          <div id="ai-feature-summary" class="setting-hint" style="margin-bottom: 6px;"></div>
+          <div id="ai-feature-summary" class="setting-hint is-lead"></div>
           <div id="ai-feature-list" class="ai-feature-list"></div>
-          <div class="setting-hint" style="margin-top: 8px;">「自动推进」的审阅模型与「后台任务」的自动续跑在各自区块设置，此处不重复</div>
+          <div class="setting-hint">「自动推进」的审阅模型与「后台任务」的自动续跑在各自区块设置，此处不重复</div>
         </section>
 
         <section class="settings-block" id="settings-notifications">
@@ -599,7 +590,7 @@
             <input id="setting-notif-system" type="checkbox">
             <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>任务完成时发送系统通知（需浏览器授权）</span>
           </label>
-          <div id="notif-permission-hint" class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);"></div>
+          <div id="notif-permission-hint" class="setting-hint"></div>
         </section>
 
         <section class="settings-block" id="settings-bg-tasks">
@@ -613,7 +604,7 @@
             <input id="setting-bg-auto-resume" type="checkbox" checked>
             <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 12h-4l-3 8-4-16-3 8h-4"/></svg>任务有消息时自动叫醒模型（不必由你说"继续"）</span>
           </label>
-          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">每个对话最多自动续跑 3 次；关掉后消息仍然保留，下次你说话时一并交给模型</div>
+          <div class="setting-hint">每个对话最多自动续跑 3 次；关掉后消息仍然保留，下次你说话时一并交给模型</div>
         </section>
 
         <section class="settings-block" id="settings-parallel">
@@ -627,10 +618,10 @@
             <input id="setting-background-runs" type="checkbox" checked>
             <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.9 4.9l2.9 2.9M16.2 16.2l2.9 2.9M2 12h4M18 12h4M4.9 19.1l2.9-2.9M16.2 7.8l2.9-2.9"/></svg>切走会话时让它继续运行（停止仍用按钮显式触发）</span>
           </label>
-          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">关闭后恢复原行为：切换会话即中断当前生成。停止按钮在任何设置下都只停当前这一场</div>
+          <div class="setting-hint">关闭后恢复原行为：切换会话即中断当前生成。停止按钮在任何设置下都只停当前这一场</div>
           <label class="setting-row">
             <span>同时最多跑几场</span>
-            <select id="setting-max-parallel-runs">
+            <select id="setting-max-parallel-runs" class="setting-input">
               <option value="1">1（退回一次一场）</option>
               <option value="2" selected>2</option>
               <option value="3">3</option>
@@ -639,13 +630,13 @@
           </label>
           <label class="setting-row">
             <span>同一个项目内最多几场</span>
-            <select id="setting-max-runs-per-project">
+            <select id="setting-max-runs-per-project" class="setting-input">
               <option value="1" selected>1（同项目串行）</option>
               <option value="2">2</option>
               <option value="3">3</option>
             </select>
           </label>
-          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">同项目并行会让两场同时改同一批文件，出问题难以定位来源；未开启工作区隔离时建议保持 1</div>
+          <div class="setting-hint">同项目并行会让两场同时改同一批文件，出问题难以定位来源；未开启工作区隔离时建议保持 1</div>
         </section>
 
         <section class="settings-block" id="settings-ui">
@@ -659,7 +650,7 @@
             <input id="setting-ui-mode" type="checkbox">
             <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>启用通用 UI（极简 Codex 风格布局）</span>
           </label>
-          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">开启后顶栏与左右面板收进左侧导航栏；空对话时输入框居中，消息区限宽 720px。此模式仍在探索，布局与入口位置可能随版本调整，可随时在此关闭还原。</div>
+          <div class="setting-hint">开启后顶栏与左右面板收进左侧导航栏；空对话时输入框居中，消息区限宽 720px。此模式仍在探索，布局与入口位置可能随版本调整，可随时在此关闭还原。</div>
         </section>
 
         <section class="settings-block" id="settings-web-search">
@@ -676,7 +667,7 @@
               <button class="review-mode-btn" data-value="bing"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Bing</span></button>
               <button class="review-mode-btn" data-value="ddg"><span class="icon-text"><svg class="svg-icon" viewBox="0.5 0.5 958.7 958.7" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M479.9 959.2C214.8 959.2.5 745 .5 479.9S214.8.5 479.9.5s479.3 214.3 479.3 479.4S745 959.2 479.9 959.2z" fill="#de5833"/><path d="M920.1 479.9c0 59.9-11.2 117.4-34.4 171.7-22.3 52-53.5 99.1-94.2 139.9-40 39.9-87.1 71.9-139.9 94.2-54.3 22.4-111.8 34.4-171.7 34.4-60 0-117.5-11.2-171.8-34.4-52-22.3-99.1-53.5-139.9-94.2-39.9-40-71.9-87.1-94.2-139.9C51.6 597.3 39.6 539 39.6 479.9c0-60 11.2-117.5 34.4-171.8 22.3-52 53.5-99.1 94.2-139.9 40-39.9 87.1-71.9 139.9-94.2 54.3-22.4 111.8-34.4 171.8-34.4 59.9 0 117.4 11.2 171.7 34.4 52 22.3 99.1 53.5 139.9 94.2 39.9 40 71.9 87.1 94.2 139.9 23.2 54.3 34.4 111.8 34.4 171.8zm-33.6-.8c0-225.4-182.1-407.5-407.4-407.5-225.4 0-407.5 182.9-407.5 407.5 0 176.5 112.6 326.7 269.2 383.5-20.7-87.1-79.9-336.4-93.5-476.2-9.5-99.1 44-152.6 147.1-166.2-44.8-14.4-123.9-10.4-123.9-10.4 1.6-27.2 41.6-32.8 41.6-32.8-20.8-10.3-39.2-15.9-39.2-15.9 110.3-15.2 179.8 22.3 209.3 61.5 119.9 28.7 139.1 166.2 139.1 205.3 0 164.6-138.3-12-138.3 194.2 0 89.5 67.2 210.1 92.7 253.2 178.2-43.1 310.8-203.7 310.8-396.2z" fill="#fff"/><path d="M457.5 546.2c0-52.8 71.9-69.5 99.1-69.5 73.5 0 177.3-47.2 202.9-46.4 26.4.8 43.1 11.2 43.1 23.2 0 17.6-147 83.9-203.7 78.3-54.3-4.8-67.1.8-67.1 23.2 0 19.1 39.1 36.7 82.3 36.7 64.7 0 127.8-28.8 147-15.2 16.8 12-44 55.2-113.5 55.2s-190.1-32.8-190.1-85.5z" fill="#fed30a"/><g fill="#2d4f8d"><path d="M585.3 322.5c-19.2-24.8-53.5-25.6-65.5 3.1 18.4-14.3 40.7-17.5 65.5-3.1zM371.2 323.3c-26.4-16-70.3-17.6-67.9 32.7 13.6-31.2 31.1-36.7 67.9-32.7zM595.7 396c0 14.3-12 26.3-26.4 26.3-14.3 0-26.3-12-26.3-26.3 0-14.4 12-26.4 26.3-26.4 14.4 0 26.4 12 26.4 26.4zm-8.8-10.4c0-4.8-3.2-8-8-8s-8 4-8 8c0 4.8 4 8 8 8s7.2-3.2 8-8zM395.2 414.3c0 16.8-13.6 30.4-30.4 30.4s-30.4-13.6-30.4-30.4c0-16.7 13.6-30.3 30.4-30.3s30.4 13.6 30.4 30.3zm-10.4-11.2c0-4.8-4-8.7-8.8-8.7-4.9 0-8.8 3.9-8.8 8.7 0 4.9 3.9 8.8 8.8 8.8 4.8 0 8.8-3.9 8.8-8.8z"/></g><path d="M261.7 363.2c27.2 197.3 88.7 454.6 101.5 507.4l-21.6-7.2c-20.7-87.1-79.9-337.2-93.5-477-5.5-60.8 12-103.9 50.4-131.9-24 24.8-44 56-36.8 108.7zM271.3 209.8c0-4 1.6-8 3.2-11.2 17.6 0 83.1.8 124.7 20.8 0 0-2.4.8-5.6.8-45.6-14.4-123.1-9.6-122.3-10.4zM310.5 177h1.6c-20.8-10.3-39.2-15.9-39.2-15.9 5.6-.8 10.4-.8 16-1.6 6.4 3.2 16.8 8.7 29.6 17.5h-8z" fill="#d5d7d8"/><path d="M646 837c-11.1 4-64.7-15.2-89.4-24.8-.8 1.6-1.6 3.2-3.2 4-11.2 7.2-42.4 11.2-59.2 7.2h-.8c-27.1 15.2-81.5 44.8-91 39.2-12.8-7.2-15.2-107.1-12.8-131.1.8-18.3 64.7 11.2 96.6 26.4 12-12.8 63.2-17.6 65.6-9.6.8 1.6 1.6 4.8 2.4 8.8 19.9-14.4 72.7-51.9 86.2-48.7 16.8 4 20 124.6 5.6 128.6z" fill="#67bd47"/><path d="M551.8 817c-.8 4-1.6 6.4-4 8-12.8 7.2-44 11.2-60.8 7.2-17.5-2.4-11.1-20-11.1-59.1 0-3.2 3.2-6.4 7.1-8.8 0 39.1-5.5 55.9 11.2 59.1 16 4 45.6.8 57.6-6.4z" fill="#43a347"/></svg>DuckDuckGo</span></button>
             </div>
-            <div id="web-search-engine-hint" class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);"></div>
+            <div id="web-search-engine-hint" class="setting-hint"></div>
           </div>
           <div class="setting-section">
             <label class="setting-label">网页 JS 渲染</label>
@@ -685,7 +676,7 @@
               <button class="review-mode-btn" data-value="on"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>始终渲染</span></button>
               <button class="review-mode-btn" data-value="off"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>不渲染</span></button>
             </div>
-            <div id="web-search-render-hint" class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);"></div>
+            <div id="web-search-render-hint" class="setting-hint"></div>
           </div>
         </section>
 
@@ -710,7 +701,7 @@
               <input id="image-gen-key" type="password" class="setting-input" placeholder="sk-...">
             </div>
           </div>
-          <div id="image-gen-status" class="setting-hint" style="margin-top: 8px; font-size: 12px; color: var(--text-muted);"></div>
+          <div id="image-gen-status" class="setting-hint"></div>
         </section>
 
         <section class="settings-block" id="settings-video-gen">
@@ -734,7 +725,7 @@
               <input id="video-gen-key" type="password" class="setting-input" placeholder="sk-...">
             </div>
           </div>
-          <div id="video-gen-status" class="setting-hint" style="margin-top: 8px; font-size: 12px; color: var(--text-muted);"></div>
+          <div id="video-gen-status" class="setting-hint"></div>
         </section>
 
         <section class="settings-block" id="settings-permission">
@@ -749,7 +740,7 @@
             <button class="review-mode-btn" data-mode="auto"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>自动审批</span></button>
             <button class="review-mode-btn is-danger" data-mode="full"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>完全访问</span></button>
           </div>
-          <div id="permission-mode-hint" class="setting-hint" style="margin-top: 8px; font-size: 12px; color: var(--text-muted);"></div>
+          <div id="permission-mode-hint" class="setting-hint"></div>
         </section>
 
         <section class="settings-block" id="settings-skills">
@@ -792,18 +783,21 @@
             </div>
           </div>
           <div class="about-row">
-            <label class="setting-label" style="margin-bottom:0;">备份</label>
+            <label class="setting-label is-inline">备份</label>
             <span class="setting-hint">单个 JSON 文件，含后端数据库与本地设置</span>
             <button id="btn-backup-export" class="send-btn send-btn-sm" type="button"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>下载备份</span></button>
           </div>
           <div class="about-row">
-            <label class="setting-label" style="margin-bottom:0;">恢复</label>
+            <label class="setting-label is-inline">恢复</label>
             <span class="setting-hint"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>按 id 合并导入，不覆盖已有数据</span></span>
             <button id="btn-backup-import" class="send-btn send-btn-sm" type="button">⤣ 导入备份</button>
             <input type="file" id="backup-file-input" accept=".json,application/json" hidden>
           </div>
           <div id="backup-status" class="setting-hint"></div>
-          <div class="settings-block-head" style="margin-top:18px;">
+        </section>
+
+        <section class="settings-block" id="settings-storage">
+          <div class="settings-block-head">
             <div>
               <h2>存储空间</h2>
               <p>查看各部分占用，可压缩数据库或清理缓存</p>
@@ -864,7 +858,7 @@
               <button id="btn-typing-save" class="send-btn send-btn-sm" type="button">保存题库</button>
             </div>
           </details>
-          <div class="setting-hint" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">首个字符开始计时，退格可改错；打完或按回车结束本局</div>
+          <div class="setting-hint">首个字符开始计时，退格可改错；打完或按回车结束本局</div>
         </section>
 
         <section class="settings-block" id="settings-about">
@@ -875,13 +869,13 @@
             </div>
           </div>
           <div class="about-row">
-            <label class="setting-label" style="margin-bottom:0;">当前版本</label>
+            <label class="setting-label is-inline">当前版本</label>
             <span id="about-version" class="about-version"></span>
             <button id="btn-check-update" class="send-btn send-btn-sm" type="button">检查更新</button>
             <button id="btn-view-onboarding" class="send-btn send-btn-sm" type="button" title="重新查看首次启动引导">新手引导</button>
           </div>
           <div class="about-row">
-            <label class="setting-label" style="margin-bottom:0;">项目链接</label>
+            <label class="setting-label is-inline">项目链接</label>
             <button id="btn-open-website" class="send-btn send-btn-sm" type="button" title="在系统浏览器打开官网"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>官网</span></button>
             <button id="btn-open-github" class="send-btn send-btn-sm" type="button" title="在系统浏览器打开 GitHub 仓库"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M12 0c6.63 0 12 5.276 12 11.79-.001 5.067-3.29 9.567-8.175 11.187-.6.118-.825-.25-.825-.56 0-.398.015-1.665.015-3.242 0-1.105-.375-1.813-.81-2.181 2.67-.295 5.475-1.297 5.475-5.822 0-1.297-.465-2.344-1.23-3.169.12-.295.54-1.503-.12-3.125 0 0-1.005-.324-3.3 1.209a11.32 11.32 0 00-3-.398c-1.02 0-2.04.133-3 .398-2.295-1.518-3.3-1.209-3.3-1.209-.66 1.622-.24 2.83-.12 3.125-.765.825-1.23 1.887-1.23 3.169 0 4.51 2.79 5.527 5.46 5.822-.345.294-.66.81-.765 1.577-.69.31-2.415.81-3.495-.973-.225-.354-.9-1.223-1.845-1.209-1.005.015-.405.56.015.781.51.28 1.095 1.327 1.23 1.666.24.663 1.02 1.93 4.035 1.385 0 .988.015 1.916.015 2.196 0 .31-.225.664-.825.56C3.303 21.374-.003 16.867 0 11.791 0 5.276 5.37 0 12 0z"/></svg>GitHub</span></button>
           </div>
@@ -1491,7 +1485,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260926-002"></script>
+  <script type="module" src="./js/app.js?v=20260926-003"></script>
 
 </body>
 </html>

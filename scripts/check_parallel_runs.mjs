@@ -118,7 +118,7 @@ ok("历史数组自带它那一场的现场（项目/宪法/知识）",
   /list\._project = scope \|\| null;/.test(CHAT) && /list\._constitution = r \? constitutionForScope\(scope\)/.test(CHAT)
   && /list\._knowledge = threadKnowledge\.get/.test(CHAT));
 ok("组装请求读的是历史数组自带的现场，不回读全局",
-  /buildMessages\(history, history\._constitution \|\| effectiveConstitution\(\), toolMode, \{ project: history\._project \|\| null \}\)/.test(CHAT)
+  (CHAT.match(/buildMessages\(history, history\._constitution \|\| effectiveConstitution\(\), toolMode, \{ project: history\._project \|\| null(?:, grindTurn)? \}\)/g) || []).length === 2
   && !/buildMessages\(history, state\.constitution/.test(CHAT));
 ok("知识段按场次取（全局那份会被后台那场覆盖）",
   /knowledge: opts\.knowledge \?\? \(Array\.isArray\(userMessages\._knowledge\) \? userMessages\._knowledge : null\)/.test(ADAPTER));

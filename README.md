@@ -169,6 +169,7 @@ Action Playbooks: Write the required flow for a recurring task into `data/action
 ### Chat & Data Management
 
 - Full-text content search in history sidebar, context excerpts on match, click to jump to session
+- Settings sidebar lists every section (entries generated from the sections themselves), with a search box on top that highlights the matching row
 - Rename sessions, export as Markdown, batch manage/delete; messages support individual edit/delete
 - One-click backup: all data (chats/memories/assets/settings) exported as JSON, import to restore
 - Storage management: itemized usage, database compression, clear chats, WebView cache cleanup

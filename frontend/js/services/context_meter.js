@@ -7,18 +7,18 @@
  * 可信的是占比与趋势，不是与上游账单的逐位一致。
  */
 
-import { state, estimateTokens, contextBudgetOf, effectiveConstitution } from "../store.js?v=20260926-002";
-import { buildSystemContent } from "./adapter.js?v=20260926-002";
-import { getToolsSystemPrompt } from "./tools.js?v=20260926-002";
+import { state, estimateTokens, contextBudgetOf, effectiveConstitution } from "../store.js?v=20260926-003";
+import { buildSystemContent } from "./adapter.js?v=20260926-003";
+import { getToolsSystemPrompt } from "./tools.js?v=20260926-003";
 
 // 每条消息的角色与分隔符开销（OpenAI 风格 chatml 的近似值）
 const MSG_OVERHEAD = 4;
 
-function measurePromptSide() {
-  // 对话模式下系统提示不含工具目录，口径必须与实际载荷一致，否则工具桶虚高
-  const chatOnly = state.chatMode === "chat";
-  const whole = buildSystemContent(state.currentModel?.id || "", effectiveConstitution(), { withTools: !chatOnly });
-  if (chatOnly) return { system: estimateTokens(whole), tools: 0 };
+function measurePromptSide(grindTurn = false) {
+  // 本轮不发工具目录（对话态 / 磨墨轮）时，估算口径必须跟着载荷一起缩，否则工具桶虚高一截
+  const noTools = state.chatMode === "chat" || grindTurn;
+  const whole = buildSystemContent(state.currentModel?.id || "", effectiveConstitution(), { withTools: !noTools, grindTurn });
+  if (noTools) return { system: estimateTokens(whole), tools: 0 };
   const tools = getToolsSystemPrompt({ compact: true });
   // 工具目录始终追加在系统提示词末尾，按长度差切出前段即可，无需依赖 endsWith
   const head = whole.slice(0, Math.max(0, whole.length - tools.length));
@@ -82,8 +82,8 @@ function measureHistory(messages) {
 }
 
 /** 返回 { total, limit, buckets:[{key,label,tokens}] }，buckets 按占用量降序。 */
-export function measureContext(messages = state.messages) {
-  const prompt = measurePromptSide();
+export function measureContext(messages = state.messages, opts = {}) {
+  const prompt = measurePromptSide(opts.grindTurn === true);
   const history = measureHistory(Array.isArray(messages) ? messages : []);
   const buckets = [
     { key: "system", label: "系统提示词", tokens: prompt.system },

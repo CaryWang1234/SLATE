@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import * as common from "../frontend/js/services/agent_common.js";
 // 版本串必须与 tools.js 里的 import 说明符同形：写成 store.js（无 ?v=）会载入第二个 store 实例，
 // 工具改的是那一份 state，守卫读的是这一份 → 永远假红/假绿
-import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20260926-002";
+import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20260926-003";
 
 const NEXT_OK = "Next: use this result to continue the task. Do not repeat the same tool call unless new parameters are needed.";
 const NEXT_FAIL = "Next: fix the parameters or choose a different tool. Do not repeat the identical failing call.";
@@ -40,7 +40,7 @@ const DESKTOP_HARNESS = `
 - 若刚完成文件修改/生成，优先验证：读取文件、运行检查/测试/构建或说明无法验证原因。
 - 若已完成并验证，回复首行写【任务完成】，再逐项列出交付内容与验证方式；不写该标记视为仍在推进。
 - 目标模式下：如有 TODOLIST，完成一批就 todo_manage(action=update)，全部 done/blocked 后再收尾。
-- 干完了就停：验证全部通过后调用 exit_target_mode 收口（summary 写交付+验证方式+结果），然后下一条回复给出最终汇报；未到验证阶段就不要调用它。
+- 收口按 [可用工具] 的「收口纪律」走：exit_target_mode（summary 写交付+验证方式+结果）→ 下一条回复首行【任务完成】；未到验证阶段不要调它。
 - 有 2 个工具失败：请换参数、换工具或先读取更多上下文，不要重复完全相同的失败调用。`;
 
 const DESKTOP_AUTOPILOT = `
@@ -51,7 +51,7 @@ const DESKTOP_AUTOPILOT = `
 - 若刚完成文件修改/生成，优先验证：读取文件、运行检查/测试/构建或说明无法验证原因。
 - 若已完成并验证，回复首行写【任务完成】，再逐项列出交付内容与验证方式；不写该标记视为仍在推进。
 - Autopilot 模式下：不要等用户说“继续”；任务未完成就继续观察、修改或验证。
-- 干完了就停：全部交付并逐项验证通过后，调用 exit_autopilot 收口，然后下一条回复给出最终汇报；不要用停发工具或只说“已完成”来结束循环。`;
+- 收口按 [可用工具] 的「收口纪律」走：exit_autopilot → 下一条回复首行【任务完成】。`;
 
 const MOBILE_FAILED = `
 \n[Agent Loop 指令]
@@ -227,6 +227,26 @@ assert.equal(effectiveToolMode("local", "openai", "chat"), "none");
   assert.match(TOOLS.exit_target_mode.description, /绝对不要调用/, "exit_target_mode 必须写明未验证不得调用");
   assert.match(TOOLS.exit_autopilot.description, /不改动目标模式开关/, "exit_autopilot 越权：描述要声明它不碰目标模式开关");
   assert.match(getToolsSystemPrompt(), /收口纪律/, "工具纪律里必须显式要求干完就收口");
+
+  // 收口协议只此一处定义（工具目录的「收口纪律」），章程与催办串只引用它、各自绑定本模式的工具。
+  // 以前四处各写一遍，已经漂出两处真错：章程承诺了一个根本不存在的轮次标签，
+  // 而模型可见的目录里从来没教过【任务完成】——完成判定认的偏偏就是这个标记。
+  const settleLine = /7\. 收口纪律[\s\S]*?\n\n/.exec(CATALOGUE)?.[0] || "";
+  assert.ok(settleLine.includes("【任务完成】"), "收口纪律必须把完成标记写给模型：不教它，模型只会停在「我干完了」那句自然语言上");
+  assert.ok(settleLine.includes("exit_target_mode") && settleLine.includes("exit_autopilot"),
+    "收口纪律要一次点名两种模式的收口工具：只说「停下」不说「调哪个」，模型无从显式退出");
+  const TOOLS_SRC = readFileSync(new URL("../frontend/js/services/tools.js", import.meta.url), "utf8");
+  const CHAT_SRC = readFileSync(new URL("../frontend/js/components/chat.js", import.meta.url), "utf8");
+  const COMMON_SRC = readFileSync(new URL("../frontend/js/services/agent_common.js", import.meta.url), "utf8");
+  assert.equal((TOOLS_SRC.match(/干完了就停/g) || []).length, 1,
+    "「干完了就停」只许出现在收口纪律一处：同一个规矩多一处复述就多一处能对不上");
+  assert.equal((CHAT_SRC.match(/收口协议：/g) || []).length, 0, "章程不再自带一套收口协议，只引用收口纪律");
+  assert.equal((CHAT_SRC.match(/「收口纪律」/g) || []).length, 2,
+    "chat.js 两处引用（目标模式章程 + Autopilot 章程）：引用一变回自带一套，两处就会各说各话");
+  assert.equal((CHAT_SRC.match(/「收口纪律」/g) || []).length, 2,
+    "chat.js 两处引用（目标模式章程 + Autopilot 章程）：引用一变回自带一套，两处就会各说各话");
+  assert.equal((COMMON_SRC.match(/「收口纪律」/g) || []).length, 2,
+    "两条轮内催办各引用一次收口纪律（目标模式 / Autopilot），不再自己重写一遍规矩");
 
   const prior = { ...(state.harness || {}) };
   state.harness = { enabled: false, maxRounds: HARNESS_MAX_ROUNDS };

@@ -5665,12 +5665,13 @@ textarea::-webkit-scrollbar-thumb {
   background: var(--bg);
 }
 
+/* 左侧导航 + 右侧单列；两处都是定义列宽的地方，只留这一份（窄屏折叠见下方 @media） */
 .settings-page {
   flex: 1;
   overflow-y: auto;
   padding: 18px;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  grid-template-columns: 184px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -9873,20 +9874,67 @@ img.file-type-icon {
   margin: 4px 0 8px;
 }
 
-/* ── 设置页：左侧锚点导航 + 单列内容 ─────────────── */
+/* ── 设置页：左侧搜索 + 锚点导航，右侧单列内容 ─────────────── */
+/* 导航条目由 app.js 从 .settings-block 现读生成，宽度按最长标题（数据备份与恢复）留足。 */
 
-.settings-page {
-  grid-template-columns: 168px minmax(0, 1fr);
-}
-
-.settings-nav {
+.settings-side {
   position: sticky;
   top: 0;
   align-self: start;
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  /* 21 条区块名比一屏高，侧栏自己滚，不然滚到底也点不到后面几项 */
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.settings-search {
+  position: relative;
+}
+
+.settings-search-input {
+  padding-right: 26px;
+}
+
+.settings-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-search-clear:hover {
+  color: var(--text);
+  background: var(--bg-alt);
+}
+
+/* 桌面样式没有全局 .hidden，这颗按钮的隐藏得自己写一条 */
+.settings-search-clear.hidden { display: none; }
+
+.settings-search-status {
+  min-height: 14px;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
   gap: 2px;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .settings-nav-item {
@@ -9898,6 +9946,9 @@ img.file-type-icon {
   border-radius: 0 var(--radius) var(--radius) 0;
   letter-spacing: 0.5px;
   cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: color var(--transition), background-color var(--transition);
 }
 
@@ -9914,6 +9965,7 @@ img.file-type-icon {
 }
 
 .settings-main {
+  --settings-control-w: 460px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -9924,12 +9976,79 @@ img.file-type-icon {
   scroll-margin-top: 8px;
 }
 
+/* 搜索没命中的区块整块收起：留白比一堆灰掉的条目好读 */
+.settings-block.settings-hidden { display: none; }
+
+/* 命中的那一行描边+底色，用 inset 阴影改外观不改尺寸，逐字输入时内容不跳 */
+.settings-main .settings-search-hit {
+  background: var(--bg-alt);
+  box-shadow: inset 3px 0 0 var(--gold), 0 0 0 1px var(--border);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* 控件宽度统一：同一个概念以前在有的区块铺满整行、有的只占 240px */
+.settings-main .setting-group > .setting-input {
+  max-width: var(--settings-control-w);
+}
+
+.settings-main .setting-group > .setting-input[type="number"] {
+  max-width: 148px;
+}
+
+.settings-main .setting-group > .setting-textarea {
+  max-width: calc(var(--settings-control-w) * 2 + 10px);
+}
+
+/* 「同时最多跑几场」这类「说明—下拉」行：整行限宽，下拉靠右自成一线 */
+.settings-block .setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: var(--settings-control-w);
+  margin: 0 0 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-block .setting-row .setting-input {
+  width: auto;
+  min-width: 150px;
+  max-width: 200px;
+}
+
+.settings-block .setting-hint {
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+/* 居中排的一行里不要额外顶开基线 */
+.settings-block .about-row .setting-hint {
+  margin-top: 0;
+}
+
+.settings-block .setting-hint.is-lead {
+  margin-bottom: 6px;
+}
+
+.settings-block .setting-label.is-inline {
+  margin-bottom: 0;
+}
+
 @media (max-width: 760px) {
   .settings-page {
     grid-template-columns: 1fr;
   }
-  .settings-nav {
+  .settings-side {
     position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+  .settings-search {
+    max-width: 320px;
+  }
+  .settings-nav {
     flex-direction: row;
     flex-wrap: wrap;
   }
@@ -9937,6 +10056,7 @@ img.file-type-icon {
     border-left: none;
     border-bottom: 2px solid transparent;
     border-radius: var(--radius);
+    white-space: normal;
   }
   .settings-nav-item.active {
     border-left: none;

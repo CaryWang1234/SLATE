@@ -2,34 +2,34 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode } from "./store.js?v=20260926-002";
-import { initI18n, t } from "./services/i18n.js?v=20260926-002";
-import { iconSvgEl } from "./services/icons.js?v=20260926-002";
-import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260926-002";
-import { get, post, put } from "./services/api.js?v=20260926-002";
-import { dlgConfirm } from "./services/dialog.js?v=20260926-002";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260926-002";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260926-002";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260926-002";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260926-002";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260926-002";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260926-002";
-import { initTeamPanel } from "./components/team.js?v=20260926-002";
-import { initProjectBar } from "./components/project_bar.js?v=20260926-002";
-import { initSessionSummary } from "./components/session_summary.js?v=20260926-002";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260926-002";
-import { initTypingGame } from "./components/typing_game.js?v=20260926-002";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260926-002";
-import { initMemoryPanel } from "./components/memory.js?v=20260926-002";
-import { initExpertsPanel } from "./components/experts.js?v=20260926-002";
-import { initSchedule } from "./components/schedule.js?v=20260926-002";
-import { initRiskGuard } from "./services/riskguard.js?v=20260926-002";
-import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20260926-002";
-import { initUnderstandPanel } from "./components/understand.js?v=20260926-002";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260926-002";
-import { setProject, setProjectFileTree } from "./store.js?v=20260926-002";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260926-002";
-import { installErrorSink } from "./services/error_sink.js?v=20260926-002";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode } from "./store.js?v=20260926-003";
+import { initI18n, t } from "./services/i18n.js?v=20260926-003";
+import { iconSvgEl } from "./services/icons.js?v=20260926-003";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260926-003";
+import { get, post, put } from "./services/api.js?v=20260926-003";
+import { dlgConfirm } from "./services/dialog.js?v=20260926-003";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260926-003";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260926-003";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260926-003";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260926-003";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260926-003";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260926-003";
+import { initTeamPanel } from "./components/team.js?v=20260926-003";
+import { initProjectBar } from "./components/project_bar.js?v=20260926-003";
+import { initSessionSummary } from "./components/session_summary.js?v=20260926-003";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260926-003";
+import { initTypingGame } from "./components/typing_game.js?v=20260926-003";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260926-003";
+import { initMemoryPanel } from "./components/memory.js?v=20260926-003";
+import { initExpertsPanel } from "./components/experts.js?v=20260926-003";
+import { initSchedule } from "./components/schedule.js?v=20260926-003";
+import { initRiskGuard } from "./services/riskguard.js?v=20260926-003";
+import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20260926-003";
+import { initUnderstandPanel } from "./components/understand.js?v=20260926-003";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260926-003";
+import { setProject, setProjectFileTree } from "./store.js?v=20260926-003";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260926-003";
+import { installErrorSink } from "./services/error_sink.js?v=20260926-003";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -645,37 +645,150 @@ function openSettings(options = {}) {
 
 function closeSettings() { switchPanel("chat"); }
 
-// ── 设置页：左侧锚点导航（点击滚动 + 滚动高亮）──────────────
+// ── 设置页：左侧导航（区块现读生成）+ 搜索 ──────────────
+// 条目从 .settings-block 现读：以前手写清单漏过三块（后台任务、多任务与项目、MCP Server），
+// 只要区块与导航不同源，「左栏收录全部条目」就没有保障。搜索过滤时同一份索引负责重建。
+
+const SETTINGS_BLOCK_SEL = "#panel-settings .settings-main .settings-block";
+// 命中标记的粒度：一行设置。外层 .setting-section 只包住命中行时不重复描框。
+const SETTINGS_ROW_SEL = ".setting-group, .setting-section, .setting-check, .about-row, "
+  + ".permission-mode-row, .web-search-mode-row, .custom-model-row, .key-mgmt-row, "
+  + ".ai-feature-row, .skill-item, .mcp-server-item";
+
+/** @type {{id: string, el: HTMLElement, title: string, nav: HTMLElement|null, visible: boolean}[]} */
+let settingsSections = [];
+let settingsPageEl = null;
+
+function normSettingsText(s) {
+  return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** 区块标题：取 h2 的首个非空文本节点，「实验性」这类徽标不跟着进导航 */
+function settingsBlockTitle(block) {
+  const h2 = block.querySelector(".settings-block-head h2");
+  if (!h2) return block.id;
+  for (const n of h2.childNodes) {
+    if (n.nodeType === Node.TEXT_NODE && n.textContent.trim()) return n.textContent.trim();
+  }
+  return (h2.textContent || "").trim();
+}
+
+/** 可搜文本：可见文字（含 option 文本）+ 只存在于属性里的 placeholder / title */
+function settingsHaystack(el) {
+  let s = el.textContent || "";
+  for (const node of el.querySelectorAll("[placeholder], [title]")) {
+    s += " " + (node.getAttribute("placeholder") || "") + " " + (node.getAttribute("title") || "");
+  }
+  return normSettingsText(s);
+}
+
+function renderSettingsNav() {
+  const nav = document.getElementById("settings-nav");
+  if (!nav) return;
+  nav.textContent = "";
+  for (const sec of settingsSections) {
+    if (!sec.visible) continue;
+    const a = document.createElement("a");
+    a.className = "settings-nav-item";
+    a.dataset.target = sec.id;
+    a.textContent = sec.title;
+    a.title = sec.title;
+    a.addEventListener("click", () => {
+      sec.el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    nav.appendChild(a);
+    sec.nav = a;
+  }
+}
+
+/** 滚动高亮：取顶边已越过容器顶部 24px 线的最后一个可见区块（被搜掉的区块不参与） */
+function syncSettingsNavHighlight() {
+  if (!settingsPageEl) return;
+  const visible = settingsSections.filter(s => s.visible);
+  if (!visible.length) return;
+  const pageTop = settingsPageEl.getBoundingClientRect().top;
+  let active = visible[0];
+  for (const sec of visible) {
+    if (sec.el.getBoundingClientRect().top - pageTop <= 24) active = sec;
+  }
+  for (const sec of visible) {
+    sec.nav?.classList.toggle("active", sec === active);
+  }
+}
+
+function applySettingsFilter(query) {
+  const q = normSettingsText(query);
+  let matched = 0;
+  for (const sec of settingsSections) {
+    const rows = [...sec.el.querySelectorAll(SETTINGS_ROW_SEL)];
+    let hitRow = null;
+    for (const row of rows) {
+      // 折叠起来的编辑器/详情没有渲染，标了也看不见，索性不标
+      const on = !!q && row.offsetParent !== null && settingsHaystack(row).includes(q);
+      row.classList.toggle("settings-search-hit", on);
+      if (on && !hitRow) hitRow = row;
+    }
+    // 命中的是内层行时，去掉包住它的外层描边，避免一个开关套两层框
+    if (hitRow) {
+      for (const row of sec.el.querySelectorAll(".settings-search-hit")) {
+        if (row !== hitRow && row.contains(hitRow)) row.classList.remove("settings-search-hit");
+      }
+    }
+    // 标题/说明命中而整块没有单独成行的内容（如「用量统计」）时，整块留下但不描框
+    sec.visible = !q || settingsHaystack(sec.el).includes(q);
+    sec.el.classList.toggle("settings-hidden", !sec.visible);
+    if (sec.visible) matched += 1;
+  }
+  renderSettingsNav();
+  const status = document.getElementById("settings-search-status");
+  if (status) {
+    status.textContent = !q ? t("共 {n} 组设置", { n: settingsSections.length })
+      : matched ? t("匹配到 {n} 组设置", { n: matched }) : t("没有匹配的设置项");
+  }
+  document.getElementById("btn-settings-search-clear")?.classList.toggle("hidden", !q);
+  syncSettingsNavHighlight();
+  return matched;
+}
+
+function initSettingsSearch() {
+  const input = document.getElementById("settings-search");
+  if (!input) return;
+  // i18n 遍历刻意跳过 input，占位符得自己翻，否则英文界面留着中文
+  input.placeholder = t("搜索设置项");
+  const firstTarget = () => settingsSections.find(s => s.visible && s.el.querySelector(".settings-search-hit"))
+    || settingsSections.find(s => s.visible);
+  input.addEventListener("input", () => applySettingsFilter(input.value));
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { input.value = ""; applySettingsFilter(""); return; }
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const sec = firstTarget();
+    if (!sec) return;
+    sec.el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const hit = sec.el.querySelector(".settings-search-hit");
+    const control = hit?.querySelector("input, select, textarea, button");
+    control?.focus({ preventScroll: true });
+  });
+  document.getElementById("btn-settings-search-clear")?.addEventListener("click", () => {
+    input.value = "";
+    applySettingsFilter("");
+    input.focus();
+  });
+}
 
 function initSettingsNav() {
-  const page = document.querySelector(".settings-page");
+  settingsPageEl = document.querySelector(".settings-page");
   const nav = document.getElementById("settings-nav");
-  if (!page || !nav) return;
-  const items = [...nav.querySelectorAll(".settings-nav-item")];
-  if (!items.length) return;
-
-  items.forEach(item => {
-    item.addEventListener("click", (e) => {
-      e.preventDefault();
-      document.getElementById(item.dataset.target)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  });
-
-  // 高亮规则：取顶边已越过容器顶部 24px 线的最后一个区块
-  const onScroll = () => {
-
-    const top = page.getBoundingClientRect().top;
-    let activeId = items[0].dataset.target;
-    for (const item of items) {
-      const block = document.getElementById(item.dataset.target);
-      if (block && block.getBoundingClientRect().top - top <= 24) activeId = item.dataset.target;
-    }
-    items.forEach(item => item.classList.toggle("active", item.dataset.target === activeId));
-  };
-  page.addEventListener("scroll", onScroll, { passive: true });
-  // 设置页的滚动位置跨次打开是保留的：不在打开时对一次，高亮会停在 HTML 里写死的第一项，
+  if (!settingsPageEl || !nav) return;
+  settingsSections = [...document.querySelectorAll(SETTINGS_BLOCK_SEL)]
+    .filter(el => el.id)
+    .map(el => ({ id: el.id, el, title: settingsBlockTitle(el), nav: null, visible: true }));
+  initSettingsSearch();
+  applySettingsFilter("");   // 空查询即"全量"：生成条目 + 状态行都从这里出发
+  // 设置页的滚动位置跨次打开是保留的：不在打开时对一次，高亮会停在列表第一项，
   // 指着「模型配置」却其实在看「备份」——不滚一下就不会自己纠正。
-  resyncSettingsNav = () => requestAnimationFrame(onScroll);
+  settingsPageEl.addEventListener("scroll", syncSettingsNavHighlight, { passive: true });
+  resyncSettingsNav = () => requestAnimationFrame(syncSettingsNavHighlight);
   resyncSettingsNav();
 }
 
@@ -1228,7 +1341,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260926-002").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260926-003").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1673,7 +1786,7 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     open.title = t("切到该项目");
     open.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { switchToProject } = await import("./services/project_scene.js?v=20260926-002");
+      const { switchToProject } = await import("./services/project_scene.js?v=20260926-003");
       const out = await switchToProject(projectId);
       if (!out.ok) toast(out.reason || t("切换失败"));
       await refreshCodexHistory();
@@ -1688,8 +1801,8 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     pin.setAttribute("aria-pressed", entry?.pinned ? "true" : "false");
     pin.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { patchRegistry } = await import("./services/project.js?v=20260926-002");
-      const { refreshRegistry } = await import("./services/project_scene.js?v=20260926-002");
+      const { patchRegistry } = await import("./services/project.js?v=20260926-003");
+      const { refreshRegistry } = await import("./services/project_scene.js?v=20260926-003");
       await patchRegistry(projectId, { pinned: !(entry?.pinned) });
       await refreshRegistry();
       renderCodexHistory();
@@ -1894,7 +2007,7 @@ async function saveSettings() {
     if (constData) {
       if (state.project) {
         // 打开着项目就写进项目（.slate/config.json，跟着仓库走），全局版本保持不动
-        const { updateProjectConfig } = await import("./services/project.js?v=20260926-002");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260926-003");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -2144,11 +2257,11 @@ async function init() {
   // lastProjectPath 退成第二道：老数据第一次升级到带注册表的版本时，册子是空的，
   // 拿它补登一次，用户不会感到"项目不见了"。
   try {
-    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20260926-002");
+    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20260926-003");
     const res = await getCurrentProject();
     let project = res.code === 0 ? res.data : null;
     if (!project && state._lastProjectPath) {
-      const { openProject } = await import("./services/project.js?v=20260926-002");
+      const { openProject } = await import("./services/project.js?v=20260926-003");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) project = openRes.data;
     }

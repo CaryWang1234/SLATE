@@ -1964,5 +1964,11 @@ export const EN_DICT = {
   "差异不可用": "Diff unavailable",
   "差异读取失败": "Failed to load diff",
   "没有可显示的差异": "Nothing to show",
+  // ── 设置页：左栏搜索与导航（app.js 生成条目 + index.html 新区块） ──
+  "搜索设置项": "Search settings",
+  "清除": "Clear",
+  "共 {n} 组设置": "{n} sections",
+  "匹配到 {n} 组设置": "Matched {n} sections",
+  "没有匹配的设置项": "No matching settings",
 
 };

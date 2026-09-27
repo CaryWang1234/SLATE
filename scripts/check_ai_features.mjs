@@ -188,7 +188,9 @@ ok("唯一写入口：改完就落盘并通知订阅者",
 // ── 5. 设置界面 ──────────────────────────────
 
 ok("设置页有独立区块", has(HTML, 'id="settings-ai-features"'));
-ok("区块有锚点导航项", has(HTML, 'data-target="settings-ai-features"'));
+// 左栏条目由 app.js 从区块现读生成（手写清单漏过三块），所以这里钉的是「区块本身在」
+ok("区块在 .settings-main 里（左栏靠它生成条目）",
+  has(HTML, '<section class="settings-block" id="settings-ai-features">'));
 ok("行由 JS 渲染进容器（一张表一处渲染，不手抄 13 遍 DOM）",
   has(HTML, 'id="ai-feature-list"') && /export function renderAiFeatureSettings/.test(SERVICE));
 ok("每行是复选框 + 模型下拉",

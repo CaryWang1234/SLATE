@@ -3,7 +3,7 @@
  * 提示词注入、墨迹解析、墨稿检测与三个动作（送入目标 / 投到白板 / 存为模板）。
  */
 
-import { get, post, del, patch } from "./api.js?v=20260926-002";
+import { get, post, del, patch } from "./api.js?v=20260926-003";
 
 const MAX_ROUNDS = 10;
 
@@ -12,9 +12,14 @@ const COLLECT_RE = /^(收墨|够了|就这样|可以了|出墨稿|结束磨墨)\
 
 // ── 提示词 ─────────────────────────────────
 
+// 磨墨全程（含每一轮追问与收墨）都是"只研磨不施工"：这条不能只挂在接墨那一条上，
+// 否则第 2 轮起就只剩「继续研磨」，加上可用的工具与 Autopilot 章程，模型会自己开工。
+const NO_EXEC = "只研磨不施工：这一阶段不调用任何工具、不要改文件、不要跑命令、不开始实现；产出只有追问、墨迹状态与（收墨时）墨稿";
+
 const RULES = [
   "追问纪律：每条回复只问一个缺口；能给 A/B 选项就给选项（选项简短、互斥），尽量少问开放式问题",
   "不要寒暄、不要重复已确认内容、不要一次问多个问题",
+  NO_EXEC,
   "用户回复「收墨 / 够了 / 就这样」或信息已足够时，立即进入收墨输出墨稿",
 ].join("\n");
 
@@ -43,6 +48,7 @@ function grindRoundPrompt(session) {
   const round = session.round;
   return `[磨墨模式 · 磨墨 · ${round}/${MAX_ROUNDS} 轮]
 继续研磨：只问下一个最重要的缺口，选择题优先。${round >= MAX_ROUNDS ? "已达追问上限，本轮直接收墨输出墨稿。" : `还剩 ${MAX_ROUNDS - round} 轮，若信息已足够可提前收墨。`}
+${NO_EXEC}
 ${STATUS_FORMAT}
 ${DRAFT_FORMAT}`;
 }
@@ -50,6 +56,7 @@ ${DRAFT_FORMAT}`;
 function collectingPrompt() {
   return `[磨墨模式 · 收墨]
 停止追问。基于以上所有对话信息，输出最终墨稿：先用 1-2 句总结共识，再给出完整 JSON。未知项放入 open_questions。
+${NO_EXEC}要动工请等用户点「送入目标模式」。
 ${DRAFT_FORMAT}`;
 }
 
