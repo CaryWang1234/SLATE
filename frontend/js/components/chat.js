@@ -84,6 +84,38 @@ const CHAT_DRAFT_KEY = "slate_chat_draft";
 // 用户向上滚动浏览历史时不强制拉到底部，仅在处于底部时跟随
 let stickToBottom = true;
 
+// ── 线程重绘台账 ─────────────────────────────
+// 整表重建把"加一条消息"变成 O(全部消息) 的活儿：300 条的现场实测一次追加 180ms，
+// 一回合要通知三次，会话越长越卡。这里记下每个落点画过什么（消息 + 签名 + 节点），
+// 下次只重画签名变了的那一条、末尾多退少补；对不上号（换了一场、搬过树、画过欢迎页）
+// 就退回整棵重建，与今天的行为一致。
+const threadViews = new WeakMap();   // host → { items: [{ msg, sig, el }], blank }
+
+function blankView() {
+  return { items: [], blank: true };
+}
+
+// 签名只取"会画出不同东西"的字段，每一项都是 O(1) 读。
+// 刻意不含 msg.id：id 是持久化回来才补上的，而它只决定"编辑/删除按钮有没有"，
+// 那件事由 syncMsgActionButtons 就地补建——把 id 写进签名等于每条气泡在 id 落地后
+// 白白重画一次（顺带丢掉思考面板与卡片展开态）。跨场不是问题：比对时还要求是同一只
+// 消息对象，从后端重新读回来的那份是另一只对象，走整段重画。
+function renderSignature(msg) {
+  const results = Array.isArray(msg.toolResults) ? msg.toolResults.length
+    : (Array.isArray(msg.metadata?.toolResults) ? msg.metadata.toolResults.length : 0);
+  const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls.length
+    : (Array.isArray(msg.metadata?.toolCalls) ? msg.metadata.toolCalls.length : 0);
+  return [
+    msg.role ?? "", msg.model ?? "",
+    isHiddenContextMessage(msg) ? 1 : 0,
+    typeof msg.content === "string" ? msg.content.length : "",
+    typeof msg.display === "string" ? msg.display.length : "-",
+    calls, results,
+    Array.isArray(msg.files) ? msg.files.length : 0,
+    msg.roundSummary?.runId ?? "", msg.truncated ? 1 : 0,
+  ].join("|");
+}
+
 function cleanupStaleToolMarkers() {
   const lastMsg = state.messages[state.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return;
@@ -130,6 +162,9 @@ function stashRunThread(run) {
   const off = offHostOf(run);
   off.innerHTML = "";
   while (chatScroll.firstChild) off.appendChild(chatScroll.firstChild);
+  // 节点是整批搬走的：台账得跟着走，否则屏幕那侧会以为这些消息还画着而一条都不补
+  threadViews.set(off, threadViews.get(chatScroll) || blankView());
+  threadViews.set(chatScroll, blankView());
 }
 
 // 搬回屏幕：返回 true 表示屏幕已经是这一场的现场（不必再从消息数组重渲染）
@@ -137,6 +172,8 @@ function adoptRunThread(run) {
   if (!run?.off || !chatScroll || !run.off.childElementCount) return false;
   chatScroll.innerHTML = "";
   while (run.off.firstChild) chatScroll.appendChild(run.off.firstChild);
+  threadViews.set(chatScroll, threadViews.get(run.off) || blankView());
+  threadViews.set(run.off, blankView());
   run.off = null;
   return true;
 }
@@ -1424,35 +1461,57 @@ function syncMsgActionButtons(convId = state.currentConversationId) {
   });
 }
 
-function renderAllMessages() {
-  renderThreadInto(chatScroll, state.messages);
+function renderAllMessages(options = {}) {
+  renderThreadInto(chatScroll, state.messages, options);
 }
 
 // 把一份消息数组画进指定的落点（屏幕或某场后台生成的游离节点）
-function renderThreadInto(host, msgs) {
+function renderThreadInto(host, msgs, options = {}) {
   if (!host) return;
   const live = host === chatScroll;
-  host.innerHTML = "";
   const list = Array.isArray(msgs) ? msgs : [];
+  const visible = [];
+  for (let i = 0; i < list.length; i++) {
+    if (!isHiddenContextMessage(list[i])) visible.push({ msg: list[i], index: i });
+  }
   // 无可见消息时展示欢迎页（替代 :empty 占位提示）
-  const hasVisible = list.some(m => !isHiddenContextMessage(m));
-
-  if (!hasVisible) {
+  if (!visible.length) {
+    host.innerHTML = "";
+    threadViews.set(host, blankView());
     if (live) {
       host.appendChild(buildWelcomeEl());
       requestAnimationFrame(() => cxEmptyIn());
     }
     return;
   }
+
+  let view = options.force ? null : threadViews.get(host);
+  if (!view || view.blank) {
+    // 上一轮画的是欢迎页／别场的现场，或调用方点名整棵重绘：清干净从头画
+    host.innerHTML = "";
+    view = { items: [], blank: false };
+  }
   // 项目 chip 是全站共用的那一个节点：挂到后台那场的游离树上，等于从屏幕上把它搬走
-  if (live && convProjectEl) {
-    host.appendChild(convProjectEl);
+  if (live && convProjectEl && convProjectEl.parentNode !== host) {
+    if (host.firstChild) host.insertBefore(convProjectEl, host.firstChild);
+    else host.appendChild(convProjectEl);
     updateConvProjectBadge();
   }
-  list.forEach((msg, i) => {
-    if (isHiddenContextMessage(msg)) return;
-    host.appendChild(renderMessage(msg, i));
-  });
+
+  // 逐位比对：还是那只消息对象、签名也没变，才留用原节点；从第一处对不上的位置起重画
+  const items = view.items;
+  let k = 0;
+  while (k < items.length && k < visible.length
+    && items[k].msg === visible[k].msg && items[k].sig === renderSignature(visible[k].msg)) k++;
+  for (let i = items.length - 1; i >= k; i--) items[i].el.remove();
+  items.length = k;
+  for (let i = k; i < visible.length; i++) {
+    const msg = visible[i].msg;
+    const el = renderMessage(msg, visible[i].index);
+    host.appendChild(el);
+    items.push({ msg, sig: renderSignature(msg), el });
+  }
+  threadViews.set(host, view);
   if (live) {
     stickToBottom = true;
     host.scrollTop = host.scrollHeight;
@@ -1525,6 +1584,30 @@ function renderAssistantContent(contentEl, content, cursor = null) {
   if (cursor) contentEl.appendChild(cursor);
   contentEl.querySelectorAll("pre code").forEach(b => { if (window.hljs) hljs.highlightElement(b); });
   attachCodeCopyButtons(contentEl);
+}
+
+// 流式合帧：上游每吐 8～20 字就重排整条气泡（全文重解析 markdown + 高亮 + 重建复制按钮），
+// 实测一条 5638 字的回复写 1411 次 DOM、4.6 秒里 3.9 秒是不可输入的长任务。改成最多每
+// STREAM_PAINT_MS 重排一次，画的是"最后到达的那一版"；收尾必须 flush，否则末块的字会丢。
+const STREAM_PAINT_MS = 60;
+
+function createStreamPainter(paint) {
+  let timer = 0, pending = false, last = -Infinity;
+  const run = () => { timer = 0; pending = false; last = performance.now(); paint(); };
+  return {
+    kick() {
+      pending = true;
+      if (timer) return;
+      const wait = STREAM_PAINT_MS - (performance.now() - last);
+      if (wait <= 0) run();
+      else timer = setTimeout(run, wait);
+    },
+    flush() {
+      if (timer) { clearTimeout(timer); timer = 0; }
+      if (pending) run();
+      pending = false;
+    },
+  };
 }
 
 const REASONING_MARKER_RE = /\x00?\x01R\x01\x00?/g;
@@ -3086,6 +3169,10 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
     const cursor = msgEl ? addStreamingCursor(msgEl) : null;
     const contMeta = {};
     let part = "";
+    const paintCont = createStreamPainter(() => {
+      if (contentEl) renderAssistantContent(contentEl, content + part, cursor);
+      autoScrollIn(msgEl?.parentElement || chatScroll);
+    });
     try {
       for await (const chunk of streamChat({ model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, messages, api_key: apiKey, base_url: baseUrl, temperature: params?.temperature ?? 0.7, max_tokens: params?.max_tokens ?? getOutputMaxTokens(), reasoning_effort: state.reasoningEffort || "auto", stream: true, signal, meta: contMeta, ...(toolMode === "native" ? { tools: buildOpenAITools() } : {}) }, { onToolCall: (calls) => { out.toolCalls = calls; ink?.onCalls(calls); } })) {
         appendStreamChunk(chunk, {
@@ -3095,18 +3182,19 @@ async function continueTruncatedOutput(msgEl, content, modelId, apiKey, baseUrl,
           content(text) {
             part += text;
             markActivity(convId);
-            if (contentEl) renderAssistantContent(contentEl, content + part, cursor);
+            paintCont.kick();
             ink?.onTextContent(content + part);
-            autoScrollIn(msgEl?.parentElement || chatScroll);
           },
         });
       }
       fr = contMeta.finishReason || "";
     } catch (err) {
+      paintCont.flush();
       if (cursor) removeStreamingCursor(cursor);
       if (!isAbortError(err)) { console.warn("自动续写失败:", err); reportError(err, "自动续写"); }
       break;
     }
+    paintCont.flush();
     if (cursor) removeStreamingCursor(cursor);
     if (!part.trim()) break; // 模型零输出，再试也无意义
     content += stripOverlap(content, part);
@@ -3842,6 +3930,14 @@ const desktopIo = {
     let followThinkingPanel = null;
     const followMeta = {};
     const ink = attachInkstream(followEl);
+    const paintFollow = createStreamPainter(() => {
+      renderAssistantContent(followContent, followContent2, cursor);
+      autoScrollIn(threadHostOf(deskRun));
+    });
+    const paintFollowReason = createStreamPainter(() => {
+      if (followThinkingPanel) updateThinkingPanel(followThinkingPanel, followReasoningText);
+      autoScrollIn(threadHostOf(deskRun));
+    });
     try {
       await streamWithNativeFallback({ history, model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, api_key: apiKey, base_url: baseUrl, temperature: params.temperature ?? 0.7, max_tokens: params.max_tokens ?? getOutputMaxTokens(), signal, meta: followMeta, onToolCall: (calls) => { nativeCalls.length = 0; nativeCalls.push(...calls); ink.onCalls(calls); } }, (chunk) => {
         appendStreamChunk(chunk, {
@@ -3849,15 +3945,13 @@ const desktopIo = {
             followReasoningText += text;
             markActivity(genConvId);
             if (!followThinkingPanel) followThinkingPanel = createThinkingPanel(followEl);
-            updateThinkingPanel(followThinkingPanel, followReasoningText);
-            autoScrollIn(threadHostOf(deskRun));
+            paintFollowReason.kick();
           },
           content(text) {
             followContent2 += text;
             markActivity(genConvId);
-            renderAssistantContent(followContent, followContent2, cursor);
+            paintFollow.kick();
             ink.onTextContent(followContent2);
-            autoScrollIn(threadHostOf(deskRun));
           },
         });
       });
@@ -3870,6 +3964,8 @@ const desktopIo = {
       if (!isAbortError(err)) reportError(err, "工具后续轮");
     }
 
+    paintFollow.flush();
+    paintFollowReason.flush();
     removeStreamingCursor(cursor);
     const contOut = {};
     if (!signal?.aborted && (hasTruncatedTail(followContent2) || followMeta.finishReason === "length")) {
@@ -4271,6 +4367,14 @@ async function sendMessage(queuedPayload = null, opts = {}) {
   let thinkingPanel = null;
   const streamMeta = {};
   const ink0 = attachInkstream(msgEl);
+  const paintText = createStreamPainter(() => {
+    renderAssistantContent(msgEl.querySelector(".msg-content"), fullContent, cursor);
+    autoScrollIn(threadHostOf(run));
+  });
+  const paintReason = createStreamPainter(() => {
+    if (thinkingPanel) updateThinkingPanel(thinkingPanel, reasoningText);
+    autoScrollIn(threadHostOf(run));
+  });
   try {
     await streamWithNativeFallback({ history: historyForAdapter, model: modelId, provider: state.currentModel?.provider, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, use_responses: state.useResponses, signal, meta: streamMeta, grindTurn: grindTurnOn, onToolCall: (calls) => { nativeCalls0.length = 0; nativeCalls0.push(...calls); ink0.onCalls(calls); } }, (chunk) => {
       // 检测 reasoning 前缀，分离思考内容
@@ -4279,16 +4383,13 @@ async function sendMessage(queuedPayload = null, opts = {}) {
           reasoningText += text;
           markActivity(genConvId);
           if (!thinkingPanel) thinkingPanel = createThinkingPanel(msgEl);
-          updateThinkingPanel(thinkingPanel, reasoningText);
-          autoScrollIn(threadHostOf(run));
+          paintReason.kick();
         },
         content(text) {
           fullContent += text;
           markActivity(genConvId);
-          const contentEl = msgEl.querySelector(".msg-content");
-          renderAssistantContent(contentEl, fullContent, cursor);
+          paintText.kick();
           ink0.onTextContent(fullContent);
-          autoScrollIn(threadHostOf(run));
         },
       });
     });
@@ -4303,6 +4404,9 @@ async function sendMessage(queuedPayload = null, opts = {}) {
       : t("请求失败: {msg}", { msg: err.message });
   }
 
+  // 先把在途的那一帧画完再摘光标：否则延时的重排会把已经摘掉的光标又append回去
+  paintText.flush();
+  paintReason.flush();
   removeStreamingCursor(cursor);
 
   // 提前收流（无 [DONE]、无 finish_reason）记在消息上：收尾时必须如实报出来，不能静默收场
@@ -5246,7 +5350,7 @@ async function switchConversation(convId) {
       if (ink) lastInkStatus = ink;
     }
     renderGrindPanel();
-    renderAllMessages(); // 重新渲染以应用墨痕样式与墨稿按钮
+    renderAllMessages({ force: true }); // 墨痕样式与墨稿按钮读的是解析结果，签名没变也要重画
   } else {
     hideGrindPanel();
   }
@@ -5610,6 +5714,14 @@ async function regenerateMessage(msg, msgEl) {
   let regenLoop = null;
   let streamFailed = false;
   const inkR = attachInkstream(msgEl);
+  const paintRegen = createStreamPainter(() => {
+    renderAssistantContent(contentEl, fullContent, cursor);
+    autoScroll();
+  });
+  const paintRegenReason = createStreamPainter(() => {
+    if (thinkingPanel) updateThinkingPanel(thinkingPanel, reasoningText);
+    autoScroll();
+  });
   try {
     await streamWithNativeFallback({ history, model: modelId, provider: (findModelById(modelId) || state.currentModel)?.provider, api_key: apiKey, base_url: baseUrl, temperature: params.temperature, max_tokens: params.max_tokens, signal, meta: regenMeta, grindTurn: grindGuardOn(regenConvId), onToolCall: (calls) => { regenNativeCalls.length = 0; regenNativeCalls.push(...calls); inkR.onCalls(calls); } }, (chunk) => {
       appendStreamChunk(chunk, {
@@ -5617,15 +5729,13 @@ async function regenerateMessage(msg, msgEl) {
           reasoningText += text;
           markActivity();
           if (!thinkingPanel) thinkingPanel = createThinkingPanel(msgEl);
-          updateThinkingPanel(thinkingPanel, reasoningText);
-          autoScroll();
+          paintRegenReason.kick();
         },
         content(text) {
           fullContent += text;
           markActivity();
-          renderAssistantContent(contentEl, fullContent, cursor);
+          paintRegen.kick();
           inkR.onTextContent(fullContent);
-          autoScroll();
         },
       });
     });
@@ -5638,6 +5748,8 @@ async function regenerateMessage(msg, msgEl) {
       ? (fullContent ? `${fullContent}\n\n[已停止]` : "已停止")
       : t("请求失败: {msg}", { msg: err.message });
   }
+  paintRegen.flush();
+  paintRegenReason.flush();
   removeStreamingCursor(cursor);
 
   try {
