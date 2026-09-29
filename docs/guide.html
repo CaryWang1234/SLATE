@@ -443,6 +443,7 @@
           <div class="lang-zh">
             <p><strong>方式一：安装包（推荐）</strong></p>
             <p>前往 <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank">GitHub Releases</a> 下载 <code>SLATE-Setup-x.x.x.exe</code>，双击安装即可。</p>
+            <p>装好后点窗口右上角的 X 不会结束应用：SLATE 缩进系统通知区域继续跑，正在生成的那一轮照常收工，手机端的局域网连接也不掉。双击托盘图标（或右键「显示主窗口」）找回窗口，右键「退出 SLATE」才真的退出，第一次缩下去会弹一条气泡提示。托盘只用 Windows 原生 API 实现，不引入第三方依赖；非 Windows、或这个登录会话根本没有通知区域时，关窗退回原来的直接退出。</p>
             <p><strong>方式二：源码运行</strong></p>
             <pre>git clone https://github.com/CaryWang1234/SLATE.git
 cd SLATE
@@ -459,6 +460,7 @@ python desktop.py</pre>
           <div class="lang-en">
             <p><strong>Option A: Installer (Recommended)</strong></p>
             <p>Download <code>SLATE-Setup-x.x.x.exe</code> from <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank">GitHub Releases</a> and run the installer.</p>
+            <p>On Windows, clicking X does not quit the app: SLATE hides into the notification area and keeps serving, so the turn that is generating finishes and LAN clients stay connected. Double-click the tray icon (or right-click → "Show window") to bring the window back; only "Quit SLATE" actually exits, and the first time it hides a balloon tells you where it went. The tray uses Windows native APIs only and adds no third-party dependency; off Windows, or in a logon session with no notification area, closing the window exits exactly as before.</p>
             <p><strong>Option B: From Source</strong></p>
             <pre>git clone https://github.com/CaryWang1234/SLATE.git
 cd SLATE
@@ -494,7 +496,7 @@ python desktop.py</pre>
             <div class="ink-note"><strong>快捷键：</strong>Enter 发送 · Shift+Enter 换行 · Ctrl+N 新建对话</div>
             <div class="ink-note"><strong>＋ 模式菜单：</strong>输入框左侧的 <strong>＋</strong> 按钮集中了模式入口 —— 磨墨 / 头脑风暴 / 目标模式 / 定时任务，以及「提及」分组（技能 / 工具 / MCP / 文件），点击行即可启动对应模式或弹出对应候选列表。</div>
             <div class="ink-note"><strong>思考强度滑杆：</strong>点输入框左侧的档位胶囊弹出滑杆，刻度只列当前模型支持的档位（自动 / 关 / 低 / 中 / 高），每档下方以小字标注对应墨色（随墨 / 清墨 / 淡墨 / 浓墨 / 焦墨），拖动时只预览、松手才生效并落盘。刻度不是照抄一份固定表：SLATE 按端点能力分了九类，强制思考的模型没有「关」这一档；只分开关的端点在档位旁注明「低 / 中 / 高都按开」；这个模型接不住的刻度直接置灰并写明原因，切模型那一刻也会在弹窗里提示。上游若以 400 点名该字段，会剥掉它重发一次——最坏是这次档位不生效，而不是模型用不了。</div>
-            <div class="ink-note"><strong>上下文预算滑杆：</strong>设置页「模型配置」里每个模型一行「最大上下文」（自动 / 100K / 200K / 400K / 600K / 800K / 1M）。同一个值肩挑两件事——自动压缩的触发阈值与用量条的分母，所以读数不会和压缩时机各说各话；选「自动」时按模型标称窗口 ×0.8 吸附到最近的档位（1M 窗口落到 800K）。用量条可以直接点，点了跳到对应模型的这一行。</div>
+            <div class="ink-note"><strong>上下文预算：</strong>设置页「模型配置」里每个模型一行「最大上下文」，由按该模型窗口生成的滑杆、精确数字框、以及「探测窗口」按钮三件组成。「自动」取这个模型自己的标称窗口 ×0.8，不再吸附公共档位——只有 8K 窗口的本地模型过去只能凑不满最低一档、等于把窗口占满没地方写回复，现在拿到 6553。数字框保留你填的精确值（131072 就是 131072，只在 1K–4M 内夹取）。Ollama / llama.cpp / vLLM / OpenAI 兼容这类本地或自定义端点可以一键探测真实窗口，探到的值单独存一张覆盖表，随时能一键清除回到端点自带值。同一个值肩挑两件事——自动压缩的触发阈值与用量条的分母，所以读数不会和压缩时机各说各话；用量条可以直接点，点了跳到对应模型的这一行。</div>
             <div class="ink-note"><strong>历史摘要折叠条：</strong>超过阈值后，较早的对话会被压成一段摘要。摘要本身仍按原格式完整发给模型，只在消息区折叠成一条——点标题展开才解析 Markdown，长历史不会把当前几轮挤出屏幕。</div>
           </div>
           <div class="lang-en">
@@ -508,7 +510,7 @@ python desktop.py</pre>
             <div class="ink-note"><strong>Shortcuts:</strong> Enter to send · Shift+Enter for newline · Ctrl+N for new conversation</div>
             <div class="ink-note"><strong>＋ Mode Menu:</strong> The <strong>＋</strong> button left of the chat input centralizes mode entries — Grind / Brainstorm / Target Mode / Scheduled Tasks — plus an @-mention group (Skills / Tools / MCP / Files) that opens a filtered picker.</div>
             <div class="ink-note"><strong>Reasoning slider:</strong> Click the level pill left of the input to open a slider whose ticks list only what the current model supports (auto / off / low / medium / high). Each tick carries its ink shade in small type (free / clear / light / rich / charred); dragging previews, letting go applies and persists. Those ticks are not a copied fixed table: SLATE sorts endpoints into nine capability classes, so a model that forces reasoning has no "off" tick, on/off-only endpoints say "low/medium/high are all treated as on", and a tick this model cannot take is greyed out with the reason — switching models says so in the popup too. If upstream answers 400 naming that field, it is stripped and retried once: worst case the level is ignored, not the model unusable.</div>
-            <div class="ink-note"><strong>Context budget slider:</strong> Under Settings → model configuration, every model row carries a "max context" slider (auto / 100K / 200K / 400K / 600K / 800K / 1M). One value does two jobs — the auto-compaction threshold and the usage-bar denominator — so the reading can never disagree with when compression fires. "Auto" takes the model's nominal window × 0.8 and snaps to the nearest tick (a 1M window lands on 800K); the usage bar is clickable and jumps to that model's row.</div>
+            <div class="ink-note"><strong>Context budget:</strong> Under Settings → model configuration, every model row carries a "max context" control made of three parts — a slider whose ticks are generated from that model's own window, an exact number box, and a "probe window" button. "Auto" now takes this model's nominal window × 0.8 with no snapping to shared ticks: a local model with an 8K window used to be unable to reach the lowest tick and would fill the whole window, leaving no room for the reply, and now lands on 6553. The number box keeps whatever you type (131072 stays 131072; it is only clamped inside 1K–4M). For Ollama / llama.cpp / vLLM / OpenAI-compatible endpoints, one click probes the endpoint's real window, which is stored as a separate override you can clear back to the endpoint's own value at any time. One value still does two jobs — the auto-compaction threshold and the usage-bar denominator — so the reading can never disagree with when compression fires, and the usage bar is clickable and jumps to that model's row.</div>
             <div class="ink-note"><strong>Collapsible history summary:</strong> once the threshold is passed, earlier turns are compressed into a summary. That summary is still sent to the model in full; in the transcript it folds into a single strip that parses Markdown only when expanded, so a long history does not push the current turns off the screen.</div>
           </div>
         </div>
@@ -926,8 +928,8 @@ python desktop.py</pre>
               <tr><td>审批模式</td><td>三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 23 类高危）/ 完全访问（都不问）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改</td></tr>
               <tr><td>主题</td><td>深色/浅色切换</td></tr>
               <tr><td>语言</td><td>中文 / English</td></tr>
-              <tr><td>上下文压缩</td><td>自动/手动压缩历史对话；摘要发给模型的是原文，界面上折成一条可展开的折叠条</td></tr>
-              <tr><td>上下文预算</td><td>每个模型一行滑杆（自动 / 100K / 200K / 400K / 600K / 800K / 1M），同时决定自动压缩阈值与用量条分母</td>
+              <tr><td>上下文压缩</td><td>自动/手动压缩历史对话；摘要发给模型的是原文，界面上折成一条可展开的折叠条。系统的催办与工具结果投喂只进上下文，压缩之后也不会冒成气泡</td></tr>
+              <tr><td>上下文预算</td><td>模型行上「最大上下文」= 按该模型窗口生成的滑杆 + 精确数字框 + 「探测窗口」。自动档取该模型标称窗口 ×0.8、不吸附公共档位；本地/自定义端点可一键探测真实窗口、也可一键清除。同一个值同时决定自动压缩阈值与用量条分母</td>
               <tr><td>AI 辅助功能</td><td>对话以外的 13 项耗 Token 功能，逐项开关 + 单独选模型</td></tr>
               <tr><td>短回复审阅</td><td>模型回复后自动检查是否需要推进</td></tr>
             </table>
@@ -940,8 +942,8 @@ python desktop.py</pre>
               <tr><td>Safety Mode</td><td>Three tiers: Manual (confirm every command and every network call) / Auto (only the 23 high-risk patterns) / Full Access (ask nothing). This is the default for new conversations; the approval pill in the input bar changes it for one conversation</td></tr>
               <tr><td>Theme</td><td>Dark/Light toggle</td></tr>
               <tr><td>Language</td><td>Chinese / English</td></tr>
-              <tr><td>Context Compression</td><td>Auto/manual history compression; the model still receives the summary in full, the transcript folds it into an expandable strip</td></tr>
-              <tr><td>Context Budget</td><td>One slider per model (auto / 100K / 200K / 400K / 600K / 800K / 1M); it sets both the auto-compaction threshold and the usage-bar denominator</td>
+              <tr><td>Context Compression</td><td>Auto/manual history compression; the model still receives the summary in full, the transcript folds it into an expandable strip. System nudges and tool-result feeds go only into the context — they never surface as bubbles, even after compression</td></tr>
+              <tr><td>Context Budget</td><td>Per-model "max context" = a slider whose ticks come from that model's own window, an exact number box, and a probe-window button. Auto takes this model's nominal window × 0.8 with no snapping to shared ticks; local/custom endpoints can be probed for their real window and cleared with one click. The same value drives both the auto-compaction threshold and the usage-bar denominator</td>
               <tr><td>AI Assistance</td><td>13 token-spending features outside the chat loop, each with its own switch and model</td></tr>
               <tr><td>Short Reply Review</td><td>Auto-check if reply needs follow-up</td></tr>
             </table>

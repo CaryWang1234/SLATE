@@ -45,6 +45,8 @@ SLATE（砚）是一款**本地优先**的 AI 协作调度台。它把主流大�
 
 前往 [GitHub Releases](https://github.com/CaryWang1234/SLATE/releases) 下载 `SLATE-Setup-x.x.x.exe`，双击安装即可。
 
+装好后点窗口右上角的 X 不会结束应用：SLATE 缩进系统通知区域继续跑，正在生成的那一轮照常收工，手机端的局域网连接也不掉。双击托盘图标（或右键「显示主窗口」）找回窗口，右键「退出 SLATE」才真的退出，第一次缩下去会弹一条气泡提示。托盘只用 Windows 原生 API 实现，不引入第三方依赖；非 Windows、或这个登录会话根本没有通知区域时，关窗退回原来的直接退出。
+
 #### 方式二：源码运行
 
 ```bash
@@ -394,14 +396,14 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 |------|------|
 | 模型管理 | 添加/删除 API Key，配置自定义端点，可选启用 Responses API |
 | 推理强度 | 点输入框左侧胶囊开滑杆弹窗，按模型能力给出可选档位（自动/关/低/中/高），每档下方小字标注对应墨色（随墨/清墨/淡墨/浓墨/焦墨）；能力分九类：强制思考的模型没有「关」档，只能整体开关的端点标注「低/中/高都按开」，接不住的档位置灰并写明原因，上游 400 点名该字段时剥掉重发一次；拖动松手才落盘 |
-| 上下文预算 | 模型行上的滑杆（自动/100K/200K/400K/600K/800K/1M），同时决定自动压缩阈值与用量条分母；选「自动」时按标称窗口 ×0.8 吸附到最近的档位 |
+| 上下文预算 | 模型行上「最大上下文」= 按该模型窗口生成的滑杆 + 精确数字框 + 「探测窗口」。自动档取这个模型自己的标称窗口 ×0.8，不再吸附公共档位（8K 的本地模型拿到 6553，而不是把窗口占满没地方写回复）；数字框保留你填的精确值（131072 就是 131072，只在 1K–4M 内夹取）；本地/自定义端点可一键探测真实窗口（Ollama / llama.cpp / vLLM / OpenAI 兼容），探到的值单独存着、可一键清除。同一个值同时决定自动压缩阈值与用量条分母 |
 | 输出控制 | 最大 Token 数、流式输出开关 |
 | 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 / Continue Autopilot（末轮续跑） |
 | 审批模式 | 三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 23 类高危）/ 完全访问（都不问）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改 |
 | 局域网遥控 | 查看访问地址与二维码，设置局域网访问密码 |
 | 主题 | 深色/浅色切换 |
 | 语言 | 中文/English |
-| 上下文压缩 | 自动/手动压缩历史对话；摘要发给模型的是完整原文，界面上折成一条可展开的折叠条 |
+| 上下文压缩 | 自动/手动压缩历史对话；摘要发给模型的是完整原文，界面上折成一条可展开的折叠条。系统催办与工具结果投喂这类隐藏轮只进上下文、不占消息区，压缩后重建保留段也不会把它们画成气泡 |
 | AI 辅助功能 | 对话以外的 13 项耗 Token 功能逐项开关 + 单独选模型；关掉即一次模型都不发，工具类的三项（子代理/图片/视频）还会从工具目录里消失 |
 | 多任务与项目 | 切走会话是否让它继续在跑（关掉即旧语义：切换即中断）、同时最多跑几场（1–4）、同一项目内最多几场（1–3，默认串行）；排队中的任务在右栏任务中心与输入框上方都看得见 |
 
@@ -445,6 +447,8 @@ Core philosophy: **Let ideas go straight to action, without tool friction in bet
 #### Option A: Installer (Recommended)
 
 Download `SLATE-Setup-x.x.x.exe` from [GitHub Releases](https://github.com/CaryWang1234/SLATE/releases) and run the installer.
+
+On Windows, clicking X does not quit the app: SLATE hides into the notification area and keeps serving, so the turn that is generating finishes and LAN clients stay connected. Double-click the tray icon (or right-click → "Show window") to bring the window back; only "Quit SLATE" actually exits. The first time it hides, a balloon tells you where it went. The tray is implemented with Windows native APIs only, adding no third-party dependency; off Windows, or in a logon session with no notification area, closing the window exits exactly as before.
 
 #### Option B: From Source
 
@@ -800,14 +804,14 @@ Let AI automatically execute tasks on schedule or by events.
 |---------|-------------|
 | Model Management | Add/remove API keys, configure custom endpoints, optionally enable Responses API |
 | Reasoning Effort | Click the pill left of the input to open a slider; levels follow the model's capability (auto/off/low/medium/high), each tick annotated with its ink shade in small type (free/clear/light/rich/charred). Nine capability classes decide what appears: a model that forces reasoning has no "off", on/off-only endpoints say "low/medium/high are all treated as on", a tick the model cannot take is greyed out with the reason, and a 400 naming the field causes one retry with it stripped. The value is persisted only when you let go |
-| Context Budget | Per-model slider (auto/100K/200K/400K/600K/800K/1M) driving both the auto-compress threshold and the usage bar |
+| Context Budget | Per-model "max context" = a slider whose ticks are generated from that model's own window, plus an exact number box and a "probe window" button. Auto now takes this model's nominal window × 0.8 with no snapping to shared ticks (an 8K local model gets 6553 instead of eating the whole window with no room for the reply); the box keeps whatever you type (131072 stays 131072, clamped only inside 1K–4M); local/custom endpoints can be probed for their real window (Ollama / llama.cpp / vLLM / OpenAI-compatible), stored as a separate override you can clear with one click. The same value drives both the auto-compress threshold and the usage bar |
 | Output Control | Max tokens, streaming toggle |
 | Auto-Advance | Autopilot / short-reply review / long-stall review / Continue Autopilot |
 | Safety Mode | High-risk command approval policy |
 | LAN Remote | View LAN URL / QR code, configure remote access password |
 | Theme | Dark/Light toggle |
 | Language | Chinese / English |
-| Context Compression | Auto/manual compression of history; the model still receives the summary in full, the transcript folds it into an expandable strip |
+| Context Compression | Auto/manual compression of history; the model still receives the summary in full, the transcript folds it into an expandable strip. System nudges and tool-result feeds stay context-only — rebuilding the retained tail after compression never paints them as bubbles |
 | AI Assistance | 13 token-spending features outside the chat loop, each with its own switch and optional pinned model; off means no request at all, and the three tool-driven ones also disappear from the tool catalogue |
 | Tasks & Projects | Whether a run keeps going when you switch away (off restores the old "switch means stop"), how many runs may go at once (1-4), and how many within one project (1-3, serial by default); queued sends are visible both in the right-hand task centre and above the input box |
 
