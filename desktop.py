@@ -9,12 +9,18 @@ import socket
 import threading
 
 import desktop_tray
+import desktop_instance
 
 # 获取当前文件所在目录，方便后续路径
 BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 LOG_PATH = os.path.join(BASE_DIR, 'desktop_backend.log')
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 STORAGE_PATH = os.path.join(DATA_DIR, 'webview_profile')
+WINDOW_TITLE = 'SLATE 砚'
+
+# 锁要活得和进程一样久：句柄在，别人才会在双击第二份时判定"已有实例"。
+# 放模块全局而不是局部量，是为了让"谁持着闸门"这件事在代码里读得出来
+_instance_lock = None
 
 
 def _find_icon():
@@ -238,6 +244,17 @@ def attach_tray(window, log=lambda message: None) -> TrayHandle:
     return handle
 
 def main():
+    global _instance_lock
+    # 0. 单实例闸门：必须排在清日志与起后端之前。晚一步就已经多起一份服务、
+    #    多一个写同一座 SQLite 的进程，还会把主实例正在写的 desktop_backend.log 清空。
+    _instance_lock = desktop_instance.try_acquire(BASE_DIR)
+    if _instance_lock is None:
+        # 第一份可能正在开窗口（那一刻窗口还不存在），也可能正藏在通知区域里；
+        # 两种都要给用户一句回话，不许双击完像什么都没发生。
+        surfaced = desktop_instance.handoff(WINDOW_TITLE, BASE_DIR)
+        print('SLATE 已在运行：' + ('已切回已有窗口。' if surfaced else '已交给正在启动的那个实例。'))
+        return
+
     # 1. 启动 uvicorn 服务器
     open(LOG_PATH, 'w', encoding='utf-8').close()
     os.makedirs(STORAGE_PATH, exist_ok=True)
@@ -268,7 +285,7 @@ def main():
             log(f'backend failed: {error}')
             stop_process(uvicorn_process)
             webview.create_window(
-                title='SLATE 砚',
+                title=WINDOW_TITLE,
                 html=f'<h2>SLATE backend failed to start</h2><p>{error}</p><p>See desktop_backend.log.</p>',
                 width=720,
                 height=360,
@@ -279,7 +296,7 @@ def main():
     # 2. 创建 pywebview 窗口，加载本地地址
     log('creating window')
     window = webview.create_window(
-        title='SLATE 砚',
+        title=WINDOW_TITLE,
         url=app_url,
         width=1200,
         height=800,
