@@ -47,6 +47,8 @@ SLATE（砚）是一款**本地优先**的 AI 协作调度台。它把主流大�
 
 装好后点窗口右上角的 X 不会结束应用：SLATE 缩进系统通知区域继续跑，正在生成的那一轮照常收工，手机端的局域网连接也不掉。双击托盘图标（或右键「显示主窗口」）找回窗口，右键「退出 SLATE」才真的退出，第一次缩下去会弹一条气泡提示。托盘只用 Windows 原生 API 实现，不引入第三方依赖；非 Windows、或这个登录会话根本没有通知区域时，关窗退回原来的直接退出。
 
+同一份安装只会开一个 SLATE 窗口：窗口已经开着、或者已经缩进通知区域时再双击一次图标，不会多出一个窗口、也不会多起一份后端——新进程会把正在跑的那个窗口唤回前台（抢不到前台时让任务栏图标闪一下），然后自己退掉。锁随进程消失，崩溃或被任务管理器结束都不会把应用变成「再也打不开」；装到另一个目录的副本算另一份安装，可以与这一份同时跑。
+
 #### 方式二：源码运行
 
 ```bash
@@ -449,6 +451,8 @@ Core philosophy: **Let ideas go straight to action, without tool friction in bet
 Download `SLATE-Setup-x.x.x.exe` from [GitHub Releases](https://github.com/CaryWang1234/SLATE/releases) and run the installer.
 
 On Windows, clicking X does not quit the app: SLATE hides into the notification area and keeps serving, so the turn that is generating finishes and LAN clients stay connected. Double-click the tray icon (or right-click → "Show window") to bring the window back; only "Quit SLATE" actually exits. The first time it hides, a balloon tells you where it went. The tray is implemented with Windows native APIs only, adding no third-party dependency; off Windows, or in a logon session with no notification area, closing the window exits exactly as before.
+
+One install opens exactly one SLATE window: if the window is already open, or already hidden in the notification area, launching again adds no second window and starts no second backend — the new process brings the running window to the front (flashing its taskbar icon when Windows refuses the foreground) and then exits. The lock disappears with the process, so a crash or a kill in Task Manager never leaves the app "unable to open again"; a copy installed into a different folder counts as a different install and may run alongside this one.
 
 #### Option B: From Source
 
