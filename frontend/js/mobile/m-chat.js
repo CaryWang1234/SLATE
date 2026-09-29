@@ -7,22 +7,23 @@
 
 import {
   state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit, effectiveConstitution,
-} from "../store.js?v=20260926-003";
-import { fmtTokens } from "../services/usage.js?v=20260926-003";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260926-003";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260926-003";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260926-003";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260926-003";
-import { createAgentLoop } from "../services/agent_loop.js?v=20260926-003";
-import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20260926-003";
-import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260926-003";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260926-003";
-import { toolLabel } from "../services/tool_meta.js?v=20260926-003";
-import { renderMarkdown } from "../services/markdown.js?v=20260926-003";
-import { mToast, t } from "./m-ui.js?v=20260926-003";
-import { mountRoundSummary, renderRoundSummary } from "../components/round_summary.js?v=20260926-003";
-import { mHandleStructured } from "./m-auth.js?v=20260926-003";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20260926-003";
+} from "../store.js?v=20260929-001";
+import { fmtTokens } from "../services/usage.js?v=20260929-001";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260929-001";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20260929-001";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20260929-001";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20260929-001";
+import { createAgentLoop } from "../services/agent_loop.js?v=20260929-001";
+import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20260929-001";
+import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260929-001";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20260929-001";
+import { toolLabel } from "../services/tool_meta.js?v=20260929-001";
+import { compressedThread } from "../services/thread_compress.js?v=20260929-001";
+import { renderMarkdown } from "../services/markdown.js?v=20260929-001";
+import { mToast, t } from "./m-ui.js?v=20260929-001";
+import { mountRoundSummary, renderRoundSummary } from "../components/round_summary.js?v=20260929-001";
+import { mHandleStructured } from "./m-auth.js?v=20260929-001";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20260929-001";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -512,7 +513,7 @@ async function mCheckCompress(modelId, apiKey, baseUrl) {
     // 与桌面同一个预算口径：手机和桌面看的是同一个"什么时候压缩"
     const res = await post("/chat/compress", { messages: msgs, keep_recent_rounds: 2, max_tokens: contextBudgetOf(modelId) });
     if (res.code !== 0 || !res.data?.need_compress) return;
-    const { compress_prompt, keep_messages, compress_count } = res.data;
+    const { compress_prompt, compress_count } = res.data;
     const target = aiModelFor("context_compress", { id: modelId, base_url: baseUrl, key: apiKey });
     if (!target.usable) return;
     let summary = "";
@@ -537,7 +538,9 @@ async function mCheckCompress(modelId, apiKey, baseUrl) {
     }
     if (!summary.trim()) return;
     const summaryMsg = { role: "system", content: `[历史摘要]: ${summary.trim()}` };
-    setMessages([summaryMsg, ...keep_messages.map(m => ({ ...m, model: "" }))]);
+    // 保留段要从本地消息对象现取：keep_messages 只是投影副本，带着它重建会把
+    // 隐藏轮（[系统警告]、工具结果投喂）的 hidden 抹掉，手机上就多出一条条系统气泡
+    setMessages(compressedThread(summaryMsg, state.messages, compress_count));
     mToast(t("上下文已压缩：{n} 条消息已摘要", { n: compress_count }));
   } catch (e) {
     console.warn("[SLATE-Mobile] 压缩检查失败:", e);

@@ -2,34 +2,34 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode } from "./store.js?v=20260926-003";
-import { initI18n, t } from "./services/i18n.js?v=20260926-003";
-import { iconSvgEl } from "./services/icons.js?v=20260926-003";
-import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260926-003";
-import { get, post, put } from "./services/api.js?v=20260926-003";
-import { dlgConfirm } from "./services/dialog.js?v=20260926-003";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260926-003";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260926-003";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260926-003";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260926-003";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260926-003";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260926-003";
-import { initTeamPanel } from "./components/team.js?v=20260926-003";
-import { initProjectBar } from "./components/project_bar.js?v=20260926-003";
-import { initSessionSummary } from "./components/session_summary.js?v=20260926-003";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260926-003";
-import { initTypingGame } from "./components/typing_game.js?v=20260926-003";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260926-003";
-import { initMemoryPanel } from "./components/memory.js?v=20260926-003";
-import { initExpertsPanel } from "./components/experts.js?v=20260926-003";
-import { initSchedule } from "./components/schedule.js?v=20260926-003";
-import { initRiskGuard } from "./services/riskguard.js?v=20260926-003";
-import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20260926-003";
-import { initUnderstandPanel } from "./components/understand.js?v=20260926-003";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260926-003";
-import { setProject, setProjectFileTree } from "./store.js?v=20260926-003";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260926-003";
-import { installErrorSink } from "./services/error_sink.js?v=20260926-003";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, contextCapStops, contextCapStopIndex, contextWindowSource, getContextWindow, setModelContextWindow, getModelDefinition, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode } from "./store.js?v=20260929-001";
+import { initI18n, t } from "./services/i18n.js?v=20260929-001";
+import { iconSvgEl } from "./services/icons.js?v=20260929-001";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260929-001";
+import { get, post, put } from "./services/api.js?v=20260929-001";
+import { dlgConfirm } from "./services/dialog.js?v=20260929-001";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260929-001";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260929-001";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260929-001";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20260929-001";
+import { initSkillPanel } from "./components/skill_panel.js?v=20260929-001";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260929-001";
+import { initTeamPanel } from "./components/team.js?v=20260929-001";
+import { initProjectBar } from "./components/project_bar.js?v=20260929-001";
+import { initSessionSummary } from "./components/session_summary.js?v=20260929-001";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260929-001";
+import { initTypingGame } from "./components/typing_game.js?v=20260929-001";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260929-001";
+import { initMemoryPanel } from "./components/memory.js?v=20260929-001";
+import { initExpertsPanel } from "./components/experts.js?v=20260929-001";
+import { initSchedule } from "./components/schedule.js?v=20260929-001";
+import { initRiskGuard } from "./services/riskguard.js?v=20260929-001";
+import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20260929-001";
+import { initUnderstandPanel } from "./components/understand.js?v=20260929-001";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20260929-001";
+import { setProject, setProjectFileTree } from "./store.js?v=20260929-001";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260929-001";
+import { installErrorSink } from "./services/error_sink.js?v=20260929-001";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -372,10 +372,11 @@ function saveCustomModel() {
 
 // ── 密钥管理面板（设置弹窗内）──────────────
 
-// ── 每模型上下文预算滑杆 ───────────────────────────────
-// 一档 = 这个模型在 SLATE 里能用多少上下文：同时决定自动压缩阈值与上下文条的分母。
-// 0 档「自动」用该模型自己的默认上限（标称窗口留两成余量后吸附到档位）；
-// 标称窗口缺失或小到凑不满一档的模型（自定义 / 本地），自动才落回全局「上下文 Token 上限」。
+// ── 每模型上下文预算控件 ───────────────────────────────
+// 一个控件背后三个数：滑杆档位（按这个模型的窗口生成）、精确预算（可手输，不被档位表裁剪）、
+// 以及"这个窗口是从哪来的"（端点自带 / 探测所得 / 根本不知道）。
+// 「自动」= 标称窗口 ×0.8。本地与自定义端点常把窗口写在 /api/show、/props、/v1/models 里，
+// 所以给一个探测入口；探不到就明说，让用户手填，而不是拿一个猜出来的数冒充自动。
 function buildContextCapControl(model) {
   const wrap = document.createElement("div");
   wrap.className = "ctx-cap";
@@ -388,44 +389,129 @@ function buildContextCapControl(model) {
   slider.type = "range";
   slider.className = "ctx-cap-slider";
   slider.min = "0";
-  slider.max = String(CONTEXT_CAP_STOPS.length - 1);
   slider.step = "1";
-  slider.value = String(Math.max(0, CONTEXT_CAP_STOPS.indexOf(getContextCap(model.id))));
   slider.dataset.modelCtx = model.id; // 走查与设置页定位用：控件必须能对应到具体模型
   slider.setAttribute("aria-label", `${t("最大上下文")} · ${model.name}`);
 
   const readout = document.createElement("span");
   readout.className = "ctx-cap-value";
 
-  const paint = (stop) => {
+  // 滑杆只有十几个点位，表达不了 131072 这种"窗口本来就是那个数"，所以配一个精确框
+  const exact = document.createElement("input");
+  exact.type = "number";
+  exact.className = "ctx-cap-exact";
+  exact.min = "1024";   // 与 store 的夹取下限同一个数（守卫按 CONTEXT_CAP_MIN 核对），别让控件谎报下限
+  exact.step = "1";     // 保留精确值：step=512 会让 180000 这类合法值被判成 stepMismatch
+  exact.dataset.modelCtxInput = model.id;
+  exact.setAttribute("aria-label", `${t("精确上下文预算")} · ${model.name}`);
+
+  const probeBtn = document.createElement("button");
+  probeBtn.type = "button";
+  probeBtn.className = "ctx-cap-probe";
+  probeBtn.dataset.modelCtxProbe = model.id;
+
+  const clearProbe = document.createElement("button");
+  clearProbe.type = "button";
+  clearProbe.className = "ctx-cap-probe-clear";
+  clearProbe.dataset.modelCtxProbeClear = model.id;
+  clearProbe.textContent = "×";
+  clearProbe.title = t("清除探测到的窗口，回到端点自带值");
+  clearProbe.addEventListener("click", () => {
+    setModelContextWindow(model.id, 0);
+    syncStops();
+    paint();
+    toast(t("已清除探测到的窗口"));
+  });
+
+  let stops = contextCapStops(model.id);
+
+  function syncStops() {
+    stops = contextCapStops(model.id);
+    slider.max = String(stops.length - 1);
+    slider.value = String(contextCapStopIndex(model.id, getContextCap(model.id)));
+  }
+
+  function paint(capOverride) {
     const declared = declaredContextWindow(model.id);
-    const auto = !stop;
-    const eff = auto ? contextBudgetOf(model.id) : Math.min(stop, declared || stop);
-    const clamped = !auto && declared > 0 && stop > declared;
-    const perModel = auto && declaredContextWindow(model.id) > 0 && defaultContextCap(model.id) > 0;
-    readout.textContent = stop
-      ? (clamped ? `${fmtContextTokens(stop)} → ${fmtContextTokens(eff)}` : fmtContextTokens(stop))
-      : `${t("自动")} · ${fmtContextTokens(eff)}`;
+    const cap = capOverride === undefined ? getContextCap(model.id) : capOverride;
+    const auto = !cap;
+    const eff = auto ? contextBudgetOf(model.id) : Math.min(cap, declared || cap);
+    const clamped = !auto && declared > 0 && cap > declared;
+    const src = contextWindowSource(model.id);
+    const perModel = auto && declared > 0 && defaultContextCap(model.id) > 0;
+    readout.textContent = auto
+      ? `${t("自动")} · ${fmtContextTokens(eff)}`
+      : (clamped ? `${fmtContextTokens(cap)} → ${fmtContextTokens(eff)}` : fmtContextTokens(cap));
+    const base = perModel
+      ? t("按该模型标称窗口 {w} 留两成余量：压缩阈值与上下文条都按 {b} 计算", { w: fmtContextTokens(declared), b: fmtContextTokens(eff) })
+      : t("压缩阈值与上下文条都按 {b} 计算", { b: fmtContextTokens(eff) });
     readout.title = clamped
       ? t("超出模型标称窗口，已按 {w} 封顶", { w: fmtContextTokens(declared) })
-      : perModel
-        ? t("按该模型标称窗口 {w} 留两成余量：压缩阈值与上下文条都按 {b} 计算", { w: fmtContextTokens(declared), b: fmtContextTokens(eff) })
-        : t("压缩阈值与上下文条都按 {b} 计算", { b: fmtContextTokens(eff) });
-    slider.classList.toggle("is-auto", !stop);
-  };
+      : (src === "probed" ? `${base} · ${t("窗口为探测所得")}` : base);
+    exact.value = String(eff);
+    exact.classList.toggle("is-auto", auto);
+    probeBtn.textContent = t(src === "probed" ? "重新探测" : "探测窗口");
+    // 桌面 CSS 没有全局 .hidden，判隐藏的走查读不到像素，这里直接用 display
+    clearProbe.style.display = src === "probed" ? "" : "none";
+    slider.classList.toggle("is-auto", auto);
+  }
 
-  paint(getContextCap(model.id));
+  syncStops();
+  paint();
   // 拖动只刷新读数，松手/键盘落定才写设置：免得每过一个中间值都持久化一次
-  slider.addEventListener("input", () => paint(CONTEXT_CAP_STOPS[Number(slider.value)] || 0));
+  slider.addEventListener("input", () => paint(stops[Number(slider.value)] || 0));
   slider.addEventListener("change", () => {
-    const stop = CONTEXT_CAP_STOPS[Number(slider.value)] || 0;
-    setModelContextCap(model.id, stop);
-    paint(stop);
+    setModelContextCap(model.id, stops[Number(slider.value)] || 0);
+    syncStops();
+    paint();
+  });
+  exact.addEventListener("change", () => {
+    const typed = parseInt(exact.value, 10);
+    if (!Number.isFinite(typed) || typed <= 0) { paint(); return; }
+    setModelContextCap(model.id, typed);
+    syncStops();
+    paint();
+  });
+  probeBtn.addEventListener("click", async () => {
+    const def = getModelDefinition(model.id) || {};
+    const baseUrl = String(def.base_url || "").trim();
+    if (!baseUrl) { toast(t("这个模型没有可探测的 Base URL")); return; }
+    probeBtn.disabled = true;
+    probeBtn.textContent = t("探测中…");
+    let found = 0;
+    let source = "";
+    let message = "";
+    try {
+      const res = await post("/proxy/probe-context", {
+        model: model.id,
+        base_url: baseUrl,
+        provider: def.provider || "openai",
+        api_key: getModelKey(model.id) || "",
+      });
+      found = Number(res?.data?.context_window) || 0;
+      source = String(res?.data?.source || "");
+      message = String(res?.message || "");
+    } catch (err) {
+      message = `${t("探测失败")}：${String(err?.message || err)}`;
+    }
+    probeBtn.disabled = false;
+    if (found > 0) {
+      setModelContextWindow(model.id, found);
+      syncStops();
+      paint();
+      toast(t("探测到上下文窗口 {w}（来自 {s}）", { w: fmtContextTokens(found), s: source }));
+      return;
+    }
+    paint();
+    toast(message || t("这个端点没有暴露上下文窗口，请按模型文档手填"));
   });
 
   wrap.appendChild(name);
   wrap.appendChild(slider);
   wrap.appendChild(readout);
+  wrap.appendChild(exact);
+  wrap.appendChild(probeBtn);
+  wrap.appendChild(clearProbe);
   return wrap;
 }
 
@@ -1341,7 +1427,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260926-003").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20260929-001").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1786,7 +1872,7 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     open.title = t("切到该项目");
     open.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { switchToProject } = await import("./services/project_scene.js?v=20260926-003");
+      const { switchToProject } = await import("./services/project_scene.js?v=20260929-001");
       const out = await switchToProject(projectId);
       if (!out.ok) toast(out.reason || t("切换失败"));
       await refreshCodexHistory();
@@ -1801,8 +1887,8 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     pin.setAttribute("aria-pressed", entry?.pinned ? "true" : "false");
     pin.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { patchRegistry } = await import("./services/project.js?v=20260926-003");
-      const { refreshRegistry } = await import("./services/project_scene.js?v=20260926-003");
+      const { patchRegistry } = await import("./services/project.js?v=20260929-001");
+      const { refreshRegistry } = await import("./services/project_scene.js?v=20260929-001");
       await patchRegistry(projectId, { pinned: !(entry?.pinned) });
       await refreshRegistry();
       renderCodexHistory();
@@ -2007,7 +2093,7 @@ async function saveSettings() {
     if (constData) {
       if (state.project) {
         // 打开着项目就写进项目（.slate/config.json，跟着仓库走），全局版本保持不动
-        const { updateProjectConfig } = await import("./services/project.js?v=20260926-003");
+        const { updateProjectConfig } = await import("./services/project.js?v=20260929-001");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -2257,11 +2343,11 @@ async function init() {
   // lastProjectPath 退成第二道：老数据第一次升级到带注册表的版本时，册子是空的，
   // 拿它补登一次，用户不会感到"项目不见了"。
   try {
-    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20260926-003");
+    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20260929-001");
     const res = await getCurrentProject();
     let project = res.code === 0 ? res.data : null;
     if (!project && state._lastProjectPath) {
-      const { openProject } = await import("./services/project.js?v=20260926-003");
+      const { openProject } = await import("./services/project.js?v=20260929-001");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) project = openRes.data;
     }

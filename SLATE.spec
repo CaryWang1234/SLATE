@@ -21,6 +21,8 @@ datas = [
     ('backend/routers', 'backend/routers'),
     ('backend/skills', 'backend/skills'),
     ('backend/workflows', 'backend/workflows'),
+    # 托盘图标运行时要用：EXE 的 icon= 只画 exe 文件图标，不会把 .ico 放进包里
+    ('app.ico', '.'),
 ] + _clr_data + _cffi_data
 
 binaries_extra = _clr_libs

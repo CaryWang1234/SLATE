@@ -14,6 +14,7 @@ import logging
 import re
 import uuid
 from typing import Any
+from urllib.parse import quote, urlparse
 
 import httpx
 from fastapi import APIRouter, Request
@@ -401,6 +402,157 @@ def _find_model(model_id: str, base_url: str | None = None, provider: str | None
             "context_window": 32768,
         }
     return None
+
+
+# ── 上下文窗口探测（本地 / 自定义端点的「自动」要按真实窗口来）────────
+# 厂商云端的窗口写死在 MODEL_REGISTRY 里，本地端点（Ollama / LM Studio / llama.cpp /
+# vLLM）只能让用户在添加模型时手填。猜小了浪费上下文，猜大了直接吃上游 400，
+# 所以这里按端点形态轮询几个公认入口，取第一个说得通的数；读不到就如实返回"没探测到"。
+# 键名按"这台服务器实际会接多少"排序：正在服务的 n_ctx/num_ctx 优先于训练窗口，
+# 否则会把 262144 的训练长度发给一个只开 4096 的服务。
+CONTEXT_WINDOW_KEYS: tuple[str, ...] = (
+    "num_ctx", "n_ctx", "total_n_ctx", "context_length", "max_model_len",
+    "max_position_embeddings",
+)
+CONTEXT_WINDOW_MIN = 512
+CONTEXT_WINDOW_MAX = 8_000_000
+PROBE_TIMEOUT = httpx.Timeout(8.0, connect=4.0)
+PROBE_STRING_BUDGET = 200_000  # 只在有界的字符串里试 JSON，别拿整段文档去解析
+
+
+def _probe_roots(base_url: str) -> tuple[str, str]:
+    """拆成 (兼容层根, 站点根)：/v1/models 与挂在站点根上的 /props、/api/show 不是同一处。"""
+    raw = str(base_url or "").strip().rstrip("/")
+    origin = re.sub(r"/v1$", "", raw)
+    v1 = raw if raw.endswith("/v1") else f"{origin}/v1"
+    return v1, origin
+
+
+def _safe_probe_base(base_url: str) -> str:
+    """只允许 http/https 且必须有主机名；Base URL 是用户配的，但别把这里变成任意请求转发器。"""
+    try:
+        parsed = urlparse(str(base_url or "").strip())
+    except ValueError:
+        return ""
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return ""
+    if any(ch in str(base_url) for ch in ("\r", "\n", " ", "\t")):
+        return ""
+    return str(base_url).strip().rstrip("/")
+
+
+def _harvest_context_window(node: Any) -> int:
+    """在任意 JSON 结构里按 CONTEXT_WINDOW_KEYS 的优先级找窗口数；找不到返回 0。
+
+    两处形状必须认得，否则本地端点一个都探不到：Ollama 把窗口写成带架构前缀的
+    `llama.context_length`，又把服务窗口包成 `{"num_ctx": {"default": 4096}}` 这种 schema 形状。
+    """
+    hits: list[tuple[int, int]] = []
+
+    def accept(key: str, value: int) -> None:
+        if key in CONTEXT_WINDOW_KEYS and CONTEXT_WINDOW_MIN <= value <= CONTEXT_WINDOW_MAX:
+            hits.append((CONTEXT_WINDOW_KEYS.index(key), value))
+
+    def walk(cur: Any, key: str, depth: int) -> None:
+        if depth > 6:
+            return
+        leaf = str(key).rsplit(".", 1)[-1]
+        if isinstance(cur, dict):
+            default = cur.get("default")
+            if isinstance(default, (int, float)) and not isinstance(default, bool):
+                accept(leaf, int(default))
+            for k, v in cur.items():
+                walk(v, str(k).lower(), depth + 1)
+        elif isinstance(cur, list):
+            for item in cur[:200]:
+                walk(item, leaf, depth + 1)
+        elif isinstance(cur, bool):
+            return
+        elif isinstance(cur, (int, float)):
+            accept(leaf, int(cur))
+        elif isinstance(cur, str) and cur.startswith(("{", "[")) and len(cur) < PROBE_STRING_BUDGET:
+            # Ollama 的 parameters / raw 是 JSON 字符串，不当字符串处理就当没有
+            try:
+                walk(json.loads(cur), leaf, depth + 1)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                return
+
+    walk(node, "", 0)
+    if not hits:
+        return 0
+    best_rank = min(rank for rank, _ in hits)
+    return min(value for rank, value in hits if rank == best_rank)
+
+
+def _probe_plan(v1: str, origin: str, model: str) -> list[tuple[str, str, str, Any]]:
+    """(标签, 方法, 完整 URL, 请求体或 None)；标签会回给前端，探测失败时能看出卡在哪一步。"""
+    quoted = quote(model, safe="")
+    return [
+        ("ollama/api/show", "POST", f"{origin}/api/show", {"model": model}),
+        ("openai/models/{id}", "GET", f"{v1}/models/{quoted}", None),
+        ("llama.cpp/props", "GET", f"{origin}/props", None),
+        ("llama.cpp/v1/props", "GET", f"{v1}/props", None),
+        ("openai/models", "GET", f"{v1}/models", None),
+    ]
+
+
+def _pick_model_entry(node: Any, model: str) -> Any:
+    """列表端点里只认这一条模型自己的对象，别把邻居的窗口当成它的。"""
+    items = node.get("data") if isinstance(node, dict) else node
+    if not isinstance(items, list):
+        return None
+    for item in items:
+        if isinstance(item, dict) and str(item.get("id") or item.get("name") or "") == model:
+            return item
+    return None
+
+
+@router.post("/probe-context")
+async def probe_context(request: Request) -> dict[str, Any]:
+    """探测某个端点上这个模型的真实上下文窗口；探不到时明确说探不到。"""
+    body = await request.json()
+    model = str(body.get("model") or "").strip()
+    api_key = str(body.get("api_key") or "").strip()
+    provider = str(body.get("provider") or "openai")
+    base_url = _safe_probe_base(str(body.get("base_url") or ""))
+    if not model or not base_url:
+        return {"code": -1, "data": None, "message": "模型名与 Base URL 必填，且只支持 http/https 端点"}
+
+    if provider == "anthropic":
+        headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01"}
+    else:
+        headers = {"authorization": f"Bearer {api_key}"} if api_key else {}
+
+    v1, origin = _probe_roots(base_url)
+    tried: list[str] = []
+    async with httpx.AsyncClient(timeout=PROBE_TIMEOUT, follow_redirects=False) as client:
+        for label, method, url, payload in _probe_plan(v1, origin, model):
+            tried.append(label)
+            try:
+                if method == "POST":
+                    resp = await client.post(url, json=payload, headers=headers)
+                else:
+                    resp = await client.get(url, headers=headers)
+            except httpx.HTTPError:
+                continue
+            if resp.status_code >= 400:
+                continue
+            try:
+                data = resp.json()
+            except (json.JSONDecodeError, ValueError):
+                continue
+            if label == "openai/models":
+                data = _pick_model_entry(data, model)
+                if data is None:
+                    continue
+            window = _harvest_context_window(data)
+            if window:
+                return {"code": 0,
+                        "data": {"context_window": window, "source": label},
+                        "message": "ok"}
+    return {"code": 0,
+            "data": {"context_window": 0, "source": "", "tried": tried},
+            "message": "这个端点没有暴露上下文窗口，请按模型文档手填"}
 
 
 def _build_openai_request(body: dict[str, Any], cap: str = "none", level: str = "auto") -> dict[str, Any]:

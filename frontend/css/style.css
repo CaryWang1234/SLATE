@@ -6033,6 +6033,62 @@ textarea::-webkit-scrollbar-thumb {
   outline-offset: 3px;
 }
 
+/* 精确框：滑杆只有十几个点位，表达不了 131072 这类"窗口本来就是那个数" */
+.ctx-cap-exact {
+  flex-shrink: 0;
+  width: 78px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.ctx-cap-exact.is-auto {
+  color: var(--text-muted);
+  border-style: dashed;
+}
+
+.ctx-cap-exact:focus-visible,
+.ctx-cap-probe:focus-visible,
+.ctx-cap-probe-clear:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.ctx-cap-probe,
+.ctx-cap-probe-clear {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.ctx-cap-probe:hover:not(:disabled) {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.ctx-cap-probe:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ctx-cap-probe-clear {
+  padding: 3px 6px;
+}
+
+.ctx-cap-probe-clear:hover {
+  color: var(--danger, #B4453C);
+  border-color: var(--danger, #B4453C);
+}
+
 .ctx-cap-value {
   flex-shrink: 0;
   min-width: 78px;

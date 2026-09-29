@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260926-003";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260926-003";
+import { makeId } from "./services/utils.js?v=20260929-001";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260929-001";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -34,6 +34,9 @@ const state = {
   // 每模型的上下文预算（modelId → token 数；缺省或 0 = 自动）
   // 预算决定两件事：上下文条算到哪儿算满、自动压缩在第几轮触发。两者必须同一个数。
   modelContextCaps: {},
+  // 探测到的真实窗口覆盖（modelId → token 数）：本地/自定义端点的窗口注册表里猜不准，
+  // 探测成功后存在这里，不动用户自己填的 customModels 条目，也不污染内置注册表。
+  modelContextWindows: {},
 
   // 用量统计（当前对话）
   usage: {
@@ -256,6 +259,7 @@ function buildPersistentData() {
     todoPanelOpen: state.todoPanelOpen !== false,
     maxTokens: state.maxTokens,
     modelContextCaps: state.modelContextCaps,
+    modelContextWindows: state.modelContextWindows,
     autoReview: state.autoReview,
     outputSettings: state.outputSettings,
     fileOutput: state.fileOutput,
@@ -445,6 +449,7 @@ function getSharedPersistentData(data = buildPersistentData()) {
     currentModelId: data.currentModelId || null,
     maxTokens: data.maxTokens || 64000,
     modelContextCaps: normalizeContextCaps(data.modelContextCaps),
+    modelContextWindows: normalizeContextWindows(data.modelContextWindows),
     autoReview: data.autoReview || {},
     outputSettings: data.outputSettings || {},
     fileOutput: data.fileOutput || {},
@@ -534,6 +539,7 @@ function loadPersistent() {
     state.backgroundRuns = data.backgroundRuns !== false;
     state.maxTokens = Math.max(1000, parseInt(data.maxTokens) || 64000);
     state.modelContextCaps = normalizeContextCaps(data.modelContextCaps);
+    state.modelContextWindows = normalizeContextWindows(data.modelContextWindows);
     state.autoReview = {
       ...state.autoReview,
       ...(data.autoReview || {}),
@@ -606,6 +612,9 @@ async function loadSharedPersistent() {
     }
     if (data.modelContextCaps && typeof data.modelContextCaps === "object") {
       state.modelContextCaps = normalizeContextCaps(data.modelContextCaps);
+    }
+    if (data.modelContextWindows && typeof data.modelContextWindows === "object") {
+      state.modelContextWindows = normalizeContextWindows(data.modelContextWindows);
     }
     state.autoReview = {
       ...state.autoReview,
@@ -815,16 +824,22 @@ function hasModelKey(modelId) {
 }
 
 // ── 每模型上下文预算 ───────────────────────────────────
-// 滑杆只给这几档（0 = 自动）：让"这个模型我能开多大上下文"不必先去查厂商文档。
-// 自动档沿用模型标称窗口；窗口未知时回落 64K，也就是本功能之前的硬编码值。
+// 余量放在最前面：上下文塞到刚好等于窗口，第一条回复就没地方写了。
+const CONTEXT_HEADROOM_RATIO = 0.8;
+const CONTEXT_CAP_MIN = 1024;
+const CONTEXT_CAP_MAX = 4000000;
+// 滑杆的粗档（大模型常用区间）与细档（本地/自定义的小窗口）。窗口只有 8K 的模型
+// 只能在 100K 起跳的粗档里选，等于没得选，所以档位要按这个模型的窗口生成。
 const CONTEXT_CAP_STOPS = [0, 100000, 200000, 400000, 600000, 800000, 1000000];
+const CONTEXT_CAP_FINE_STOPS = [4096, 8192, 16384, 24576, 32768, 49152, 65536, 131072, 262144, 524288];
 const CONTEXT_CAP_FALLBACK = 64000;
 
 function normalizeContextCap(value) {
   const n = parseInt(value, 10);
   if (!Number.isFinite(n) || n <= 0) return 0;
-  // 吸附到最近档位：手输 150000 这类值不会造出滑杆表达不了的第四种状态
-  return CONTEXT_CAP_STOPS.reduce((best, stop) => (stop && Math.abs(stop - n) < Math.abs(best - n) ? stop : best), 0);
+  // 手输保留精确值：131072 这种"模型窗口本来就是那个数"不该被吸附成 100000 少掉三万。
+  // 只夹到区间内，防手滑填 0 或几千万把分母弄没。
+  return Math.min(CONTEXT_CAP_MAX, Math.max(CONTEXT_CAP_MIN, n));
 }
 
 function normalizeContextCaps(raw) {
@@ -833,6 +848,26 @@ function normalizeContextCaps(raw) {
   for (const [modelId, value] of Object.entries(raw)) {
     const cap = normalizeContextCap(value);
     if (cap > 0 && typeof modelId === "string" && modelId) out[modelId] = cap;
+  }
+  return out;
+}
+
+// 探测到的窗口独立一套：它是"这个端点实际能吃多少"，不是"我给这个模型留多少预算"。
+const CONTEXT_WINDOW_MIN = 512;
+const CONTEXT_WINDOW_MAX = 8000000;
+
+function normalizeContextWindow(value) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n) || n < CONTEXT_WINDOW_MIN || n > CONTEXT_WINDOW_MAX) return 0;
+  return n;
+}
+
+function normalizeContextWindows(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [modelId, value] of Object.entries(raw)) {
+    const win = normalizeContextWindow(value);
+    if (win > 0 && typeof modelId === "string" && modelId) out[modelId] = win;
   }
   return out;
 }
@@ -860,37 +895,78 @@ function setModelContextCap(modelId, tokens) {
 }
 
 // 生效预算：这一条同时喂给上下文条与自动压缩阈值，两边不再是两个数。
-// 「自动」= 这个模型自己的默认上限（见 defaultContextCap）：1M 窗口的模型默认 800K、
-// 256K 的默认 200K，而不是所有模型共用全局那一个 64K。只有标称窗口缺失或小到凑不满
-// 一档的模型（自定义 / 本地），才沿用全局「上下文 Token 上限」，再按窗口封顶。
+// 用户显式设过的值优先，但不得超过该模型标称窗口；没设过就用它自己的默认上限。
+// 只有标称窗口缺失的模型（极少数）才沿用全局「上下文 Token 上限」。
 function contextBudgetOf(modelId) {
   const declared = declaredContextWindow(modelId);
   const manual = getContextCap(modelId);
   if (manual) return declared > 0 ? Math.min(manual, declared) : manual;
   const perModel = defaultContextCap(modelId);
   if (perModel) return perModel;
-  const global = parseInt(state.maxTokens, 10) > 0 ? parseInt(state.maxTokens, 10) : CONTEXT_CAP_FALLBACK;
-  return declared > 0 ? Math.min(global, declared) : global;
+  return parseInt(state.maxTokens, 10) > 0 ? parseInt(state.maxTokens, 10) : CONTEXT_CAP_FALLBACK;
 }
 
-// 每模型默认上限：按标称窗口留两成余量（上下文塞到刚好等于窗口，第一条回复就没地方写了），
-// 再向下吸附到滑杆档位——默认值必须是滑杆表达得出来的数，否则"自动"和拖到同一档不等价。
-const CONTEXT_HEADROOM_RATIO = 0.8;
-
+// 每模型默认上限：标称窗口 × 0.8，不吸附到滑杆档位。
+// 吸附会把不同模型压成同一个数（200K/256K/128K 全变 200K），更要命的是小窗口模型
+// 凑不满最低一档只能返回 0，于是"自动"对本地/自定义等于全额占用窗口、没留输出余量。
 function defaultContextCap(modelId) {
   const declared = declaredContextWindow(modelId);
   if (!(declared > 0)) return 0;
   const room = Math.floor(declared * CONTEXT_HEADROOM_RATIO);
+  return Math.max(Math.min(CONTEXT_CAP_MIN, declared), room);
+}
+
+// 这个模型的滑杆档位：自动(0) + 落在它窗口内的所有档 + 与"自动"等价的哪一下。
+// 窗口未知时全档都给（用户自己知道端点能吃多大），标称值本身不进档位表——它没有余量。
+function contextCapStops(modelId) {
+  const declared = declaredContextWindow(modelId);
+  const all = [...CONTEXT_CAP_STOPS.slice(1), ...CONTEXT_CAP_FINE_STOPS].sort((a, b) => a - b);
+  const stops = [0, ...all.filter(n => !(declared > 0) || n <= declared)];
+  const auto = defaultContextCap(modelId);
+  if (auto > 0 && !stops.includes(auto)) stops.push(auto);
+  return stops.sort((a, b) => a - b);
+}
+
+// 手输的精确值多半不在档位里，滑杆落在最近的一档上（数字框仍显示精确值）
+function contextCapStopIndex(modelId, cap) {
+  const stops = contextCapStops(modelId);
+  if (!(cap > 0)) return 0;
   let best = 0;
-  for (const stop of CONTEXT_CAP_STOPS) {
-    if (stop > 0 && stop <= room && stop > best) best = stop;
-  }
+  let bestDist = Infinity;
+  stops.forEach((stop, i) => {
+    if (!stop) return;
+    const dist = Math.abs(stop - cap);
+    if (dist < bestDist) { bestDist = dist; best = i; }
+  });
   return best;
 }
 
-// 模型标称窗口：只做展示（预算小于它时，界面要告诉用户模型本身能吃多少）
+// 模型标称窗口：先看探测覆盖，再看注册表/自定义里填的值。
+// 只做展示与封顶（预算小于它时，界面要告诉用户模型本身能吃多少）。
 function declaredContextWindow(modelId) {
+  const probed = getContextWindow(modelId);
+  if (probed) return probed;
   return parseInt(getModelDefinition(modelId)?.context_window, 10) || 0;
+}
+
+function getContextWindow(modelId) {
+  return normalizeContextWindow(state.modelContextWindows?.[modelId] ?? 0);
+}
+
+function setModelContextWindow(modelId, tokens) {
+  if (!modelId) return;
+  const width = normalizeContextWindow(tokens);
+  if (width > 0) state.modelContextWindows[modelId] = width;
+  else delete state.modelContextWindows[modelId];
+  savePersistent();
+  notify("modelContextWindows", state.modelContextWindows);
+}
+
+// 窗口数是从哪来的，界面要说实话：探测覆盖 / 端点自带 / 完全不知道
+function contextWindowSource(modelId) {
+  if (getContextWindow(modelId)) return "probed";
+  if (parseInt(getModelDefinition(modelId)?.context_window, 10) > 0) return "declared";
+  return "unknown";
 }
 
 // 预算是否来自用户显式设置（用于界面区分"自动"与"手动"）
@@ -902,7 +978,9 @@ function fmtContextTokens(n) {
   const v = parseInt(n, 10) || 0;
   if (!v) return "0";
   if (v >= 1000000) return `${(v / 1000000).toFixed(v % 1000000 ? 1 : 0)}M`;
-  return `${Math.round(v / 1000)}K`;
+  // 本地/自定义模型的窗口常是 6553 这类非整千值，四舍五入成 "7K" 看着像随口给的数
+  if (v >= 1000) return `${v % 1000 ? (v / 1000).toFixed(1) : v / 1000}K`;
+  return String(v);
 }
 
 function addCustomModel(model) {
@@ -1432,7 +1510,9 @@ function setModelRegistry(registry) {
 export {
   API_BASE, state, subscribe, notify,
   setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel,
-  CONTEXT_CAP_STOPS, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, isContextCapManual, fmtContextTokens,
+  CONTEXT_CAP_STOPS, CONTEXT_CAP_FINE_STOPS, CONTEXT_CAP_MIN, CONTEXT_CAP_MAX, contextCapStops, contextCapStopIndex,
+  getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, isContextCapManual, fmtContextTokens,
+  getContextWindow, setModelContextWindow, contextWindowSource, normalizeContextWindow, CONTEXT_WINDOW_MIN, CONTEXT_WINDOW_MAX,
   setActiveExpertId,
   setChatMode, setReasoningEffort, normalizeChatMode, normalizeReasoningEffort,
   setHarnessEnabled, requestLoopExit, takeLoopExit,

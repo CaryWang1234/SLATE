@@ -8,10 +8,29 @@ import urllib.request
 import socket
 import threading
 
+import desktop_tray
+
 # 获取当前文件所在目录，方便后续路径
 BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 LOG_PATH = os.path.join(BASE_DIR, 'desktop_backend.log')
-STORAGE_PATH = os.path.join(BASE_DIR, 'data', 'webview_profile')
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+STORAGE_PATH = os.path.join(DATA_DIR, 'webview_profile')
+
+
+def _find_icon():
+    """托盘要用 app.ico：打包后它随 datas 落在 _internal 根，源码态就在仓库根。"""
+    roots = []
+    if getattr(sys, 'frozen', False):
+        roots.append(getattr(sys, '_MEIPASS', ''))
+    roots += [BASE_DIR, os.path.dirname(os.path.abspath(__file__))]
+    for root in roots:
+        if not root:
+            continue
+        path = os.path.join(root, 'app.ico')
+        if os.path.exists(path):
+            return path
+    return None
+
 
 def log(message):
     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
@@ -151,6 +170,73 @@ def stop_process(process):
     if log_file:
         log_file.close()
 
+class TrayHandle:
+    """窗口与托盘之间的接线。attach_tray() 造它，主循环走完后调 shutdown() 摘图标。
+
+    口径：点 X 不再停机，窗口缩进系统通知区域继续跑（后端就在本进程/子进程里，
+    手机端局域网连接也不断）；只有托盘菜单里的「退出」才真退。托盘起不来（非
+    Windows、或这个会话根本没有通知区域）时退回"关窗即退出"的老行为。
+    """
+
+    def __init__(self, window, log=lambda message: None):
+        self.window = window
+        self.log = log
+        self.tray = None
+        self.quitting = threading.Event()
+        self.hinted = threading.Event()
+
+    def show(self):
+        try:
+            self.window.show()
+            self.window.restore()  # 最小化过的那条路：只 Show 会把窗口留在任务栏下面
+        except Exception as exc:
+            self.log(f'tray show failed: {exc}')
+
+    def request_quit(self):
+        self.quitting.set()  # 先立牌：closing 分支才知道这次是真退，不是又要缩起来
+        try:
+            self.window.destroy()
+        except Exception as exc:
+            self.log(f'tray quit failed: {exc}')
+
+    def on_closing(self):
+        tray_ready = bool(self.tray and self.tray.added())
+        # pywebview 只把字面 False 当"取消关闭"，所以走不走托盘必须交给 close_action 判
+        if desktop_tray.close_action(self.quitting.is_set(), tray_ready) == 'exit':
+            return True
+        try:
+            self.window.hide()
+        except Exception as exc:
+            self.log(f'hide to tray failed: {exc}')
+            return True  # 藏不起来就别把窗口卡没：让这次关闭照常走完
+        if self.tray and not self.hinted.is_set():
+            self.hinted.set()  # 只在第一次缩起来时说清去哪儿找回窗口
+            self.tray.hint()
+        self.log('window hidden to tray')
+        return False
+
+    def shutdown(self):
+        if self.tray:
+            self.tray.stop()
+            self.tray = None
+
+
+def attach_tray(window, log=lambda message: None) -> TrayHandle:
+    handle = TrayHandle(window, log)
+    handle.window.events.closing += handle.on_closing
+    if desktop_tray.available():
+        tray = desktop_tray.Tray(
+            icon_path=_find_icon(),
+            on_show=handle.show,
+            on_quit=handle.request_quit,
+            text=desktop_tray.labels(desktop_tray.read_lang(DATA_DIR)),
+        )
+        if tray.start():
+            handle.tray = tray
+        else:
+            log('tray unavailable; closing the window exits as before')
+    return handle
+
 def main():
     # 1. 启动 uvicorn 服务器
     open(LOG_PATH, 'w', encoding='utf-8').close()
@@ -201,7 +287,10 @@ def main():
         confirm_close=False
     )
 
-    # 3. 启动 pywebview 事件循环（阻塞）
+    # 3. 托盘：关掉窗口不停机，缩到系统通知区域继续跑（先只做 Windows）
+    tray_handle = attach_tray(window, log)
+
+    # 4. 启动 pywebview 事件循环（阻塞）
     log('starting webview')
     webview.start(
         debug=False,
@@ -211,7 +300,8 @@ def main():
     )
     log('webview closed')
 
-    # 4. 窗口关闭后，确保子进程终止（以防万一）
+    # 5. 退出收尾：先摘掉托盘图标（别在通知区域留个按不动的死图标），再确保子进程终止
+    tray_handle.shutdown()
     stop_process(uvicorn_process)
 
 if __name__ == '__main__':

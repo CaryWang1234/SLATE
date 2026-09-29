@@ -197,11 +197,13 @@ ok("任务中心的进行中跟着登记表走（不只看屏幕上这一场）"
 ok("任务中心画出在跑与排队的行，并提供跳转与单独停止",
   /function renderRunRow\(run\)/.test(PANEL) && /abortRun\(run\.run_id\)/.test(PANEL)
   && /去看这一场/.test(PANEL) && /phase === "queued"/.test(PANEL));
+const STORE_EXPORTS = STORE.slice(STORE.indexOf("export {"));
+const exported = (fn) => STORE_EXPORTS.split(/[,\n]/).some((t) => t.trim() === fn);
 ok("并行设置三个控件接线到位（HTML id 与 store setter 一一对应）",
   has(HTML, "id=\"setting-background-runs\"") && has(HTML, "id=\"setting-max-parallel-runs\"")
   && has(HTML, "id=\"setting-max-runs-per-project\"")
   && /function renderParallelSettings\(\)/.test(APPJS)
-  && /export \{[\s\S]{0,900}setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns/.test(STORE));
+  && ["setMaxParallelRuns", "setMaxConcurrentRunsPerProject", "setBackgroundRuns"].every(exported));
 ok("三个取值持久化且越界回落（脏值不该让并行整体失灵）",
   /maxParallelRuns: normalizeCountInt\(state\.maxParallelRuns, 1, 4, 2\)/.test(STORE)
   && /maxConcurrentRunsPerProject: normalizeCountInt\(state\.maxConcurrentRunsPerProject, 1, 3, 1\)/.test(STORE)

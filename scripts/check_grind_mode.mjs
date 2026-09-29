@@ -23,9 +23,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   MAX_ROUNDS, COLLECT_RE, firstRoundPrompt, grindRoundPrompt, collectingPrompt,
-} from "../frontend/js/services/grind.js?v=20260926-003";
+} from "../frontend/js/services/grind.js?v=20260929-001";
 // 与 chat.js 用同一条 ?v= 说明符，否则 Node 里载入的是第二份实例（纯函数也读不到同一份状态）
-const { effectiveToolMode, detectToolCalls, TOOLS } = await import("../frontend/js/services/tools.js?v=20260926-003");
+const { effectiveToolMode, detectToolCalls, TOOLS } = await import("../frontend/js/services/tools.js?v=20260929-001");
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 let checks = 0;
