@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 (如 0.4.4)'
+        description: '版本号（可带预发布后缀，如 0.4.5-rc1 / 0.4.5-beta2）'
         required: true
         default: '0.4.4'
 
@@ -62,7 +62,9 @@ jobs:
         run: |
           $iscc = Get-ChildItem "C:\Program Files*\Inno Setup*\ISCC.exe" | Select-Object -First 1
           if (-not $iscc) { Write-Error "ISCC.exe not found"; exit 1 }
-          & $iscc.FullName "SLATE_InnoSetup.iss"
+          $ver = "${{ steps.version.outputs.version }}"
+          $build = (Get-Date).ToUniversalTime().ToString("yyyyMMddHHmm")
+          & $iscc.FullName "/DMyAppVersion=$ver" "/DMyAppBuild=$build" "SLATE_InnoSetup.iss"
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Generate SHA256 checksum
@@ -173,6 +175,6 @@ jobs:
             artifacts/SLATE-macOS-${{ steps.version.outputs.version }}/*.sha256
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,14 +1,31 @@
 ; ─────────────────────────────────────────────────────────────
 ; SLATE（砚）Windows 安装程序
 ; 编译：ISCC SLATE_InnoSetup.iss（或运行 build_installer.bat）
+; 带预发布版本编译：ISCC /DMyAppVersion=0.4.5-rc1 SLATE_InnoSetup.iss
 ; 语言：向导第一步选择安装包语言（简体中文 / English），
 ;       应用界面语言在后续步骤另选（见 [Code] LangPage）
 ; ─────────────────────────────────────────────────────────────
 
 #define MyAppName "SLATE 砚"
-#define MyAppVersion "0.4.4"
-; 构建号（yyyyMMddHHmm），每次发布构建时更新
-#define MyAppBuild "202609112021"
+; 版本号唯一事实源，允许预发布后缀：0.4.5 / 0.4.5-beta1 / 0.4.5-rc1。
+; 命令行或 CI 用 /DMyAppVersion=<去掉 v 的 tag> 注入时，本行默认值不生效。
+#ifdef MyAppVersion
+#else
+  #define MyAppVersion "0.4.4-rc1"
+#endif
+; VersionInfoVersion 只接受「最多四段数字点分」，后缀会让编译报 invalid，故拆出数字段；
+; AppVersion、安装包文件名、产品版本仍用带后缀的完整标签。
+#define MyAppVerDashPos Pos("-", MyAppVersion)
+#if MyAppVerDashPos > 0
+  #define MyAppNumericVersion Copy(MyAppVersion, 1, MyAppVerDashPos - 1)
+#else
+  #define MyAppNumericVersion MyAppVersion
+#endif
+; 构建号（yyyyMMddHHmm）。发布构建由 CI 用 /DMyAppBuild= 注入，本地构建用下行默认值
+#ifdef MyAppBuild
+#else
+  #define MyAppBuild "202609272109"
+#endif
 #define MyAppPublisher "SLATE"
 #define MyAppURL "https://github.com/CaryWang1234/SLATE"
 #define MyAppExeName "SLATE.exe"
@@ -52,7 +69,7 @@ UninstallDisplayName={#MyAppName}
 CloseApplications=yes
 RestartApplications=no
 ; 版本信息（写入安装包属性页）
-VersionInfoVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppNumericVersion}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} 安装程序 Installer (Build {#MyAppBuild})
 VersionInfoProductName={#MyAppName}

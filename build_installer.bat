@@ -1,5 +1,8 @@
 @echo off
 title Build SLATE Installer
+rem Usage: build_installer.bat [version]
+rem   version: full version, prerelease suffix allowed (0.4.5 / 0.4.5-rc1 / 0.4.5-beta2).
+rem   Omit to use MyAppVersion defined in SLATE_InnoSetup.iss.
 
 set ISCC=ISCC.exe
 set ISCC_FOUND=0
@@ -40,7 +43,11 @@ if not exist "dist\SLATE\SLATE.exe" (
 )
 
 echo [SLATE] Building installer...
-"%ISCC%" "SLATE_InnoSetup.iss"
+rem Optional arg 1 = full version incl. prerelease suffix, e.g. 0.4.5-rc1.
+set "VER_ARG="
+if not "%~1"=="" set "VER_ARG=/DMyAppVersion=%~1"
+if not "%~1"=="" echo [SLATE] Version override: %~1
+"%ISCC%" %VER_ARG% "SLATE_InnoSetup.iss"
 if %errorlevel% neq 0 (
   echo [SLATE] Inno Setup compiler failed or was not found.
   echo [SLATE] Install Inno Setup 6 or open SLATE_InnoSetup.iss manually.
@@ -48,5 +55,5 @@ if %errorlevel% neq 0 (
   exit /b 1
 )
 
-echo [SLATE] Done: installer\SLATE-Setup-0.3.2.exe
+echo [SLATE] Done. See installer\SLATE-Setup-*.exe
 pause

@@ -44,6 +44,7 @@ hiddenimports = [
     'backend.routers.settings',
     'backend.routers.skills',
     'backend.routers.system_info',
+    'backend.routers.theme',
     'backend.routers.update',
     'backend.routers.vault',
     'backend.routers.workflows',

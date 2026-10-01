@@ -29,6 +29,9 @@ if [ -z "$VERSION" ]; then
     log_error "无法确定版本号，请手动传入: bash build_macos.sh 0.4.4"
 fi
 
+# 把同一个版本串（含 -rc1/-beta1 后缀）交给 SLATE_macos.spec 写进 Info.plist
+export SLATE_APP_VERSION="${VERSION}"
+
 BUILD_TIMESTAMP=$(date +"%Y%m%d%H%M")
 APP_NAME="SLATE 砚"
 BUNDLE_NAME="${APP_NAME}.app"
@@ -49,7 +52,12 @@ check_command python3 "python@3"
 check_command pip3 "python-pip"
 check_command pyinstaller "pyinstaller"
 check_command hdiutil ""  # macOS 自带
-check_command create-dmg "create-dmg" || log_warn "create-dmg 未安装，将使用基础 dmg 创建方式 (brew install create-dmg)"
+# create-dmg 是可选依赖，不能走 check_command：那个函数缺命令就 exit 1，而下面本来就备了
+# 一条 hdiutil 的兜底路径——挂在必选检查上，等于没装 create-dmg 的机器连兜底那一支都走不到，
+# 整个构建在依赖检查这一步就没了。
+if ! command -v create-dmg &> /dev/null; then
+    log_warn "create-dmg 未安装，将使用基础 dmg 创建方式 (brew install create-dmg)"
+fi
 
 # ── 清理旧构建 ──────────────────────────────────────────────
 log_info "清理旧构建..."
@@ -151,9 +159,10 @@ rm -rf "${DMG_TEMP}"
 
 # ── 生成校验和 ──────────────────────────────────────────────
 log_info "生成 SHA256 校验和..."
-cd dist
-shasum -a 256 "${DMG_FILENAME}" > "${DMG_FILENAME}.sha256"
-cd ../..
+# 用子 shell 进出目录，不在脚本正文里 cd：原先 cd dist 之后配的是一步退回两级，从
+# <repo>/dist 直接退到仓库的上一层，后面任何"按仓库根算"的相对路径都会落空，而 CI 正是在
+# 这一步之后取产物。子 shell 里的 cd 不碰调用方的 cwd。
+( cd dist && shasum -a 256 "${DMG_FILENAME}" > "${DMG_FILENAME}.sha256" )
 
 # ── 完成 ────────────────────────────────────────────────────
 log_info "=========================================="
@@ -164,7 +173,7 @@ log_info "校验和: dist/${DMG_FILENAME}.sha256"
 log_info ""
 log_info "安装说明："
 log_info "1. 双击打开 ${DMG_FILENAME}"
-log_info "2. 将 SLATE.app 拖入 Applications 文件夹"
+log_info "2. 将 ${BUNDLE_NAME} 拖入 Applications 文件夹"
 log_info "3. 首次运行可能需要右键点击 → 打开（绕过 Gatekeeper）"
 log_info ""
 log_info "如需代码签名，请在脚本中配置 Apple Developer ID"
