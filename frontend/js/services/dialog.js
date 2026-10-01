@@ -7,12 +7,13 @@
  * - dlgPrompt(message, opts)  -> Promise<string|null>  输入框（取消返回 null，确认返回字符串）
  * - dlgToast(message, duration) 轻量通知，复用页面 #toast-container
  * - dlgUserAsk(question, options) -> Promise<string|null>  模型主动弹窗询问（选择题 chips + 自由输入）
+ * - dlgReview({ title, original, revised }) -> Promise<boolean>  原文/改写并排审阅，只有「采用」为 true
  *
  * opts: { title, okText, cancelText, danger, value, placeholder, textarea, rows, options }
  *       options: [{value,label}] 传入时渲染下拉选择（替代手敲枚举值）
  */
 
-import { t } from "./i18n.js?v=20260929-001";
+import { t } from "./i18n.js?v=20261001-002";
 
 // 对话框需要盖在已有模态（卡片编辑、技能执行等，z-index:1000）之上
 let zTop = 2000;
@@ -263,6 +264,70 @@ export function dlgUserAsk(question, options) {
     document.addEventListener("keydown", onKey, true);
 
     input.focus();
+  });
+}
+
+/**
+ * 审阅弹窗：原文与改写并排，只有点「采用」才返回 true。
+ * 其余退出通道（保留原文 / ESC / × / 背景点击）一律返回 false——
+ * 这类弹窗的默认必须是"什么都不改"，否则一次误触就把用户的稿子换了。
+ */
+export function dlgReview({ title = "审阅优化结果", original = "", revised = "" }) {
+  return new Promise((resolve) => {
+    const { root, backdrop, closeBtn, body, footer } = buildShell(title);
+    root.classList.add("dlg-review-modal");
+    let done = false;
+
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      root.remove();
+      resolve(value);
+    };
+
+    const pane = (label, text) => {
+      const box = document.createElement("div");
+      box.className = "dlg-review-pane";
+      const head = document.createElement("div");
+      head.className = "dlg-review-label";
+      head.textContent = label;
+      const content = document.createElement("div");
+      content.className = "dlg-review-text";
+      // 两段正文是用户自己的稿子：英文界面下 MutationObserver 会把撞上词典的那几句翻掉，
+      // 用户看到的"原文"就不是他写的东西了。
+      content.dataset.i18nSkip = "";
+      content.textContent = text;
+      box.appendChild(head);
+      box.appendChild(content);
+      return box;
+    };
+
+    const grid = document.createElement("div");
+    grid.className = "dlg-review-grid";
+    grid.appendChild(pane(t("原文"), original));
+    grid.appendChild(pane(t("优化后"), revised));
+    body.appendChild(grid);
+
+    const keepBtn = makeBtn(t("保留原文"), "dlg-btn");
+    keepBtn.addEventListener("click", () => finish(false));
+    footer.appendChild(keepBtn);
+
+    const adoptBtn = makeBtn(t("采用"), "dlg-btn dlg-btn-primary");
+    adoptBtn.addEventListener("click", () => finish(true));
+    footer.appendChild(adoptBtn);
+
+    backdrop.addEventListener("click", () => finish(false));
+    closeBtn.addEventListener("click", () => finish(false));
+
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      finish(false);
+    };
+    document.addEventListener("keydown", onKey, true);
+
+    adoptBtn.focus();
   });
 }
 

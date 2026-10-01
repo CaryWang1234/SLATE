@@ -27,6 +27,7 @@ const MEMORY = read("frontend/js/components/memory.js");
 const REVIEW = read("frontend/js/components/review.js");
 const UNDERSTAND = read("frontend/js/components/understand.js");
 const BOARD = read("frontend/js/components/whiteboard.js");
+const POLISH = read("frontend/js/components/prompt_polish.js");
 const SUBAGENT = read("frontend/js/services/subagent.js");
 const RISK = read("frontend/js/services/riskguard.js");
 const WORKFLOW = read("frontend/js/services/workflow.js");
@@ -90,6 +91,7 @@ const CONSUMERS = {
   code_understand: [[UNDERSTAND, "startUnderstanding"]],
   code_review: [[REVIEW, "startReview"]],
   whiteboard_organize: [[BOARD, "aiOrganize"]],
+  prompt_polish: [[POLISH, "polishDraft"]],
   subagent: [[SUBAGENT, "runOneSubAgent"]],
   command_explain: [[RISK, "explainCommand"], [MAUTH, "mExplainCommand"]],
   workflow_dag: [[WORKFLOW, "runWorkflow"], [WORKFLOW, "resolveBinding"]],

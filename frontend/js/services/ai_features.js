@@ -11,8 +11,8 @@
  * mode 只是给人看的标签：自动 = 后台自己会发请求，手动 = 你点一下才发，模型调用 = 由模型自己决定调不调。
  */
 
-import { state, getModelKey, savePersistent, notify } from "../store.js?v=20260929-001";
-import { t } from "./i18n.js?v=20260929-001";
+import { state, getModelKey, savePersistent, notify } from "../store.js?v=20261001-002";
+import { t } from "./i18n.js?v=20261001-002";
 
 export const AI_FEATURES = [
   {
@@ -42,6 +42,10 @@ export const AI_FEATURES = [
   {
     id: "whiteboard_organize", name: "黑板 AI 整理", mode: "手动", model: true,
     note: "把黑板现有卡片交给模型重排：改标题、补详情、连依赖、按语义分色",
+  },
+  {
+    id: "prompt_polish", name: "提示词优化", mode: "手动", model: true,
+    note: "输入框「优化提示词」按钮：把草稿交给模型改写一遍，改完必须比对确认才回填，不确认就一个字都不改",
   },
   {
     id: "subagent", name: "子代理并行", mode: "模型调用", tool: "subagent_run", model: true,
@@ -155,7 +159,7 @@ export function aiFeatureOffTip(id) {
  */
 export function aiFeatureBlocked(id) {
   if (isAiFeatureOn(id)) return false;
-  import("../app.js?v=20260929-001").then(({ toast }) => toast(aiFeatureOffTip(id))).catch(() => {});
+  import("../app.js?v=20261001-002").then(({ toast }) => toast(aiFeatureOffTip(id))).catch(() => {});
   return true;
 }
 

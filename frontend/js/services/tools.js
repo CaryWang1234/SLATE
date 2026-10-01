@@ -12,18 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20260929-001";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20260929-001";
-import { guardSkillCall } from "./riskguard.js?v=20260929-001";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20260929-001";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20260929-001";
-import { t } from "./i18n.js?v=20260929-001";
-import { makeId } from "./utils.js?v=20260929-001";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20260929-001";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20260929-001";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20260929-001";
-import { isAiToolOff } from "./ai_features.js?v=20260929-001";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20260929-001";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20261001-002";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261001-002";
+import { guardSkillCall } from "./riskguard.js?v=20261001-002";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20261001-002";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261001-002";
+import { t } from "./i18n.js?v=20261001-002";
+import { makeId } from "./utils.js?v=20261001-002";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261001-002";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261001-002";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20261001-002";
+import { isAiToolOff } from "./ai_features.js?v=20261001-002";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261001-002";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -414,12 +414,21 @@ const TOOLS = {
 
   user_ask: {
     name: "询问用户",
-    description: "任务需要额外条件输入时调用：向用户提出一个选择题并等待回答。question 必填（向用户提出的问题，如“希望用什么风格生成？”），options 可选（2-6 个选项的数组；用户也可自由输入自定义答案）。调用后返回用户的选择，请基于答案继续任务。仅在任务关键条件缺失且无法基于上下文合理假设时使用，不要过度打扰用户。",
+    description: "任务需要额外条件输入时调用：向用户提出一个选择题并等待回答。question 必填（向用户提出的问题，如“希望用什么风格生成？”），options 可选（2-6 个选项的数组；用户也可自由输入自定义答案）。调用后返回用户的选择，请基于答案继续任务。仅在任务关键条件缺失且无法基于上下文合理假设时使用，不要过度打扰用户。夜间模式（全托管）下本工具不弹窗询问，会直接让你从选项里自行拍板继续。",
     params: {
       question: { type: "string", description: "向用户提出的问题", required: true },
       options: { type: "array", description: "选择题选项（2-6 个字符串），用户也可自由输入" },
     },
-    async execute({ question, options }) {
+    async execute({ question, options }, callCtx = {}) {
+      // 这一档对用户的承诺是"没有任何东西在等人"：弹窗挂在一场没人看的对话上，
+      // 任务就会停在那道选择题上过夜，所以这里不弹窗，把决定权交回模型。
+      if (permissionModeFor(callCtx.convId) === "full") {
+        const opts = (Array.isArray(options) ? options : [])
+          .map(o => String(o ?? "").trim()).filter(Boolean).slice(0, 6);
+        return opts.length
+          ? `夜间模式（全托管）：不向用户提问。请从 ${JSON.stringify(opts)} 中自行选定一项，把选定的方案与理由写进回复，然后继续任务。`
+          : "夜间模式（全托管）：不向用户提问。请基于现有信息自行选定合理方案，把方案与理由写进回复，然后继续任务。";
+      }
       const answer = await dlgUserAsk(String(question || "").trim(), options);
       if (answer === null) return "用户未提供条件，请基于现有信息继续，或向用户说明还缺少什么。";
       return `用户回答: ${answer}`;
@@ -434,9 +443,10 @@ const TOOLS = {
     },
     async execute({ keyword }, callCtx = {}) {
       try {
-        let mcp = {}, skills = {}, remoteTools = [];
+        let mcp = {}, evolved = {}, skills = {}, remoteTools = [];
         if (state.skills) {
           mcp = state.skills.mcp || {};
+          evolved = state.skills.evolved || {};
           skills = state.skills.skills || {};
         }
         // 远程那份按「这一场的项目」取：全局清单里被项目掩码关掉的服务器，
@@ -447,6 +457,7 @@ const TOOLS = {
           const res = await get(`/skills${pid ? `?project=${encodeURIComponent(pid)}` : ""}`);
           if (res.code === 0) {
             mcp = res.data.mcp || {};
+            evolved = res.data.evolved || {};
             skills = res.data.skills || {};
             remoteTools = res.data.remoteTools || [];
           }
@@ -454,6 +465,8 @@ const TOOLS = {
         const kw = String(keyword || "").trim().toLowerCase();
         const all = [
           ...Object.entries(mcp).map(([name, desc]) => ({ name, desc: String(desc), type: "内置工具" })),
+          // 自进化的那份单独列一类：模型要知道这名字不是程序自带的，出问题去看「扩展 → 新功能」
+          ...Object.entries(evolved).map(([name, desc]) => ({ name, desc: String(desc), type: "自进化工具" })),
           ...Object.entries(skills).map(([name, desc]) => ({ name, desc: String(desc), type: "SKILL.md 技能" })),
           ...(remoteTools || []).map(t => ({ name: `mcp__${t.serverId}__${t.name}`, desc: `[MCP:${t.server}] ${t.description || ""}`, type: "远程 MCP" })),
         ];
@@ -471,7 +484,7 @@ const TOOLS = {
 
   skill_run: {
     name: "执行工具",
-    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/replace_range按行号范围替换（start_line/end_line/content，推荐先view确认行号）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(终端会话：支持多会话管理、状态保持（cd/$env: 跨命令保持，PowerShell 变量不跨命令）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，Windows 每条命令一个 PowerShell 进程：多行块与 &&/|| 均可用，交互式 REPL（裸 python/node）拿不到输入会拖到超时故别用，高危命令双层拦截；是否每条命令都先征求用户批准，看这一场对话的审批模式（手动=逐条问，自动=只问高危，完全访问=不问）), bg_task(后台终端任务：跑长耗时命令（实验服务器后端、编译训练、长测试）不占住对话，action=start起任务（command命令、label任务名、work_dir工作目录、timeout秒数可选，>0到点自动终止、trigger事件传 {on:「exit」结束事件 / on:「match」命中正则，后者必须带 pattern 正则}、notify默认false，置true时命中/结束会把事件送回叫醒你）/status查状态（不传task_id则列全部）/log取输出（since_offset只取新增，tail_lines取最后N行，grep过滤）/stop杀整棵进程树。start 立刻返回不等命令跑完，返回里有 pid、开头一小段输出和 tail；此后不要轮询！要成果就用 status/log 主动问，或靠 trigger+notify 让系统送你消息。进程寿命等于 SLATE 后端寿命，日志落在 data/bg_tasks/<id>.log；宁可开一个后台任务也不要拿 terminal 干等，命令走的审批档与 terminal 完全一致（后台 ≠ 免审批）), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，engine可选auto（Bing+DuckDuckGo并发合并去重，推荐）/bing/ddg，mode=fetch时query为URL；联网与开浏览器都算「访问网络」，手动审批档下会先征求用户同意，被拒时不要重试，改用本地证据或问用户), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文Markdown，支持JS渲染页面与PDF，mode=html时返回原始HTML，render_js可选auto（正文过短自动渲染）/on/off，max_chars截断长度默认20000上限60000), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新的工具，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果), image_gen(AI图片生成：prompt描述必填、size尺寸可选如1024x1024、n数量默认1最多4，需先在设置中配置模型与Key，返回preview_url可预览), video_gen(AI视频生成：prompt描述必填、duration时长秒数默认5最多30，需先在设置中配置模型与Key，返回preview_url可预览)。也可传入 SKILL.md 技能名读取其定义内容",
+    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/replace_range按行号范围替换（start_line/end_line/content，推荐先view确认行号）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(终端会话：支持多会话管理、状态保持（cd/$env: 跨命令保持，PowerShell 变量不跨命令）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，Windows 每条命令一个 PowerShell 进程：多行块与 &&/|| 均可用，交互式 REPL（裸 python/node）拿不到输入会拖到超时故别用，高危命令双层拦截；是否每条命令都先征求用户批准，看这一场对话的审批模式（手动=逐条问，自动=只问高危，夜间模式=都不问且也不会向你提问）), bg_task(后台终端任务：跑长耗时命令（实验服务器后端、编译训练、长测试）不占住对话，action=start起任务（command命令、label任务名、work_dir工作目录、timeout秒数可选，>0到点自动终止、trigger事件传 {on:「exit」结束事件 / on:「match」命中正则，后者必须带 pattern 正则}、notify默认false，置true时命中/结束会把事件送回叫醒你）/status查状态（不传task_id则列全部）/log取输出（since_offset只取新增，tail_lines取最后N行，grep过滤）/stop杀整棵进程树。start 立刻返回不等命令跑完，返回里有 pid、开头一小段输出和 tail；此后不要轮询！要成果就用 status/log 主动问，或靠 trigger+notify 让系统送你消息。进程寿命等于 SLATE 后端寿命，日志落在 data/bg_tasks/<id>.log；宁可开一个后台任务也不要拿 terminal 干等，命令走的审批档与 terminal 完全一致（后台 ≠ 免审批）), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，engine可选auto（Bing+DuckDuckGo并发合并去重，推荐）/bing/ddg，mode=fetch时query为URL；联网与开浏览器都算「访问网络」，手动审批档下会先征求用户同意，被拒时不要重试，改用本地证据或问用户), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文Markdown，支持JS渲染页面与PDF，mode=html时返回原始HTML，render_js可选auto（正文过短自动渲染）/on/off，max_chars截断长度默认20000上限60000), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新工具，产物落 data/evolved/ 并在「扩展 → 新功能」里管理，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有的自产工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果), image_gen(AI图片生成：prompt描述必填、size尺寸可选如1024x1024、n数量默认1最多4，需先在设置中配置模型与Key，返回preview_url可预览), video_gen(AI视频生成：prompt描述必填、duration时长秒数默认5最多30，需先在设置中配置模型与Key，返回preview_url可预览)。也可传入 SKILL.md 技能名读取其定义内容",
     params: {
       skill: { type: "string", description: "工具或技能名称", required: true },
       params: { type: "object", description: "工具参数" },
@@ -522,12 +535,17 @@ const TOOLS = {
         });
         const res = streamed.fallback
           ? await post("/skills/execute", { skill, params: p, project: scopeProjectParam(callCtx) })
-          : (streamed.result || { code: -1, data: null, message: t("工具流式执行失败") });
+          : (streamed.result || { code: -1, data: null, message: "工具流式执行失败" });
         if (res.code === 0) {
           const data = res.data;
           // 后台任务：把刚起的任务登记进面板并开始轮询（模型不该轮询，但人要看得到）
           if (skill === "bg_task" && data && data.task) noteBgTaskStarted(data, callCtx.convId || "");
           if (data && data.type === "custom_skill" && data.content) return data.content;
+          // 后端把「这活儿没干成」装在 code:0 里回（缺依赖就是这一类）。原样 stringify 会拼成
+          // 「[工具 skill_run 成功]: {"error": ...}」——模型照那句成功往下说，就能宣布 PPT 做好了。
+          if (data && typeof data === "object" && typeof data.error === "string" && data.error) {
+            return { error: data.error };
+          }
           if (typeof data === "string") return data.length > 2000 ? data.slice(0, 2000) + "…" : data;
           return JSON.stringify(data, null, 2);
         }
@@ -1350,10 +1368,10 @@ const TOOL_USE_RECIPES = [
   ["只知道文件名", "project_find_file -> project_read_file"],
   ["修改已有文件", "project_read_file 确认现状 -> file_edit"],
   ["创建新文件", "file_create 原样格式；超长内容用 file_append 分段"],
-  ["运行仓库检查/命令", "skill_run terminal（默认注入项目 work_dir）"],
+  ["运行仓库检查/命令/构建/Git", "skill_run terminal（默认注入项目 work_dir）；只看分支与提交用 git_tool"],
   ["跑长耗时命令（服务器/编译/训练/长测试）", "skill_run bg_task action=start（默认注入 work_dir），起完别轮询；要结果用 action=status/log，或 trigger+notify=true 等消息"],
   ["代码/文档安全扫描", "skill_run code_scan / doc_scan"],
-  ["桌面操作", "skill_run computer_use，截图默认 jpeg/fast"],
+  ["桌面/浏览器操作", "网页优先 browser_automation；必须操作桌面 UI 时才 skill_run computer_use（截图默认 jpeg/fast）"],
   ["生成图表/二维码/文档", "skill_run chart_create/qrcode_create/doc_write/ppt_create/word_create/excel_tool"],
   ["生成图片/视频", "image_gen / video_gen（需先在设置中配置模型与 Key）"],
   ["多个互不依赖的子任务并行", "subagent_run agents=[{name,task}] 一次并行派出，task 写清背景与期望产出"],
@@ -1361,8 +1379,10 @@ const TOOL_USE_RECIPES = [
   ["用户的事像某个既有流程/说过要固化流程", "actions_list keyword=关键词 -> actions_read id=... -> 按步骤实际执行"],
   ["用户要求把流程固化成以后可复用", "actions_list 查重（有则 actions_read 读原文再覆盖）-> actions_write id=... content=SAY-1 原文（含 author: model）"],
   ["任务缺少关键条件（风格/受众/格式/语言等）", "user_ask question=问题 options=[选项]"],
-  ["事实性问答（可查证）", "先 project_files/project_read_file 或 web_search 佐证，再基于事实回答"],
+  ["事实性问答（可查证）", "有本地证据先本地：project_files/project_read_file；查不到再 web_search 佐证，然后基于事实回答"],
   ["在海量代码中定位关键字/函数/符号", "code_search query=关键词（可 scope 缩小范围）-> project_read_file 精读"],
+  ["多步骤大任务", "todo_manage action=init 先拆解，完成一项或一批就 action=update 同步，不等最后一次性写"],
+  ["改完要验证", "读取改后的文件或跑检查/测试/构建；验证不了就说明原因，别只宣布改完了"],
 ];
 
 const SKILL_RUN_QUICK_LIST = [
@@ -1385,17 +1405,9 @@ const CORE_AGENT_TOOLS = [
   "exit_target_mode", "exit_autopilot",
 ];
 
-const AGENT_TOOL_DECISION_RULES = [
-  "需要仓库事实：先 project_files / project_find_file / project_read_file，再回答或修改。",
-  "定位代码位置：code_search 搜内容/符号（可限定 scope），再 project_read_file 精读。",
-  "修改已有文件：先读现状与行号，再 file_edit；改完后读取或运行检查验证。",
-  "创建新文件：file_create 用原样格式；长文件分段 file_append，不要省略内容。",
-  "运行命令/测试/构建/Git：skill_run terminal 或 git_tool，默认会注入项目目录。",
-  "搜索实时信息：web_search（默认 Bing+DDG 双引擎合并）/ web_fetch（精读网页，自动 JS 渲染与 PDF）；有本地证据优先本地。",
-  "桌面/浏览器操作：优先 browser_automation；必须操作系统 UI 时再 computer_use。",
-  "复杂多步任务：用 todo_manage 维护状态；完成一批就更新，不等最后。",
-  "可视化梳理：用 board_batch 一次性组织卡片和依赖。",
-];
+// 模型侧「什么时候用哪个工具」只写在 TOOL_USE_RECIPES 一处。
+// 这里曾经有过第二份「决策规则」，同一件事两种措辞，改一处漏一处（第四批收掉）。
+
 
 function compactDescription(text, limit = 260) {
   const clean = String(text || "").replace(/\s+/g, " ").trim();
@@ -1818,6 +1830,12 @@ async function executeTool(name, params, callCtx = {}) {
   }
   try {
     const output = await tool.execute(params, callCtx);
+    // 工具用 {error:"…"} 报「没干成」：走这条才有 success:false，模型收到的才是
+    // 「失败 + 换参数/换工具」那句下一步提示，而不是「成功」后面跟一段错误 JSON。
+    if (output && typeof output === "object" && !output._type
+      && typeof output.error === "string" && output.error) {
+      return { success: false, output: output.error };
+    }
     // 结构化结果（如 file_edit / file_create）直接传递，同时生成文本摘要给 AI
     if (output && typeof output === "object" && output._type) {
       let summary = `[工具 ${name}] `;
@@ -1903,7 +1921,7 @@ async function executeToolCalls(calls, ctx = {}) {
 
 function getToolsSystemPrompt({ minimal = false, compact = false, project = null } = {}) {
   let s = "\n\n[可用工具]\n";
-  s += "你拥有工具，可以直接操作用户的工作环境。\n\n";
+  s += "你拥有工具，可以直接操作用户的工作环境。有一条边界先说清楚：灾难级命令（清空根目录、格式化磁盘一类）由后端无条件硬拦，任何审批档位都不放行——撞到这类拒绝不要重试、不要换写法绕，直接告诉用户被拦与你的替代方案。\n\n";
   s += "**Agent 调用纪律**\n";
   s += "工具优先：能查证就不猜，能执行就不描述——凡涉及项目现状、实时信息、生成/计算/验证的内容，默认先调用对应工具获取事实再回答，不要凭记忆或推测作答。\n";
   s += "1. 必须使用下方格式实际发出调用，不要只描述意图；禁止说“我先看看”“我需要查看”后停住。\n";
@@ -1911,7 +1929,7 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
   s += "3. 同一回复可批量调用互不依赖的读取/扫描工具；有依赖的等工具结果后再继续。\n";
   s += "4. 工具失败后换参数、换工具或读取更多上下文；不要重复完全相同的失败调用。\n";
   s += "5. 等待用户选择、确认、补充隐私信息或许可时，不调用工具；但任务缺少用户必须提供的关键条件（如生成风格、目标受众、输出格式、尺寸、语言）且无法合理假设时，调用 user_ask 以选择题形式询问，拿到回答后继续。\n";
-  s += "6. 工具/技能纪律：优先用工具佐证再回答——事实性、现状性问题默认查项目文件或联网搜索；仅当回答不依赖外部事实（纯闲聊、纯观点、无需佐证的概念解释）时才直接回答。不确定技能是否存在时，先 skill_search 搜索确认，再决定是否 skill_run；搜索到的技能与任务无关时，绝不强行使用。\n";
+  s += "6. 不确定技能是否存在时，先 skill_search 搜索确认，再决定是否 skill_run；搜到的技能与任务无关时，绝不强行使用。\n";
   s += "7. 收口纪律（循环何时结束以本条为准，其他地方提到收口都按这里）：干完活的标志是回复首行写【任务完成】，再逐项列出交付内容与验证方式——既不调收口工具也不写这个标记，系统判定为仍在推进并自动续跑。写标记之前先按模式显式收口：目标模式调 exit_target_mode、Autopilot 调 exit_autopilot（summary 写清交付了什么、怎么验证、结果如何），然后在下一条回复里给出那份最终汇报。干完了就停，不要继续多读多改来“再确认一遍”；反过来，任务没做完时不要靠停发工具、只说“已完成”或反复复述计划来结束循环。\n\n";
   s += "**工具选择速查**\n";
   // 关掉的功能连"速查"都不提：留着配方等于把模型往一个已经摘掉的工具上引，
@@ -1921,7 +1939,6 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
     if (offToolNames.some(name => route.includes(name))) continue;
     s += `- ${scene}: ${route}\n`;
   }
-  for (const rule of AGENT_TOOL_DECISION_RULES) s += `- ${rule}\n`;
   s += "\n";
   s += "**调用格式**：每次调用独占一块，◈◈◈ 与 ◈◆◆ 是固定标记，不可省略；一次回复可多次调用：\n";
   s += "（开标记必须原样写 ◈◈◈，不要改写成 <tool_name> 之类的标签形式，那样系统解析不到、本轮会直接终止）\n";
@@ -1956,9 +1973,13 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
   ).filter(([key]) => !isAiToolOff(key));
 
   s += compact || minimal ? "**核心 Agent 工具**\n" : "**工具目录**\n";
+  // 自进化工具是用户自己长出来的能力，模型不看目录就不知道它们存在。
+  // 停用的那份后端已经不进 catalog，所以这里列出来的都真能调。
+  const evolvedNames = Object.keys(state.skills?.evolved || {}).slice(0, 8);
   for (const [key, tool] of toolEntries) {
     const desc = key === "skill_run"
-      ? `调用内置工具/远程 MCP/自定义技能。不确定技能名时先调用 skill_search 搜索。常用内置工具：${SKILL_RUN_QUICK_LIST.filter(n => !isAiToolOff(n)).join(", ")}。复杂参数按工具名传入 params。`
+      ? `调用内置工具/远程 MCP/自定义技能。常用内置技能：${SKILL_RUN_QUICK_LIST.filter(n => !isAiToolOff(n)).slice(0, 14).join(", ")}；其余技能名不确定就 skill_search 查（它与 skill_run 的分工已在纪律里）。复杂参数按工具名传入 params。`
+        + (evolvedNames.length ? `自产工具（工具工厂生成，参数不确定就 skill_search 查）：${evolvedNames.join(", ")}。` : "")
       : compactDescription(tool.description);
     s += `### ${key} ${desc}\n`;
     if (tool.rawContent) {
@@ -1976,7 +1997,9 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
         s += `  - ${pk}: ${pv.type}${pv.required ? " (必填)" : ""} ${compactDescription(pv.description, 120)}\n`;
       }
     }
-    s += `示例:\n◈◈◈${key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
+    // 每个工具再附一份调用示例，在精简目录里是把开头那条「调用格式＋示例」重讲 18 遍；
+    // 轻量模型那份（minimal）留着，它们正是靠逐条例子才认得格式。
+    if (!compact) s += `示例:\n◈◈◈${key}\n${JSON.stringify(_example(tool.params))}\n◈◆◆\n\n`;
   }
 
   if (compact || minimal) {
@@ -1999,66 +2022,21 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
 
   if (minimal) return s;
 
-  // 黑板策略
+  // 黑板策略（第四批压成三行：颜色与"批量优先"本来 board_batch 自己的描述里就有）
   s += "[黑板策略 / board_* 工具]\n";
-  s += "黑板是你的可视化工作区，卡片是结构化的思维单元。主动利用黑板帮助用户思考和组织信息。\n\n";
-  s += "**何时主动使用黑板**\n";
-  s += "- 用户讨论复杂问题、多步骤任务、系统设计时，主动用 board_batch 将拆解结果投到黑板\n";
-  s += "- 用户头脑风暴时，将想法整理成卡片并按逻辑关系连接\n";
-  s += "- 任务拆解时，用卡片表示每个步骤，用 arrows 表示依赖关系\n";
-  s += "- 用户说“整理一下”“梳理一下”“画个流程图”时，直接操作黑板\n\n";
-  s += "**颜色语义（主动使用）**\n";
-  s += "- red: 问题/风险/阻塞项\n";
-  s += "- orange: 进行中/待处理\n";
-  s += "- yellow: 想法/待讨论\n";
-  s += "- green: 已完成通过/确认\n";
-  s += "- blue: 信息/数据/资源\n";
-  s += "- purple: 创意/设计/灵感\n\n";
-  s += "**最佳实践：**\n";
-  s += "1. 批量操作优先：用 board_batch 一次性构建完整结构，而非逐个 board_add\n";
-  s += "2. 先读后改：修改前用 board_read 了解现有结构\n";
-  s += "3. 建立连接：用 arrows 明确卡片间的依赖/数据流关系\n";
-  s += "4. 语义着色：根据卡片性质主动分配颜色，让用户一目了然\n";
-  s += "5. 保持简洁：卡片标题不超过 10 字，详情不超过 3 行\n\n";
+  s += "黑板是可视化工作区，卡片是结构化思维单元——用户讨论复杂问题、多步骤任务、系统设计，或说「整理一下」「梳理一下」「画个流程图」时，主动把拆解结果投上去。\n";
+  s += "- 一次成型用 board_batch（别逐个 board_add），改前先 board_read；卡片之间用 arrows 表达依赖/数据流；标题不超过 10 字、详情不超过 3 行\n";
+  s += "- 颜色按性质给：red 问题/阻塞、orange 进行中、yellow 待讨论、green 已完成、blue 信息/数据、purple 创意\n\n";
 
-  // file_edit 专项指导
-  s += "[文件编辑规则 / file_edit 工具]\n";
-  s += "当用户要求修改、编辑、修复项目中的已有文件时，你必须使用 file_edit 工具。\n";
-  s += "核心原则：你说改它就真改，你不说它绝不碰。\n";
-  s += "- file_path: 相对于项目根目录的路径\n";
-  s += "- file_path 只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
-  s += "- 中文、emoji、全角符号等特殊字符必须原样放入 old_text/new_text/content，不要写成 Unicode 转义、HTML 实体或乱码占位；工具会自动识别并保留常见文本编码\n";
-  s += "- 遇到非 UTF-8 文件时，先用 file_peek auto_detect=true 或 file_edit action=view 确认内容；必要时给 file_edit 传 encoding（如 gb18030、utf-16、utf-8-sig）\n";
-  s += "- 修改前必须先用 project_read_file、file_peek 或 file_edit action=view/read 确认最新内容与行号\n";
-  s += "- 推荐路径：已确认行号时使用 action=replace_range，传 start_line、end_line、content，按完整行范围替换，最稳妥\n";
-  s += "- 小范围且 old_text 唯一时可使用 action=edit，edits 为 JSON 数组，每项包含 old_text 和 new_text\n";
-  s += "- action=edit 的 old_text 必须在文件中唯一出现；不唯一或找不到时，重新读取并改用 replace_range\n";
-  s += "- 只包含你要修改的部分，不要包含整个文件内容；replace_range 的 content 只写目标行范围的新内容\n";
-  s += "- 可以包含多组 edits 一次性完成所有修改；跨远距离的大修改优先分多次 replace_range\n";
-  s += "- 用户会看到 diff 预览，并可以选择「接受」「拒绝」或「复制」\n";
-  s += "- 编辑完成后，简要汇报改动与验证结果；没有新指令时不要自动继续无关修改\n";
-
-  // file_create 专项指导
-  s += "\n[文件创建规则 / file_create 工具]\n";
-  s += "当用户要求创建新文件时，你必须使用 file_create 工具。\n";
-  s += "专用格式（重要，不是 JSON）：◈◈◈file_create 后第一行写相对路径，第二行起原样直写文件完整内容，最后用 ◈◆◆ 闭合。\n";
-  s += "内容区严禁 JSON 包裹、严禁转义换行/引号、严禁代码围栏（```）——像平常写代码一样直接写。\n";
-  s += "中文、emoji、全角符号等必须原样直写，禁止替换成 ?、□、\\uXXXX 或 HTML 实体。\n";
-  s += "- 路径只能使用项目根相对路径，不能使用磁盘绝对路径、URL、~ 或 ..\n";
-  s += "- 如果用户只要求输出文件但没有指定位置，默认放到 outputs/ 下，并使用清晰的文件名\n";
-  s += "- 内容必须输出完整，绝不允许用“…其余省略” / “同上”等方式缩写\n";
-  s += "- 超长文件（预计超过 300 行）必须分段写入：先用 file_create 写入前半部分（在完整行边界截断），再用一次或多次 file_append 从断点精确接续补齐剩余部分；单次调用宁小勿大，避免输出被截断\n";
-  s += "- 如果收到“输出被截断”相关的工具结果反馈，不要重复已写入的内容，立即用 file_append 从断点接续补齐\n";
-  s += "- 如果文件已存在，应使用 file_edit 工具而非 file_create\n";
-  s += "- 用户会看到内容预览，并可以选择「接受」「拒绝」或「复制」\n";
-  s += "- 创建完成后，简要汇报文件路径与内容概览\n";
-
-  // file_append 专项指导
-  s += "\n[文件追加规则 / file_append 工具]\n";
-  s += "向已存在文件末尾追加内容，用于分段写入超长文件。格式与 file_create 相同：第一行路径，第二行起原样直写内容，不是 JSON。\n";
-  s += "- 路径对应的文件必须已存在（先 file_create 后 file_append）\n";
-  s += "- 内容从上次写入结束的精确位置接续，绝不重复已有内容\n";
-  s += "- 输出被截断时，系统会要求你用 file_append 补齐；每次追加控制在 300 行以内\n";
+  // 三个文件类工具共用一份规则：以前每个工具各写一段，同一条限制重复三遍（第四批合并）
+  s += "[文件写入规则 / file_edit · file_create · file_append]\n";
+  s += "你说改它就真改，你不说它绝不碰；改完简要汇报改动与验证方式，没有新指令别顺手改无关的地方。\n";
+  s += "- 路径一律写项目根相对路径，不要磁盘绝对路径、URL、~ 或 ..\n";
+  s += "- 改已有文件先用 project_read_file 或 file_edit action=view 读回现状与行号；行号确认后优先 action=replace_range（start_line/end_line/content，content 只写这几行的新内容），不要整文件重写；只有 old_text 在全文件唯一时才用 action=edit，不唯一或没匹配到就重新读、改走 replace_range；隔得远的多处改动分几次 replace_range，比堆一个大 edits 稳\n";
+  s += "- 中文、emoji、全角符号一律原样写进 old_text/new_text/content，不要改成 \\uXXXX 转义、HTML 实体或 ?、□ 占位；碰到非 UTF-8 文件先 view 确认内容，必要时传 encoding（gb18030、utf-16、utf-8-sig）\n";
+  s += "- 新建文件用 file_create，文件已存在就用 file_edit；用户只说要文件没指定位置时，放 outputs/ 下并起能看懂的文件名\n";
+  s += "- 内容必须完整，不许「…其余省略」「同上」；预计超过 300 行就分段写——file_create 写前半段（在完整行边界断开），再用 file_append 从断点精确接续补齐，绝不重复已写内容。收到「输出被截断」的回执就立刻用 file_append 从新断点续写，别重发已经落盘的部分\n";
+  s += "- 用户会看到 diff 或内容预览，可以「接受」「拒绝」或「复制」\n\n";
 
   // actions_write 专项指导
   s += "\n[Action 书写规则 / actions_write 工具]\n";

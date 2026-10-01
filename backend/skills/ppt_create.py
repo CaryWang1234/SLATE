@@ -55,7 +55,7 @@ def execute(
         from pptx.enum.text import PP_ALIGN
         from pptx.enum.shapes import MSO_SHAPE
     except ImportError:
-        return {"error": "缺少依赖 python-pptx，请先执行: pip install python-pptx"}
+        return {"error": "python-pptx 未安装，PPT 生成当前不可用（缺的是运行环境依赖，要用户自行装 python-pptx）。请把缺依赖的情况告诉用户，不要自行执行安装命令。"}
 
     doc_title = (title or "").strip() or "未命名演示文稿"
     theme_name, colors = _resolve_theme(theme)

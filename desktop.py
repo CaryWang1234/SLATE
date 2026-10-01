@@ -10,13 +10,22 @@ import threading
 
 import desktop_tray
 import desktop_instance
+import desktop_platform
 
 # 获取当前文件所在目录，方便后续路径
-BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-LOG_PATH = os.path.join(BASE_DIR, 'desktop_backend.log')
-DATA_DIR = os.path.join(BASE_DIR, 'data')
-STORAGE_PATH = os.path.join(DATA_DIR, 'webview_profile')
+FROZEN = getattr(sys, 'frozen', False)
+BASE_DIR = os.path.dirname(sys.executable) if FROZEN else os.path.dirname(os.path.abspath(__file__))
+# 三个路径由平台助手现算，不在这里写死拼接：Mac 装机版的数据与日志落进 .app 就等于是
+# 一次"升级即丢 Key"，见 desktop_platform 模块说明。
+_PATHS = desktop_platform.bundle_paths(BASE_DIR, os.path.expanduser('~'), sys.platform, FROZEN)
+DATA_DIR = _PATHS['data_dir']
+LOG_PATH = _PATHS['log_path']
+STORAGE_PATH = _PATHS['storage_path']
 WINDOW_TITLE = 'SLATE 砚'
+
+# Mac 装机版的 data 目录是第一次启动才有的，而 main() 上来就 open(LOG_PATH, 'w') 清空日志——
+# 目录不在就是 FileNotFoundError，窗口还没起进程就没了。Windows 与源码态这里是个 no-op。
+os.makedirs(DATA_DIR, exist_ok=True)
 
 # 锁要活得和进程一样久：句柄在，别人才会在双击第二份时判定"已有实例"。
 # 放模块全局而不是局部量，是为了让"谁持着闸门"这件事在代码里读得出来
@@ -103,7 +112,7 @@ def start_uvicorn(port):
     return process
 
 def start_embedded_uvicorn(port):
-    os.environ['SLATE_DATA_DIR'] = os.path.join(BASE_DIR, 'data')
+    os.environ['SLATE_DATA_DIR'] = DATA_DIR
     log_file = open(LOG_PATH, 'a', encoding='utf-8')
     log(f'starting embedded backend on port {port}')
 
@@ -262,7 +271,7 @@ def main():
     preferred_port = 8000
     preferred_url = f'http://127.0.0.1:{preferred_port}'
     uvicorn_process = None
-    frozen = getattr(sys, 'frozen', False)
+    frozen = FROZEN
 
     if not frozen and can_reuse_server(preferred_url):
         port = preferred_port
@@ -311,7 +320,7 @@ def main():
     log('starting webview')
     webview.start(
         debug=False,
-        gui='edgechromium',
+        gui=desktop_platform.webview_gui(sys.platform),
         private_mode=False,
         storage_path=STORAGE_PATH,
     )

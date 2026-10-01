@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20260929-001";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20260929-001";
+import { makeId } from "./services/utils.js?v=20261001-002";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261001-002";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -15,9 +15,50 @@ const API_BASE = `${API_ORIGIN}/api`;
 // 放宽同时要把话说在前头：上限是止损线，不是预算——干完活该由模型自己调 exit_target_mode 收口。
 export const HARNESS_MAX_ROUNDS = 80;
 
+// ── 自定义主题：用户只填四个源色，其余配色令牌由它们推导（services/theme_custom.js）──
+// 默认值抄 style.css 的浅色主题：没开启自定义时，这份状态不该改动任何一个像素。
+export const CUSTOM_THEME_DEFAULT_COLORS = { bg: "#FCFBF8", panel: "#F3EFE8", text: "#26231E", accent: "#836523" };
+const HEX6_RE = /^#[0-9A-Fa-f]{6}$/;
+
+function normalizeThemeHex(value, fallback) {
+  const s = String(value || "").trim();
+  return HEX6_RE.test(s) ? s.toUpperCase() : fallback;
+}
+
+// 脏值（手改 localStorage、手机同步来的半截对象）逐字段回落默认，而不是整份丢弃：
+// 主题只管观感，认不出的字段按默认渲染比"偷偷关掉自定义"更可预期。
+function normalizeCustomTheme(value) {
+  const src = value && typeof value === "object" ? value : {};
+  const c = src.colors && typeof src.colors === "object" ? src.colors : {};
+  const f = src.fonts && typeof src.fonts === "object" ? src.fonts : {};
+  const b = src.background && typeof src.background === "object" ? src.background : {};
+  return {
+    enabled: src.enabled === true,
+    preset: typeof src.preset === "string" ? src.preset : "",
+    colors: {
+      bg: normalizeThemeHex(c.bg, CUSTOM_THEME_DEFAULT_COLORS.bg),
+      panel: normalizeThemeHex(c.panel, CUSTOM_THEME_DEFAULT_COLORS.panel),
+      text: normalizeThemeHex(c.text, CUSTOM_THEME_DEFAULT_COLORS.text),
+      accent: normalizeThemeHex(c.accent, CUSTOM_THEME_DEFAULT_COLORS.accent),
+    },
+    // 空串 = 跟随 style.css 的系统字体栈；这里不校验字体名，可选集合由控件本身限定
+    fonts: {
+      main: typeof f.main === "string" ? f.main : "",
+      code: typeof f.code === "string" ? f.code : "",
+    },
+    background: {
+      enabled: b.enabled === true,
+      // 遮罩浓度：底色压在背景图上的不透明度（%）。低于 40 正文就会直接骑在图上，
+      // 高于 95 等于没有图，所以两端都收死。
+      veil: normalizeCountInt(b.veil, 40, 95, 72),
+    },
+  };
+}
+
 const state = {
   // 主题
   theme: "light",
+  customTheme: normalizeCustomTheme(null),
 
   // 通用 UI 模式：classic（默认，完整布局）| codex（极简 Codex 风格）
   uiMode: "classic",
@@ -88,8 +129,8 @@ const state = {
   // 宪法
   constitution: null,
 
-  // 内置工具 + SKILL.md 技能 + 远程 MCP 工具
-  skills: { mcp: {}, skills: {}, remote: {} },
+  // 内置工具 + 自进化工具（data/evolved/）+ SKILL.md 技能 + 远程 MCP 工具
+  skills: { mcp: {}, evolved: {}, skills: {}, remote: {} },
 
   // Actions（data/actions/*.yml 流程说明书）：内存快照，磁盘才是真源，故不落 localStorage
   actions: [],
@@ -170,7 +211,7 @@ const state = {
   onboardingSeen: false,
 
   // 默认审批模式（设置页那三项改的是它）：ask=手动审批（执行命令/访问网络都问）
-  // auto=自动审批（只在命中高危规则时问）full=完全访问（一律不问；灾难级命令始终由后端硬拦）
+  // auto=自动审批（只在命中高危规则时问）full=夜间模式/全托管（命令、联网、提问都不问；灾难级命令始终由后端硬拦）
   permissionMode: "ask",
 
   // 每一场对话自己的审批档（convId → 档）：没单独选过的场沿用上面那个默认档。
@@ -240,6 +281,7 @@ function notify(key, data) {
 function buildPersistentData() {
   return {
     theme: normalizeTheme(state.theme),
+    customTheme: normalizeCustomTheme(state.customTheme),
     uiMode: state.uiMode === "codex" ? "codex" : "classic",
     modelKeys: state.modelKeys,
     customModels: state.customModels,
@@ -443,6 +485,9 @@ function savePersistent() {
 function getSharedPersistentData(data = buildPersistentData()) {
   return {
     theme: normalizeTheme(data.theme),
+    // 自定义主题跟着同步：配色与字体是一台设备的偏好，手机上也该看到同一套；
+    // 背景图文件只存在本机 data/theme/，手机端拿到的是"要不要用图"这个开关，取不到图时组件会自己退回无图模式。
+    customTheme: normalizeCustomTheme(data.customTheme),
     uiMode: data.uiMode === "codex" ? "codex" : "classic",
     modelKeys: data.modelKeys || {},
     customModels: data.customModels || [],
@@ -516,6 +561,7 @@ function loadPersistent() {
     if (!raw) return;
     const data = JSON.parse(raw);
     state.theme = normalizeTheme(data.theme);
+    state.customTheme = normalizeCustomTheme(data.customTheme);
     state.uiMode = data.uiMode === "codex" ? "codex" : "classic";
     state.modelKeys = data.modelKeys || {};
     state.customModels = data.customModels || [];
@@ -603,6 +649,9 @@ async function loadSharedPersistent() {
     }
     if (Object.prototype.hasOwnProperty.call(data, "theme")) {
       state.theme = normalizeTheme(data.theme);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "customTheme")) {
+      state.customTheme = normalizeCustomTheme(data.customTheme);
     }
     if (Object.prototype.hasOwnProperty.call(data, "uiMode")) {
       state.uiMode = data.uiMode === "codex" ? "codex" : "classic";
@@ -788,15 +837,41 @@ function takeLoopExit() {
   return v;
 }
 
+function customThemeActive() {
+  return state.customTheme?.enabled === true;
+}
+
 function setTheme(t) {
+  // 自定义主题生效时锁住明暗：整套令牌是从那四个源色推导的，再切一次明暗底版只会两套色互相矛盾。
+  // 这里只负责"不生效"，怎么把原因说给用户由各个入口（顶栏按钮 / Ctrl+D / 手机版）自己决定——
+  // 启动时也会调一次 setTheme 回灌已存主题，那种调用不该弹出"被锁了"的提示。
+  if (customThemeActive()) return false;
   state.theme = normalizeTheme(t);
   document.documentElement.setAttribute("data-theme", state.theme);
   savePersistent();
   notify("theme", state.theme);
+  return true;
 }
 
 function toggleTheme() {
-  setTheme(state.theme === "light" ? "dark" : "light");
+  return setTheme(state.theme === "light" ? "dark" : "light");
+}
+
+// 打补丁式改自定义主题：colors/fonts/background 三组各自浅合并，调用方只写要动的那一格，
+// 少传一格就把它冲回默认的做法在这里挡掉（合并完再过一遍 normalize，脏值照样回落）。
+function setCustomTheme(patch) {
+  const cur = normalizeCustomTheme(state.customTheme);
+  const p = patch && typeof patch === "object" ? patch : {};
+  state.customTheme = normalizeCustomTheme({
+    ...cur,
+    ...p,
+    colors: { ...cur.colors, ...(p.colors || {}) },
+    fonts: { ...cur.fonts, ...(p.fonts || {}) },
+    background: { ...cur.background, ...(p.background || {}) },
+  });
+  savePersistent();
+  notify("customTheme", state.customTheme);
+  return state.customTheme;
 }
 
 function setCurrentModel(model) {
@@ -1509,7 +1584,7 @@ function setModelRegistry(registry) {
 
 export {
   API_BASE, state, subscribe, notify,
-  setTheme, toggleTheme, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel,
+  setTheme, toggleTheme, setCustomTheme, customThemeActive, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel,
   CONTEXT_CAP_STOPS, CONTEXT_CAP_FINE_STOPS, CONTEXT_CAP_MIN, CONTEXT_CAP_MAX, contextCapStops, contextCapStopIndex,
   getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, isContextCapManual, fmtContextTokens,
   getContextWindow, setModelContextWindow, contextWindowSource, normalizeContextWindow, CONTEXT_WINDOW_MIN, CONTEXT_WINDOW_MAX,

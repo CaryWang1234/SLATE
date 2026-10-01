@@ -1,16 +1,17 @@
 /**
  * SLATE MCP Server 管理组件
- * 在设置页中展示已配置的外部 MCP Server，支持添加/删除/连接/断开。
+ * 在扩展页中展示已配置的外部 MCP Server，支持添加/删除/连接/断开。
  */
 
-import { get, post, del } from "../services/api.js?v=20260929-001";
-import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20260929-001";
-import { refreshSkills } from "./skill_panel.js?v=20260929-001";
-import { iconSvgEl } from "../services/icons.js?v=20260929-001";
-import { mcpIconKey } from "../services/mcp_logos.js?v=20260929-001";
-import { state, subscribe } from "../store.js?v=20260929-001";
-import { t } from "../services/i18n.js?v=20260929-001";
-import { forgetScopeCatalog } from "../services/project_scope.js?v=20260929-001";
+import { get, post, del } from "../services/api.js?v=20261001-002";
+import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20261001-002";
+import { refreshSkills } from "./skill_panel.js?v=20261001-002";
+import { setExtCount } from "./extensions.js?v=20261001-002";
+import { iconSvgEl } from "../services/icons.js?v=20261001-002";
+import { mcpIconKey } from "../services/mcp_logos.js?v=20261001-002";
+import { state, subscribe } from "../store.js?v=20261001-002";
+import { t } from "../services/i18n.js?v=20261001-002";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20261001-002";
 
 let serverListEl, btnAdd, btnRefresh;
 
@@ -39,6 +40,7 @@ const STATUS_LABEL = {
 function renderServerList(servers) {
   if (!serverListEl) return;
   serverListEl.innerHTML = "";
+  setExtCount("mcp", servers?.length || 0);
 
   if (!servers || !servers.length) {
     const empty = document.createElement("div");

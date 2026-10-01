@@ -45,7 +45,9 @@ MAX_OUTPUT = MAX_OUTPUT_CHARS
 # Terminal pipes use UTF-8 regardless of the Windows ANSI/OEM code page.
 TERMINAL_ENCODING = "utf-8"
 # 禁止的命令前缀（无条件拦截）
-BLOCKED_PREFIXES = ("rm -rf /", "format c:", "format d:", "mkfs", "dd if=")
+# `rm -rf ~` 是 Mac/Linux 那侧的"把家目录抹了"：展开成 /Users/<name>，等于 rm -rf / 换个
+# 写法，而 ~/ 带不带都命中同一个前缀。
+BLOCKED_PREFIXES = ("rm -rf /", "rm -rf ~", "format c:", "format d:", "mkfs", "dd if=")
 
 # 高危命令规则（写死）
 HIGH_RISK_PATTERNS: list[tuple[re.Pattern, str]] = [
@@ -57,6 +59,7 @@ HIGH_RISK_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"Remove-Item", re.I), "删除文件（Remove-Item）"),
     (re.compile(r"\bdd\b(?=.*\bof=)", re.I), "磁盘写入（dd）"),
     (re.compile(r"\b(fdisk|diskpart|parted)\b", re.I), "磁盘分区操作"),
+    (re.compile(r"\bdiskutil\s+(erase|reformat|partitionDisk|secureErase)", re.I), "抹掉/重分区磁盘卷（macOS diskutil）"),
     (re.compile(r"\b(shutdown|reboot|poweroff|halt)\b", re.I), "关机/重启"),
     (re.compile(r"\binit\s+[06]\b"), "关机/重启"),
     (re.compile(r"\bsudo\b", re.I), "提权执行（sudo）"),

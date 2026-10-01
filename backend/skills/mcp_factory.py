@@ -1,20 +1,19 @@
 """工具工厂：让 SLATE 自生产适配自身的工具。
 
-根据描述自动生成符合 SLATE 工具规范的 Python 模块，
-保存到 backend/skills/ 并动态注册到工具列表。
+根据描述生成符合 SLATE 工具规范的 Python 模块，落到 **data/evolved/**（用户数据区），
+由 backend/evolution.py 负责装载、启用/停用、留底与回滚。
 标准 MCP 协议端点见 backend/routers/mcp.py。
+
+产物不落 backend/skills/：那是源码目录，一次重装就把攒下来的自生产工具全冲掉，
+而且"程序往自己源码树里写文件"本身就越过了「零自主修改」这条线。
 """
 
 from __future__ import annotations
 
-import importlib
 import re
-import sys
-from pathlib import Path
 from typing import Any
 
-# 工具模块存放目录
-SKILLS_DIR = Path(__file__).resolve().parent
+from backend import evolution
 
 # 工具模板（占位符用 __XXX__ 包裹，避免与用户代码中的 {} 冲突）
 TOOL_TEMPLATE = '''"""__DESCRIPTION__
@@ -51,10 +50,16 @@ def _clean_text(text: Any) -> str:
 
 
 def _sanitize_name(name: str) -> str:
-    """清理工具名称，只保留安全字符。"""
-    cleaned = re.sub(r"[^\w]", "_", name.strip().lower())
+    """清理工具名称：只留 a-z0-9_（工具名就是文件名，也是模型调用时写的那串）。
+
+    截到 48 是跟 evolution 那条正则对齐的——留下 64 位会在落盘那一步被判定"名字不合法"，
+    等于把一个本来能救的调用推成一次莫名失败。
+    """
+    cleaned = re.sub(r"[^0-9a-z_]+", "_", str(name or "").strip().lower())
     cleaned = re.sub(r"_+", "_", cleaned).strip("_")
-    return cleaned[:64]
+    if cleaned[:1].isdigit():
+        cleaned = f"tool_{cleaned}"
+    return cleaned[:48]
 
 
 def _generate_params(param_specs: list[dict]) -> tuple[str, str, str]:
@@ -124,19 +129,18 @@ def execute(
     overwrite: bool = False,
     **_kw: Any,
 ) -> dict[str, Any]:
-    """创建新的工具。
+    """创建或覆盖一个自进化工具。
 
     Args:
         tool_name: 工具名称（英文，将作为模块名）
         description: 工具功能描述
         params: 参数规格列表，每项包含 name/type/required/default/description
         body: 工具核心逻辑代码（Python 代码字符串）
-        overwrite: 是否覆盖已存在的工具
+        overwrite: 是否覆盖已有的同名自进化工具
 
     Returns:
         dict: 包含 tool_name, file_path, description 等信息
     """
-    # 参数校验
     name = _sanitize_name(tool_name)
     if not name:
         return {"error": "tool_name 不能为空，且只能包含字母数字下划线"}
@@ -147,25 +151,24 @@ def execute(
     if not body or not body.strip():
         return {"error": "body 不能为空，请提供工具的核心逻辑代码"}
 
-    # 检查是否已存在
-    target_path = SKILLS_DIR / f"{name}.py"
-    if target_path.exists() and not overwrite:
+    # 与内置工具同名是自找没趣：那条调用路径先命中内置，生成的这份永远不会被跑到。
+    # 与其让用户攒一个死文件，不如当场说清楚，换个名字再来。
+    if name in evolution.builtin_names():
+        return {"error": f"{name} 已是内置工具名，自生成的同名工具会被内置顶掉；请换一个名字"}
+
+    existing = evolution.read_manifest(name)
+    if existing and not overwrite:
         return {
-            "error": f"工具 {name} 已存在，设置 overwrite=true 可覆盖",
-            "existing_path": str(target_path),
+            "error": f"工具 {name} 已存在，设置 overwrite=true 可覆盖（覆盖前会自动留底，可在「扩展 → 新功能」里回滚）",
+            "existing_path": str(evolution.EVOLVED_DIR / f"{name}.py"),
         }
 
-    # 生成参数
     param_list = params or []
     params_str, param_docs, validations = _generate_params(param_list)
 
-    # 处理 body
-    if not body:
-        body = '    result = {"message": "请实现具体逻辑"}'
-    else:
-        # 确保 body 有正确的缩进
-        body_lines = body.strip().split("\n")
-        body = "\n".join("    " + line if line.strip() else "" for line in body_lines)
+    # 确保 body 有正确的缩进
+    body_lines = body.strip().split("\n")
+    indented = "\n".join("    " + line if line.strip() else "" for line in body_lines)
 
     # 生成代码（占位符替换，避免 .format 与用户代码中的 {} 冲突）
     code = (TOOL_TEMPLATE
@@ -173,42 +176,31 @@ def execute(
             .replace("__PARAMS__", params_str)
             .replace("__PARAM_DOCS__", param_docs or "        无参数")
             .replace("__VALIDATIONS__", validations or "    # 无需校验")
-            .replace("__BODY__", body))
+            .replace("__BODY__", indented))
 
-    # 写入文件
-    try:
-        target_path.write_text(code, encoding="utf-8")
-    except OSError as e:
-        return {"error": f"写入文件失败: {e}"}
+    result = evolution.save_tool(name, description, param_list, code, note="ok")
+    if result["code"] != 0:
+        return {"error": result["message"]}
 
-    # 动态注册到 BUILTIN_SKILLS
-    try:
-        # 导入 skills 路由模块以访问 BUILTIN_SKILLS
-        from backend.routers.skills import BUILTIN_SKILLS
-        BUILTIN_SKILLS[name] = description
-    except ImportError:
-        pass  # 如果导入失败，工具仍然可以通过模块直接调用
-
-    # 尝试导入验证
-    try:
-        # 清除可能的缓存
-        module_name = f"backend.skills.{name}"
-        if module_name in sys.modules:
-            del sys.modules[module_name]
-        importlib.import_module(module_name)
-    except Exception as e:
+    data = result["data"]
+    # 装载一次：语法过了不代表 import 得过（比如 body 里引用了没装的包）。
+    # 当场报出来，比模型下次调用时才发现"装载失败"省一整轮。
+    module, load_error = evolution.load_module(name)
+    if load_error:
         return {
-            "warning": f"工具已创建但导入验证失败: {e}",
+            "warning": f"工具已写入但装载失败：{load_error}",
             "tool_name": name,
-            "file_path": str(target_path),
+            "file_path": data["file_path"],
             "description": description,
         }
 
     return {
         "status": "ok",
         "tool_name": name,
-        "file_path": str(target_path),
+        "file_path": data["file_path"],
         "description": description,
         "params_count": len(param_list),
-        "message": f"工具 {name} 创建成功，已注册到工具列表",
+        "backed_up": data.get("backed_up", ""),
+        "message": (f"工具 {name} 创建成功，已登记到「扩展 → 新功能」"
+                    + ("（覆盖前已留底，可随时回滚）" if data.get("backed_up") else "")),
     }

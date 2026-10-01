@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20260929-001">
+  <link rel="stylesheet" href="./css/style.css?v=20261001-002">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -35,12 +35,13 @@
   <header id="topbar">
     <div class="topbar-left">
       <span class="logo-icon"><img src="./icon.png" alt=""></span>
-      <span class="logo">砚</span>
+      <span class="logo" data-i18n-skip>砚</span>
       <span class="logo-sub">SLATE</span>
     </div>
     <div class="topbar-center">
       <button class="tab-btn active" data-panel="chat">对话</button>
       <button class="tab-btn" data-panel="whiteboard">黑板</button>
+      <button class="tab-btn" data-panel="ext">扩展</button>
       <button class="tab-btn" data-panel="factory">工厂</button>
       <button class="tab-btn" data-panel="settings">设置</button>
     </div>
@@ -141,7 +142,35 @@
               </div>
               <div class="input-toolbar">
                 <div class="input-toolbar-left">
-                  <button id="btn-mode-menu" class="icon-btn" title="模式与功能：磨墨 / 头脑风暴 / 目标模式 / 定时任务 / 提及技能·工具·MCP·文件"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+                  <div class="mode-menu-picker" id="mode-menu-picker">
+                    <button id="btn-mode-menu" class="icon-btn" type="button" title="模式与功能：磨墨 / 头脑风暴 / 目标模式 / 定时任务 / 提及技能·工具·MCP·文件" aria-haspopup="dialog" aria-expanded="false" aria-controls="mode-menu-pop"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+                    <div id="mode-menu-pop" class="mode-menu-pop hidden" role="dialog" aria-label="模式与功能">
+                      <div class="mode-menu-head">模式与功能</div>
+                      <div class="mode-menu-body">
+                        <button type="button" class="mode-row" id="row-grind">
+                          <span class="mode-row-label">磨墨模式</span>
+                          <span class="mode-row-hint" id="mode-status-grind">把粗糙想法研磨成任务书</span>
+                        </button>
+                        <button type="button" class="mode-row" id="row-bs" role="switch" aria-checked="false">
+                          <span class="mode-row-label">头脑风暴</span>
+                          <span class="mode-switch" id="sw-bs" aria-hidden="true"></span>
+                        </button>
+                        <button type="button" class="mode-row" id="row-harness" role="switch" aria-checked="false">
+                          <span class="mode-row-label">目标模式</span>
+                          <span class="mode-switch" id="sw-harness" aria-hidden="true"></span>
+                        </button>
+                        <button type="button" class="mode-row" id="row-schedule">
+                          <span class="mode-row-label">定时任务</span>
+                          <span class="mode-row-hint">创建与管理定时 / 事件任务</span>
+                        </button>
+                        <div class="mode-menu-divider">提及（@ 前缀）</div>
+                        <button type="button" class="mode-row mode-row-mention" id="row-mention-skill"><span class="mode-row-label">技能</span><span class="mode-row-caret">›</span></button>
+                        <button type="button" class="mode-row mode-row-mention" id="row-mention-tool"><span class="mode-row-label">工具</span><span class="mode-row-caret">›</span></button>
+                        <button type="button" class="mode-row mode-row-mention" id="row-mention-mcp"><span class="mode-row-label">MCP</span><span class="mode-row-caret">›</span></button>
+                        <button type="button" class="mode-row mode-row-mention" id="row-mention-file"><span class="mode-row-label">文件</span><span class="mode-row-caret">›</span></button>
+                      </div>
+                    </div>
+                  </div>
                   <select id="chat-mode-select" class="input-pill-select" title="回复方式">
                     <option value="agent">智能体</option>
                     <option value="chat">对话</option>
@@ -183,6 +212,7 @@
                   </div>
                 </div>
                 <div class="input-toolbar-right">
+                  <button id="btn-polish" class="icon-btn polish-btn" title="优化提示词"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg></button>
                   <button id="btn-voice" class="icon-btn voice-btn" title="语音输入" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
                   <button id="btn-send" class="send-btn">发送</button>
                 </div>
@@ -221,10 +251,10 @@
                   <div class="team-input-row">
                     <input id="team-topic-input" type="text" class="team-topic-input" placeholder="输入讨论议题">
                     <select id="team-max-rounds" class="team-rounds-select" title="最大辩论轮数">
-                      <option value="3">3篇</option>
-                      <option value="5" selected>5篇</option>
-                      <option value="8">8篇</option>
-                      <option value="10">10篇</option>
+                      <option value="3">3 轮</option>
+                      <option value="5" selected>5 轮</option>
+                      <option value="8">8 轮</option>
+                      <option value="10">10 轮</option>
                     </select>
                     <button id="btn-start-discuss" class="send-btn">开始讨论</button>
                     <button id="btn-stop-discuss" class="send-btn btn-danger hidden" disabled>停止讨论</button>
@@ -367,7 +397,7 @@
         </div>
         <div class="factory-section">
           <label class="factory-label">约束条件</label>
-          <textarea id="factory-constraints" class="factory-input" placeholder="禁止修改的文件、必须遵守的规则（规则）" rows="2"></textarea>
+          <textarea id="factory-constraints" class="factory-input" placeholder="禁止修改的文件、必须遵守的规则…" rows="2"></textarea>
         </div>
         <button id="btn-generate-prompt" class="generate-btn">生成提示</button>
         <div id="prompt-output" class="prompt-output hidden">
@@ -376,6 +406,101 @@
             <button id="btn-copy-prompt" class="icon-btn" title="复制">⧉</button>
           </div>
           <pre id="prompt-result" class="prompt-result"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 扩展面板：技能 / 工具 / 新功能 / MCP / 专家包 / Actions 统一管理 -->
+    <section id="panel-ext" class="panel ext-panel">
+      <div class="panel-header">
+        <span class="panel-title">扩展</span>
+        <span class="panel-sub">模型能用什么，在这一页决定</span>
+      </div>
+      <div class="ext-layout">
+        <nav class="ext-nav" id="ext-nav"></nav>
+        <div class="ext-main">
+
+          <section class="ext-section" data-ext="skills">
+            <div class="ext-head">
+              <div class="ext-head-text">
+                <h2>技能 · SKILL.md <span class="ext-count" id="ext-skills-count">0</span></h2>
+                <p>一份写给模型的做事说明；导入后模型按任务自己取用</p>
+              </div>
+              <div class="skill-upload">
+                <button id="btn-discover-plugins" class="icon-btn" title="扫描 Codex/Claude 标准目录发现已安装插件"> 发现插件</button>
+                <button id="btn-github-import" class="icon-btn" title="从 GitHub 仓库导入 SKILL.md 技能"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M12 0c6.63 0 12 5.276 12 11.79-.001 5.067-3.29 9.567-8.175 11.187-.6.118-.825-.25-.825-.56 0-.398.015-1.665.015-3.242 0-1.105-.375-1.813-.81-2.181 2.67-.295 5.475-1.297 5.475-5.822 0-1.297-.465-2.344-1.23-3.169.12-.295.54-1.503-.12-3.125 0 0-1.005-.324-3.3 1.209a11.32 11.32 0 00-3-.398c-1.02 0-2.04.133-3 .398-2.295-1.518-3.3-1.209-3.3-1.209-.66 1.622-.24 2.83-.12 3.125-.765.825-1.23 1.887-1.23 3.169 0 4.51 2.79 5.527 5.46 5.822-.345.294-.66.81-.765 1.577-.69.31-2.415.81-3.495-.973-.225-.354-.9-1.223-1.845-1.209-1.005.015-.405.56.015.781.51.28 1.095 1.327 1.23 1.666.24.663 1.02 1.93 4.035 1.385 0 .988.015 1.916.015 2.196 0 .31-.225.664-.825.56C3.303 21.374-.003 16.867 0 11.791 0 5.276 5.37 0 12 0z"/></svg>GitHub</span></button>
+                <button id="btn-import-skill" class="icon-btn" title="从本地路径导入 SKILL.md 技能">⤣ 导入技能</button>
+                <button id="btn-upload-skill" class="icon-btn" title="上传文件新建 SKILL.md 技能">+ 新建技能</button>
+              </div>
+            </div>
+            <div id="ext-skill-list" class="skill-list ext-list"></div>
+          </section>
+
+          <section class="ext-section" data-ext="tools">
+            <div class="ext-head">
+              <div class="ext-head-text">
+                <h2>工具 <span class="ext-count" id="ext-tools-count">0</span></h2>
+                <p>后端常驻能力，模型经 skill_run 调用；关掉的功能连目录都不出现</p>
+              </div>
+            </div>
+            <div id="ext-tool-list" class="skill-list ext-list"></div>
+          </section>
+
+          <section class="ext-section" data-ext="evolved">
+            <div class="ext-head">
+              <div class="ext-head-text">
+                <h2>新功能 <span class="ext-count" id="ext-evolved-count">0</span></h2>
+                <p>SLATE 自己生产的工具，落在 data/evolved/；可停用、可回滚、可随时撤销</p>
+              </div>
+              <div class="skill-upload">
+                <button id="btn-ext-evolved-refresh" class="icon-btn" title="重新读取 data/evolved/"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>刷新</span></button>
+              </div>
+            </div>
+            <div id="ext-evolved-list" class="skill-list ext-list"></div>
+          </section>
+
+          <section class="ext-section" data-ext="mcp">
+            <div class="ext-head">
+              <div class="ext-head-text">
+                <h2>MCP Server <span class="ext-count" id="ext-mcp-count">0</span></h2>
+                <p>连接外部 MCP Server 扩展工具能力（SSE 传输），可按项目掩码</p>
+              </div>
+              <div class="skill-upload">
+                <button id="btn-add-mcp-server" class="icon-btn" title="添加外部 MCP Server">+ 添加 MCP Server</button>
+                <button id="btn-refresh-mcp-servers" class="icon-btn" title="刷新所有 MCP Server 连接状态"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>刷新</span></button>
+              </div>
+            </div>
+            <div id="mcp-server-list" class="mcp-server-list ext-list"></div>
+            <div id="ext-mcp-tool-list" class="skill-list ext-list"></div>
+          </section>
+
+          <section class="ext-section" data-ext="experts">
+            <div class="ext-head">
+              <div class="ext-head-text">
+                <h2>专家包 <span class="ext-count" id="ext-experts-count">0</span></h2>
+                <p>角色设定 + 知识库 + 技能打包成一份可切换的专家</p>
+              </div>
+              <div class="skill-upload">
+                <button id="btn-ext-expert-new" class="icon-btn" title="新建专家包">+ 新建专家包</button>
+                <button id="btn-ext-expert-import" class="icon-btn" title="导入专家包 zip 文件"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>导入</span></button>
+              </div>
+            </div>
+            <div id="ext-expert-list" class="ext-expert-list ext-list"></div>
+          </section>
+
+          <section class="ext-section" data-ext="actions">
+            <div class="ext-head">
+              <div class="ext-head-text">
+                <h2>Actions · 流程说明书 <span class="ext-count" id="ext-actions-count">0</span></h2>
+                <p>把一件常做的事写成必要流程，模型照着走；每一版都留底，可随时回滚</p>
+              </div>
+              <div class="skill-upload">
+                <button id="btn-ext-action-new" class="icon-btn" title="新建 Action">+ 新建 Action</button>
+              </div>
+            </div>
+            <div id="ext-action-list" class="skill-list ext-list"></div>
+          </section>
+
         </div>
       </div>
     </section>
@@ -602,7 +727,7 @@
           </div>
           <label class="setting-check">
             <input id="setting-bg-auto-resume" type="checkbox" checked>
-            <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 12h-4l-3 8-4-16-3 8h-4"/></svg>任务有消息时自动叫醒模型（不必由你说"继续"）</span>
+            <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 12h-4l-3 8-4-16-3 8h-4"/></svg>任务有消息时自动叫醒模型（不必由你说“继续”）</span>
           </label>
           <div class="setting-hint">每个对话最多自动续跑 3 次；关掉后消息仍然保留，下次你说话时一并交给模型</div>
         </section>
@@ -651,6 +776,59 @@
             <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>启用通用 UI（极简 Codex 风格布局）</span>
           </label>
           <div class="setting-hint">开启后顶栏与左右面板收进左侧导航栏；空对话时输入框居中，消息区限宽 720px。此模式仍在探索，布局与入口位置可能随版本调整，可随时在此关闭还原。</div>
+        </section>
+
+        <section class="settings-block" id="settings-theme">
+          <div class="settings-block-head">
+            <div>
+              <h2>自定义主题</h2>
+              <p>改配色、字体与背景图；开启期间深色/浅色切换锁定，关闭即整套回到内置主题</p>
+            </div>
+          </div>
+          <label class="setting-check">
+            <input id="theme-custom-enabled" type="checkbox">
+            <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21.3a9.3 9.3 0 1 1 0-18.6c5.1 0 9.3 3.5 9.3 7.8 0 2.6-2.1 4.4-4.6 4.4H15a2 2 0 0 0-1.4 3.3 1.9 1.9 0 0 1-1.6 3.1z"/><circle cx="7.8" cy="11.3" r="1.1"/><circle cx="10.2" cy="7.3" r="1.1"/><circle cx="14.9" cy="8.1" r="1.1"/></svg>启用自定义主题</span>
+          </label>
+          <div class="setting-hint">配色只填四个源色，其余色值由它们按亮度与对比度算出来：正文与三个次要层级都会被拉到能读的清。开启期间顶栏的明暗按钮与 Ctrl+D 不生效，点它会说明原因。</div>
+          <div class="setting-section">
+            <label class="setting-label">基础预设</label>
+            <div class="theme-preset-row" id="theme-preset-row"></div>
+            <div class="setting-hint">点一个预设就把整套源色填进下面的色板，之后仍可逐格改；改过之后不再属于任何预设</div>
+          </div>
+          <div class="setting-section">
+            <label class="setting-label">配色</label>
+            <div class="theme-color-grid">
+              <label class="theme-color-field"><span>页面底色</span><input id="theme-color-bg" type="color"></label>
+              <label class="theme-color-field"><span>面板底色</span><input id="theme-color-panel" type="color"></label>
+              <label class="theme-color-field"><span>正文颜色</span><input id="theme-color-text" type="color"></label>
+              <label class="theme-color-field"><span>强调颜色</span><input id="theme-color-accent" type="color"></label>
+            </div>
+          </div>
+          <div class="setting-section">
+            <label class="setting-label">字体</label>
+            <div class="theme-font-grid">
+              <label class="theme-color-field"><span>正文</span><select id="theme-font-main" class="setting-input"></select></label>
+              <label class="theme-color-field"><span>代码</span><select id="theme-font-code" class="setting-input"></select></label>
+            </div>
+            <div class="setting-hint">只列系统里已有的字体族，不随包带字体文件；某台机器上没装的字体会回落到系统默认</div>
+          </div>
+          <div class="setting-section">
+            <label class="setting-label">背景图</label>
+            <div class="theme-bg-row">
+              <button id="theme-bg-pick" class="send-btn send-btn-sm" type="button"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3.5" width="18" height="17" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M21 15.5l-4.5-4.5L6 20.5"/></svg>选择图片</span></button>
+              <button id="theme-bg-clear" class="send-btn send-btn-sm" type="button">移除</button>
+              <input id="theme-bg-file" class="theme-file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+            </div>
+            <label class="setting-check theme-bg-switch"><input id="theme-bg-enabled" type="checkbox"><span>铺在界面上</span></label>
+            <label class="setting-row theme-veil-row">
+              <span>遮罩浓度</span>
+              <input id="theme-bg-veil" class="theme-veil-slider" type="range" min="40" max="95" step="1">
+              <output id="theme-bg-veil-value" class="theme-veil-value">72%</output>
+            </label>
+            <div class="setting-hint" id="theme-bg-state">本机还没有背景图</div>
+            <div class="setting-hint">图片存在本机 data/theme/ 里，不进对话记录、也不复制到另一台设备。遮罩浓度是底色压在图上的不透明度：太低正文会骑在图上，太高就等于没有图。</div>
+          </div>
+          <button id="theme-reset" class="send-btn send-btn-sm" type="button">恢复默认色板</button>
         </section>
 
         <section class="settings-block" id="settings-web-search">
@@ -732,47 +910,15 @@
           <div class="settings-block-head">
             <div>
               <h2>审批模式</h2>
-              <p>新对话的默认审批模式。单个对话可在输入框的选择器里改，改过后不再跟随这里；灾难级命令（rm -rf /、format 等）任何模式都强制拦截</p>
+              <p>新对话的默认审批模式。单个对话可在输入框的选择器里改，改过后不再跟随这里；夜间模式是全托管——命令、联网、连「缺条件时问你一句」都不问，适合挂着跑完再看；灾难级命令（rm -rf /、format 等）任何模式都强制拦截</p>
             </div>
           </div>
           <div class="permission-mode-row">
             <button class="review-mode-btn" data-mode="ask"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>手动审批</span></button>
             <button class="review-mode-btn" data-mode="auto"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>自动审批</span></button>
-            <button class="review-mode-btn is-danger" data-mode="full"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>完全访问</span></button>
+            <button class="review-mode-btn is-danger" data-mode="full"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>夜间模式</span></button>
           </div>
           <div id="permission-mode-hint" class="setting-hint"></div>
-        </section>
-
-        <section class="settings-block" id="settings-skills">
-          <div class="settings-block-head">
-            <div>
-              <h2>工具 / 技能</h2>
-              <p>管理内置工具、SKILL.md 技能与 Actions 流程</p>
-            </div>
-          </div>
-          <div id="skill-panel" class="skill-panel">
-            <div id="skill-list" class="skill-list"></div>
-            <div class="skill-upload">
-              <button id="btn-discover-plugins" class="icon-btn" title="扫描 Codex/Claude 标准目录发现已安装插件"> 发现插件</button>
-              <button id="btn-github-import" class="icon-btn" title="从 GitHub 仓库导入 SKILL.md 技能"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M12 0c6.63 0 12 5.276 12 11.79-.001 5.067-3.29 9.567-8.175 11.187-.6.118-.825-.25-.825-.56 0-.398.015-1.665.015-3.242 0-1.105-.375-1.813-.81-2.181 2.67-.295 5.475-1.297 5.475-5.822 0-1.297-.465-2.344-1.23-3.169.12-.295.54-1.503-.12-3.125 0 0-1.005-.324-3.3 1.209a11.32 11.32 0 00-3-.398c-1.02 0-2.04.133-3 .398-2.295-1.518-3.3-1.209-3.3-1.209-.66 1.622-.24 2.83-.12 3.125-.765.825-1.23 1.887-1.23 3.169 0 4.51 2.79 5.527 5.46 5.822-.345.294-.66.81-.765 1.577-.69.31-2.415.81-3.495-.973-.225-.354-.9-1.223-1.845-1.209-1.005.015-.405.56.015.781.51.28 1.095 1.327 1.23 1.666.24.663 1.02 1.93 4.035 1.385 0 .988.015 1.916.015 2.196 0 .31-.225.664-.825.56C3.303 21.374-.003 16.867 0 11.791 0 5.276 5.37 0 12 0z"/></svg>GitHub</span></button>
-              <button id="btn-import-skill" class="icon-btn" title="从本地路径导入 SKILL.md 技能">⤣ 导入技能</button>
-              <button id="btn-upload-skill" class="icon-btn" title="上传文件新建 SKILL.md 技能">+ 新建技能</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="settings-block" id="settings-mcp-servers">
-          <div class="settings-block-head">
-            <div>
-              <h2>MCP Server</h2>
-              <p>连接外部 MCP Server 扩展工具能力（SSE 传输）</p>
-            </div>
-          </div>
-          <div id="mcp-server-list" class="mcp-server-list"></div>
-          <div class="skill-upload">
-            <button id="btn-add-mcp-server" class="icon-btn" title="添加外部 MCP Server">+ 添加 MCP Server</button>
-            <button id="btn-refresh-mcp-servers" class="icon-btn" title="刷新所有 MCP Server 连接状态"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>刷新</span></button>
-          </div>
         </section>
 
         <section class="settings-block" id="settings-data">
@@ -929,6 +1075,28 @@
     </div>
   </div>
 
+  <!-- ══ 自进化工具弹窗：看生成的代码 + 留底回滚 ══ -->
+  <div id="evolved-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="evolved-modal-title">自进化工具</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="evolved-modal-meta" class="evolved-modal-meta"></div>
+        <pre id="evolved-source" class="evolved-source"></pre>
+        <div id="evolved-history" class="evolved-history hidden"></div>
+      </div>
+      <div class="modal-footer evolved-modal-footer">
+        <button id="btn-evolved-history" class="dlg-btn">历史版本</button>
+        <button id="btn-evolved-toggle" class="dlg-btn">停用</button>
+        <button id="btn-evolved-delete" class="dlg-btn dlg-btn-danger">撤销工具</button>
+        <button class="modal-close dlg-btn">关闭</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ 打开项目弹窗 ══ -->
   <div id="project-open-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
@@ -1021,7 +1189,7 @@
         <!-- 知识中心 -->
         <div id="memory-tab-knowledge" class="memory-tab-content">
           <div class="knowledge-toolbar">
-            <input id="knowledge-search-input" class="setting-input" type="text" placeholder="搜索知识库...">
+            <input id="knowledge-search-input" class="setting-input" type="text" placeholder="搜索知识库…">
             <button id="btn-search-knowledge" class="send-btn send-btn-sm">搜索</button>
             <button id="btn-add-knowledge" class="send-btn send-btn-sm">+ 添加知识</button>
           </div>
@@ -1125,7 +1293,7 @@
           <div id="expert-list" class="exp-list"></div>
         </div>
         <div class="exp-detail">
-          <div id="expert-detail-empty" class="exp-detail-empty">从左侧选择专家包，或新建 / 导入一</div>
+          <div id="expert-detail-empty" class="exp-detail-empty">从左侧选择专家包，或新建 / 导入一个</div>
           <div id="expert-detail-form" class="exp-detail-form hidden">
             <div class="exp-field-row">
               <label class="exp-field">名称<input id="expert-name" type="text" class="exp-input" placeholder="专家名称"></label>
@@ -1236,40 +1404,6 @@
     </div>
   </div>
 
-  <!-- ══ 模式与功能弹窗（输入框"+"入口）══ -->
-  <div id="mode-menu-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content mode-menu-content">
-      <div class="modal-header">
-        <span>模式与功能</span>
-        <button class="modal-close icon-btn">×</button>
-      </div>
-      <div class="modal-body mode-menu-body">
-        <button type="button" class="mode-row" id="row-grind">
-          <span class="mode-row-label">磨墨模式</span>
-          <span class="mode-row-hint" id="mode-status-grind">把粗糙想法研磨成任务书</span>
-        </button>
-        <button type="button" class="mode-row" id="row-bs" role="switch" aria-checked="false">
-          <span class="mode-row-label">头脑风暴</span>
-          <span class="mode-switch" id="sw-bs" aria-hidden="true"></span>
-        </button>
-        <button type="button" class="mode-row" id="row-harness" role="switch" aria-checked="false">
-          <span class="mode-row-label">目标模式</span>
-          <span class="mode-switch" id="sw-harness" aria-hidden="true"></span>
-        </button>
-        <button type="button" class="mode-row" id="row-schedule">
-          <span class="mode-row-label">定时任务</span>
-          <span class="mode-row-hint">创建与管理定时 / 事件任务</span>
-        </button>
-        <div class="mode-menu-divider">提及（@ 前缀）</div>
-        <button type="button" class="mode-row mode-row-mention" id="row-mention-skill"><span class="mode-row-label">技能</span><span class="mode-row-caret">›</span></button>
-        <button type="button" class="mode-row mode-row-mention" id="row-mention-tool"><span class="mode-row-label">工具</span><span class="mode-row-caret">›</span></button>
-        <button type="button" class="mode-row mode-row-mention" id="row-mention-mcp"><span class="mode-row-label">MCP</span><span class="mode-row-caret">›</span></button>
-        <button type="button" class="mode-row mode-row-mention" id="row-mention-file"><span class="mode-row-label">文件</span><span class="mode-row-caret">›</span></button>
-      </div>
-    </div>
-  </div>
-
   <!-- ══ 审批弹窗（命令 / 联网共用一扇门，标题与字段名由 riskguard 按这一笔改） ══ -->
   <div id="risk-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
@@ -1283,7 +1417,7 @@
         <label class="setting-label" id="risk-command-label">命令</label>
         <pre id="risk-command" class="risk-command"></pre>
         <label class="setting-label" id="risk-explain-label">目的说明（模型分析）</label>
-        <div id="risk-explain" class="risk-explain">正在分析...</div>
+        <div id="risk-explain" class="risk-explain">正在分析…</div>
         <p class="risk-note">批准后命令将直接执行，请确认已理解其影响</p>
       </div>
       <div class="modal-footer">
@@ -1457,7 +1591,7 @@
             <span class="onboarding-icon"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
             <div class="onboarding-card-body">
               <b>内置工具</b>
-              <p>文件读写编辑、终端沙箱、联网搜索、PPT/Word/Excel 生成等 30 个工具，高危命令需审批</p>
+              <p>文件读写编辑、终端沙箱、联网搜索、PPT/Word/Excel 生成等 35 个工具，高危命令需审批。</p>
             </div>
           </div>
           <div class="onboarding-card">
@@ -1471,7 +1605,7 @@
             <span class="onboarding-icon"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M17 18h1"/><path d="M12 18h1"/><path d="M7 18h1"/></svg></span>
             <div class="onboarding-card-body">
               <b>更多面板</b>
-              <p>顶栏黑板（卡片式逻辑链）、工厂（提示词生产）、设置（模型/上下文 / 备份）</p>
+              <p>顶栏黑板（卡片式逻辑链）、扩展（技能 / 工具 / MCP / 专家包 / Actions）、工厂（提示词生产）、设置（模型/上下文 / 备份）</p>
             </div>
           </div>
         </div>
@@ -1485,7 +1619,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20260929-001"></script>
+  <script type="module" src="./js/app.js?v=20261001-002"></script>
 
 </body>
 </html>

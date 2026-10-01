@@ -24,7 +24,7 @@ def _open_pdf(file_path: str):
     try:
         import pdfplumber
     except ImportError:
-        raise RuntimeError("pdfplumber 未安装。请执行: pip install pdfplumber")
+        raise RuntimeError("pdfplumber 未安装，PDF 解析当前不可用（缺的是运行环境依赖，要用户自行装 pdfplumber）。请把缺依赖的情况告诉用户，不要自行执行安装命令。")
     p = Path(os.path.expanduser(file_path or ""))
     if not p.is_file():
         raise FileNotFoundError(f"文件不存在: {file_path}")

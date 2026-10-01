@@ -10,8 +10,8 @@
  *   iconText(name, text) → 返回 <span class="icon-text">图标+文本</span>（文本走 textNode，无 XSS）
  */
 
-import { CUSTOM_ICONS, CUSTOM_VIEWBOXES } from "./icons_custom.js?v=20260929-001";
-import { MCP_ICONS, MCP_VIEWBOXES } from "./mcp_icons.js?v=20260929-001";
+import { CUSTOM_ICONS, CUSTOM_VIEWBOXES } from "./icons_custom.js?v=20261001-002";
+import { MCP_ICONS, MCP_VIEWBOXES } from "./mcp_icons.js?v=20261001-002";
 
 const ICONS = {
   key: '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
@@ -46,6 +46,7 @@ const ICONS = {
   ban: '<circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
   unlock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
   star: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
   map: '<path d="M1 6v16l7-3 8 3 7-3V3l-7 3-8-3-7 3zm7-3v16m8-13v16"/>',

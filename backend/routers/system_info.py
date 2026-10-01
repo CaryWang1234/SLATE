@@ -200,7 +200,7 @@ async def get_system_info():
     if not HAS_PSUTIL:
         return {
             "code": 1,
-            "message": "psutil 未安装，无法获取系统信息。请运行: pip install psutil",
+            "message": "psutil 未安装，系统信息当前不可用（需要用户在运行环境里安装该依赖）",
             "data": None
         }
     

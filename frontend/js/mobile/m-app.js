@@ -3,9 +3,9 @@
  * 底部 tab 切换 / 顶部状态条 / 键盘适配 / 空状态
  */
 
-import { state, subscribe, toggleTheme } from "../store.js?v=20260929-001";
-import { t } from "../services/i18n.js?v=20260929-001";
-import { mToast } from "./m-ui.js?v=20260929-001";
+import { state, subscribe, toggleTheme } from "../store.js?v=20261001-002";
+import { t } from "../services/i18n.js?v=20261001-002";
+import { mToast } from "./m-ui.js?v=20261001-002";
 
 const $ = (id) => document.getElementById(id);
 
@@ -54,7 +54,8 @@ export function initMApp() {
     themeBtn.innerHTML = "◐";
     themeBtn.title = t("切换主题");
     themeBtn.addEventListener("click", () => {
-      toggleTheme();
+      // 自定义主题生效时 store 会拒绝切换：这里负责把原因说出来，而不是继续播报上一个模式的名字
+      if (!toggleTheme()) { mToast(t("自定义主题生效中，明暗切换已锁定")); return; }
       mToast(state.theme === "dark" ? t("深色模式") : t("浅色模式"));
     });
     right.appendChild(themeBtn);

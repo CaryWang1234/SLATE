@@ -23,6 +23,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
+from backend import evolution
 from backend.skills import plugin_adapter
 from backend.skills.call_ctx import CallCancelled, CallContext
 from backend.skills.sandbox import validate_skill_params, sanitize_param, MAX_PARAM_LENGTH
@@ -61,7 +62,7 @@ BUILTIN_SKILLS: dict[str, str] = {
     "html_bundle": "将 html 及相对路径的 css/js 内联合并为单个 html 文件（便携分发）",
     "code_scan": "代码安全扫描（检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等）",
     "doc_scan": "文档安全扫描（检测文档中的 PII/凭证/财务数据/机密标记/内网信息等，支持 md/docx/pptx/xlsx/pdf）",
-    "mcp_factory": "工具工厂：根据描述自动生成新的工具，让 SLATE 自生产适配自身的工具",
+    "mcp_factory": "工具工厂：根据描述自动生成新工具，产物落 data/evolved/（可在「扩展 → 新功能」停用/回滚/撤销），让 SLATE 自生产适配自身的工具",
     "system_info": "系统元认知：获取本机日期时间、CPU/内存/GPU/存储配置、电池电量、网络连接状态",
     "browser_automation": "浏览器自动化：基于 Playwright 控制 Chromium 浏览器（导航/截图/点击/输入/执行JS）",
     "computer_use": "桌面自动化：基于 pyautogui 控制鼠标键盘与窗口（快速截图/点击/输入/按键/剪贴板/窗口管理/图像定位）",
@@ -97,10 +98,13 @@ def _list_md_skills() -> dict[str, str]:
 
 @router.get("")
 async def list_skills(project: str = "") -> dict[str, Any]:
-    """列出所有可用能力：内置工具 + SKILL.md 技能 + 远程 MCP 工具。
+    """列出所有可用能力：内置工具 + 自进化工具 + SKILL.md 技能 + 远程 MCP 工具。
 
     带 project 时远程那部分按该项目的掩码收窄——面板上看不见的工具，注入给模型的
     schema 里也不该有。
+
+    自进化那份单独给一个 key，不并进 mcp：模型目录里要分清"程序自带的"与"自己长出来的"，
+    后者用户能停用、能回滚、能撤销，混进内置就再也找不回来。
     """
     from backend import mcp_client
     remote_tools = mcp_client.get_all_remote_tools(project)
@@ -113,6 +117,7 @@ async def list_skills(project: str = "") -> dict[str, Any]:
         "code": 0,
         "data": {
             "mcp": BUILTIN_SKILLS,
+            "evolved": evolution.catalog(),
             "skills": _list_md_skills(),
             "remote": remote_dict,
             "remoteTools": remote_tools,
@@ -142,6 +147,18 @@ async def execute_skill(body: dict[str, Any]) -> dict[str, Any]:
         if not hasattr(module, "execute"):
             return {"code": -1, "data": None, "message": f"技能 {skill_name} 缺少 execute 函数"}
 
+        try:
+            result = await run_in_threadpool(module.execute, **params)
+            return {"code": 0, "data": result, "message": "ok"}
+        except Exception as e:
+            return {"code": -1, "data": None, "message": f"技能执行失败: {e}"}
+
+    # 自进化工具（data/evolved/）：内置那条路已经先走过，同名时内置赢
+    clean_evolved = evolution.clean_name(skill_name)
+    if clean_evolved and evolution.read_manifest(clean_evolved):
+        module, load_error = evolution.load_module(clean_evolved)
+        if module is None:
+            return {"code": -1, "data": None, "message": load_error}
         try:
             result = await run_in_threadpool(module.execute, **params)
             return {"code": 0, "data": result, "message": "ok"}
@@ -187,7 +204,12 @@ def _sse_frame(envelope: dict[str, Any]) -> str:
 
 
 def _resolve_stream_target(skill_name: str, params: dict[str, Any]) -> tuple[str, Any, str]:
-    """定位执行体。返回 (kind, target, error)，kind ∈ builtin / custom / mcp / ''。"""
+    """定位执行体。返回 (kind, target, error)，kind ∈ builtin / custom / mcp / ''。
+
+    自进化工具也按 builtin 这条路回（都是"一个带 execute 的模块"），区别只在装载方式：
+    前者从 data/evolved/ 按文件装载，后者从源码树 import。分流写在下面，装载失败
+    必须原样回原因——"停用中"与"代码有语法错"对用户是两件完全不同的事。
+    """
     if skill_name in BUILTIN_SKILLS:
         try:
             module = importlib.import_module(f"backend.skills.{skill_name}")
@@ -195,6 +217,13 @@ def _resolve_stream_target(skill_name: str, params: dict[str, Any]) -> tuple[str
             return "builtin", None, f"技能模块 {skill_name} 加载失败"
         if not hasattr(module, "execute") and not hasattr(module, "run_stream"):
             return "builtin", None, f"技能 {skill_name} 缺少 execute 函数"
+        return "builtin", module, ""
+
+    clean_evolved = evolution.clean_name(skill_name)
+    if clean_evolved and evolution.read_manifest(clean_evolved):
+        module, load_error = evolution.load_module(clean_evolved)
+        if module is None:
+            return "builtin", None, load_error
         return "builtin", module, ""
 
     if skill_name.startswith("mcp__"):

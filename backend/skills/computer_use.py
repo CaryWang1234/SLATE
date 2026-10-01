@@ -62,7 +62,11 @@ def _get_pyautogui():
     try:
         import pyautogui
     except ImportError:
-        raise RuntimeError("pyautogui 未安装。请执行: pip install pyautogui")
+        raise RuntimeError(
+            "pyautogui 未安装，桌面自动化这项能力当前不可用"
+            "（缺的是 SLATE 运行环境的依赖，需要用户在终端里装 pyautogui）。"
+            "请把缺依赖的情况告诉用户，不要自行执行安装命令。"
+        )
     pyautogui.FAILSAFE = _FAILSAFE
     pyautogui.PAUSE = _PAUSE
     pyautogui.MINIMUM_DURATION = 0
@@ -78,7 +82,11 @@ def _get_gw():
     try:
         import pygetwindow as gw
     except ImportError:
-        raise RuntimeError("pygetwindow 未安装。请执行: pip install pygetwindow")
+        raise RuntimeError(
+            "pygetwindow 未安装，窗口管理这项能力当前不可用"
+            "（缺的是 SLATE 运行环境的依赖，需要用户在终端里装 pygetwindow）。"
+            "请把缺依赖的情况告诉用户，不要自行执行安装命令。"
+        )
     _GW = gw
     return gw
 
@@ -407,7 +415,8 @@ def execute(
             try:
                 location = pag.locateOnScreen(image_path, confidence=confidence)
             except (TypeError, NotImplementedError):
-                return {"error": "图像定位需要安装 opencv：pip install opencv-python"}
+                return {"error": "图像定位需要 opencv，当前运行环境没有它（要用户自行安装）。"
+                                 "请改用坐标或窗口标题定位，并把缺 opencv 这件事告诉用户，不要自行执行安装命令。"}
             if location is None:
                 return {"status": "not_found", "message": "未在屏幕上找到匹配的图片", "elapsed_ms": int((time.perf_counter() - started) * 1000)}
             center = pag.center(location)

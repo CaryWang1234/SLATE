@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import re
+import sys
 import webbrowser
 
 import httpx
@@ -14,14 +15,17 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/update", tags=["update"])
 
-# 与 SLATE_InnoSetup.iss 的 MyAppVersion 保持同步
-APP_VERSION = "0.4.4"
+# 与 SLATE_InnoSetup.iss 的 MyAppVersion 保持同步；预发布版带后缀，如 "0.4.5-rc1"
+APP_VERSION = "0.4.4-rc1"
 
 REPO = "CaryWang1234/SLATE"
 API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
-# 安装包命名规则：SLATE-Setup-{版本}.exe（与 build_installer.bat 产物一致）
-DOWNLOAD_URL = "https://github.com/{repo}/releases/download/{tag}/SLATE-Setup-{ver}.exe"
+# 安装包命名规则：SLATE-Setup-{版本}{后缀}，与 build_installer.bat / build_macos.sh 的产物一致
+DOWNLOAD_URL = "https://github.com/{repo}/releases/download/{tag}/SLATE-Setup-{ver}{ext}"
 RELEASE_PAGE = "https://github.com/{repo}/releases/tag/{tag}"
+# 各平台的装机包后缀。Linux 不在这张表里——它没有打包产物（官网就是这么写的），
+# 于是那一侧拿到的是 Release 页，而不是今天这样被指到 Windows 的 .exe 上。
+INSTALLER_EXT = {"win32": ".exe", "darwin": ".dmg"}
 # 允许用系统浏览器打开的链接前缀：本仓库 GitHub 页 + 官网
 ALLOWED_PREFIXES = (
     f"https://github.com/{REPO}",
@@ -29,10 +33,42 @@ ALLOWED_PREFIXES = (
 )
 
 
-def _parse_version(tag: str) -> tuple[int, ...]:
-    """把 v0.2.7 / 0.2.7 / v0.2.7-beta 之类的 tag 解析为可比较的数字元组。"""
-    nums = re.findall(r"\d+", tag or "")
-    return tuple(int(n) for n in nums[:3]) if nums else (0,)
+def _parse_version(tag: str) -> tuple[int, int, int, int]:
+    """解析成可比较四元组：数字三段 + 预发布位次（首个 - 之后算预发布，位次 0，排在同名正式版 1 之前）。"""
+    base, sep, _suffix = (tag or "").strip().lstrip("vV").partition("-")
+    nums = [int(n) for n in re.findall(r"\d+", base)[:3]]
+    nums += [0] * (3 - len(nums))
+    return (*nums, 0 if sep else 1)
+
+
+def installer_ext(platform: str) -> str:
+    """这台机器的装机包后缀；空串 = 这个平台没有打包产物。"""
+    return INSTALLER_EXT.get(str(platform or ""), "")
+
+
+def pick_asset_url(assets, ext: str) -> str:
+    """从 Release 资产里挑出本机那一份。
+
+    只认 endswith(ext)：校验文件叫 `SLATE-Setup-x.dmg.sha256`，按后缀自然排除了；
+    反过来如果判据写成"名字里带 .dmg"就会把校验和当成安装包发给用户。
+    """
+    if not ext:
+        return ""
+    for asset in assets or []:
+        if str(asset.get("name") or "").lower().endswith(ext):
+            return str(asset.get("browser_download_url") or "")
+    return ""
+
+
+def download_url_for(assets, repo: str, tag: str, ver: str, platform: str) -> str:
+    """资产直链 → 按命名规则拼的直链 → Release 页（这个平台压根没有包时）。"""
+    ext = installer_ext(platform)
+    asset_url = pick_asset_url(assets, ext)
+    if asset_url:
+        return asset_url
+    if ext:
+        return DOWNLOAD_URL.format(repo=repo, tag=tag, ver=ver, ext=ext)
+    return RELEASE_PAGE.format(repo=repo, tag=tag)
 
 
 @router.get("/check")
@@ -57,13 +93,7 @@ async def check_update():
     latest = tag.lstrip("vV")
     has_update = bool(tag) and _parse_version(latest) > _parse_version(APP_VERSION)
 
-    # 优先取 Release 资产里的 .exe 直链，取不到再按命名规则拼接
-    asset_url = ""
-    for asset in data.get("assets") or []:
-        if str(asset.get("name") or "").lower().endswith(".exe"):
-            asset_url = str(asset.get("browser_download_url") or "")
-            break
-
+    # 下载直链按当前平台挑（Mac 拿 .dmg，Windows 拿 .exe），见 download_url_for
     return {
         "code": 0,
         "data": {
@@ -71,7 +101,7 @@ async def check_update():
             "latest": latest,
             "hasUpdate": has_update,
             "checked": True,
-            "downloadUrl": asset_url or DOWNLOAD_URL.format(repo=REPO, tag=tag, ver=latest),
+            "downloadUrl": download_url_for(data.get("assets"), REPO, tag, latest, sys.platform),
             "releaseUrl": RELEASE_PAGE.format(repo=REPO, tag=tag),
             "notes": str(data.get("body") or "")[:500],
         },

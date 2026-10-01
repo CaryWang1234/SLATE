@@ -47,7 +47,9 @@ def _ensure_browser() -> Any:
         from playwright.sync_api import sync_playwright
     except ImportError:
         raise RuntimeError(
-            "playwright 未安装。请执行: pip install playwright && playwright install chromium"
+            "playwright 未安装，浏览器自动化这项能力当前不可用"
+            "（缺的是 SLATE 运行环境的依赖，需要用户在终端里装 playwright 与 chromium）。"
+            "请把缺依赖的情况告诉用户，不要自行执行安装命令。"
         )
     _playwright = sync_playwright().start()
     _browser = _playwright.chromium.launch(headless=_headless)

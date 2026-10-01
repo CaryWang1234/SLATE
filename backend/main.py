@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
@@ -11,8 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import actions, bg_tasks, chat, constitution, diagnostics, events, experts, files, grind, i18n, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, typing, update, vault, workflows
-from backend import mcp_client
+from backend.routers import actions, bg_tasks, chat, constitution, diagnostics, events, evolved, experts, files, grind, i18n, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, theme, typing, update, vault, workflows
+from backend import evolution, mcp_client
 from backend.skills import bg_task as bg_task_skill
 
 # system_info 需要 psutil，可能不在所有环境中可用
@@ -20,7 +21,6 @@ try:
     from backend.routers import system_info
     HAS_SYSTEM_INFO = True
 except ImportError as e:
-    import logging
     logging.warning(f"[system_info] 路由导入失败: {e}")
     HAS_SYSTEM_INFO = False
 
@@ -98,6 +98,8 @@ app.include_router(typing.router, prefix="/api")
 app.include_router(diagnostics.router, prefix="/api")
 app.include_router(actions.router, prefix="/api")
 app.include_router(bg_tasks.router, prefix="/api")
+app.include_router(theme.router, prefix="/api")
+app.include_router(evolved.router, prefix="/api")
 
 # system_info 路由（需要 psutil，可能不可用）
 if HAS_SYSTEM_INFO:
@@ -108,6 +110,21 @@ if HAS_SYSTEM_INFO:
 async def _start_schedule_loop():
     """启动定时任务后台循环。"""
     scheduler.start_scheduler()
+
+
+@app.on_event("startup")
+async def _migrate_legacy_tools():
+    """把旧版写进 backend/skills/ 的自生产工具搬进 data/evolved/。
+
+    失败只记日志：那些文件在新版里本来也不会被注册（不在 BUILTIN_SKILLS 里），
+    留一次迁移不顺不该让整个后端起不来。
+    """
+    try:
+        moved = evolution.migrate_legacy()
+        if moved:
+            logging.info(f"[evolution] 自进化工具已迁入 data/evolved/: {', '.join(moved)}")
+    except Exception as e:  # noqa: BLE001 - 启动路径上的兜底，见上方说明
+        logging.warning(f"[evolution] 旧自进化工具迁移失败: {e}")
 
 
 @app.on_event("startup")

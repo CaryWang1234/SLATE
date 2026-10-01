@@ -177,7 +177,9 @@ def _get_network_info() -> dict:
 def execute() -> str:
     """获取系统元认知信息并返回格式化文本"""
     if not HAS_PSUTIL:
-        return "psutil 未安装，无法获取系统信息。请运行: pip install psutil"
+        return ("psutil 未安装，系统信息这项能力当前不可用"
+                "（缺的是 SLATE 运行环境的依赖，需要用户在终端里装）。"
+                "请把缺依赖的情况告诉用户，不要自行执行安装命令。")
 
     now = datetime.now()
     tz = datetime.now().astimezone().tzinfo

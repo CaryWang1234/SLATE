@@ -2,7 +2,7 @@
  * 审批模式守卫：scripts/check_permission_mode.mjs
  *
  * 这一改最坏的失败模式不是"弹窗没出来"（当场就能看见），而是**问错了档还没人知道**：
- * 输入框写着"完全访问"却每一条都问、切到另一场对话还留着上一场的档、
+ * 输入框写着"夜间模式"却每一条都问、切到另一场对话还留着上一场的档、
  * auto 档把联网也拦下来（用户要的就是"只拦高危"）、手机那侧自己再算一遍档位
  * 于是桌面放行手机弹窗。这些都属"看不出来的那类"，所以钉死在下面。
  *
@@ -12,8 +12,11 @@
  * ② 三档语义只有一处实现：ask=命令+联网都问，auto=只问高危，full=都不问；
  *    命令类＝terminal / bg_task(start)，联网类＝web_search / web_fetch / browser_automation。
  * ③ 判定与"问人的脸"分开：手机只换 UI（window.__slateGuardUi），不许自带第二份档位判断。
- * ④ 输入框那颗胶囊：跟着屏幕上这一场重画；完全访问图标与文字都标红；弹窗自带 hidden 声明。
+ * ④ 输入框那颗胶囊：跟着屏幕上这一场重画；夜间模式（full）图标与文字都标红；弹窗自带 hidden 声明。
  * ⑤ 新会话创建那一刻，"还没建起来的这一场"选的档要搬到它名下；删会话要清掉那一份。
+ * ⑥ 夜间模式＝全托管：这一档不许留下任何"等人"的入口——命令/联网走 riskguard 直接放行，
+ *    AI 主动问用户那句（user_ask）也不许弹窗，要回话让模型自己拍板；显示名换了三处
+ *    （胶囊 / 设置页 / 词条），存储值仍是 full，旧名"完全访问"不许在界面代码里残留。
  *
  * 运行：node scripts/check_permission_mode.mjs
  */
@@ -39,6 +42,7 @@ const MINIT = read("frontend/js/mobile/m-init.js");
 const HTML = read("frontend/index.html");
 const CSS = read("frontend/css/style.css");
 const DICT = read("frontend/js/services/i18n_dict.js");
+const ICONS = read("frontend/js/services/icons.js");
 const SETTINGS_PY = read("backend/routers/settings.py");
 
 const results = [];
@@ -148,14 +152,21 @@ ok("胶囊跟着屏幕上这一场重画：切会话/新会话都会经过 updat
 ok("选择器只认 store 的档位读写，不自己存一份",
   /import \{ state, subscribe, permissionModeFor, setPermissionModeFor \} from "\.\.\/store\.js/.test(PICKER)
   && !/localStorage/.test(PICKER));
-ok("完全访问：胶囊上的图标与文字都标红",
+ok("夜间模式：胶囊上的图标与文字都标红",
   /\.approval-pill\.is-full \{\s*\n\s*color: var\(--danger\)/.test(CSS)
   && /\.approval-pill\.is-full \.approval-pill-icon \{\s*\n\s*color: var\(--danger\)/.test(CSS)
   && /btn\.classList\.toggle\("is-full", mode\.id === "full"\)/.test(PICKER));
+ok("夜间模式那一行的显示名与图标已换（存储值仍是 full，改名不改键）",
+  /\{ id: "full", icon: "moon", label: "夜间模式"/.test(PICKER)
+  && /moon: '<path d="M21 12\.79A9 9 0 1 1 11\.21 3 7 7 0 0 0 21 12\.79z"\/>'/.test(ICONS)
+  && /id: "full"/.test(PICKER));
+ok("旧的显示名「完全访问」在界面代码里不留残留（半改会让胶囊与设置页各说一个名字）",
+  !/完全访问/.test(PICKER + HTML + CSS + DICT + APPJS));
 ok("弹窗里那一行也整行标红，用的还是同一个 --danger",
   /\.approval-opt\.is-full,[\s\S]{0,80}color: var\(--danger\)/.test(CSS));
-ok("设置页的「完全访问」按钮同样标红（两处红同源）",
+ok("设置页的「夜间模式」按钮同样标红、名字与胶囊一致（两处同源）",
   /data-mode="full"[^>]*class="review-mode-btn is-danger"|class="review-mode-btn is-danger"[^>]*data-mode="full"/.test(HTML)
+  && /data-mode="full"[\s\S]{0,400}夜间模式/.test(HTML)
   && /\.permission-mode-row \.review-mode-btn\.is-danger \.svg-icon \{[\s\S]{0,60}color: var\(--danger\)/.test(CSS));
 ok("自带 hidden 的弹窗在桌面 CSS 里声明过（桌面没有全局 .hidden）",
   /\.approval-pop\.hidden \{ display: none; \}/.test(CSS));
@@ -170,9 +181,34 @@ ok("设置页那一族按钮改的是默认档（走 store setter，会通知胶
   && !/function applyPermissionMode\(mode\) \{\s*\n\s*state\.permissionMode = mode;/.test(APPJS));
 ok("设置页文案说明白「这是新对话的默认档，单场可改」",
   /新对话的默认审批模式/.test(HTML));
-for (const key of ["审批模式", "手动审批", "完全访问", "命令执行审批", "联网访问审批", "只改这一场"]) {
+for (const key of ["审批模式", "手动审批", "夜间模式", "命令执行审批", "联网访问审批", "只改这一场"]) {
   ok(`词条：${key}`, new RegExp(`"${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}":`).test(DICT));
 }
+
+// ── 7b. 夜间模式＝全托管：不许留下任何"等人"的入口 ──────────────
+// 判口只认 store 那一个 accessor，且必须按**这一场**（callCtx.convId）取档：
+// 并行时拿"屏幕上那一颗"去判，后台那场就会在没人看的对话里弹出一道选择题。
+const ASK_BLOCK = TOOLS.slice(TOOLS.indexOf("  user_ask: {"));
+const ASK_BODY = ASK_BLOCK.slice(0, ASK_BLOCK.indexOf("\n  },"));
+ok("user_ask 在夜间模式下不弹窗：先按这一场的档位分流",
+  /if \(permissionModeFor\(callCtx\.convId\) === "full"\) \{/.test(ASK_BODY));
+// 两条回执（有选项 / 没选项）必须各自成立：整块 ASK_BODY 一起判会让另一支把分借走，
+// 实测给"有选项那支"下毒后守卫仍全绿（见 .qoder/mutate_approval_mode.py）。
+const ASK_TERNARY = ASK_BODY.slice(ASK_BODY.indexOf("return opts.length"));
+const ARM_SPLIT = ASK_TERNARY.indexOf("\n          : ");
+const OPT_ARM = ASK_TERNARY.slice(0, ARM_SPLIT);
+const NOOPT_ARM = ASK_TERNARY.slice(ARM_SPLIT);
+ok("夜间模式有选项时：回执把选项本身交出去，模型才知道能在什么里挑",
+  /夜间模式（全托管）：不向用户提问/.test(OPT_ARM)
+  && /JSON\.stringify\(opts\)/.test(OPT_ARM)
+  && /中自行选定一项/.test(OPT_ARM));
+ok("夜间模式没选项时：回执同样要它自己定方案（不能回一句空的让它再问一遍）",
+  /夜间模式（全托管）：不向用户提问/.test(NOOPT_ARM)
+  && /自行选定/.test(NOOPT_ARM));
+ok("弹窗只留在非夜间那条路上（dlgUserAsk 不许被挪到分支之前）",
+  /return opts\.length[\s\S]{0,220}\n\s*\}\n\s*const answer = await dlgUserAsk\(/.test(ASK_BODY));
+ok("工具目录里写明了这一档不会提问（模型看得见才不会白调一轮）",
+  /夜间模式（全托管）下本工具不弹窗询问/.test(ASK_BODY));
 
 // ── 汇总 ─────────────────────────────────────────────────────
 const failed = results.filter(([p]) => !p);

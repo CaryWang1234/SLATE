@@ -3,15 +3,16 @@
  * 对话模式通过 #expert-select 注入；团队模式通过成员 expertId 注入
  */
 
-import { state, setActiveExpertId } from "../store.js?v=20260929-001";
+import { state, setActiveExpertId } from "../store.js?v=20261001-002";
 import {
   loadExperts, getExpert, createExpert, saveExpert, deleteExpert,
   importExpertZip, expertExportUrl, uploadExpertFile, deleteExpertFile,
-} from "../services/experts.js?v=20260929-001";
-import { dlgConfirm } from "../services/dialog.js?v=20260929-001";
-import { t } from "../services/i18n.js?v=20260929-001";
+} from "../services/experts.js?v=20261001-002";
+import { dlgConfirm } from "../services/dialog.js?v=20261001-002";
+import { t } from "../services/i18n.js?v=20261001-002";
+import { setExtCount } from "./extensions.js?v=20261001-002";
 
-let modal, expertListEl, detailEmpty, detailForm;
+let modal, expertListEl, extListEl, detailEmpty, detailForm;
 let nameInput, descInput, personaInput, rulesInput;
 let knowledgeListEl, skillsListEl;
 let expertsCache = [];
@@ -26,7 +27,7 @@ function fmtSize(n) {
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20260929-001");
+    const { toast: showToast } = await import("../app.js?v=20261001-002");
     showToast(msg);
   } catch {
     console.warn(msg);
@@ -55,6 +56,7 @@ async function refreshList(keepSelection = true) {
     await toast(t("专家包加载失败: {msg}", { msg: e.message }));
   }
   renderList();
+  renderExtList();
   refreshExpertSelects();
   if (keepSelection && currentId && expertsCache.some(x => x.id === currentId)) {
     // 保持当前选中（保存后刷新场景）
@@ -90,6 +92,47 @@ function renderList() {
 
     el.addEventListener("click", () => selectExpert(item.id));
     expertListEl.appendChild(el);
+  }
+}
+
+/**
+ * 扩展页的专家包一览：这一栏只回答"有哪些、各带多少知识与技能"，
+ * 编辑仍留在原弹窗里——那边是表单加文件管理，塞进分栏会把两件事挤在一屏。
+ */
+function renderExtList() {
+  if (!extListEl) return;
+  extListEl.innerHTML = "";
+  setExtCount("experts", expertsCache.length);
+  if (!expertsCache.length) {
+    const empty = document.createElement("div");
+    empty.className = "ext-empty";
+    empty.textContent = t("暂无专家包，点右上「＋ 新建专家包」或「导入」");
+    extListEl.appendChild(empty);
+    return;
+  }
+  for (const item of expertsCache) {
+    const el = document.createElement("div");
+    el.className = "exp-item" + (item.id === currentId ? " active" : "");
+    el.title = t("点击在弹窗中编辑");
+
+    const name = document.createElement("div");
+    name.className = "exp-item-name";
+    name.textContent = item.name || item.id;
+
+    const meta = document.createElement("div");
+    meta.className = "exp-item-meta";
+    meta.textContent = [
+      item.description,
+      t("知识 {k} · 技能 {s}", { k: item.knowledge_count, s: item.skills_count }),
+    ].filter(Boolean).join(" | ");
+
+    el.appendChild(name);
+    el.appendChild(meta);
+    el.addEventListener("click", () => {
+      openExpertModal();
+      selectExpert(item.id);
+    });
+    extListEl.appendChild(el);
   }
 }
 
@@ -304,6 +347,7 @@ function initExpertsPanel() {
   modal = document.getElementById("expert-modal");
   if (!modal) return;
   expertListEl = document.getElementById("expert-list");
+  extListEl = document.getElementById("ext-expert-list");
   detailEmpty = document.getElementById("expert-detail-empty");
   detailForm = document.getElementById("expert-detail-form");
   nameInput = document.getElementById("expert-name");
@@ -324,6 +368,9 @@ function initExpertsPanel() {
 
   const zipInput = document.getElementById("expert-zip-input");
   document.getElementById("btn-expert-import").addEventListener("click", () => zipInput.click());
+  // 扩展页那一栏的入口按钮：新建与导入是同一对处理函数，只是长在不同位置
+  document.getElementById("btn-ext-expert-new")?.addEventListener("click", handleNew);
+  document.getElementById("btn-ext-expert-import")?.addEventListener("click", () => zipInput.click());
   zipInput.addEventListener("change", async () => {
     const file = zipInput.files?.[0];
     zipInput.value = "";

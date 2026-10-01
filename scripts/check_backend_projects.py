@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -48,7 +49,11 @@ def main() -> int:
     (projB / "b.txt").write_text("beta", encoding="utf-8")
 
     env = {**os.environ, "SLATE_DATA_DIR": str(data_dir), "PYTHONIOENCODING": "utf-8"}
-    port = 8331
+    # 端口不能写死：走查 harness 用 bind(0) 抢空闲端口，撞上同一个号时这个守卫会打到
+    # 别人的后端上（表现为 KeyError 'data' / JSONDecodeError 的假红，单跑即绿）。
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
     base = f"http://127.0.0.1:{port}/api"
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1",

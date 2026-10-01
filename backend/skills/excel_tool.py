@@ -81,7 +81,7 @@ def _create(title: str, sheet: str, headers: Any, rows: Any, data: str, file_nam
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill
     except ImportError:
-        return {"error": "openpyxl 未安装。请执行: pip install openpyxl"}
+        return {"error": "openpyxl 未安装，Excel 读写当前不可用（缺的是运行环境依赖，要用户自行装 openpyxl）。请把缺依赖的情况告诉用户，不要自行执行安装命令。"}
 
     header_list: list[Any] = []
     body: list[list[Any]] | None = None
@@ -157,7 +157,7 @@ def _read(file_path: str, sheet: str, limit: int) -> dict[str, Any]:
         try:
             from openpyxl import load_workbook
         except ImportError:
-            return {"error": "openpyxl 未安装。请执行: pip install openpyxl"}
+            return {"error": "openpyxl 未安装，Excel 读写当前不可用（缺的是运行环境依赖，要用户自行装 openpyxl）。请把缺依赖的情况告诉用户，不要自行执行安装命令。"}
         wb = load_workbook(str(p), read_only=True, data_only=True)
         sheet_name = (sheet or "").strip()
         if sheet_name and sheet_name not in wb.sheetnames:
@@ -205,7 +205,7 @@ def _convert(file_path: str, out: str) -> dict[str, Any]:
         try:
             from openpyxl import Workbook
         except ImportError:
-            return {"error": "openpyxl 未安装。请执行: pip install openpyxl"}
+            return {"error": "openpyxl 未安装，Excel 读写当前不可用（缺的是运行环境依赖，要用户自行装 openpyxl）。请把缺依赖的情况告诉用户，不要自行执行安装命令。"}
         wb = Workbook()
         ws = wb.active
         ws.title = p.stem[:31] or "Sheet1"
@@ -220,7 +220,7 @@ def _convert(file_path: str, out: str) -> dict[str, Any]:
         try:
             from openpyxl import load_workbook
         except ImportError:
-            return {"error": "openpyxl 未安装。请执行: pip install openpyxl"}
+            return {"error": "openpyxl 未安装，Excel 读写当前不可用（缺的是运行环境依赖，要用户自行装 openpyxl）。请把缺依赖的情况告诉用户，不要自行执行安装命令。"}
         wb = load_workbook(str(p), read_only=True, data_only=True)
         ws = wb.active
         out_path = Path(out).expanduser() if (out or "").strip() else p.with_suffix(".csv")

@@ -4,17 +4,17 @@
  * 2. mHandleStructured：file_edit/file_create 的 diff 预览 → 接受/拒绝（file_append 调用时即写入）
  */
 
-import { state, getModelKey } from "../store.js?v=20260929-001";
-import { post } from "../services/api.js?v=20260929-001";
-import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20260929-001";
-import { mShowRiskSheet, mShowDiffSheet, mToast, t } from "./m-ui.js?v=20260929-001";
+import { state, getModelKey } from "../store.js?v=20261001-002";
+import { post } from "../services/api.js?v=20261001-002";
+import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20261001-002";
+import { mShowRiskSheet, mShowDiffSheet, mToast, t } from "./m-ui.js?v=20261001-002";
 
 /** 用当前模型解释命令目的（与桌面 explainCommand 同一逻辑，失败返回兜底文案） */
 async function mExplainCommand(command) {
   // 与桌面同一档：关掉就少发一趟请求，审批照常有
   if (!isAiFeatureOn("command_explain")) return t("（命令目的说明已关闭，可在桌面端设置 → AI 辅助功能打开）");
   const target = aiModelFor("command_explain", state.currentModel);
-  if (!target.usable) return t("（当前未配置模型 API Key，无法生成目的说明）");
+  if (!target.usable) return t("（当前未配置模型或 API Key，无法生成目的说明）");
   try {
     const res = await post("/proxy/chat", {
       model: target.id,

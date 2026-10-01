@@ -4,14 +4,14 @@
  * 这里只管"屏幕上现在生效的是哪一档"和"改这一场的档"，两边不各存一份判断。
  */
 
-import { state, subscribe, permissionModeFor, setPermissionModeFor } from "../store.js?v=20260929-001";
-import { iconSvgEl } from "../services/icons.js?v=20260929-001";
-import { t } from "../services/i18n.js?v=20260929-001";
+import { state, subscribe, permissionModeFor, setPermissionModeFor } from "../store.js?v=20261001-002";
+import { iconSvgEl } from "../services/icons.js?v=20261001-002";
+import { t } from "../services/i18n.js?v=20261001-002";
 
 const MODES = [
   { id: "ask", icon: "shield", label: "手动审批", hint: "执行命令、访问网络都先问你" },
   { id: "auto", icon: "zap", label: "自动审批", hint: "只在命中高危规则时问你，其余直接放行" },
-  { id: "full", icon: "unlock", label: "完全访问", hint: "不询问（灾难级命令仍由后端拦截）", danger: true },
+  { id: "full", icon: "moon", label: "夜间模式", hint: "全托管：命令、联网、提问都不问（灾难级命令仍由后端拦截）", danger: true },
 ];
 
 let popOpen = false;
@@ -99,7 +99,7 @@ function syncApprovalPicker() {
     iconWrap.textContent = "";
     iconWrap.appendChild(iconSvgEl(mode.icon));
   }
-  // 完全访问：图标和文字一起标红（图标是 currentColor，红在容器上）
+  // 夜间模式（全托管）：图标和文字一起标红（图标是 currentColor，红在容器上）
   btn.classList.toggle("is-full", mode.id === "full");
   btn.title = t("{mode}：{hint}", { mode: t(mode.label), hint: t(mode.hint) });
   syncActiveRow();

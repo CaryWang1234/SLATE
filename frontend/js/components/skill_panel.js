@@ -1,17 +1,19 @@
 /**
- * SLATE 工具 / 技能面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）
+ * 扩展页的能力面板：内置工具列表 + SKILL.md 技能（上传/导入/删除）
  * + Actions（data/actions/*.yml 流程说明书：可编辑、试校验、删除、留底回滚）。
  */
 
-import { state, subscribe, setSkills, setActions } from "../store.js?v=20260929-001";
-import { get, post, put, del, upload } from "../services/api.js?v=20260929-001";
-import { guardSkillCall } from "../services/riskguard.js?v=20260929-001";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20260929-001";
-import { t } from "../services/i18n.js?v=20260929-001";
-import { setIconText } from "../services/icons.js?v=20260929-001";
-import { forgetScopeCatalog } from "../services/project_scope.js?v=20260929-001";
+import { state, subscribe, setSkills, setActions } from "../store.js?v=20261001-002";
+import { get, post, put, del, upload } from "../services/api.js?v=20261001-002";
+import { guardSkillCall } from "../services/riskguard.js?v=20261001-002";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20261001-002";
+import { t } from "../services/i18n.js?v=20261001-002";
+import { setIconText } from "../services/icons.js?v=20261001-002";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20261001-002";
+import { setExtCount } from "./extensions.js?v=20261001-002";
 
-let skillList, btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
+let skillList, toolList, mcpToolList, actionList;
+let btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
 
 function showToast(msg) {
   const container = document.getElementById("toast-container");
@@ -248,56 +250,324 @@ const SKILL_PARAM_DEFS = {
   ],
 };
 
-// ── 列表渲染：工具 + SKILL.md 技能区 ───────────
+// ── 扩展页四类列表：技能 / 内置工具 / MCP 远程工具 / Actions ──────
+// 四类各占一个容器。以前四组小标题连着排在同一列里，「工具」「MCP 远程工具」
+// 「技能」三个名字相近的组滚起来容易看串，用户会以为少加载了一类。
 
-function createSectionHeader(text, count) {
-  const head = document.createElement("div");
-  head.className = "skill-section-header";
-  const title = document.createElement("span");
-  title.className = "skill-section-title";
-  title.textContent = text;
-  const badge = document.createElement("span");
-  badge.className = "skill-section-count";
-  badge.textContent = String(count);
-  head.appendChild(title);
-  head.appendChild(badge);
-  return head;
+function extEmpty(host, text) {
+  if (!host) return;
+  const empty = document.createElement("div");
+  empty.className = "ext-empty";
+  empty.textContent = text;
+  host.appendChild(empty);
 }
 
 function renderSkillList() {
-  skillList.innerHTML = "";
-
-  // 内置工具
-  const mcp = state.skills.mcp || {};
-  skillList.appendChild(createSectionHeader("工具", Object.keys(mcp).length));
-  for (const [name, desc] of Object.entries(mcp)) {
-    skillList.appendChild(createSkillItem(name, desc, "工具"));
+  const skills = Object.entries(state.skills.skills || {});
+  if (skillList) {
+    skillList.innerHTML = "";
+    for (const [name, desc] of skills) skillList.appendChild(createSkillItem(name, desc, "Skill"));
+    if (!skills.length) extEmpty(skillList, t("暂无技能，可点右上「导入技能」或「新建技能」"));
   }
+  setExtCount("skills", skills.length);
 
-  // 远程 MCP 工具
-  const remote = state.skills.remote || {};
-  const remoteCount = Object.keys(remote).length;
-  if (remoteCount > 0) {
-    skillList.appendChild(createSectionHeader("MCP 远程工具", remoteCount));
-    for (const [name, desc] of Object.entries(remote)) {
-      skillList.appendChild(createSkillItem(name, desc, "MCP"));
-    }
+  const tools = Object.entries(state.skills.mcp || {});
+  if (toolList) {
+    toolList.innerHTML = "";
+    for (const [name, desc] of tools) toolList.appendChild(createSkillItem(name, desc, "工具"));
+    if (!tools.length) extEmpty(toolList, t("后端没有返回任何内置工具"));
   }
+  setExtCount("tools", tools.length);
 
-  // SKILL.md 技能
-  const skills = state.skills.skills || {};
-  skillList.appendChild(createSectionHeader("技能 · SKILL.md", Object.keys(skills).length));
-  if (Object.keys(skills).length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "skill-empty-hint";
-    empty.textContent = "暂无技能，可点击下方「导入技能」或「新建技能」";
-    skillList.appendChild(empty);
-  }
-  for (const [name, desc] of Object.entries(skills)) {
-    skillList.appendChild(createSkillItem(name, desc, "Skill"));
+  // 远程 MCP 工具挂在 MCP 那一栏：它与上面的 Server 列表是同一件事的两半
+  const remote = Object.entries(state.skills.remote || {});
+  if (mcpToolList) {
+    mcpToolList.innerHTML = "";
+    for (const [name, desc] of remote) mcpToolList.appendChild(createSkillItem(name, desc, "MCP"));
+    if (!remote.length) extEmpty(mcpToolList, t("还没有已连接的远程工具：在上方添加并连接一个 MCP Server"));
   }
 
   renderActionsSection();
+}
+
+// ── 自进化工具（data/evolved/，工具工厂自己生产的工具） ──────
+// 这一栏存在的理由很具体：产物从源码目录搬进了用户数据目录，升级覆盖不到它，
+// 但"能不能被模型用、这一版生成错了怎么退回去"必须有人在界面上说得上话。
+// 停用是整条从模型目录里摘掉（不是调用时再报错），回滚与撤销都先留底。
+
+let evolvedListEl;
+let evolvedModal, evolvedModalTitle, evolvedModalMeta, evolvedSource, evolvedHistory;
+let btnEvolvedHistory, btnEvolvedToggle, btnEvolvedDelete;
+let evolvedCache = [];
+let currentEvolvedName = "";
+
+function evolvedItem(name) {
+  return evolvedCache.find(x => x.name === name) || null;
+}
+
+/** 这一条现在是什么状态：停用 / 被内置同名顶掉 / 代码本身有问题。 */
+function evolvedStates(item) {
+  const out = [];
+  if (item.error) out.push({ text: t("不可用：{msg}", { msg: item.error }), kind: "bad" });
+  else if (item.shadowed) out.push({ text: t("与内置工具同名，已由内置接管"), kind: "warn" });
+  else if (!item.enabled) out.push({ text: t("已停用"), kind: "muted" });
+  return out;
+}
+
+function renderEvolvedSection() {
+  if (!evolvedListEl) return;
+  evolvedListEl.innerHTML = "";
+  for (const item of evolvedCache) evolvedListEl.appendChild(createEvolvedItem(item));
+  if (!evolvedCache.length) {
+    extEmpty(evolvedListEl, t("还没有自产工具。让模型用「工具工厂」生成一个，产物会出现在这里，可随时停用或撤销"));
+  }
+  setExtCount("evolved", evolvedCache.length);
+}
+
+function createEvolvedItem(item) {
+  const row = document.createElement("div");
+  row.className = "skill-item evolved-item" + (item.enabled && !item.error && !item.shadowed ? "" : " evolved-off");
+
+  const info = document.createElement("div");
+  const nameRow = document.createElement("div");
+  nameRow.className = "skill-item-name";
+  const badge = document.createElement("span");
+  badge.className = "skill-kind-badge skill-kind-evolved";
+  badge.textContent = t("自产");
+  nameRow.appendChild(badge);
+  nameRow.appendChild(document.createTextNode(" " + item.name));
+  info.appendChild(nameRow);
+
+  const descEl = document.createElement("div");
+  descEl.className = "skill-item-desc";
+  descEl.textContent = item.description || "";
+  info.appendChild(descEl);
+
+  for (const st of evolvedStates(item)) {
+    const note = document.createElement("div");
+    note.className = `evolved-state evolved-state-${st.kind}`;
+    note.textContent = st.text;
+    info.appendChild(note);
+  }
+  row.appendChild(info);
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.className = "icon-btn evolved-toggle-btn";
+  toggleBtn.textContent = item.enabled ? t("停用") : t("启用");
+  toggleBtn.title = item.enabled ? t("停用后模型目录里不再出现这一项") : t("重新交给模型使用");
+  toggleBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    await toggleEvolved(item.name, !item.enabled);
+  });
+  row.appendChild(toggleBtn);
+
+  const delBtn = document.createElement("button");
+  delBtn.className = "skill-item-del";
+  delBtn.title = t("撤销这个工具（删前留底）");
+  delBtn.textContent = "×";
+  delBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    await deleteEvolved(item.name);
+  });
+  row.appendChild(delBtn);
+
+  row.addEventListener("click", () => openEvolvedModal(item.name));
+  return row;
+}
+
+async function toggleEvolved(name, enabled) {
+  try {
+    const res = await post(`/evolved/${encodeURIComponent(name)}/toggle`, { enabled });
+    if (res.code !== 0) { showToast(t("操作失败: {msg}", { msg: res.message || t("未知错误") })); return; }
+    showToast(enabled ? t("已启用 {name}", { name }) : t("已停用 {name}，模型目录里已摘掉", { name }));
+    await refreshEvolved();
+    refreshSkills();
+  } catch (e) {
+    showToast(t("请求失败: {msg}", { msg: e.message }));
+  }
+}
+
+async function deleteEvolved(name) {
+  const ok = await dlgConfirm(t("撤销自进化工具 {name}？源码会先存入历史版本，之后仍可在「历史版本」里看到。", { name }),
+    { danger: true, okText: t("撤销工具"), title: t("撤销自进化工具") });
+  if (!ok) return;
+  try {
+    const res = await del(`/evolved/${encodeURIComponent(name)}`);
+    if (res.code !== 0) { showToast(t("撤销失败: {msg}", { msg: res.message || t("未知错误") })); return; }
+    showToast(t("已撤销 {name}", { name }));
+    if (currentEvolvedName === name) closeEvolvedModal();
+    await refreshEvolved();
+    refreshSkills();
+  } catch (e) {
+    showToast(t("请求失败: {msg}", { msg: e.message }));
+  }
+}
+
+function closeEvolvedModal() {
+  evolvedModal?.classList.add("hidden");
+}
+
+async function openEvolvedModal(name) {
+  const item = evolvedItem(name);
+  if (!item) return;
+  currentEvolvedName = name;
+  evolvedModalTitle.textContent = t("自进化工具: {name}", { name });
+  const meta = [
+    item.description || "",
+    t("参数 {n} 个", { n: (item.params || []).length }),
+    item.created_at ? t("创建于 {t}", { t: item.created_at }) : "",
+    item.updated_at ? t("最后改动 {t}", { t: item.updated_at }) : "",
+    item.bytes ? `${item.bytes} B` : "",
+    item.versions ? t("留底 {n} 版", { n: item.versions }) : "",
+  ].filter(Boolean).join(" · ");
+  const states = evolvedStates(item).map(s => s.text).join("；");
+  evolvedModalMeta.textContent = [meta, states].filter(Boolean).join(" · ");
+  evolvedSource.textContent = t("读取中…");
+  btnEvolvedToggle.textContent = item.enabled ? t("停用") : t("启用");
+  evolvedHistory.classList.add("hidden");
+  evolvedModal.classList.remove("hidden");
+  try {
+    const res = await get(`/evolved/${encodeURIComponent(name)}/source`);
+    // 弹窗可能已经切到另一条了：迟到的旧响应不许盖掉现在这条
+    if (currentEvolvedName !== name) return;
+    evolvedSource.textContent = res.code === 0 ? (res.data?.content || "") : t("读取失败: {msg}", { msg: res.message });
+  } catch (e) {
+    if (currentEvolvedName === name) evolvedSource.textContent = t("请求失败: {msg}", { msg: e.message });
+  }
+}
+
+async function renderEvolvedHistory() {
+  if (!currentEvolvedName) return;
+  evolvedHistory.textContent = "";
+  const loading = document.createElement("div");
+  loading.className = "evolved-history-empty";
+  loading.textContent = t("读取中…");
+  evolvedHistory.appendChild(loading);
+  let rows = [];
+  let keep = 5;
+  try {
+    const res = await get(`/evolved/${encodeURIComponent(currentEvolvedName)}/history`);
+    evolvedHistory.textContent = "";
+    if (res.code !== 0) {
+      const err = document.createElement("div");
+      err.className = "evolved-history-empty";
+      err.textContent = t("读取失败: {msg}", { msg: res.message || t("未知错误") });
+      evolvedHistory.appendChild(err);
+      return;
+    }
+    rows = res.data?.versions || [];
+    keep = res.data?.keep || 5;
+  } catch (e) {
+    evolvedHistory.textContent = "";
+    const err = document.createElement("div");
+    err.className = "evolved-history-empty";
+    err.textContent = t("请求失败: {msg}", { msg: e.message });
+    evolvedHistory.appendChild(err);
+    return;
+  }
+  const tip = document.createElement("div");
+  tip.className = "evolved-history-tip";
+  tip.textContent = t("每次覆盖、撤销或回滚都会先存入历史版本，最多保留 {n} 版。", { n: keep });
+  evolvedHistory.appendChild(tip);
+  if (!rows.length) {
+    const empty = document.createElement("div");
+    empty.className = "evolved-history-empty";
+    empty.textContent = t("还没有历史版本");
+    evolvedHistory.appendChild(empty);
+    return;
+  }
+  for (const v of rows) evolvedHistory.appendChild(createEvolvedHistoryRow(v));
+}
+
+function createEvolvedHistoryRow(version) {
+  const row = document.createElement("div");
+  row.className = "action-history-row";
+
+  const label = document.createElement("span");
+  label.className = "action-history-ts";
+  label.textContent = `${formatHistoryTs(version.ts)} · ${version.bytes} B`;
+  row.appendChild(label);
+
+  const viewBtn = document.createElement("button");
+  viewBtn.className = "dlg-btn";
+  viewBtn.textContent = t("查看");
+  viewBtn.addEventListener("click", async () => {
+    const name = currentEvolvedName;
+    try {
+      const res = await get(`/evolved/${encodeURIComponent(name)}/history/${encodeURIComponent(version.ts)}`);
+      if (res.code !== 0) { showToast(t("读取失败: {msg}", { msg: res.message })); return; }
+      if (currentEvolvedName !== name) return;
+      evolvedSource.textContent = res.data?.content || "";
+    } catch (e) {
+      showToast(t("请求失败: {msg}", { msg: e.message }));
+    }
+  });
+  row.appendChild(viewBtn);
+
+  const restoreBtn = document.createElement("button");
+  restoreBtn.className = "dlg-btn dlg-btn-primary";
+  restoreBtn.textContent = version.has_manifest ? t("回滚") : t("只回滚代码");
+  restoreBtn.title = version.has_manifest ? t("把这一版的代码与说明都盖回当前")
+    : t("这一版没有留下清单，回滚后沿用现在的说明与参数");
+  restoreBtn.addEventListener("click", async () => {
+    const name = currentEvolvedName;
+    const ok = await dlgConfirm(t("把自进化工具 {name} 回滚到 {ts}？当前内容会先存入历史版本。",
+      { name, ts: formatHistoryTs(version.ts) }), { okText: t("回滚"), title: t("回滚自进化工具") });
+    if (!ok) return;
+    try {
+      const res = await post(`/evolved/${encodeURIComponent(name)}/history/restore`, { ts: version.ts });
+      if (res.code !== 0) { showToast(t("回滚失败: {msg}", { msg: res.message || t("未知错误") })); return; }
+      showToast(t("已回滚到 {ts}", { ts: formatHistoryTs(version.ts) }));
+      await refreshEvolved();
+      refreshSkills();
+      if (currentEvolvedName === name) await openEvolvedModal(name);
+    } catch (e) {
+      showToast(t("请求失败: {msg}", { msg: e.message }));
+    }
+  });
+  row.appendChild(restoreBtn);
+  return row;
+}
+
+function initEvolvedModal() {
+  evolvedListEl = document.getElementById("ext-evolved-list");
+  evolvedModal = document.getElementById("evolved-modal");
+  evolvedModalTitle = document.getElementById("evolved-modal-title");
+  evolvedModalMeta = document.getElementById("evolved-modal-meta");
+  evolvedSource = document.getElementById("evolved-source");
+  evolvedHistory = document.getElementById("evolved-history");
+  btnEvolvedHistory = document.getElementById("btn-evolved-history");
+  btnEvolvedToggle = document.getElementById("btn-evolved-toggle");
+  btnEvolvedDelete = document.getElementById("btn-evolved-delete");
+  if (!evolvedModal) return;
+
+  btnEvolvedHistory?.addEventListener("click", async () => {
+    if (!evolvedHistory.classList.contains("hidden")) {
+      evolvedHistory.classList.add("hidden");
+      return;
+    }
+    await renderEvolvedHistory();
+    evolvedHistory.classList.remove("hidden");
+  });
+  btnEvolvedToggle?.addEventListener("click", () => {
+    const item = evolvedItem(currentEvolvedName);
+    if (item) toggleEvolved(item.name, !item.enabled);
+  });
+  btnEvolvedDelete?.addEventListener("click", () => { if (currentEvolvedName) deleteEvolved(currentEvolvedName); });
+  evolvedModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {
+    el.addEventListener("click", closeEvolvedModal);
+  });
+}
+
+/** 自进化清单刷新：读不到就保持空态，这一栏是可选能力，不该每次开面板都弹错误。 */
+async function refreshEvolved() {
+  try {
+    const res = await get("/evolved");
+    evolvedCache = res.code === 0 && Array.isArray(res.data?.items) ? res.data.items : [];
+  } catch (e) {
+    evolvedCache = [];
+  }
+  renderEvolvedSection();
 }
 
 // ── Actions（data/actions/*.yml，可编辑的流程说明书） ──────
@@ -360,23 +630,15 @@ function describeActionScope(scope) {
 function renderActionsSection() {
   const list = Array.isArray(state.actions) ? state.actions : [];
   const broken = Array.isArray(state.actionsBroken) ? state.actionsBroken : [];
+  if (!actionList) return;
 
-  const head = createSectionHeader("Actions · 流程说明书", list.length);
-  const newBtn = document.createElement("button");
-  newBtn.className = "skill-section-action";
-  newBtn.textContent = t("＋ 新建 Action");
-  newBtn.addEventListener("click", handleCreateAction);
-  head.appendChild(newBtn);
-  skillList.appendChild(head);
-
+  actionList.innerHTML = "";
   if (!list.length && !broken.length) {
-    const empty = document.createElement("div");
-    empty.className = "skill-empty-hint";
-    empty.textContent = t("暂无 Action。点「＋ 新建 Action」写一份流程，或在 data/actions/ 放入 <id>.yml，模型即可读取调用");
-    skillList.appendChild(empty);
+    extEmpty(actionList, t("暂无 Action。点右上「＋ 新建 Action」写一份流程，或在 data/actions/ 放入 <id>.yml，模型即可读取调用"));
   }
-  for (const action of list) skillList.appendChild(createActionItem(action));
-  for (const item of broken) skillList.appendChild(createBrokenActionItem(item));
+  for (const action of list) actionList.appendChild(createActionItem(action));
+  for (const item of broken) actionList.appendChild(createBrokenActionItem(item));
+  setExtCount("actions", list.length);
 }
 
 function createActionItem(action) {
@@ -835,7 +1097,7 @@ function createSkillItem(name, desc, kind) {
 }
 
 async function handleDeleteSkill(name) {
-  if (!await dlgConfirm(t("确定删除技能 {name}", { name }), { danger: true, okText: "删除" })) return;
+  if (!await dlgConfirm(t("确定删除技能 {name}？", { name }), { danger: true, okText: "删除" })) return;
   try {
     const res = await del(`/skills/${encodeURIComponent(name)}`);
     showToast(res.code === 0 ? t("已删除技能 {name}", { name }) : t("删除失败: {msg}", { msg: res.message }));
@@ -884,7 +1146,7 @@ function openSkillModal(name) {
 // ── SKILL.md 技能查看器（只读展示定义内容） ─────────────
 
 async function openSkillViewer(name) {
-  skillModalTitle.textContent = t("技术 {name}", { name });
+  skillModalTitle.textContent = t("技能 {name}", { name });
   skillParams.innerHTML = "";
   btnRunSkill.classList.add("hidden");
   skillResult.classList.remove("hidden");
@@ -995,7 +1257,7 @@ async function handleUploadSkill() {
     try {
       const res = await upload(`/skills/upload?skill_name=${encodeURIComponent(name.trim())}&skill_desc=${encodeURIComponent(desc.trim())}`, formData);
       if (res.code === 0) {
-        showToast(t("技术{name} 上传成功", { name }));
+        showToast(t("技能 {name} 上传成功", { name }));
         refreshSkills();
       } else {
         showToast(t("上传失败: {msg}", { msg: res.message }));
@@ -1127,6 +1389,9 @@ async function refreshSkills() {
   if (res.code === 0) {
     setSkills(res.data);
   }
+  // 「新功能」那一栏的数据在 /api/evolved（含停用与坏掉的），跟能力清单一起重取：
+  // 分两处刷就会有一处留着上一次的样子，而这两处的数字都要对上盘上的文件。
+  refreshEvolved();
 }
 
 /** Action 目录刷新：读不到就保持空态。这是可选能力，不该在每次开面板时弹错误提示。 */
@@ -1142,7 +1407,11 @@ async function refreshActions() {
 // ── 初始化 ──────────────────────────────────
 
 function initSkillPanel() {
-  skillList = document.getElementById("skill-list");
+  skillList = document.getElementById("ext-skill-list");
+  toolList = document.getElementById("ext-tool-list");
+  mcpToolList = document.getElementById("ext-mcp-tool-list");
+  actionList = document.getElementById("ext-action-list");
+  initEvolvedModal();
   btnUpload = document.getElementById("btn-upload-skill");
   btnImport = document.getElementById("btn-import-skill");
   skillModal = document.getElementById("skill-modal");
@@ -1160,6 +1429,9 @@ function initSkillPanel() {
   if (btnDiscover) btnDiscover.addEventListener("click", handleDiscoverPlugins);
   if (btnGithubImport) btnGithubImport.addEventListener("click", handleGithubImport);
   btnRunSkill.addEventListener("click", executeSkill);
+  // 「＋ 新建 Action」现在是扩展页栏头里的静态按钮（列表容器不再自己造按钮）
+  document.getElementById("btn-ext-action-new")?.addEventListener("click", handleCreateAction);
+  document.getElementById("btn-ext-evolved-refresh")?.addEventListener("click", refreshEvolved);
 
   // 关闭弹窗
   skillModal.querySelectorAll(".modal-close, .modal-backdrop").forEach(el => {

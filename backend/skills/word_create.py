@@ -43,7 +43,7 @@ def execute(
         from docx.shared import Pt, RGBColor
         from docx.enum.text import WD_ALIGN_PARAGRAPH
     except ImportError:
-        return {"error": "缺少依赖 python-docx，请先执行: pip install python-docx"}
+        return {"error": "python-docx 未安装，Word 生成当前不可用（缺的是运行环境依赖，要用户自行装 python-docx）。请把缺依赖的情况告诉用户，不要自行执行安装命令。"}
 
     doc_title = (title or "").strip() or "未命名文档"
     doc = Document()

@@ -43,7 +43,11 @@ const blocks = [...PANEL.matchAll(BLOCK_RE)];
 
 // ── 1. 区块清单成立（左栏同源的前提：区块本身有 id、有标题）───────
 
-ok("设置区块不少于 21 组（少一组要先确认是不是整块被删了）", blocks.length >= 21, `实际 ${blocks.length}`);
+// 「工具 / 技能」与「MCP Server」两块已整块搬进扩展页，所以这里的下限是 19 而不是 21。
+// 少一组要先确认是不是整块被删了——左栏条目由区块现读生成，删一块就少一条，页面不会报错。
+ok("设置区块不少于 19 组（扩展类内容搬去扩展页后剩下的全部）", blocks.length >= 19, `实际 ${blocks.length}`);
+ok("技能/MCP 管理不再留在设置页（搬走了就别留空壳，两处都能改会各说各话）",
+  !has(HTML, 'id="settings-skills"') && !has(HTML, 'id="settings-mcp-servers"'));
 ok("每组区块都带 id（没 id 就没法锚点跳转）",
   (PANEL.match(/<section class="settings-block"/g) || []).length === blocks.length,
   `${(PANEL.match(/<section class="settings-block"/g) || []).length} vs ${blocks.length}`);

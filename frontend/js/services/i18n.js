@@ -9,7 +9,7 @@
  * - 模型生成内容与用户输入不翻译（SKIP_SELECTOR / data-i18n-skip 标记）。
  */
 
-import { EN_DICT } from "./i18n_dict.js?v=20260929-001";
+import { EN_DICT } from "./i18n_dict.js?v=20261001-002";
 
 let LANG = "zh";
 let observer = null;
@@ -18,6 +18,13 @@ let observing = false;
 // 不翻译的区域：代码块、输入框、消息正文等模型/用户内容
 const SKIP_SELECTOR =
   "script, style, textarea, input, pre, code, iframe, canvas, svg, " +
+  ".msg-content, .markdown-body, .prompt-result, .skill-result, .risk-command, " +
+  "[data-i18n-skip]";
+
+// 属性是界面说明（按钮的 title、输入框的 placeholder），不是用户内容：
+// 只有正文容器与显式豁免才连属性一起跳过。否则 <input> 因为"是输入框"就永远不会
+// 翻它的 placeholder，英文界面里满屏中文提示——而这批词典键一直是死键。
+const SKIP_ATTR_SELECTOR =
   ".msg-content, .markdown-body, .prompt-result, .skill-result, .risk-command, " +
   "[data-i18n-skip]";
 
@@ -48,6 +55,23 @@ function skipped(el) {
   return el.matches(SKIP_SELECTOR) || !!el.closest(SKIP_SELECTOR);
 }
 
+function attrSkipped(el) {
+  if (!el || el.nodeType !== 1) return false;
+  return el.matches(SKIP_ATTR_SELECTOR) || !!el.closest(SKIP_ATTR_SELECTOR);
+}
+
+/** 只翻属性：控件的说明文字，与它里面装的是什么内容无关 */
+function translateAttrs(el) {
+  if (attrSkipped(el)) return;
+  for (const a of TRANS_ATTRS) {
+    const v = el.getAttribute(a);
+    if (v && ZH_RE.test(v)) {
+      const nv = translateText(v);
+      if (nv !== v) el.setAttribute(a, nv);
+    }
+  }
+}
+
 /** 翻译元素子树：文本节点 + 可翻译属性 */
 function translateNode(root) {
   if (!root) return;
@@ -57,16 +81,9 @@ function translateNode(root) {
     if (nv !== root.data) root.data = nv;
     return;
   }
-  if (root.nodeType !== 1 || skipped(root)) return;
-
-  // 元素自身属性
-  for (const a of TRANS_ATTRS) {
-    const v = root.getAttribute(a);
-    if (v && ZH_RE.test(v)) {
-      const nv = translateText(v);
-      if (nv !== v) root.setAttribute(a, nv);
-    }
-  }
+  if (root.nodeType !== 1) return;
+  translateAttrs(root);
+  if (skipped(root)) return;
 
   // 文本节点
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -79,18 +96,9 @@ function translateNode(root) {
     if (nv !== n.data) n.data = nv;
   }
 
-  // 子元素属性
+  // 子元素属性：判的是"这段是不是用户/模型内容"，不是"这个控件会不会装用户输入"
   const els = root.querySelectorAll("[title], [placeholder], [alt], [aria-label]");
-  for (const el of els) {
-    if (skipped(el)) continue;
-    for (const a of TRANS_ATTRS) {
-      const v = el.getAttribute(a);
-      if (v && ZH_RE.test(v)) {
-        const nv = translateText(v);
-        if (nv !== v) el.setAttribute(a, nv);
-      }
-    }
-  }
+  for (const el of els) translateAttrs(el);
 }
 
 /** 启动：拉取语言配置；en 时翻译全页并监听后续 DOM 变更 */
@@ -118,14 +126,7 @@ export async function initI18n() {
           translateNode(m.target);
         }
         if (m.type === "attributes" && m.target.nodeType === 1) {
-          const a = m.attributeName;
-          if (TRANS_ATTRS.includes(a)) {
-            const v = m.target.getAttribute(a);
-            if (v && ZH_RE.test(v)) {
-              const nv = translateText(v);
-              if (nv !== v) m.target.setAttribute(a, nv);
-            }
-          }
+          if (TRANS_ATTRS.includes(m.attributeName)) translateAttrs(m.target);
         }
       }
     } finally {

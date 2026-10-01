@@ -6,10 +6,10 @@
  * - 用户批准后注入 approved 参数放行；拒绝后把拒绝理由原样回给模型
  */
 
-import { state, getModelKey, permissionModeFor } from "../store.js?v=20260929-001";
-import { post } from "./api.js?v=20260929-001";
-import { aiModelFor, isAiFeatureOn } from "./ai_features.js?v=20260929-001";
-import { t } from "./i18n.js?v=20260929-001";
+import { state, getModelKey, permissionModeFor } from "../store.js?v=20261001-002";
+import { post } from "./api.js?v=20261001-002";
+import { aiModelFor, isAiFeatureOn } from "./ai_features.js?v=20261001-002";
+import { t } from "./i18n.js?v=20261001-002";
 
 // 高危命令规则（写死）：命中任一条即要求批准
 const HIGH_RISK_PATTERNS = [
@@ -20,6 +20,7 @@ const HIGH_RISK_PATTERNS = [
   { re: /Remove-Item/i, reason: "删除文件（Remove-Item）" },
   { re: /\bdd\b(?=.*\bof=)/i, reason: "磁盘写入（dd）" },
   { re: /\b(fdisk|diskpart|parted)\b/i, reason: "磁盘分区操作" },
+  { re: /\bdiskutil\s+(erase|reformat|partitionDisk|secureErase)/i, reason: "抹掉/重分区磁盘卷（macOS diskutil）" },
   { re: /\b(shutdown|reboot|poweroff|halt)\b/i, reason: "关机/重启" },
   { re: /\binit\s+[06]\b/, reason: "关机/重启" },
   { re: /\bsudo\b/i, reason: "提权执行（sudo）" },
@@ -34,7 +35,7 @@ const HIGH_RISK_PATTERNS = [
   { re: /git\s+reset\s+--hard/i, reason: "Git 硬重置（丢弃改动）" },
   { re: /git\s+clean\s+-[a-z]*f/i, reason: "Git 清理未跟踪文件" },
   { re: /git\s+branch\s+-D\b/i, reason: "Git 强制删除分支" },
-  { re: /(drop\s+(database|table|schema)|truncate\s+table)/i, reason: "数据库删除删库" },
+  { re: /(drop\s+(database|table|schema)|truncate\s+table)/i, reason: "数据库删表/删库" },
   { re: /(npm|pnpm|yarn)\s+(uninstall|remove)\s+(-g|--global)/i, reason: "卸载全局依赖" },
 ];
 
@@ -66,7 +67,7 @@ async function explainCommand(command) {
   // 关掉就少发一趟请求：审批照常拦，只是不再解释这条命令
   if (!isAiFeatureOn("command_explain")) return t("（命令目的说明已关闭，可在设置 → AI 辅助功能打开）");
   const target = aiModelFor("command_explain", state.currentModel);
-  if (!target.usable) return "（当前未配置模型 API Key，无法生成目的说明）";
+  if (!target.usable) return t("（当前未配置模型或 API Key，无法生成目的说明）");
   try {
     const res = await post("/proxy/chat", {
       model: target.id,
@@ -178,7 +179,8 @@ function denialMessage(subject, risk) {
  * 三档语义（这一场生效哪一档由 store.permissionModeFor 现算）：
  * - ask 手动审批：执行命令、访问网络都先弹窗问
  * - auto 自动审批：只在命中高危规则时问，其余直接放行
- * - full 完全访问：一律不问（灾难级命令仍由后端硬拦）
+ * - full 夜间模式（全托管）：命令与联网一律不问（灾难级命令仍由后端硬拦）；
+ *   连"缺条件时问用户一句"也不问——那条路在 tools.js 的 user_ask 里，同一档同一个口径
  *
  * opts.manual：技能面板里用户亲手点的「执行」——命令就是他自己在参数框里填的，
  * 再逐条问一遍等于问他两次，所以这一路只拦高危（与 auto 同一判口）。

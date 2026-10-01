@@ -2,34 +2,37 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, contextCapStops, contextCapStopIndex, contextWindowSource, getContextWindow, setModelContextWindow, getModelDefinition, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode } from "./store.js?v=20260929-001";
-import { initI18n, t } from "./services/i18n.js?v=20260929-001";
-import { iconSvgEl } from "./services/icons.js?v=20260929-001";
-import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20260929-001";
-import { get, post, put } from "./services/api.js?v=20260929-001";
-import { dlgConfirm } from "./services/dialog.js?v=20260929-001";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20260929-001";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20260929-001";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20260929-001";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20260929-001";
-import { initSkillPanel } from "./components/skill_panel.js?v=20260929-001";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20260929-001";
-import { initTeamPanel } from "./components/team.js?v=20260929-001";
-import { initProjectBar } from "./components/project_bar.js?v=20260929-001";
-import { initSessionSummary } from "./components/session_summary.js?v=20260929-001";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20260929-001";
-import { initTypingGame } from "./components/typing_game.js?v=20260929-001";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20260929-001";
-import { initMemoryPanel } from "./components/memory.js?v=20260929-001";
-import { initExpertsPanel } from "./components/experts.js?v=20260929-001";
-import { initSchedule } from "./components/schedule.js?v=20260929-001";
-import { initRiskGuard } from "./services/riskguard.js?v=20260929-001";
-import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20260929-001";
-import { initUnderstandPanel } from "./components/understand.js?v=20260929-001";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20260929-001";
-import { setProject, setProjectFileTree } from "./store.js?v=20260929-001";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20260929-001";
-import { installErrorSink } from "./services/error_sink.js?v=20260929-001";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, customThemeActive, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, contextCapStops, contextCapStopIndex, contextWindowSource, getContextWindow, setModelContextWindow, getModelDefinition, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode } from "./store.js?v=20261001-002";
+import { initI18n, t } from "./services/i18n.js?v=20261001-002";
+import { iconSvgEl } from "./services/icons.js?v=20261001-002";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20261001-002";
+import { get, post, put } from "./services/api.js?v=20261001-002";
+import { dlgConfirm } from "./services/dialog.js?v=20261001-002";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20261001-002";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20261001-002";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20261001-002";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20261001-002";
+import { initSkillPanel, refreshSkills, refreshActions } from "./components/skill_panel.js?v=20261001-002";
+import { initExtensions } from "./components/extensions.js?v=20261001-002";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20261001-002";
+import { initTeamPanel } from "./components/team.js?v=20261001-002";
+import { initProjectBar } from "./components/project_bar.js?v=20261001-002";
+import { initSessionSummary } from "./components/session_summary.js?v=20261001-002";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20261001-002";
+import { initTypingGame } from "./components/typing_game.js?v=20261001-002";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20261001-002";
+import { initMemoryPanel } from "./components/memory.js?v=20261001-002";
+import { initExpertsPanel } from "./components/experts.js?v=20261001-002";
+import { initSchedule } from "./components/schedule.js?v=20261001-002";
+import { initRiskGuard } from "./services/riskguard.js?v=20261001-002";
+import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20261001-002";
+import { initThemeSettings, renderThemeSettings } from "./components/theme_settings.js?v=20261001-002";
+import { applyCustomTheme } from "./services/theme_custom.js?v=20261001-002";
+import { initUnderstandPanel } from "./components/understand.js?v=20261001-002";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20261001-002";
+import { setProject, setProjectFileTree } from "./store.js?v=20261001-002";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20261001-002";
+import { installErrorSink } from "./services/error_sink.js?v=20261001-002";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -63,6 +66,11 @@ function switchPanel(panelName) {
   });
   if (activePanelName === "whiteboard") {
     requestAnimationFrame(() => refreshWhiteboard());
+  }
+  // 扩展页是"看手头有什么"的地方：进来就重取一次，别让用户对着上一个项目的清单挑
+  if (activePanelName === "ext") {
+    refreshSkills();
+    refreshActions();
   }
   if (prevName && prevName !== activePanelName) {
     const panelEl = document.getElementById("panel-" + activePanelName);
@@ -685,6 +693,7 @@ function openSettings(options = {}) {
   renderImageGenSettings();
   renderVideoGenSettings();
   renderAiFeatureSettings();
+  renderThemeSettings();
   renderConstitutionSettings();
   renderCustomModelManagement();
   renderKeyManagement();
@@ -1427,7 +1436,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20260929-001").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20261001-002").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1451,7 +1460,7 @@ function initNotificationPersistence() {
 const PERMISSION_MODE_HINTS = {
   ask: "默认逐条确认：AI 执行命令、访问网络前都会弹窗询问",
   auto: "默认只在命中高危规则（删除、提权、强制推送等）时弹窗询问，其余直接放行；灾难级命令（rm -rf /、format 等）仍强制拦截",
-  full: "默认不询问，命令与联网直接执行；灾难级命令（rm -rf /、format 等）仍强制拦截",
+  full: "默认全托管：命令与联网直接执行，AI 缺条件时也不弹选择题问你，自己选定方案继续；灾难级命令（rm -rf /、format 等）仍强制拦截",
 };
 
 function renderPermissionModeSettings() {
@@ -1523,6 +1532,7 @@ const CX_ICON_CHAT = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stro
 const CX_ICON_TEAM = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
 const CX_ICON_BOARD = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="7" y1="10" x2="17" y2="10"/></svg>';
 const CX_ICON_FACTORY = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20h20"/><path d="M4 20V8l6 4V8l6 4V4h4v16"/></svg>';
+const CX_ICON_EXT = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v6"/><path d="M12 16v6"/><path d="M2 12h6"/><path d="M16 12h6"/><circle cx="12" cy="12" r="4"/></svg>';
 
 const CODEX_DOCK_GROUPS = [
   {
@@ -1530,6 +1540,7 @@ const CODEX_DOCK_GROUPS = [
       { key: "chat", label: "对话", text: "对话", customIcon: CX_ICON_CHAT },
       { key: "team", label: "团队", text: "团队", customIcon: CX_ICON_TEAM },
       { key: "whiteboard", label: "黑板", text: "黑板", customIcon: CX_ICON_BOARD },
+      { key: "ext", label: "扩展", text: "扩展", customIcon: CX_ICON_EXT },
       { key: "factory", label: "工厂", text: "工厂", customIcon: CX_ICON_FACTORY },
     ],
   },
@@ -1595,6 +1606,9 @@ function handleCodexDock(key) {
       break;
     case "whiteboard":
       switchPanel("whiteboard");
+      break;
+    case "ext":
+      switchPanel("ext");
       break;
     case "factory":
       switchPanel("factory");
@@ -1700,6 +1714,7 @@ function updateDockActive() {
   let activeKey = "";
   if (panelId === "panel-chat") activeKey = teamActive ? "team" : "chat";
   else if (panelId === "panel-whiteboard") activeKey = "whiteboard";
+  else if (panelId === "panel-ext") activeKey = "ext";
   else if (panelId === "panel-factory") activeKey = "factory";
   else if (panelId === "panel-settings") activeKey = "settings";
   dock.querySelectorAll(".codex-dock-item").forEach(btn => {
@@ -1872,7 +1887,7 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     open.title = t("切到该项目");
     open.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { switchToProject } = await import("./services/project_scene.js?v=20260929-001");
+      const { switchToProject } = await import("./services/project_scene.js?v=20261001-002");
       const out = await switchToProject(projectId);
       if (!out.ok) toast(out.reason || t("切换失败"));
       await refreshCodexHistory();
@@ -1887,8 +1902,8 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     pin.setAttribute("aria-pressed", entry?.pinned ? "true" : "false");
     pin.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { patchRegistry } = await import("./services/project.js?v=20260929-001");
-      const { refreshRegistry } = await import("./services/project_scene.js?v=20260929-001");
+      const { patchRegistry } = await import("./services/project.js?v=20261001-002");
+      const { refreshRegistry } = await import("./services/project_scene.js?v=20261001-002");
       await patchRegistry(projectId, { pinned: !(entry?.pinned) });
       await refreshRegistry();
       renderCodexHistory();
@@ -1950,6 +1965,28 @@ function applyUiMode() {
       cxHistReveal(document.getElementById("codex-dock-history"), true);
     });
   }
+}
+
+// ── 明暗切换的唯一入口 ──────────────────────
+// 顶栏按钮、Ctrl+D、通用 UI 的「明暗主题」快捷项（它点的是同一颗 btn-theme）都走这里。
+// 自定义主题生效时 store 会拒绝切换，这里负责把"为什么没换"说出来：
+// 只把按钮置灰不解释，最容易让人以为按钮坏了。
+function requestThemeToggle() {
+  if (toggleTheme()) {
+    toast(state.theme === "dark" ? "深色模式" : "浅色模式");
+    return true;
+  }
+  toast("自定义主题生效中：先在「设置 → 自定义主题」里关掉它，才能切换深色/浅色");
+  return false;
+}
+
+// 锁的样子只改 class 与 title，不置 disabled：点了要有回应，禁用态给不了回应
+function syncThemeLockUI() {
+  const btn = document.getElementById("btn-theme");
+  if (!btn) return;
+  const locked = customThemeActive();
+  btn.classList.toggle("is-locked", locked);
+  btn.title = locked ? "自定义主题生效中，明暗切换已锁定" : "切换主题";
 }
 
 function initUiMode() {
@@ -2033,8 +2070,8 @@ function renderGenSettings(kind) {
   if (keyEl) keyEl.value = cfg.api_key || "";
   if (statusEl) {
     statusEl.textContent = (cfg.model && cfg.api_key)
-      ? `已配置 — 当前模型：${cfg.model}（${cfg.base_url || "https://api.openai.com/v1"}）`
-      : `未配置 — 调用 ${kind === "image" ? "image_gen" : "video_gen"} 工具会返回错误`;
+      ? t("已配置 — 当前模型：{model}（{url}）", { model: cfg.model, url: cfg.base_url || "https://api.openai.com/v1" })
+      : t("未配置 — 调用 {tool} 工具会返回错误", { tool: kind === "image" ? "image_gen" : "video_gen" });
   }
 }
 
@@ -2093,7 +2130,7 @@ async function saveSettings() {
     if (constData) {
       if (state.project) {
         // 打开着项目就写进项目（.slate/config.json，跟着仓库走），全局版本保持不动
-        const { updateProjectConfig } = await import("./services/project.js?v=20260929-001");
+        const { updateProjectConfig } = await import("./services/project.js?v=20261001-002");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -2128,16 +2165,18 @@ function initKeyboardShortcuts() {
       e.preventDefault();
       return;
     }
-    // Ctrl+N: 新建对话
-    if (e.ctrlKey && e.key === "n") {
+    // Ctrl+N: 新建对话（Mac 上是 ⌘N：那边的键盘没有 Ctrl 这个肌肉记忆，
+    // 两个修饰键都认，界面里那句 "Ctrl+N" 在两边就都还是真的）
+    // defaultPrevented 那条是给白板让的：⌘D 在板上是"复制选中卡片"，元素上的监听先跑，
+    // 这里再跟着翻主题就是两个动作叠在一起（两个修饰键都认之后 Mac 也会撞上，所以一并让）
+    if ((e.ctrlKey || e.metaKey) && !e.defaultPrevented && e.key === "n") {
       e.preventDefault();
       document.getElementById("btn-new-chat")?.click();
     }
-    // Ctrl+D: 切换主题
-    if (e.ctrlKey && e.key === "d") {
+    // Ctrl+D: 切换主题（同上，Mac 走 ⌘D）
+    if ((e.ctrlKey || e.metaKey) && !e.defaultPrevented && e.key === "d") {
       e.preventDefault();
-      toggleTheme();
-      toast(state.theme === "dark" ? "深色模式" : "浅色模式");
+      requestThemeToggle();
     }
     // Escape: 关闭弹窗
     if (e.key === "Escape") {
@@ -2262,6 +2301,14 @@ async function init() {
 
   // 应用保存的主题
   document.documentElement.setAttribute("data-theme", state.theme);
+  // 自定义主题只走这一条生效通道：控件写 store → store 通知 → 这里注入样式并同步锁的样子。
+  // 启动时也来一次，把上次存的色板装回去（背景图不在本机时自动退成"只换色、不铺图"）。
+  subscribe("customTheme", (theme) => {
+    applyCustomTheme(theme);
+    renderThemeSettings();
+    syncThemeLockUI();
+  });
+  applyCustomTheme(state.customTheme).then(syncThemeLockUI);
   applyUiMode();
 
 
@@ -2269,6 +2316,8 @@ async function init() {
   safeInit("对话", initChat);
   safeInit("黑板", initWhiteboard);
   safeInit("提示词工厂", initPromptFactory);
+  // 分栏轨要先立起来：技能/MCP/专家包各栏渲染完会把条数写进轨上的徽标，晚一步就写空
+  safeInit("扩展页", initExtensions);
   safeInit("技能面板", initSkillPanel);
   safeInit("MCP Server", initMcpServerPanel);
   safeInit("AI 团队", initTeamPanel);
@@ -2304,8 +2353,7 @@ async function init() {
 
   // 主题切换
   document.getElementById("btn-theme").addEventListener("click", () => {
-    toggleTheme();
-    toast(state.theme === "dark" ? "深色模式" : "浅色模式");
+    requestThemeToggle();
   });
 
   // 设置弹窗
@@ -2321,6 +2369,7 @@ async function init() {
   initWebSearchPersistence();
   initGenSettingsPersistence();
   safeInit("AI 辅助功能设置", initAiFeatureSettings);
+  safeInit("自定义主题设置", initThemeSettings);
   initUiMode();
   safeInit("API 测试", initApiTest);
   safeInit("打字小游戏", initTypingGame);
@@ -2343,11 +2392,11 @@ async function init() {
   // lastProjectPath 退成第二道：老数据第一次升级到带注册表的版本时，册子是空的，
   // 拿它补登一次，用户不会感到"项目不见了"。
   try {
-    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20260929-001");
+    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20261001-002");
     const res = await getCurrentProject();
     let project = res.code === 0 ? res.data : null;
     if (!project && state._lastProjectPath) {
-      const { openProject } = await import("./services/project.js?v=20260929-001");
+      const { openProject } = await import("./services/project.js?v=20261001-002");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) project = openRes.data;
     }

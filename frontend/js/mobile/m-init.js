@@ -5,19 +5,20 @@
  * 3. 装配外壳与各面板
  */
 
-import { state, subscribe, loadPersistent, loadSharedPersistent, setModelRegistry } from "../store.js?v=20260929-001";
-import { measureContext } from "../services/context_meter.js?v=20260929-001";
-import { setLanToken, get } from "../services/api.js?v=20260929-001";
-import { initI18n } from "../services/i18n.js?v=20260929-001";
-import { initMApp } from "./m-app.js?v=20260929-001";
-import { mToast } from "./m-ui.js?v=20260929-001";
-import { initMChat } from "./m-chat.js?v=20260929-001";
-import { initMChatInput } from "./m-chat-input.js?v=20260929-001";
-import { initMConversations } from "./m-conversations.js?v=20260929-001";
-import { initMMemory } from "./m-memory.js?v=20260929-001";
-import { initMSchedule } from "./m-schedule.js?v=20260929-001";
-import { initMSettings } from "./m-settings.js?v=20260929-001";
-import { mApprovalSheet } from "./m-auth.js?v=20260929-001";
+import { state, subscribe, loadPersistent, loadSharedPersistent, setModelRegistry } from "../store.js?v=20261001-002";
+import { measureContext } from "../services/context_meter.js?v=20261001-002";
+import { setLanToken, get } from "../services/api.js?v=20261001-002";
+import { initI18n } from "../services/i18n.js?v=20261001-002";
+import { applyCustomTheme } from "../services/theme_custom.js?v=20261001-002";
+import { initMApp } from "./m-app.js?v=20261001-002";
+import { mToast } from "./m-ui.js?v=20261001-002";
+import { initMChat } from "./m-chat.js?v=20261001-002";
+import { initMChatInput } from "./m-chat-input.js?v=20261001-002";
+import { initMConversations } from "./m-conversations.js?v=20261001-002";
+import { initMMemory } from "./m-memory.js?v=20261001-002";
+import { initMSchedule } from "./m-schedule.js?v=20261001-002";
+import { initMSettings } from "./m-settings.js?v=20261001-002";
+import { mApprovalSheet } from "./m-auth.js?v=20261001-002";
 
 // 移动端把"问人"那张脸换成底部 sheet；判口（哪一档问什么）仍在 riskguard，桌面不受影响
 window.__slateGuardUi = mApprovalSheet;
@@ -36,6 +37,9 @@ function applyTheme() {
   document.documentElement.setAttribute("data-theme", state.theme || "dark");
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = state.theme === "dark" ? "#0A0A0A" : "#FFFFFF";
+  // 手机与桌面共用同一份 customTheme：色板在这边照样生效。背景图文件存在跑后端的那台机器
+  // 的 data/theme/ 里，手机是通过同一个后端取到它的，取不到时组件会自动退成"只换色不铺图"。
+  applyCustomTheme(state.customTheme);
 }
 
 async function init() {

@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import * as common from "../frontend/js/services/agent_common.js";
 // 版本串必须与 tools.js 里的 import 说明符同形：写成 store.js（无 ?v=）会载入第二个 store 实例，
 // 工具改的是那一份 state，守卫读的是这一份 → 永远假红/假绿
-import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20260929-001";
+import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20261001-002";
 
 const NEXT_OK = "Next: use this result to continue the task. Do not repeat the same tool call unless new parameters are needed.";
 const NEXT_FAIL = "Next: fix the parameters or choose a different tool. Do not repeat the identical failing call.";
@@ -357,6 +357,63 @@ assert.equal(effectiveToolMode("local", "openai", "chat"), "none");
   assert.match(appSrc, /state\.continueAutopilot = e\.target\.checked;[\s\S]{0,60}?savePersistent\(\);/, "开关变更没有落盘");
   assert.match(dictSrc, /"\{m\} · Continue Autopilot 追加 \{x\} 轮（第 \{k\}/, "进度文案缺英文词条");
   assert.match(dictSrc, /"Continue Autopilot（Autopilot \/ 目标模式用完轮数上限而任务未完成时/, "设置项文案缺英文词条");
+}
+
+// ── 第三批：发给模型的载荷不随界面语言漂，也不把模型支使去装依赖 ──────
+{
+  const COMMON = readFileSync(new URL("../frontend/js/services/agent_common.js", import.meta.url), "utf8");
+  // 先剥注释再判：文件头那句「一律不经 t()」正是这条约定的说明，不是违规
+  const codeOnly = COMMON.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/\bt\(/.test(codeOnly),
+    "工具结果载荷不许经界面 i18n：t() 一进来，发给模型的字符串就跟着屏幕上那门语言漂，"
+    + "而完成判定、去重与走查读的都是字面串");
+  const DICT = readFileSync(new URL("../frontend/js/services/i18n_dict.js", import.meta.url), "utf8");
+  for (const marker of ["Warnings:", "Target path:", "Next: use this result", "Status: written to disk"]) {
+    assert.ok(!DICT.includes(`"${marker}`), `载荷标记「${marker}」进了 i18n 词典＝有人把它当成了用户可见文案`);
+  }
+  // 流式兜底那句会拼进发给模型的回执，界面上的英文由 DOM observer 查词典负责（api.js 一直这么做）
+  const TOOLS_B3 = readFileSync(new URL("../frontend/js/services/tools.js", import.meta.url), "utf8");
+  const API_B3 = readFileSync(new URL("../frontend/js/services/api.js", import.meta.url), "utf8");
+  assert.match(TOOLS_B3, /message: "工具流式执行失败"/,
+    "skill_run 的流式兜底回执要字面固定：一过 t()，同一件失败对模型就有两种说法，"
+    + "空转检测与走查读的字面串也跟着界面语言漂");
+  assert.match(API_B3, /\|\| "工具流式执行失败"/, "api.js 同一处兜底也是字面串，两处口径要一致");
+  // 后端把「没干成」装在 code:0 里（缺依赖那一类）：这笔要真的判成失败，
+  // 否则模型读到的整句是「[工具 skill_run 成功]: {"error": …}」，它会照着成功那头说。
+  assert.match(TOOLS_B3, /typeof data\.error === "string"[\s\S]{0,90}return \{ error: data\.error \};/,
+    "skill_run 要把后端 code:0 里的 error 原样交出去，别 stringify 成一段看起来像产物的 JSON");
+  assert.match(TOOLS_B3, /!output\._type[\s\S]{0,140}return \{ success: false, output: output\.error \};/,
+    "executeTool 要有 {error} → success:false 这条通道：没有它，工具失败只能靠 throw 报出来");
+  const DEP_FILES = [
+    "backend/skills/browser_automation.py", "backend/skills/computer_use.py",
+    "backend/skills/excel_tool.py", "backend/skills/pdf_tool.py",
+    "backend/skills/ppt_create.py", "backend/skills/word_create.py",
+    "backend/skills/system_info.py",
+  ];
+  for (const rel of DEP_FILES) {
+    const src = readFileSync(new URL("../" + rel, import.meta.url), "utf8");
+    assert.ok(!/请(?:先)?(?:运行|执行)\s*[：:]/.test(src),
+      `${rel} 的缺依赖回话要改成陈述句：「请执行: pip install X」对模型是一句指令，自动审批档下它会自己去装东西`);
+    assert.match(src, /不要自行执行安装命令/, `${rel} 缺依赖时要明确叫模型别自己装，只把情况告诉用户`);
+  }
+}
+
+// ── 第四批：模型侧纪律单一来源 ＋ 精简目录体积上限 ──────────────
+{
+  const T = readFileSync(new URL("../frontend/js/services/tools.js", import.meta.url), "utf8");
+  assert.ok(!/AGENT_TOOL_DECISION_RULES/.test(T),
+    "「什么时候用哪个工具」只许写在 TOOL_USE_RECIPES 一处：第二份决策规则就是第二套措辞，改一处漏一处");
+  const scenes = [...T.matchAll(/^\s{2}\["([^"]+)",\s"/gm)].map(m => m[1]);
+  assert.ok(scenes.length > 10, `速查表读空了（只抓到 ${scenes.length} 行），这条判据就成摆设了`);
+  assert.equal(new Set(scenes).size, scenes.length,
+    `速查场景名重复：${scenes.filter((v, i) => scenes.indexOf(v) !== i).join(",")}——同名两条以后必然对不上`);
+  assert.equal((CATALOGUE.match(/\[文件[^\]]*规则[^\]]*\]/g) || []).length, 1,
+    "file_edit / file_create / file_append 共用一段写入规则：三段各写一遍时，同一条限制能对不上三个说法");
+  assert.ok(CATALOGUE.includes("由后端无条件硬拦") && /撞到这类拒绝不要重试/.test(CATALOGUE),
+    "灾难级命令的硬拦边界要写给模型：以前只对用户披露，模型撞上去就当是审批没通过，反复重试烧轮数");
+  // 体积上限：第四批把精简目录从 11925 压到 ~9.3k。写死上限不是为了数字好看，
+  // 是因为这条串每个请求都发一次——回弹是看不出来的，只能靠这里挡。
+  assert.ok(CATALOGUE.length < 9600, `精简工具目录体积回弹：现在 ${CATALOGUE.length} 字符（上限 9600）`);
 }
 
 console.log("agent_common.js 输出与基线逐字全等：通过");

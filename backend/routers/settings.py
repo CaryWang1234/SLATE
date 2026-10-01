@@ -41,6 +41,9 @@ async def get_shared_state():
 async def save_shared_state(req: SharedStateRequest):
     allowed_keys = {
         "theme",
+        # 自定义主题（配色/字体/背景图开关）。背景图文件本身在 data/theme/，
+        # 这里只存那份色板，手机端拿到同一套颜色。
+        "customTheme",
         "uiMode",
         "modelKeys",
         "customModels",

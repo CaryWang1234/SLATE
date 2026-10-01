@@ -3,10 +3,10 @@
  * 遥控地址 + 二维码 / 模型选择 / 密钥管理 / 主题切换
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, toggleTheme, contextBudgetOf, fmtContextTokens, setReasoningEffort, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS } from "../store.js?v=20260929-001";
-import { get } from "../services/api.js?v=20260929-001";
-import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20260929-001";
-import { onTab } from "./m-app.js?v=20260929-001";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, toggleTheme, customThemeActive, contextBudgetOf, fmtContextTokens, setReasoningEffort, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS } from "../store.js?v=20261001-002";
+import { get } from "../services/api.js?v=20261001-002";
+import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20261001-002";
+import { onTab } from "./m-app.js?v=20261001-002";
 
 function $id(id) { return document.getElementById(id); }
 
@@ -250,11 +250,13 @@ function renderThemeSection() {
   if (!box) return;
   box.innerHTML = "";
   const { card } = mkGroup(t("外观"));
+  const locked = customThemeActive();
   const row = mkRow({
     title: t("深色模式"),
-    sub: state.theme === "dark" ? t("开启") : t("关闭"),
+    // 自定义主题生效时这一行是"锁着"的：开关照点，点了给一句原因，不给一个没反应的开关
+    sub: locked ? t("自定义主题生效中，明暗切换已锁定") : (state.theme === "dark" ? t("开启") : t("关闭")),
     click: () => {
-      toggleTheme();
+      if (!toggleTheme()) { mToast(t("自定义主题生效中，明暗切换已锁定")); return; }
       const meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.content = state.theme === "dark" ? "#0A0A0A" : "#FFFFFF";
       mToast(state.theme === "dark" ? t("深色模式") : t("浅色模式"));
