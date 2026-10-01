@@ -49,6 +49,20 @@ SLATE（砚）是一款**本地优先**的 AI 协作调度台。它把主流大�
 
 同一份安装只会开一个 SLATE 窗口：窗口已经开着、或者已经缩进通知区域时再双击一次图标，不会多出一个窗口、也不会多起一份后端——新进程会把正在跑的那个窗口唤回前台（抢不到前台时让任务栏图标闪一下），然后自己退掉。锁随进程消失，崩溃或被任务管理器结束都不会把应用变成「再也打不开」；装到另一个目录的副本算另一份安装，可以与这一份同时跑。
 
+#### macOS
+
+前往 [GitHub Releases](https://github.com/CaryWang1234/SLATE/releases) 下载 `SLATE-Setup-x.x.x.dmg`，双击挂载后把「SLATE 砚」拖进「应用程序」。这个 `.dmg` 由 CI 直接产出，还没有做代码签名与公证，首次打开会被 Gatekeeper 拦下：在访达里右键（或长按）图标 → 「打开」 → 再点一次「打开」，此后就能双击启动。
+
+安装版的数据不在 `.app` 包里，而在 `~/Library/Application Support/SLATE`：对话历史、API Key、后端日志和 WebView 的个人资料都在这里。替换 `.app` 升级不会动你的数据，包体也不会在运行时被写脏——将来真签名公证时，那种改动是会废掉签名的。源码运行仍然把数据放在仓库的 `data/`。
+
+窗口用 macOS 原生的 WKWebView 渲染，Windows 用 Edge WebView2，两套内核各自的偏好与缓存互不相通。「设置 → 关于」里的检查更新在 Mac 上给出的是这一平台的 `.dmg` 链接，不会推一个双击打不开的 `.exe`；发布产物里找不到匹配文件时退回 Releases 页面。
+
+键盘上 `⌘ + N` 新建对话、`⌘ + D` 切换明暗，`Ctrl` 组合同样有效；焦点在白板画布里时 `⌘ + D` 归给「复制选中的卡片」这条绑定，不会去翻明暗。界面正文走系统字体（苹方），代码走 SF Mono / Menlo，Windows 上仍是微软雅黑与 Consolas。
+
+高危命令的清单按平台补齐：`diskutil erase`、`diskutil reformat`、`diskutil partitionDisk`、`diskutil secureErase`（抹盘、重分区）会先弹审批；`rm -rf /`、`rm -rf ~`、`mkfs`、`dd if=` 这类灾难级命令无条件禁止，连审批都不走。
+
+Mac 上还没有这两件事：通知区域常驻与「一份安装只开一个窗口」目前只在 Windows 上实现——关窗口就是退出，重复启动会再起一份。另外，这一轮 macOS 改动是在 Windows 上把「平台」当实参、将 Darwin 分支执行并断言验证的，`.app` 与 `.dmg` 尚未在真机上跑过。
+
 #### 方式二：源码运行
 
 ```bash
@@ -88,10 +102,18 @@ SLATE 支持同时接入多个模型，在对话界面顶部下拉框随时切�
 - 收起是记在你这台机器上的偏好：刷新、重启都保持折叠，清单继续往下跑也不会擅自把栏撑回来
 - 折叠期间按钮悬停会报 `{done}/{total}`，进度不至于彻底隐身；这场没有清单时按钮置灰
 
+**输入框右端「优化提示词」（✦，在语音按钮左边）：**
+- 写了一半觉得说不清，点一下把这段草稿交给当前模型改写一遍
+- 改写结果先与原文并排放在弹窗里比对，只有点「采用」才写回输入框
+- 点「保留原文」、按 Esc、点弹窗外面都不算采用，输入框一个字都不会变
+- 等结果期间你又改了草稿（包括语音听写实时写进去的字），这次结果会被放弃，不会盖掉你新写的
+- 用哪个模型可在「设置 → AI 辅助功能 → 提示词优化」单独指定；关掉后一次请求都不发
+
 **快捷键：**
 - `Enter` 发送消息
 - `Shift + Enter` 换行
-- `Ctrl + N` 新建对话
+- `Ctrl + N`（Mac 上 `⌘ + N`）新建对话
+- `Ctrl + D`（Mac 上 `⌘ + D`）切换深浅色；焦点在白板画布里时这条归复制卡片
 
 ---
 
@@ -248,7 +270,7 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 | 系统与环境 | `system_info` `git_tool` `css_color` |
 | 自动化 | `browser_automation` `computer_use` `screenshot_to_code` |
 | AI 生成 | `image_gen` `video_gen`（需在设置中配置模型与 API Key） |
-| 扩展 | `mcp_factory`（动态注册外部 MCP 工具） |
+| 扩展 | `mcp_factory`（工具工厂：生成的工具落 `data/evolved/`，可在「扩展 → 新功能」停用/回滚/撤销） |
 
 **特殊字符与编码：**
 - `file_peek` / `file_edit` 自动识别 UTF-8、UTF-8 BOM、GB18030、GBK、UTF-16 等常见文本编码
@@ -270,12 +292,25 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 - 字段：`name`、`description`、`when`（什么时候该套用）、`inputs`（要问用户拿什么）、`steps`（每步 `title` + 可选 `tool` / `detail` / `check`）、`output`、`tags`
 - 智能体态下模型自动看到 Action 目录（最多 20 条，超出只报数量并指向 `actions_list`），确认要用时调 `actions_read` 读完整流程，再按步骤实际执行；对话态没有工具，整段目录都不注入
 - 读到流程不等于做过流程：步骤里标了建议工具的，仍要真调工具完成，模型不会因为「读过 yml」就声称已经执行
-- 写坏的 yml 不会凭空消失：设置 →「工具 / 技能」里会连同「第 N 行：原因」一起列出，工具返回里也会告诉模型哪些暂时不可用
+- 写坏的 yml 不会凭空消失：顶部「扩展」页的 Actions 栏里会连同「第 N 行：原因」一起列出，工具返回里也会告诉模型哪些暂时不可用
 - 格式用的是极简 YAML 子集（2 空格缩进、块数组、`|` 字面量块），Tab 缩进、锚点、多文档等一律拒收；单文件上限 64 KB
-- 面板可编辑：设置 →「工具 / 技能」→ Actions，点「＋ 新建 Action」或点已有条目进编辑器；边写边校验，报错按「第 N 行：原因」显示，校验没过就保存不了
+- 面板可编辑：顶部「扩展」页 → Actions 栏，点「＋ 新建 Action」或点已有条目进编辑器；边写边校验，报错按「第 N 行：原因」显示，校验没过就保存不了
 - 每次覆盖或删除都会先把原文留底到 `data/actions/.history/`（每份最多 5 版），编辑器里的「历史版本」可查看任意一版或直接回滚
-- 模型也能写：`actions_write` 工具要求它先在 yml 里声明 `author: model`（面板据此打上「模型代写」徽标），且这一场开着「手动审批」时会弹窗给你审批；切到「自动审批 / 完全访问」则不弹窗——写坏可以回滚，但格式校验永远会拦住不合格的内容
+- 模型也能写：`actions_write` 工具要求它先在 yml 里声明 `author: model`（面板据此打上「模型代写」徽标），且这一场开着「手动审批」时会弹窗给你审批；切到「自动审批 / 夜间模式」则不弹窗——写坏可以回滚，但格式校验永远会拦住不合格的内容
 - 聊天框输入 `@<id>` 可把整份流程注入这条消息（注入有 6000 字上限，超出部分提示模型用 `actions_read` 读全）
+
+**自进化工具（工具工厂）：**
+
+`mcp_factory` 让 SLATE 把自己缺的工具写出来给自己用。产物一律落在 `data/evolved/`（用户数据区），一个工具两份文件：`<name>.py` 是生成的代码，`<name>.json` 是说明与参数。
+
+- 为什么不写进 `backend/skills/`：那是程序自己的源码树——一次升级就把攒下的自产工具整个冲掉，而且程序不该在运行时改自己。`data/` 升级覆盖不到，重启后清单照读
+- 管理入口：顶栏「扩展」→「新功能」栏。每条都写明当前状态：正常 / 已停用 / 代码有问题（带第几行语法错误）/ 与内置工具同名（已由内置接管）
+- 停用是从模型的工具体系里整条摘掉，不是「调用时再报错」；随时可以再启用
+- 覆盖、撤销、回滚都先留底到 `data/evolved/.history/`（每个工具最多 5 版），条目弹窗的「历史版本」可查看任一版并回滚；回滚也是写，编译不过的旧版本不许盖回去
+- 语法不过的生成代码根本不落盘（只编译自检，绝不替你执行一次）；与内置工具同名的创建请求当场拒绝
+- 同名冲突时内置优先：升级若带来了同名内置工具，那份自产代码会被顶掉并标出来——看得见、随时可撤，不必跟新版较劲
+- 历史版本遗留在 `backend/skills/` 里的产物会在启动时自动复制进 `data/evolved/`（只复制，不删程序自己目录里的文件）
+- `@` 提及与 `skill_search` 都能找到这些工具，系统提示里会点名当前启用的自产工具
 
 ---
 
@@ -401,12 +436,13 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 | 上下文预算 | 模型行上「最大上下文」= 按该模型窗口生成的滑杆 + 精确数字框 + 「探测窗口」。自动档取这个模型自己的标称窗口 ×0.8，不再吸附公共档位（8K 的本地模型拿到 6553，而不是把窗口占满没地方写回复）；数字框保留你填的精确值（131072 就是 131072，只在 1K–4M 内夹取）；本地/自定义端点可一键探测真实窗口（Ollama / llama.cpp / vLLM / OpenAI 兼容），探到的值单独存着、可一键清除。同一个值同时决定自动压缩阈值与用量条分母 |
 | 输出控制 | 最大 Token 数、流式输出开关 |
 | 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 / Continue Autopilot（末轮续跑） |
-| 审批模式 | 三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 23 类高危）/ 完全访问（都不问）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改 |
+| 审批模式 | 三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 24 类高危）/ 夜间模式（全托管：命令、联网、缺条件时反问都不问，自己拍板继续）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改 |
 | 局域网遥控 | 查看访问地址与二维码，设置局域网访问密码 |
-| 主题 | 深色/浅色切换 |
-| 语言 | 中文/English |
+| 主题 | 深色/浅色切换（顶栏按钮与 Ctrl+D）；自定义主题开着时这颗按钮会锁定，点下去说明原因而不换色 |
+| 自定义主题 | 四个源色（底色 / 面板 / 正文 / 强调）推导整套配色 + 正文与代码字体 + 本机背景图与遮罩浓度；10 套预设，改任一格即脱离预设高亮，开关跨设备同步、图只留本机 |
+| 语言 | 中文/English——按钮与区块标题之外，输入框 placeholder 与悬浮提示也走词典；用户与模型写的内容一律不翻，品牌字标「砚」用 `data-i18n-skip` 豁免 |
 | 上下文压缩 | 自动/手动压缩历史对话；摘要发给模型的是完整原文，界面上折成一条可展开的折叠条。系统催办与工具结果投喂这类隐藏轮只进上下文、不占消息区，压缩后重建保留段也不会把它们画成气泡 |
-| AI 辅助功能 | 对话以外的 13 项耗 Token 功能逐项开关 + 单独选模型；关掉即一次模型都不发，工具类的三项（子代理/图片/视频）还会从工具目录里消失 |
+| AI 辅助功能 | 对话以外的 14 项耗 Token 功能逐项开关 + 单独选模型；关掉即一次模型都不发，工具类的三项（子代理/图片/视频）还会从工具目录里消失 |
 | 多任务与项目 | 切走会话是否让它继续在跑（关掉即旧语义：切换即中断）、同时最多跑几场（1–4）、同一项目内最多几场（1–3，默认串行）；排队中的任务在右栏任务中心与输入框上方都看得见 |
 
 ---
@@ -454,6 +490,20 @@ On Windows, clicking X does not quit the app: SLATE hides into the notification 
 
 One install opens exactly one SLATE window: if the window is already open, or already hidden in the notification area, launching again adds no second window and starts no second backend — the new process brings the running window to the front (flashing its taskbar icon when Windows refuses the foreground) and then exits. The lock disappears with the process, so a crash or a kill in Task Manager never leaves the app "unable to open again"; a copy installed into a different folder counts as a different install and may run alongside this one.
 
+#### macOS
+
+Download `SLATE-Setup-x.x.x.dmg` from [GitHub Releases](https://github.com/CaryWang1234/SLATE/releases), mount it, and drag "SLATE 砚" into "Applications". The `.dmg` comes straight out of CI and is neither code-signed nor notarised yet, so the first launch is stopped by Gatekeeper: right-click (or long-press) the icon in Finder → Open → Open again. A plain double-click works from then on.
+
+An installed build keeps its data outside the `.app`, under `~/Library/Application Support/SLATE`: chat history, API keys, the backend log and the WebView profile all live there. Replacing the `.app` to upgrade therefore leaves your data alone, and the bundle is never written to at runtime — the kind of change that would void a signature once the app is signed. Running from source still uses `data/` inside the repo.
+
+The window renders through macOS-native WKWebView while Windows uses Edge WebView2; the two engines keep their own preferences and caches apart. "Check for Updates" under Settings → About hands you the `.dmg` link for this platform rather than an `.exe` you cannot open, and falls back to the Releases page when no matching asset is published.
+
+`⌘ + N` starts a new chat and `⌘ + D` toggles light/dark; the `Ctrl` chords keep working too. With focus inside the whiteboard canvas, `⌘ + D` belongs to its duplicate-selected-cards binding and does not flip the theme. The UI text uses the system font (PingFang SC) and code uses SF Mono / Menlo, where Windows stays on Microsoft YaHei and Consolas.
+
+The dangerous-command list is now platform-aware: `diskutil erase`, `diskutil reformat`, `diskutil partitionDisk` and `diskutil secureErase` ask for approval first, while catastrophic ones — `rm -rf /`, `rm -rf ~`, `mkfs`, `dd if=` — are refused outright, approval or not.
+
+Two things Mac does not have yet: the notification-area residency and the "one install, one window" gate are Windows-only, so closing the window quits and launching again starts a second copy. Also note that this round of macOS work was verified on Windows by passing the platform in as an argument and asserting the Darwin branches — the `.app` and `.dmg` have not been run on real hardware.
+
 #### Option B: From Source
 
 ```bash
@@ -493,10 +543,18 @@ SLATE supports multiple models simultaneously — switch anytime from the top dr
 - Folding is a preference stored on this machine: it survives reload and restart, and a list still making progress will not force the rail back open
 - While folded the button tooltip keeps reporting `{done}/{total}`, so progress does not vanish entirely; with no checklist in this conversation the button greys out
 
+**"Polish prompt" (the ✦ left of the mic):**
+- Half-way through a sentence and it isn't landing? One click hands the draft to the current model for a rewrite
+- The rewrite is compared against the original in a dialog first — only **Use it** writes it back
+- **Keep original**, `Esc` or clicking outside all decline it; the input box does not change by a single character
+- If the draft changes while you wait (voice dictation included), that rewrite is dropped instead of overwriting what you typed
+- Which model does it is pinned under Settings → AI Assistance → Prompt polish; switch it off and it never sends a request
+
 **Shortcuts:**
 - `Enter` to send
 - `Shift + Enter` for newline
-- `Ctrl + N` for new conversation
+- `Ctrl + N` (`⌘ + N` on Mac) for a new conversation
+- `Ctrl + D` (`⌘ + D` on Mac) for light/dark; inside the whiteboard canvas that chord belongs to the board
 
 ---
 
@@ -658,7 +716,7 @@ SLATE includes 35 built-in MCP tools. The model decides when to use them during 
 | System & Environment | `system_info` `git_tool` `css_color` |
 | Automation | `browser_automation` `computer_use` `screenshot_to_code` |
 | AI Generation | `image_gen` `video_gen` (model and API key configured in Settings) |
-| Extension | `mcp_factory` (dynamically register external MCP tools) |
+| Extension | `mcp_factory` (tool factory — generated tools live in `data/evolved/`, disable / roll back / revoke under Extensions → New features) |
 
 **Unicode and encoding:**
 - `file_peek` / `file_edit` auto-detect UTF-8, UTF-8 BOM, GB18030, GBK, UTF-16, and other common text encodings
@@ -680,12 +738,25 @@ The tools above are the hands; an Action is the agreed sequence — write the re
 - Fields: `name`, `description`, `when` (when it applies), `inputs` (what to ask the user for), `steps` (each with `title` plus optional `tool` / `detail` / `check`), `output`, `tags`
 - In Agent mode the model sees the Action catalog automatically (capped at 20 entries; the remainder is reported as a count pointing to `actions_list`), reads a full flow with `actions_read` before committing to it, then executes the steps. Chat mode has no tools, so the catalog is not injected at all
 - Reading a flow is not the same as running it: steps that name a suggested tool still require the actual call, and the model never claims completion just because it read the yml
-- A broken file does not silently disappear: Settings → "Tools / Skills" lists it together with "line N: reason", and tool results tell the model which Actions are currently unavailable
+- A broken file does not silently disappear: the Actions column on the top-level Extensions page lists it together with "line N: reason", and tool results tell the model which Actions are currently unavailable
 - The format is a minimal YAML subset (2-space indent, block arrays, `|` literal blocks); tabs, anchors and multi-document files are rejected. 64 KB per file
-- Editable in the panel: Settings → "Tools / Skills" → Actions, then "+ New Action" or click an entry to open the editor. Validation runs as you type and reports "line N: reason"; a failing draft cannot be saved
+- Editable in the panel: the Actions column on the top-level Extensions page, then "+ New Action" or click an entry to open the editor. Validation runs as you type and reports "line N: reason"; a failing draft cannot be saved
 - Every overwrite or delete first copies the previous text to `data/actions/.history/` (up to 5 versions per Action). The editor's "History" button lets you view any version or roll back to it
 - The model can write too: the `actions_write` tool requires it to declare `author: model` inside the yml (the panel badges such files "Model-written"), and in "Ask" permission mode a confirmation dialog shows the exact content first. "Auto" / "Full access" skip the dialog — a bad write is reversible via history, but the format gate never lets an invalid file through
 - Typing `@<id>` in the chat box injects the whole flow into that message, capped at 6000 characters; anything longer is trimmed with a note telling the model to read the rest with `actions_read`
+
+**Self-evolving tools (tool factory):**
+
+`mcp_factory` lets SLATE write the tools it is missing and use them itself. Every product lands in `data/evolved/` (the user data area), two files per tool: `<name>.py` holds the generated code, `<name>.json` the description and parameters.
+
+- Why not `backend/skills/`: that is the program's own source tree — one upgrade would wipe everything you had accumulated, and a running program has no business editing itself. `data/` is never overwritten by an upgrade, and the manifests are read again on every restart
+- Managed under the top **Extensions** tab → **New features** column. Each entry states its state: working / disabled / broken (with the line of the syntax error) / shadowed by a built-in tool of the same name
+- Disabling removes the tool from the model's toolbox entirely, rather than failing when it is called; re-enabling is one click
+- Overwrite, revoke and rollback each take a backup into `data/evolved/.history/` (up to 5 versions per tool). The entry dialog's "History" lists every version, lets you read one and roll back to it — and a version that no longer compiles is never written back
+- Code that does not compile never reaches the disk (the check compiles, it never executes on your behalf); a request to create a tool named after a built-in one is refused on the spot
+- Built-ins win on a name clash: if an upgrade ships a built-in tool with the same name, your generated copy is shadowed and labelled — visible, revocable, no fight with the new version
+- Products left in `backend/skills/` by older versions are copied into `data/evolved/` at startup (copied, never deleted from the program's own directory)
+- `@` mentions and `skill_search` both find these tools, and the system prompt names the currently enabled self-produced ones
 
 ---
 
@@ -813,10 +884,11 @@ Let AI automatically execute tasks on schedule or by events.
 | Auto-Advance | Autopilot / short-reply review / long-stall review / Continue Autopilot |
 | Safety Mode | High-risk command approval policy |
 | LAN Remote | View LAN URL / QR code, configure remote access password |
-| Theme | Dark/Light toggle |
-| Language | Chinese / English |
+| Theme | Dark/Light toggle (top-bar button and Ctrl+D); while a custom theme is active the button locks and clicking it explains why nothing changed |
+| Custom Theme | Four source colours (background / panel / body text / accent) derive the whole palette, plus body and code fonts and a local background image with an opacity slider; 10 presets, editing any swatch drops the preset highlight, the on/off switch syncs across devices while the image stays on this machine |
+| Language | Chinese / English — beyond buttons and section labels, input placeholders and hover titles go through the dictionary too; nothing the user or the model wrote is ever rewritten, and the brand mark 砚 opts out via `data-i18n-skip` |
 | Context Compression | Auto/manual compression of history; the model still receives the summary in full, the transcript folds it into an expandable strip. System nudges and tool-result feeds stay context-only — rebuilding the retained tail after compression never paints them as bubbles |
-| AI Assistance | 13 token-spending features outside the chat loop, each with its own switch and optional pinned model; off means no request at all, and the three tool-driven ones also disappear from the tool catalogue |
+| AI Assistance | 14 token-spending features outside the chat loop, each with its own switch and optional pinned model; off means no request at all, and the three tool-driven ones also disappear from the tool catalogue |
 | Tasks & Projects | Whether a run keeps going when you switch away (off restores the old "switch means stop"), how many runs may go at once (1-4), and how many within one project (1-3, serial by default); queued sends are visible both in the right-hand task centre and above the input box |
 
 ---

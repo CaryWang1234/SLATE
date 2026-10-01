@@ -407,7 +407,7 @@
           <li><a href="#ch10"><span class="lang-zh">工作流模板</span><span class="lang-en">Workflows</span></a></li>
           <li><a href="#ch11"><span class="lang-zh">知识库与灵光</span><span class="lang-en">Knowledge & Sparks</span></a></li>
           <li><a href="#ch12"><span class="lang-zh">Code Review</span><span class="lang-en">Code Review</span></a></li>
-          <li><a href="#ch13"><span class="lang-zh">语音输入</span><span class="lang-en">Voice Input</span></a></li>
+          <li><a href="#ch13"><span class="lang-zh">语音输入与提示词优化</span><span class="lang-en">Voice Input &amp; Prompt Polish</span></a></li>
           <li><a href="#ch14"><span class="lang-zh">截图转代码</span><span class="lang-en">Screenshot to Code</span></a></li>
           <li><a href="#ch15"><span class="lang-zh">定时任务</span><span class="lang-en">Scheduled Tasks</span></a></li>
           <li><a href="#ch16"><span class="lang-zh">设置与个性化</span><span class="lang-en">Settings</span></a></li>
@@ -445,6 +445,13 @@
             <p>前往 <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank">GitHub Releases</a> 下载 <code>SLATE-Setup-x.x.x.exe</code>，双击安装即可。</p>
             <p>装好后点窗口右上角的 X 不会结束应用：SLATE 缩进系统通知区域继续跑，正在生成的那一轮照常收工，手机端的局域网连接也不掉。双击托盘图标（或右键「显示主窗口」）找回窗口，右键「退出 SLATE」才真的退出，第一次缩下去会弹一条气泡提示。托盘只用 Windows 原生 API 实现，不引入第三方依赖；非 Windows、或这个登录会话根本没有通知区域时，关窗退回原来的直接退出。</p>
             <p>同一份安装只会开一个 SLATE 窗口：窗口已经开着、或者已经缩进通知区域时再双击一次图标，不会多出一个窗口、也不会多起一份后端——新进程会把正在跑的那个窗口唤回前台（抢不到前台时让任务栏图标闪一下），然后自己退掉。锁随进程消失，崩溃或被任务管理器结束都不会把应用变成「再也打不开」；装到另一个目录的副本算另一份安装，可以与这一份同时跑。</p>
+            <p><strong>macOS</strong></p>
+            <p>前往 <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank">GitHub Releases</a> 下载 <code>SLATE-Setup-x.x.x.dmg</code>，双击挂载后把「SLATE 砚」拖进「应用程序」。这个 <code>.dmg</code> 由 CI 直接产出，还没有做代码签名与公证，首次打开会被 Gatekeeper 拦下：在访达里右键（或长按）图标 → 「打开」 → 再点一次「打开」，此后就能双击启动。</p>
+            <p>安装版的数据不在 <code>.app</code> 包里，而在 <code>~/Library/Application Support/SLATE</code>：对话历史、API Key、后端日志和 WebView 的个人资料都在这里。替换 <code>.app</code> 升级不会动你的数据，包体也不会在运行时被写脏——将来真签名公证时，那种改动是会废掉签名的。源码运行仍然把数据放在仓库的 <code>data/</code>。</p>
+            <p>窗口用 macOS 原生的 WKWebView 渲染，Windows 用 Edge WebView2，两套内核各自的偏好与缓存互不相通。「设置 → 关于」里的检查更新在 Mac 上给出的是这一平台的 <code>.dmg</code> 链接，不会推一个双击打不开的 <code>.exe</code>；发布产物里找不到匹配文件时退回 Releases 页面。</p>
+            <p>键盘上 <code>⌘ + N</code> 新建对话、<code>⌘ + D</code> 切换明暗，<code>Ctrl</code> 组合同样有效；焦点在白板画布里时 <code>⌘ + D</code> 归给「复制选中的卡片」这条绑定，不会去翻明暗。界面正文走系统字体（苹方），代码走 SF Mono / Menlo，Windows 上仍是微软雅黑与 Consolas。</p>
+            <p>高危命令的清单按平台补齐：<code>diskutil erase</code>、<code>diskutil reformat</code>、<code>diskutil partitionDisk</code>、<code>diskutil secureErase</code>（抹盘、重分区）会先弹审批；<code>rm -rf /</code>、<code>rm -rf ~</code>、<code>mkfs</code>、<code>dd if=</code> 这类灾难级命令无条件禁止，连审批都不走。</p>
+            <p>Mac 上还没有这两件事：通知区域常驻与「一份安装只开一个窗口」目前只在 Windows 上实现——关窗口就是退出，重复启动会再起一份。另外，这一轮 macOS 改动是在 Windows 上把「平台」当实参、将 Darwin 分支执行并断言验证的，<code>.app</code> 与 <code>.dmg</code> 尚未在真机上跑过。</p>
             <p><strong>方式二：源码运行</strong></p>
             <pre>git clone https://github.com/CaryWang1234/SLATE.git
 cd SLATE
@@ -463,6 +470,13 @@ python desktop.py</pre>
             <p>Download <code>SLATE-Setup-x.x.x.exe</code> from <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank">GitHub Releases</a> and run the installer.</p>
             <p>On Windows, clicking X does not quit the app: SLATE hides into the notification area and keeps serving, so the turn that is generating finishes and LAN clients stay connected. Double-click the tray icon (or right-click → "Show window") to bring the window back; only "Quit SLATE" actually exits, and the first time it hides a balloon tells you where it went. The tray uses Windows native APIs only and adds no third-party dependency; off Windows, or in a logon session with no notification area, closing the window exits exactly as before.</p>
             <p>One install opens exactly one SLATE window: if the window is already open, or already hidden in the notification area, launching again adds no second window and starts no second backend — the new process brings the running window to the front (flashing its taskbar icon when Windows refuses the foreground) and then exits. The lock disappears with the process, so a crash or a kill in Task Manager never leaves the app "unable to open again"; a copy installed into a different folder counts as a different install and may run alongside this one.</p>
+            <p><strong>macOS</strong></p>
+            <p>Download <code>SLATE-Setup-x.x.x.dmg</code> from <a href="https://github.com/CaryWang1234/SLATE/releases" target="_blank">GitHub Releases</a>, mount it, and drag "SLATE 砚" into "Applications". The <code>.dmg</code> comes straight out of CI and is neither code-signed nor notarised yet, so the first launch is stopped by Gatekeeper: right-click (or long-press) the icon in Finder → Open → Open again. A plain double-click works from then on.</p>
+            <p>An installed build keeps its data outside the <code>.app</code>, under <code>~/Library/Application Support/SLATE</code>: chat history, API keys, the backend log and the WebView profile. Replacing the <code>.app</code> to upgrade leaves your data alone, and the bundle is never written to at runtime — the kind of change that would void a signature once the app is signed. Running from source still uses <code>data/</code> inside the repo.</p>
+            <p>The window renders through macOS-native WKWebView while Windows uses Edge WebView2; the two engines keep their own preferences and caches apart. "Check for Updates" under Settings → About hands you the <code>.dmg</code> link for this platform rather than an <code>.exe</code> you cannot open, and falls back to the Releases page when no matching asset is published.</p>
+            <p><code>⌘ + N</code> starts a new chat and <code>⌘ + D</code> toggles light/dark; the <code>Ctrl</code> chords keep working too. With focus inside the whiteboard canvas, <code>⌘ + D</code> belongs to its duplicate-selected-cards binding and does not flip the theme. UI text uses the system font (PingFang SC) and code uses SF Mono / Menlo, where Windows stays on Microsoft YaHei and Consolas.</p>
+            <p>The dangerous-command list is now platform-aware: <code>diskutil erase</code>, <code>diskutil reformat</code>, <code>diskutil partitionDisk</code> and <code>diskutil secureErase</code> ask for approval first, while catastrophic ones — <code>rm -rf /</code>, <code>rm -rf ~</code>, <code>mkfs</code>, <code>dd if=</code> — are refused outright, approval or not.</p>
+            <p>Mac does not have two things yet: notification-area residency and the "one install, one window" gate are Windows-only, so closing the window quits and launching again starts a second copy. Also note that this round of macOS work was verified on Windows by passing the platform in as an argument and asserting the Darwin branches — the <code>.app</code> and <code>.dmg</code> have not been run on real hardware.</p>
             <p><strong>Option B: From Source</strong></p>
             <pre>git clone https://github.com/CaryWang1234/SLATE.git
 cd SLATE
@@ -495,8 +509,8 @@ python desktop.py</pre>
               <li>支持本地模型（Ollama / LM Studio 的 OpenAI 兼容端点）</li>
               <li>每条回复显示模型名称与 Token 用量</li>
             </ul>
-            <div class="ink-note"><strong>快捷键：</strong>Enter 发送 · Shift+Enter 换行 · Ctrl+N 新建对话</div>
-            <div class="ink-note"><strong>＋ 模式菜单：</strong>输入框左侧的 <strong>＋</strong> 按钮集中了模式入口 —— 磨墨 / 头脑风暴 / 目标模式 / 定时任务，以及「提及」分组（技能 / 工具 / MCP / 文件），点击行即可启动对应模式或弹出对应候选列表。</div>
+            <div class="ink-note"><strong>快捷键：</strong>Enter 发送 · Shift+Enter 换行 · Ctrl+N / ⌘N 新建对话 · Ctrl+D / ⌘D 切明暗</div>
+            <div class="ink-note"><strong>＋ 模式菜单：</strong>输入框左侧的 <strong>＋</strong> 按钮集中了模式入口 —— 磨墨 / 头脑风暴 / 目标模式 / 定时任务，以及「提及」分组（技能 / 工具 / MCP / 文件），点击行即可启动对应模式或弹出对应候选列表。菜单钉在 ＋ 按钮上方：再按一次 ＋、点菜单外面或按 Esc 都会收起。</div>
             <div class="ink-note"><strong>思考强度滑杆：</strong>点输入框左侧的档位胶囊弹出滑杆，刻度只列当前模型支持的档位（自动 / 关 / 低 / 中 / 高），每档下方以小字标注对应墨色（随墨 / 清墨 / 淡墨 / 浓墨 / 焦墨），拖动时只预览、松手才生效并落盘。刻度不是照抄一份固定表：SLATE 按端点能力分了九类，强制思考的模型没有「关」这一档；只分开关的端点在档位旁注明「低 / 中 / 高都按开」；这个模型接不住的刻度直接置灰并写明原因，切模型那一刻也会在弹窗里提示。上游若以 400 点名该字段，会剥掉它重发一次——最坏是这次档位不生效，而不是模型用不了。</div>
             <div class="ink-note"><strong>上下文预算：</strong>设置页「模型配置」里每个模型一行「最大上下文」，由按该模型窗口生成的滑杆、精确数字框、以及「探测窗口」按钮三件组成。「自动」取这个模型自己的标称窗口 ×0.8，不再吸附公共档位——只有 8K 窗口的本地模型过去只能凑不满最低一档、等于把窗口占满没地方写回复，现在拿到 6553。数字框保留你填的精确值（131072 就是 131072，只在 1K–4M 内夹取）。Ollama / llama.cpp / vLLM / OpenAI 兼容这类本地或自定义端点可以一键探测真实窗口，探到的值单独存一张覆盖表，随时能一键清除回到端点自带值。同一个值肩挑两件事——自动压缩的触发阈值与用量条的分母，所以读数不会和压缩时机各说各话；用量条可以直接点，点了跳到对应模型的这一行。</div>
             <div class="ink-note"><strong>历史摘要折叠条：</strong>超过阈值后，较早的对话会被压成一段摘要。摘要本身仍按原格式完整发给模型，只在消息区折叠成一条——点标题展开才解析 Markdown，长历史不会把当前几轮挤出屏幕。</div>
@@ -509,8 +523,8 @@ python desktop.py</pre>
               <li>Supports local models (Ollama / LM Studio via OpenAI-compatible endpoints)</li>
               <li>Each reply shows model name and token usage</li>
             </ul>
-            <div class="ink-note"><strong>Shortcuts:</strong> Enter to send · Shift+Enter for newline · Ctrl+N for new conversation</div>
-            <div class="ink-note"><strong>＋ Mode Menu:</strong> The <strong>＋</strong> button left of the chat input centralizes mode entries — Grind / Brainstorm / Target Mode / Scheduled Tasks — plus an @-mention group (Skills / Tools / MCP / Files) that opens a filtered picker.</div>
+            <div class="ink-note"><strong>Shortcuts:</strong> Enter to send · Shift+Enter for newline · Ctrl+N / ⌘N new conversation · Ctrl+D / ⌘D light-dark</div>
+            <div class="ink-note"><strong>＋ Mode Menu:</strong> The <strong>＋</strong> button left of the chat input centralizes mode entries — Grind / Brainstorm / Target Mode / Scheduled Tasks — plus an @-mention group (Skills / Tools / MCP / Files) that opens a filtered picker. The panel is anchored above the ＋ button: press ＋ again, click outside, or hit Esc to dismiss it.</div>
             <div class="ink-note"><strong>Reasoning slider:</strong> Click the level pill left of the input to open a slider whose ticks list only what the current model supports (auto / off / low / medium / high). Each tick carries its ink shade in small type (free / clear / light / rich / charred); dragging previews, letting go applies and persists. Those ticks are not a copied fixed table: SLATE sorts endpoints into nine capability classes, so a model that forces reasoning has no "off" tick, on/off-only endpoints say "low/medium/high are all treated as on", and a tick this model cannot take is greyed out with the reason — switching models says so in the popup too. If upstream answers 400 naming that field, it is stripped and retried once: worst case the level is ignored, not the model unusable.</div>
             <div class="ink-note"><strong>Context budget:</strong> Under Settings → model configuration, every model row carries a "max context" control made of three parts — a slider whose ticks are generated from that model's own window, an exact number box, and a "probe window" button. "Auto" now takes this model's nominal window × 0.8 with no snapping to shared ticks: a local model with an 8K window used to be unable to reach the lowest tick and would fill the whole window, leaving no room for the reply, and now lands on 6553. The number box keeps whatever you type (131072 stays 131072; it is only clamped inside 1K–4M). For Ollama / llama.cpp / vLLM / OpenAI-compatible endpoints, one click probes the endpoint's real window, which is stored as a separate override you can clear back to the endpoint's own value at any time. One value still does two jobs — the auto-compaction threshold and the usage-bar denominator — so the reading can never disagree with when compression fires, and the usage bar is clickable and jumps to that model's row.</div>
             <div class="ink-note"><strong>Collapsible history summary:</strong> once the threshold is passed, earlier turns are compressed into a summary. That summary is still sent to the model in full; in the transcript it folds into a single strip that parses Markdown only when expanded, so a long history does not push the current turns off the screen.</div>
@@ -694,7 +708,7 @@ python desktop.py</pre>
               <tr><td>系统与环境</td><td><code>system_info</code> <code>git_tool</code> <code>css_color</code></td></tr>
               <tr><td>自动化</td><td><code>browser_automation</code> <code>computer_use</code> <code>screenshot_to_code</code></td></tr>
               <tr><td>AI 生成</td><td><code>image_gen</code> <code>video_gen</code>（需在设置中配置模型与 API Key）</td></tr>
-              <tr><td>扩展</td><td><code>mcp_factory</code>（动态注册外部工具）</td></tr>
+              <tr><td>扩展</td><td><code>mcp_factory</code>（工具工厂：生成的工具落 <code>data/evolved/</code>，可在「扩展 → 新功能」停用 / 回滚 / 撤销）</td></tr>
             </table>
             <p><strong>特殊字符与编码：</strong><code>file_peek</code> / <code>file_edit</code> 自动识别 UTF-8、UTF-8 BOM、GB18030、GBK、UTF-16 等常见文本编码；中文、emoji、全角符号会原样保留。Windows 下 <code>terminal</code> 隐藏 PowerShell 子窗口，并对 Python / Node / Git / npm / rg 等原生命令做 Unicode-safe 输出捕获。</p>
             <p><strong>Windows 命令语义：</strong>一条命令一个 PowerShell 进程，命令正文经 stdin 送入并整体按脚本解析——多行块（<code>foreach</code> / <code>if</code>）直接执行，不会因为缺一个空行而石沉大海；<code>&amp;&amp;</code> 与 <code>||</code> 在 PowerShell 5.1 上自动翻成 <code>if ($?)</code> 嵌套；语法错误原样返回并把退出码标成失败，不会再出现「报成功但什么都没跑」。会话仍保持 <code>cd</code> 与环境变量（PowerShell 变量不跨命令），交互式 REPL（裸 <code>python</code> / <code>node</code>）拿不到输入会立刻退出，不会拖住在跑的任务。</p>
@@ -706,10 +720,18 @@ python desktop.py</pre>
               <li>模型侧只注入目录（最多 20 条，只给 id + 名字 + 一句话），要完整流程需用 <code>actions_read</code> 取；目录列表用 <code>actions_list</code></li>
               <li>「读到流程」不等于「做过流程」：结果摘要与流程单都会提醒模型按步骤实际执行，不要凭说明书编造结论</li>
               <li>YAML 子集校验（SAY-1）会拒收 Tab 缩进、锚点、多文档、流式 <code>{}</code> / <code>[]</code>、折叠块 <code>&gt;</code>、<code>!!</code> 标签，并报出所在行号；改坏的 yml 在面板里仍然可见并显示原因，不会凭空消失</li>
-              <li>编辑入口：设置 → 技能与工具 → Actions 区块，点「＋ 新建 Action」或点条目进编辑器；边写边校验，报错按行号显示，校验不过保存按钮不会写盘</li>
+              <li>编辑入口：顶栏「扩展」页 → Actions 栏，点「＋ 新建 Action」或点条目进编辑器；边写边校验，报错按行号显示，校验不过保存按钮不会写盘</li>
               <li>每次覆盖或删除都会先把原文留底到 <code>data/actions/.history/</code>（每份最多 5 版），编辑器里的「历史版本」可查看某一版原文或直接回滚</li>
-              <li>模型可代写：<code>actions_write</code> 要求 yml 里声明 <code>author: model</code>（面板据此显示「模型代写」徽标），这一场开着「手动审批」时会弹出原文让你审批；「自动审批 / 完全访问」不弹窗，但格式校验始终生效</li>
+              <li>模型可代写：<code>actions_write</code> 要求 yml 里声明 <code>author: model</code>（面板据此显示「模型代写」徽标），这一场开着「手动审批」时会弹出原文让你审批；「自动审批 / 夜间模式」不弹窗，但格式校验始终生效</li>
               <li>聊天框 <code>@&lt;id&gt;</code> 提及可把整份流程注入这条消息，注入上限 6000 字，超出部分会提示模型用 <code>actions_read</code> 读全文</li>
+            </ul>
+            <p><strong>自进化工具（工具工厂）：</strong><code>mcp_factory</code> 让 SLATE 把自己缺的工具写出来给自己用。产物一律落在用户数据区 <code>data/evolved/</code>（一个工具两份文件：代码 + 说明清单），<strong>不写进 <code>backend/skills/</code> 那棵源码树</strong>——升级覆盖不到 <code>data/</code>，程序也不在运行时改自己；旧版留在源码目录里的产物会在启动时自动复制过来（只复制，不删）。管理入口是顶栏「扩展」→「新功能」栏，每条都写明当前状态：正常 / 已停用 / 代码有问题（带语法错误行号）/ 与内置工具同名（已由内置接管）。</p>
+            <ul>
+              <li>停用是从模型的工具体系里整条摘掉，不是「调用时再报错」；随时可以再启用</li>
+              <li>覆盖、撤销、回滚都先留底到 <code>data/evolved/.history/</code>（每个工具最多 5 版），条目弹窗里的「历史版本」可查看任一版原文并回滚；回滚也是写，编译不过的旧版本不许盖回去</li>
+              <li>语法不过的生成代码根本不落盘（只编译自检，绝不替你执行一次）；与内置工具同名的创建请求当场拒绝</li>
+              <li>同名冲突时内置优先：升级若带来了同名内置工具，那份自产代码会被顶掉并在栏里标出来——看得见、随时撤得掉，不必跟新版较劲</li>
+              <li><code>@</code> 提及、<code>skill_search</code> 与系统提示都会带上当前启用的自产工具</li>
             </ul>
           </div>
           <div class="lang-en">
@@ -726,7 +748,7 @@ python desktop.py</pre>
               <tr><td>System &amp; Environment</td><td><code>system_info</code> <code>git_tool</code> <code>css_color</code></td></tr>
               <tr><td>Automation</td><td><code>browser_automation</code> <code>computer_use</code> <code>screenshot_to_code</code></td></tr>
               <tr><td>AI Generation</td><td><code>image_gen</code> <code>video_gen</code> (requires model and API key in Settings)</td></tr>
-              <tr><td>Extension</td><td><code>mcp_factory</code> (register external tools)</td></tr>
+              <tr><td>Extension</td><td><code>mcp_factory</code> (tool factory — generated tools live in <code>data/evolved/</code>, disable / roll back / revoke under Extensions → New features)</td></tr>
             </table>
             <p><strong>Unicode and encoding:</strong> <code>file_peek</code> / <code>file_edit</code> auto-detect UTF-8, UTF-8 BOM, GB18030, GBK, UTF-16, and other common text encodings. Chinese, emoji, and full-width symbols are preserved as-is. On Windows, <code>terminal</code> hides PowerShell windows and captures Unicode-safe output for native commands such as Python / Node / Git / npm / rg.</p>
             <p><strong>Windows command semantics:</strong> one command, one PowerShell process. The command text is handed over on stdin and parsed as a whole script, so multi-line blocks (<code>foreach</code> / <code>if</code>) run without waiting for a blank line, <code>&amp;&amp;</code> and <code>||</code> are rewritten into <code>if ($?)</code> nesting for PowerShell 5.1, and a syntax error comes back verbatim with a failing exit code instead of "success" plus nothing. The session still keeps <code>cd</code> and environment variables (PowerShell variables do not cross commands), and an interactive REPL (bare <code>python</code> / <code>node</code>) exits immediately instead of holding the task open.</p>
@@ -738,10 +760,18 @@ python desktop.py</pre>
               <li>Only the catalog is injected into the prompt (up to 20 entries: id, name, one-line summary). Use <code>actions_read</code> for the full procedure and <code>actions_list</code> for the catalog</li>
               <li>Reading a playbook is not the same as following it: both the tool summary and the rendered procedure remind the model to actually execute the steps instead of inventing results</li>
               <li>The YAML subset validator (SAY-1) rejects Tab indentation, anchors, multi-document files, flow <code>{}</code> / <code>[]</code>, folded <code>&gt;</code> blocks and <code>!!</code> tags, and reports the offending line number. Broken files stay visible in the panel with their reason instead of disappearing</li>
-              <li>Where to edit: Settings → Skills &amp; Tools → the Actions section. "+ New Action" or clicking an entry opens the editor; validation runs as you type with line numbers, and Save refuses a failing draft</li>
+              <li>Where to edit: the top bar's Extensions page → the Actions column. "+ New Action" or clicking an entry opens the editor; validation runs as you type with line numbers, and Save refuses a failing draft</li>
               <li>Every overwrite or delete first copies the previous text to <code>data/actions/.history/</code> (up to 5 versions per Action). The editor's "History" button shows any version or rolls back to it</li>
               <li>The model can author one too: <code>actions_write</code> requires <code>author: model</code> inside the yml (the panel badges it "Model-written"), and in "Ask" permission mode the exact content is shown for approval first. "Auto" / "Full access" skip the dialog, but the format gate always applies</li>
               <li>Typing <code>@&lt;id&gt;</code> in the chat box injects the whole flow into that message, capped at 6000 characters; the trimmed remainder is flagged so the model reads the rest with <code>actions_read</code></li>
+            </ul>
+            <p><strong>Self-evolving tools (tool factory):</strong> <code>mcp_factory</code> lets SLATE write the tools it is missing and use them itself. Every product lands in the user data area <code>data/evolved/</code> — two files per tool, the code plus its manifest — and <strong>never in the <code>backend/skills/</code> source tree</strong>: an upgrade cannot overwrite <code>data/</code>, and a running program has no business editing itself. Products older versions left inside the source tree are copied over at startup (copied, not deleted). Manage them under the top bar's Extensions page → the New features column, where each entry states its state: working / disabled / broken (with the line of the syntax error) / shadowed by a built-in tool of the same name.</p>
+            <ul>
+              <li>Disabling removes the tool from the model's toolbox entirely, rather than failing when it is called; re-enabling is one click</li>
+              <li>Overwrite, revoke and rollback each take a backup into <code>data/evolved/.history/</code> (up to 5 versions per tool). The entry dialog's history list shows any version and rolls back to it — and rolling back is itself a write, so a version that no longer compiles is never restored</li>
+              <li>Code that does not compile never reaches the disk (the gate compiles, it never executes on your behalf); creating a tool named after a built-in one is refused on the spot</li>
+              <li>Built-ins win on a name clash: if an upgrade ships a built-in tool with the same name, your generated copy is shadowed and labelled — visible and revocable, no fight with the new version</li>
+              <li><code>@</code> mentions, <code>skill_search</code> and the system prompt all carry the currently enabled self-produced tools</li>
             </ul>
           </div>
         </div>
@@ -862,14 +892,16 @@ python desktop.py</pre>
       <!-- Ch13 -->
       <div class="scroll-section" id="ch13">
         <div class="chapter-title"><span class="chapter-num">13</span>
-          <span class="lang-zh">语音输入</span><span class="lang-en">Voice Input</span>
+          <span class="lang-zh">语音输入与提示词优化</span><span class="lang-en">Voice Input &amp; Prompt Polish</span>
         </div>
         <div class="chapter-body">
           <div class="lang-zh">
             <p>点击输入框旁的语音输入按钮（麦克风图标），说出想法，实时转写到输入框。支持中英文自动检测。需浏览器支持 Web Speech API（Chrome / Edge 已支持）。</p>
+            <p>它左边那颗「优化提示词」把写好一半的草稿交给当前模型改写一遍：结果先与原文并排放在弹窗里比对，只有点「采用」才写回输入框；点「保留原文」、按 Esc、点弹窗外面都不算采用。等结果期间你又改了草稿（包括语音实时写进去的字），这次结果会被放弃，不会盖掉你新写的。用哪个模型可在「设置 → AI 辅助功能 → 提示词优化」单独指定，关掉后一次请求都不发。</p>
           </div>
           <div class="lang-en">
             <p>Click the voice-input button (microphone icon) next to the input box, speak your idea, real-time transcription appears. Auto-detects Chinese and English. Requires Web Speech API (Chrome / Edge supported).</p>
+            <p>The "Polish prompt" button to its left hands a half-written draft to the current model for a rewrite: the result sits beside the original in a review dialog, and only "Use it" writes it back — "Keep original", Esc or clicking outside all decline it. Edit the draft while waiting (dictation included) and that result is dropped rather than overwriting what you typed. Pin its model under Settings → AI Assistance → Prompt polish; switch it off and it sends no request at all.</p>
           </div>
         </div>
       </div>
@@ -927,12 +959,13 @@ python desktop.py</pre>
               <tr><th>设置项</th><th>说明</th></tr>
               <tr><td>模型管理</td><td>添加/删除 API Key，配置自定义端点</td></tr>
               <tr><td>输出控制</td><td>最大 Token 数、流式输出开关</td></tr>
-              <tr><td>审批模式</td><td>三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 23 类高危）/ 完全访问（都不问）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改</td></tr>
-              <tr><td>主题</td><td>深色/浅色切换</td></tr>
+              <tr><td>审批模式</td><td>三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 24 类高危）/ 夜间模式（全托管：命令、联网、缺条件时反问都不问，自己拍板继续）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改</td></tr>
+              <tr><td>主题</td><td>深色/浅色切换；自定义主题开着时这颗按钮锁定，点下去说明原因而不换色</td></tr>
+              <tr><td>自定义主题</td><td>四个源色（底色 / 面板 / 正文 / 强调）推导整套配色 + 正文与代码字体 + 本机背景图与遮罩浓度，附 10 套预设；改任一格就脱离预设高亮，开关跨设备同步、图只留本机</td></tr>
               <tr><td>语言</td><td>中文 / English</td></tr>
               <tr><td>上下文压缩</td><td>自动/手动压缩历史对话；摘要发给模型的是原文，界面上折成一条可展开的折叠条。系统的催办与工具结果投喂只进上下文，压缩之后也不会冒成气泡</td></tr>
               <tr><td>上下文预算</td><td>模型行上「最大上下文」= 按该模型窗口生成的滑杆 + 精确数字框 + 「探测窗口」。自动档取该模型标称窗口 ×0.8、不吸附公共档位；本地/自定义端点可一键探测真实窗口、也可一键清除。同一个值同时决定自动压缩阈值与用量条分母</td>
-              <tr><td>AI 辅助功能</td><td>对话以外的 13 项耗 Token 功能，逐项开关 + 单独选模型</td></tr>
+              <tr><td>AI 辅助功能</td><td>对话以外的 14 项耗 Token 功能，逐项开关 + 单独选模型</td></tr>
               <tr><td>短回复审阅</td><td>模型回复后自动检查是否需要推进</td></tr>
             </table>
           </div>
@@ -941,20 +974,21 @@ python desktop.py</pre>
               <tr><th>Setting</th><th>Description</th></tr>
               <tr><td>Model Management</td><td>Add/remove API keys, configure custom endpoints</td></tr>
               <tr><td>Output Control</td><td>Max tokens, streaming toggle</td></tr>
-              <tr><td>Safety Mode</td><td>Three tiers: Manual (confirm every command and every network call) / Auto (only the 23 high-risk patterns) / Full Access (ask nothing). This is the default for new conversations; the approval pill in the input bar changes it for one conversation</td></tr>
-              <tr><td>Theme</td><td>Dark/Light toggle</td></tr>
+              <tr><td>Safety Mode</td><td>Three tiers: Manual (confirm every command and every network call) / Auto (only the 24 high-risk patterns) / Night Mode (fully unattended — no approval prompts, and the AI picks its own answer instead of asking you). This is the default for new conversations; the approval pill in the input bar changes it for one conversation</td></tr>
+              <tr><td>Theme</td><td>Dark/Light toggle; while a custom theme is on this button locks and clicking it explains why nothing changed</td></tr>
+              <tr><td>Custom Theme</td><td>Four source colours (background / panel / body text / accent) derive the whole palette, plus body and code fonts and a local background image with an opacity slider, with 10 presets; editing any swatch drops the preset highlight, the switch syncs across devices while the image stays on this machine</td></tr>
               <tr><td>Language</td><td>Chinese / English</td></tr>
               <tr><td>Context Compression</td><td>Auto/manual history compression; the model still receives the summary in full, the transcript folds it into an expandable strip. System nudges and tool-result feeds go only into the context — they never surface as bubbles, even after compression</td></tr>
               <tr><td>Context Budget</td><td>Per-model "max context" = a slider whose ticks come from that model's own window, an exact number box, and a probe-window button. Auto takes this model's nominal window × 0.8 with no snapping to shared ticks; local/custom endpoints can be probed for their real window and cleared with one click. The same value drives both the auto-compaction threshold and the usage-bar denominator</td>
-              <tr><td>AI Assistance</td><td>13 token-spending features outside the chat loop, each with its own switch and model</td></tr>
+              <tr><td>AI Assistance</td><td>14 token-spending features outside the chat loop, each with its own switch and model</td></tr>
               <tr><td>Short Reply Review</td><td>Auto-check if reply needs follow-up</td></tr>
             </table>
           </div>
           <div class="lang-zh">
-            <p><strong>AI 辅助功能这一栏管的是「你没开口时也在发的那请求」：</strong>上下文压缩、记忆蒸馏、对话洞察捕获、代码理解、代码审查、黑板整理、子代理、高危命令说明、工作流执行、定时任务、图片/视频生成，共 13 项，逐项可关、可单独指定模型（不选就跟随当前主模型）。关掉即一次模型都不发：工具类的三项（子代理、图片、视频）会直接从工具目录里消失，模型看不到也就不会调；定时任务被关掉时触发记录仍在，状态里写明是「已关闭」而不是「跑失败」。</p>
+            <p><strong>AI 辅助功能这一栏管的是「你没开口时也在发的那请求」：</strong>上下文压缩、记忆蒸馏、对话洞察捕获、代码理解、代码审查、黑板整理、提示词优化、子代理、高危命令说明、工作流执行、定时任务、图片/视频生成，共 14 项，逐项可关、可单独指定模型（不选就跟随当前主模型）。关掉即一次模型都不发：工具类的三项（子代理、图片、视频）会直接从工具目录里消失，模型看不到也就不会调；定时任务被关掉时触发记录仍在，状态里写明是「已关闭」而不是「跑失败」。</p>
           </div>
           <div class="lang-en">
-            <p><strong>What this section really controls is the requests you never asked for:</strong> context compression, memory distillation, conversation insights, code understanding, code review, board organize, sub-agents, command explanation, workflow runs, scheduled tasks and image/video generation — 13 items, each switchable and each able to pin its own model (otherwise it follows the main model). Off means zero requests: the three tool-driven ones vanish from the tool catalogue so the model never calls them, and a disabled scheduled task still records the trigger with "switched off" as the reason, not a failure.</p>
+            <p><strong>What this section really controls is the requests you never asked for:</strong> context compression, memory distillation, conversation insights, code understanding, code review, board organize, prompt polish, sub-agents, command explanation, workflow runs, scheduled tasks and image/video generation — 14 items, each switchable and each able to pin its own model (otherwise it follows the main model). Off means zero requests: the three tool-driven ones vanish from the tool catalogue so the model never calls them, and a disabled scheduled task still records the trigger with "switched off" as the reason, not a failure.</p>
           </div>
         </div>
       </div>
@@ -976,10 +1010,11 @@ python desktop.py</pre>
               <tr><td>磨墨模式</td><td><code>/grind</code> + 一个粗略想法，三阶段追问（接 → 磨 → 收，最多 10 轮）产出含目标、交付物、验收标准的任务书</td><td><a href="#ch5">5</a></td></tr>
               <tr><td>35 个内置工具</td><td>文件读写编辑、全项目代码检索、Unicode 安全终端、后台终端任务（起了就走，别轮询）、PPT / Word / Excel、PDF 抽取、图表 / 二维码、代码与文档安全扫描、git 信息、联网搜索与抓取、图像视频生成、浏览器与桌面自动化</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>外部 MCP Server</td><td>SSE 传输接入远端 MCP Server，工具自动发现，与内置工具同列展示、同一接口调用；认得出的品牌按 LobeHub 图标显示 logo，认不出的走通用 MCP mark</td><td><a href="#ch8">8</a></td></tr>
-              <tr><td>审批模式</td><td>三档可逐场切换：手动审批把每条命令与每次联网都拿来问你，自动审批只拦 23 类高危操作，完全访问都不问；灾难性命令在任何档位都无条件阻止，审批弹窗附带 AI 对这条命令用途的解释</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>审批模式</td><td>三档可逐场切换：手动审批把每条命令与每次联网都拿来问你，自动审批只拦 24 类高危操作，夜间模式全托管——命令、联网、连「缺条件时问你一句」都不问，自己拍板继续；灾难性命令在任何档位都无条件阻止，审批弹窗附带 AI 对这条命令用途的解释</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>全沙箱安全</td><td>路径校验 + 高危规则拦截 + 独立数据目录，删除与覆盖前先给看清楚</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>自定义技能体系</td><td>SKILL.md 即插即用，上传或导入后 <code>@</code> 提及自动注入上下文；其他 Agent 生态的技能目录可原样导入</td><td><a href="#ch9">9</a></td></tr>
               <tr><td>Actions 流程说明书</td><td>把「干某件事的必要流程」写成一份 yml，模型只看到目录、按需读全文再照做；严格子集校验带行号报错，改坏的文件不会凭空消失</td><td><a href="#ch8">8</a></td></tr>
+              <tr><td>自进化工具</td><td>工具工厂生成的代码与清单落 <code>data/evolved/</code>（升级覆盖不到这里），在「扩展 → 新功能」里停用、回滚、随时撤销；覆盖与删除都先留底，与内置同名时内置优先并把冲突标出来</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>专家包</td><td>persona.md + rules.md + knowledge/ + skills/ 五个文件打成一个 zip，聊天下拉 / 成员卡 / <code>@</code> 提及三处注入</td><td><a href="#ch9">9</a></td></tr>
               <tr><td>AI 团队多轮辩论</td><td>提案 / 支持 / 反对 / 反驳 / 决策五种角色，轻模型讨论、重模型定稿，纪要自动生成以省 token</td><td><a href="#ch6">6</a></td></tr>
               <tr><td>团队工作流 DAG</td><td>需求 → 拆解 → 编码 → 审查 → 总结，上游输出流向下游，节点状态与输入输出实时可见，成品自动归档，附 8 个模板</td><td><a href="#ch10">10</a></td></tr>
@@ -1035,10 +1070,11 @@ python desktop.py</pre>
               <tr><td>Grind Mode</td><td>Type <code>/grind</code> with a rough idea; three-phase questioning (Receive → Grind → Collect, up to 10 rounds) yields a brief with goals, deliverables and acceptance criteria</td><td><a href="#ch5">5</a></td></tr>
               <tr><td>35 built-in tools</td><td>File read/write/edit, project-wide code search, Unicode-safe terminal, background terminal tasks (start and walk away, get woken when they end), PPT / Word / Excel, PDF extraction, charts &amp; QR codes, code and document security scans, git info, web search &amp; scraping, image &amp; video generation, browser and desktop automation</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>External MCP Server</td><td>Connect remote MCP Servers over SSE; remote tools are auto-discovered and listed beside built-ins, called through the same interface. Recognised brands show their LobeHub mark, everything else falls back to the generic MCP glyph</td><td><a href="#ch8">8</a></td></tr>
-              <tr><td>High-risk command approval</td><td>23 categories of risky operations need your confirmation, catastrophic commands are blocked unconditionally, and the popup carries the AI's explanation of what the command does</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>High-risk command approval</td><td>24 categories of risky operations need your confirmation, catastrophic commands are blocked unconditionally, and the popup carries the AI's explanation of what the command does</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>Sandbox security</td><td>Path validation plus rule-based command interception and an isolated data directory — deletion and overwrite get shown to you first</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>Custom skill system</td><td>SKILL.md is plug-and-play; <code>@</code>mention auto-injects its context. Skill directories from other agent ecosystems import as-is</td><td><a href="#ch9">9</a></td></tr>
               <tr><td>Action playbooks</td><td>Write "the required procedure for a task" as a yml file; the model sees only the catalog, reads the full flow on demand, then actually follows it. A strict YAML-subset validator reports line numbers and never hides a broken file</td><td><a href="#ch8">8</a></td></tr>
+              <tr><td>Self-evolving tools</td><td>Tool-factory code and manifests land in <code>data/evolved/</code> (out of reach of upgrades), disabled, rolled back or revoked from Extensions → New features. Overwrites and deletions back up first, and a name clash with a built-in yields to the built-in — visibly</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>Expert packs</td><td>persona.md + rules.md + knowledge/ + skills/ zipped into one file per expert; inject from the chat dropdown, a team card, or <code>@</code>mention</td><td><a href="#ch9">9</a></td></tr>
               <tr><td>AI team multi-round debate</td><td>Propose / support / oppose / rebut / decide roles; light models argue, a heavy model calls the final shot, summaries generated to save tokens</td><td><a href="#ch6">6</a></td></tr>
               <tr><td>Team workflow DAG</td><td>Requirements → Decompose → Code → Review → Summarize; upstream output flows downstream, node status and I/O visible live, artifacts auto-archived, 8 templates included</td><td><a href="#ch10">10</a></td></tr>
