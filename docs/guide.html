@@ -507,6 +507,7 @@ python desktop.py</pre>
               <li>点击模型下拉框 → 添加/切换模型</li>
               <li>不同对话可使用不同模型</li>
               <li>支持本地模型（Ollama / LM Studio 的 OpenAI 兼容端点）</li>
+              <li>模型名旁边画品牌 mark：内置模型与自己添加的模型都按名字认，认得出的按品牌自己的颜色画（没有彩色原件的画中性灰单色），认不出就什么也不画，不会拿别人的 logo 顶替；自定义主题不会把品牌色染掉</li>
               <li>每条回复显示模型名称与 Token 用量</li>
             </ul>
             <div class="ink-note"><strong>快捷键：</strong>Enter 发送 · Shift+Enter 换行 · Ctrl+N / ⌘N 新建对话 · Ctrl+D / ⌘D 切明暗</div>
@@ -521,6 +522,7 @@ python desktop.py</pre>
               <li>Click model dropdown → Add/switch models</li>
               <li>Different conversations can use different models</li>
               <li>Supports local models (Ollama / LM Studio via OpenAI-compatible endpoints)</li>
+              <li>A brand mark sits beside the model name: built-ins and models you add are matched by name; recognised ones are drawn in the brand's own colours (neutral monochrome where no colour original exists), and an unknown one draws nothing instead of wearing another vendor's logo. A custom theme won't recolour them</li>
               <li>Each reply shows model name and token usage</li>
             </ul>
             <div class="ink-note"><strong>Shortcuts:</strong> Enter to send · Shift+Enter for newline · Ctrl+N / ⌘N new conversation · Ctrl+D / ⌘D light-dark</div>
@@ -543,6 +545,7 @@ python desktop.py</pre>
             <p><strong>默认轮数：</strong>普通环境任务最多 24 轮；全面排查、项目级、多文件任务最多 40 轮。系统会把工具结果隐藏回灌给模型，让它继续观察 → 执行 → 验证 → 汇报。</p>
             <p><strong>干完了就停：</strong>轮数是止损线不是预算。交付物逐项验证通过后，模型调用 <code>exit_autopilot</code>（目标模式为 <code>exit_target_mode</code>）显式收口，再给出最终汇报；没做完则继续动手，不靠停发工具或只说“已完成”来结束循环。</p>
             <p><strong>Continue Autopilot（默认开，设置 → 自动推进里可关）：</strong>轮数用完不等于干完。末轮还在执行工具时，系统把上限往后推 8 轮（最多推 3 次），让它把手上的活做完；末轮空手停笔时，系统把清单剩余项念回给它，催它继续推进或明确写【任务完成】。追加次数有上限，止损线只是被推后，没有被抹掉。</p>
+            <p><strong>轮数用尽自动续跑：</strong>追加的额度也用完、循环真的散场时，系统替你按下那颗「继续跑完」——每一场最多自动续 2 次，续出来的那一场照常走完成通道收口，并弹一条「轮数用尽 · 已自动续跑（第 1/2 次）」告诉你这不是你点的。它等这一场真的空闲下来才按（末轮的压缩与记忆整理还会占着它几秒），你切去看别的会话时也不抢那一屏；万一等不到空闲，就把「继续跑完」交回你手上，不留一头空。两种情况它不动手：这一场切到了「手动审批」档，或设置里那颗开关被关掉——那时续跑条原样挂在那儿等你点。</p>
             <p>如果模型只说”我将检查 / 接下来修改 / 是否继续”，系统会自动催它直接调工具；如果没有任何工具记录却口头说完成，系统会要求它先验证或真正动手。</p>
             <p><strong>砚流 · 落笔即所见：</strong>模型正在逐个 token 写工具参数时，SLATE 会按本地工具 schema 解析这份还没写完的参数，实时演成一行预览——哪些字段已经闭合、哪个字段正在写。它只做预览，<strong>半成品参数永不触发执行</strong>；几十 KB 的正文类字段一律折叠成行数与字数，不刷屏。</p>
             <p><strong>停止是真取消：</strong>点击停止会同时关闭模型流与工具调用的流式通道，后端随即终止对应的子进程与在跑任务，不再是“界面停了、活还在干”。被取消的调用会以独立状态记进本地事件账，与正常完成区分开。</p>
@@ -566,6 +569,7 @@ python desktop.py</pre>
             <p>If the model only says it will inspect/edit/continue, SLATE nudges it to call tools. If it claims completion without any tool evidence, SLATE asks it to verify or actually act first.</p>
             <p><strong>Stop when it's done:</strong> the round budget is a stop-loss, not a target. Once every deliverable is verified, the model closes the loop by calling <code>exit_autopilot</code> (<code>exit_target_mode</code> in Target Mode) and then writes the final report; unfinished work keeps moving instead of ending on silence or a bare "done".</p>
             <p><strong>Continue Autopilot (on by default; Settings → Auto-Advance):</strong> running out of rounds is not the same as being done. When the last round was still executing tools, the ceiling moves back by 8 rounds (at most 3 top-ups) so the work in flight can finish; when the model stops without doing anything, the open TODOLIST items are read back to it and it is told to keep going or write 【任务完成】 explicitly. Top-ups are capped, so the stop-loss is pushed later rather than erased.</p>
+            <p><strong>Auto-resume at the cap:</strong> when every top-up is spent and the loop really dismisses, the system presses the "继续跑完" button for you — at most 2 auto-resumes per conversation, and the resumed run closes through the normal completion channel. A toast reports which one it is, so you can see it was not your click. It waits until that conversation is genuinely idle (post-round compression and memory work still hold it for a few seconds) and never steals the screen of another conversation; if it cannot get a window it hands the resume bar back instead of leaving nothing. Two cases keep it hands-off: this conversation is on the Manual approval tier, or the switch is off under Settings → Auto-Advance — then the resume bar simply stays put for you to click.</p>
             <p><strong>InkStream — arguments as they are written:</strong> while the model streams a tool call token by token, SLATE parses the half-formed arguments against the local tool schema and shows a live one-line preview of which fields are already closed and which one is still being written. It is preview only — <strong>incomplete arguments never reach execution</strong>; multi-KB text fields fold into line and character counts instead of flooding the screen.</p>
             <p><strong>Stop really cancels:</strong> pressing Stop closes both the model stream and the tool-call stream, so the backend terminates the matching subprocess or running task instead of "UI stopped, work still going". Cancelled calls are recorded in the local event ledger under their own status, kept apart from successful ones.</p>
             <p><strong>A truncated answer says so:</strong> upstream will occasionally return a round with thinking and no body — the two share one output ceiling, and a long think leaves no room to write. That ending is no longer swallowed: when the stream produced content and then ended naturally with neither <code>[DONE]</code> nor a <code>finish_reason</code>, the round is flagged and reported as it closes, with the cause kept apart (thinking consumed the whole output budget, or upstream cut the stream early); a reply that did produce text but stopped early is labelled possibly incomplete. Both this notice and the "Continue" entry used to hang off Autopilot/target mode, so with both off there was no signal at all — you just watched it stop.</p>
@@ -631,9 +635,12 @@ python desktop.py</pre>
             <ol>
               <li>点击顶栏「团队」标签</li>
               <li>选择团队成员（9 种预设组合或自定义）</li>
-              <li>输入问题 → 各成员按角色依次发表观点（3 轮辩论）</li>
-              <li>输出共识总结</li>
+              <li>输入问题 → 各成员按角色依次发表观点（最大轮数 3 / 5 / 8 / 10，默认 5 轮）</li>
+              <li>决策者给出结论；勾着「决策需我拍板」时到这里停住，等你签字</li>
             </ol>
+            <p><strong>决策停点：</strong>「决策需我拍板」默认开着——采纳才算收口，选「继续讨论」则带着「未拍板」再辩一轮（重开有上限，不会一直烧 token）。夜间模式（全托管）不弹窗打断，但那一行照画并写明是自动采纳。</p>
+            <p><strong>发言的账：</strong>某位成员这轮失败或没配 API Key，那一格标「失败」/「未参与」，不进下一位的上下文，也不算进发言数与星图。</p>
+            <p><strong>背后跑：</strong>切回对话面板时辩论继续跑，待拍板与收口都进右栏任务中心那一张表（与后台终端任务、子代理批次同一族），点行上的按钮跳回这一场；手动停止的那场进历史并标「已中断」。</p>
             <p><strong>自定义团队：</strong>设置 → 团队管理 → 添加/编辑成员，每个成员可指定模型、角色、人设。</p>
             <p><strong>讨论记录：</strong>每次发言除写进本机历史，还会落进后端（团队会话 + 名册 + 每人一次事件账本 run），黑板 · 工作流视图的星图读的就是这份；落库失败时历史仍在，列表里标「仅本机记录」。</p>
           </div>
@@ -642,9 +649,12 @@ python desktop.py</pre>
             <ol>
               <li>Click "Team" tab</li>
               <li>Select members (9 presets or custom)</li>
-              <li>Enter question → Members speak in role order (3 rounds)</li>
-              <li>Consensus summary output</li>
+              <li>Enter question → Members speak in role order (max rounds 3 / 5 / 8 / 10, default 5)</li>
+              <li>The decider concludes; with "Decision needs my sign-off" ticked it stops there and waits for you</li>
             </ol>
+            <p><strong>Decision sign-off:</strong> on by default — only approving closes the debate, choosing "keep discussing" re-opens it one more round marked "Not signed off" (re-opens are capped, so it can't burn tokens forever). Night mode never interrupts but still draws that row as auto-approved.</p>
+            <p><strong>Speech accounting:</strong> if a member's request fails or has no API key, that row reads "Failed" / "Did not join" — it never enters the next member's context and never counts towards speech totals or the star map.</p>
+            <p><strong>Running in the background:</strong> the debate continues while you are back on the chat panel; awaiting sign-off and the result land in the right-hand task list (same family as background terminal jobs and sub-agent batches), and the row's button jumps back to that session. A manually stopped debate stays in history labelled "Interrupted".</p>
             <p><strong>Custom Teams:</strong> Settings → Team Management → Add/Edit members with model, role, persona.</p>
             <p><strong>Discussion record:</strong> each turn is persisted beyond local history — a team session, its roster and one event-ledger run per member — which is what the Whiteboard → Workflow star map reads. If the write fails the local history stays and that session is labelled "Local only".</p>
           </div>
@@ -722,7 +732,7 @@ python desktop.py</pre>
               <li>YAML 子集校验（SAY-1）会拒收 Tab 缩进、锚点、多文档、流式 <code>{}</code> / <code>[]</code>、折叠块 <code>&gt;</code>、<code>!!</code> 标签，并报出所在行号；改坏的 yml 在面板里仍然可见并显示原因，不会凭空消失</li>
               <li>编辑入口：顶栏「扩展」页 → Actions 栏，点「＋ 新建 Action」或点条目进编辑器；边写边校验，报错按行号显示，校验不过保存按钮不会写盘</li>
               <li>每次覆盖或删除都会先把原文留底到 <code>data/actions/.history/</code>（每份最多 5 版），编辑器里的「历史版本」可查看某一版原文或直接回滚</li>
-              <li>模型可代写：<code>actions_write</code> 要求 yml 里声明 <code>author: model</code>（面板据此显示「模型代写」徽标），这一场开着「手动审批」时会弹出原文让你审批；「自动审批 / 夜间模式」不弹窗，但格式校验始终生效</li>
+              <li>模型可代写：<code>actions_write</code> 要求 yml 里声明 <code>author: model</code>（面板据此显示「模型代写」徽标），这一场开着「手动审批」时会弹出原文让你审批；「自动审批 / 完全访问 / 夜间模式」不弹窗，但格式校验始终生效</li>
               <li>聊天框 <code>@&lt;id&gt;</code> 提及可把整份流程注入这条消息，注入上限 6000 字，超出部分会提示模型用 <code>actions_read</code> 读全文</li>
             </ul>
             <p><strong>自进化工具（工具工厂）：</strong><code>mcp_factory</code> 让 SLATE 把自己缺的工具写出来给自己用。产物一律落在用户数据区 <code>data/evolved/</code>（一个工具两份文件：代码 + 说明清单），<strong>不写进 <code>backend/skills/</code> 那棵源码树</strong>——升级覆盖不到 <code>data/</code>，程序也不在运行时改自己；旧版留在源码目录里的产物会在启动时自动复制过来（只复制，不删）。管理入口是顶栏「扩展」→「新功能」栏，每条都写明当前状态：正常 / 已停用 / 代码有问题（带语法错误行号）/ 与内置工具同名（已由内置接管）。</p>
@@ -762,7 +772,7 @@ python desktop.py</pre>
               <li>The YAML subset validator (SAY-1) rejects Tab indentation, anchors, multi-document files, flow <code>{}</code> / <code>[]</code>, folded <code>&gt;</code> blocks and <code>!!</code> tags, and reports the offending line number. Broken files stay visible in the panel with their reason instead of disappearing</li>
               <li>Where to edit: the top bar's Extensions page → the Actions column. "+ New Action" or clicking an entry opens the editor; validation runs as you type with line numbers, and Save refuses a failing draft</li>
               <li>Every overwrite or delete first copies the previous text to <code>data/actions/.history/</code> (up to 5 versions per Action). The editor's "History" button shows any version or rolls back to it</li>
-              <li>The model can author one too: <code>actions_write</code> requires <code>author: model</code> inside the yml (the panel badges it "Model-written"), and in "Ask" permission mode the exact content is shown for approval first. "Auto" / "Full access" skip the dialog, but the format gate always applies</li>
+              <li>The model can author one too: <code>actions_write</code> requires <code>author: model</code> inside the yml (the panel badges it "Model-written"), and in "Ask" permission mode the exact content is shown for approval first. "Auto" / "Full access" / "Night Mode" skip the dialog, but the format gate always applies</li>
               <li>Typing <code>@&lt;id&gt;</code> in the chat box injects the whole flow into that message, capped at 6000 characters; the trimmed remainder is flagged so the model reads the rest with <code>actions_read</code></li>
             </ul>
             <p><strong>Self-evolving tools (tool factory):</strong> <code>mcp_factory</code> lets SLATE write the tools it is missing and use them itself. Every product lands in the user data area <code>data/evolved/</code> — two files per tool, the code plus its manifest — and <strong>never in the <code>backend/skills/</code> source tree</strong>: an upgrade cannot overwrite <code>data/</code>, and a running program has no business editing itself. Products older versions left inside the source tree are copied over at startup (copied, not deleted). Manage them under the top bar's Extensions page → the New features column, where each entry states its state: working / disabled / broken (with the line of the syntax error) / shadowed by a built-in tool of the same name.</p>
@@ -897,11 +907,11 @@ python desktop.py</pre>
         <div class="chapter-body">
           <div class="lang-zh">
             <p>点击输入框旁的语音输入按钮（麦克风图标），说出想法，实时转写到输入框。支持中英文自动检测。需浏览器支持 Web Speech API（Chrome / Edge 已支持）。</p>
-            <p>它左边那颗「优化提示词」把写好一半的草稿交给当前模型改写一遍：结果先与原文并排放在弹窗里比对，只有点「采用」才写回输入框；点「保留原文」、按 Esc、点弹窗外面都不算采用。等结果期间你又改了草稿（包括语音实时写进去的字），这次结果会被放弃，不会盖掉你新写的。用哪个模型可在「设置 → AI 辅助功能 → 提示词优化」单独指定，关掉后一次请求都不发。</p>
+            <p>它左边那颗「优化提示词」把写好一半的草稿交给当前模型改写一遍：结果先与原文并排放在弹窗里比对，只有点「采用」才写回输入框；点「保留原文」、按 Esc、点弹窗外面都不算采用。等结果期间你又改了草稿（包括语音实时写进去的字），这次结果会被放弃，不会盖掉你新写的。带思考的模型（DeepSeek / GLM / o 系）会把 reasoning 混在同一条流里，那些分片整段丢掉，不会跟着改写结果一起回填。用哪个模型可在「设置 → AI 辅助功能 → 提示词优化」单独指定，关掉后一次请求都不发。</p>
           </div>
           <div class="lang-en">
             <p>Click the voice-input button (microphone icon) next to the input box, speak your idea, real-time transcription appears. Auto-detects Chinese and English. Requires Web Speech API (Chrome / Edge supported).</p>
-            <p>The "Polish prompt" button to its left hands a half-written draft to the current model for a rewrite: the result sits beside the original in a review dialog, and only "Use it" writes it back — "Keep original", Esc or clicking outside all decline it. Edit the draft while waiting (dictation included) and that result is dropped rather than overwriting what you typed. Pin its model under Settings → AI Assistance → Prompt polish; switch it off and it sends no request at all.</p>
+            <p>The "Polish prompt" button to its left hands a half-written draft to the current model for a rewrite: the result sits beside the original in a review dialog, and only "Use it" writes it back — "Keep original", Esc or clicking outside all decline it. Edit the draft while waiting (dictation included) and that result is dropped rather than overwriting what you typed. Models that think out loud (DeepSeek / GLM / o-series) mix their reasoning into the same stream — those chunks are discarded whole, so no thinking ever lands back in your draft. Pin its model under Settings → AI Assistance → Prompt polish; switch it off and it sends no request at all.</p>
           </div>
         </div>
       </div>
@@ -959,13 +969,14 @@ python desktop.py</pre>
               <tr><th>设置项</th><th>说明</th></tr>
               <tr><td>模型管理</td><td>添加/删除 API Key，配置自定义端点</td></tr>
               <tr><td>输出控制</td><td>最大 Token 数、流式输出开关</td></tr>
-              <tr><td>审批模式</td><td>三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 24 类高危）/ 夜间模式（全托管：命令、联网、缺条件时反问都不问，自己拍板继续）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改</td></tr>
+              <tr><td>审批模式</td><td>四档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 24 类高危）/ 完全访问（命令与联网都不问，缺条件时仍弹选择题问你一句，胶囊标红）/ 夜间模式（全托管：命令、联网、连反问都不问，自己拍板继续，胶囊标夜紫）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改。夜间模式下面还有一颗「跑任务时不让电脑睡眠」：只挡系统睡眠，屏幕照常熄灭，合盖、手动睡眠、已经睡着的机器都叫不醒；租约靠页面心跳续，页面刷新或崩掉后最迟 60 秒交还电源策略；由桌面端界面持有，手机端那一页跑的任务、没有前端在跑的定时任务与后台终端任务都不钉，这一版只在 Windows 上生效</td></tr>
               <tr><td>主题</td><td>深色/浅色切换；自定义主题开着时这颗按钮锁定，点下去说明原因而不换色</td></tr>
-              <tr><td>自定义主题</td><td>四个源色（底色 / 面板 / 正文 / 强调）推导整套配色 + 正文与代码字体 + 本机背景图与遮罩浓度，附 10 套预设；改任一格就脱离预设高亮，开关跨设备同步、图只留本机</td></tr>
+              <tr><td>自定义主题</td><td>四个源色（底色 / 面板 / 正文 / 强调）推导整套配色 + 正文与代码字体（也能导入自己的字体文件）+ 板块透明度 + 本机背景图与遮罩浓度，附 10 套预设；还能取 Wallpaper Engine 正在用的那张壁纸的预览图当背景——只读它写在自己目录里的配置与 preview，不启动它、不改它的设置，它换了壁纸这里不跟着换，要再点一次；项目栏的文件类型图标也跟着强调色现算（多色图标按色相染色）；改任一格就脱离预设高亮，开关跨设备同步、图与字体只留本机</td></tr>
+              <tr><td>会话归档</td><td>「任务」栏每一行悬停都有归档：归档只是让这一场从任务列表离场，不是删除；正在生成的那一场会被拦下并说明原因（任务中心与进度都指着那一行）。归档过的会话在这一栏逐条恢复（回到任务栏）或删除，删除前先确认，删下去连消息一起清掉</td></tr>
               <tr><td>语言</td><td>中文 / English</td></tr>
               <tr><td>上下文压缩</td><td>自动/手动压缩历史对话；摘要发给模型的是原文，界面上折成一条可展开的折叠条。系统的催办与工具结果投喂只进上下文，压缩之后也不会冒成气泡</td></tr>
               <tr><td>上下文预算</td><td>模型行上「最大上下文」= 按该模型窗口生成的滑杆 + 精确数字框 + 「探测窗口」。自动档取该模型标称窗口 ×0.8、不吸附公共档位；本地/自定义端点可一键探测真实窗口、也可一键清除。同一个值同时决定自动压缩阈值与用量条分母</td>
-              <tr><td>AI 辅助功能</td><td>对话以外的 14 项耗 Token 功能，逐项开关 + 单独选模型</td></tr>
+              <tr><td>AI 辅助功能</td><td>对话以外的 15 项耗 Token 功能，逐项开关 + 单独选模型（含自动会话标题：新对话跑完首轮补一个短标题，只替换还是「首条消息前 30 字」那种占位标题）</td></tr>
               <tr><td>短回复审阅</td><td>模型回复后自动检查是否需要推进</td></tr>
             </table>
           </div>
@@ -974,21 +985,22 @@ python desktop.py</pre>
               <tr><th>Setting</th><th>Description</th></tr>
               <tr><td>Model Management</td><td>Add/remove API keys, configure custom endpoints</td></tr>
               <tr><td>Output Control</td><td>Max tokens, streaming toggle</td></tr>
-              <tr><td>Safety Mode</td><td>Three tiers: Manual (confirm every command and every network call) / Auto (only the 24 high-risk patterns) / Night Mode (fully unattended — no approval prompts, and the AI picks its own answer instead of asking you). This is the default for new conversations; the approval pill in the input bar changes it for one conversation</td></tr>
+              <tr><td>Approval Mode</td><td>Four tiers: Manual (confirm every command and every network call) / Auto (only the 24 high-risk patterns) / Full Access (commands and network go unasked, the AI still poses one clarifying question when it lacks a condition — the pill renders red) / Night Mode (fully unattended — no approval prompts and no question either, it picks an option and keeps going, the pill renders night-purple). This page sets the default for new conversations; the approval pill in the input bar changes it for one conversation. Under Night Mode sits a "keep this machine awake during night runs" checkbox: it blocks system sleep only — the display still blanks, closing the lid or sleeping by hand still win, and an already-asleep machine cannot be woken. The lease is renewed by the page's heartbeat, so a refresh or a crash hands the power policy back within 60 seconds. The desktop window holds it — tasks running on the phone page, scheduled tasks with no front-end run and background terminal tasks do not. Windows only in this version</td></tr>
               <tr><td>Theme</td><td>Dark/Light toggle; while a custom theme is on this button locks and clicking it explains why nothing changed</td></tr>
-              <tr><td>Custom Theme</td><td>Four source colours (background / panel / body text / accent) derive the whole palette, plus body and code fonts and a local background image with an opacity slider, with 10 presets; editing any swatch drops the preset highlight, the switch syncs across devices while the image stays on this machine</td></tr>
+              <tr><td>Custom Theme</td><td>Four source colours (background / panel / body text / accent) derive the whole palette, plus body and code fonts (import your own font files), a panel-opacity slider, and a local background image with an opacity slider, with 10 presets; it can also pull the preview of the wallpaper Wallpaper Engine is currently using — read-only: it never launches or reconfigures that app, and a new wallpaper there does not follow over until you click again. Editing any swatch drops the preset highlight, the switch syncs across devices while images and fonts stay on this machine</td></tr>
+              <tr><td>Session Archive</td><td>Every row in the Tasks rail offers Archive on hover — archiving only takes the conversation out of the task list, it is not deletion; a conversation that is still generating is blocked with a reason (the task centre and its progress point at that row). Archived conversations live here, each restorable back into the Tasks rail or deletable after a confirmation that also clears its messages</td></tr>
               <tr><td>Language</td><td>Chinese / English</td></tr>
               <tr><td>Context Compression</td><td>Auto/manual history compression; the model still receives the summary in full, the transcript folds it into an expandable strip. System nudges and tool-result feeds go only into the context — they never surface as bubbles, even after compression</td></tr>
               <tr><td>Context Budget</td><td>Per-model "max context" = a slider whose ticks come from that model's own window, an exact number box, and a probe-window button. Auto takes this model's nominal window × 0.8 with no snapping to shared ticks; local/custom endpoints can be probed for their real window and cleared with one click. The same value drives both the auto-compaction threshold and the usage-bar denominator</td>
-              <tr><td>AI Assistance</td><td>14 token-spending features outside the chat loop, each with its own switch and model</td></tr>
+              <tr><td>AI Assistance</td><td>15 token-spending features outside the chat loop, each with its own switch and model (including the auto session title: after a new conversation's first exchange the model proposes a short title, replacing only placeholder titles — the "first 30 characters of the opening message" kind)</td></tr>
               <tr><td>Short Reply Review</td><td>Auto-check if reply needs follow-up</td></tr>
             </table>
           </div>
           <div class="lang-zh">
-            <p><strong>AI 辅助功能这一栏管的是「你没开口时也在发的那请求」：</strong>上下文压缩、记忆蒸馏、对话洞察捕获、代码理解、代码审查、黑板整理、提示词优化、子代理、高危命令说明、工作流执行、定时任务、图片/视频生成，共 14 项，逐项可关、可单独指定模型（不选就跟随当前主模型）。关掉即一次模型都不发：工具类的三项（子代理、图片、视频）会直接从工具目录里消失，模型看不到也就不会调；定时任务被关掉时触发记录仍在，状态里写明是「已关闭」而不是「跑失败」。</p>
+            <p><strong>AI 辅助功能这一栏管的是「你没开口时也在发的那请求」：</strong>上下文压缩、记忆蒸馏、对话洞察捕获、自动会话标题、代码理解、代码审查、黑板整理、提示词优化、子代理、高危命令说明、工作流执行、定时任务、图片/视频生成，共 15 项，逐项可关、可单独指定模型（不选就跟随当前主模型）。关掉即一次模型都不发：工具类的三项（子代理、图片、视频）会直接从工具目录里消失，模型看不到也就不会调；定时任务被关掉时触发记录仍在，状态里写明是「已关闭」而不是「跑失败」。其中自动会话标题只在首轮跑完后发一趟，而且只替换还是「首条消息前 30 字」那种占位标题——你自己改过的名字一概不动。</p>
           </div>
           <div class="lang-en">
-            <p><strong>What this section really controls is the requests you never asked for:</strong> context compression, memory distillation, conversation insights, code understanding, code review, board organize, prompt polish, sub-agents, command explanation, workflow runs, scheduled tasks and image/video generation — 14 items, each switchable and each able to pin its own model (otherwise it follows the main model). Off means zero requests: the three tool-driven ones vanish from the tool catalogue so the model never calls them, and a disabled scheduled task still records the trigger with "switched off" as the reason, not a failure.</p>
+            <p><strong>What this section really controls is the requests you never asked for:</strong> context compression, memory distillation, conversation insights, auto session title, code understanding, code review, board organize, prompt polish, sub-agents, command explanation, workflow runs, scheduled tasks and image/video generation — 15 items, each switchable and each able to pin its own model (otherwise it follows the main model). Off means zero requests: the three tool-driven ones vanish from the tool catalogue so the model never calls them, and a disabled scheduled task still records the trigger with "switched off" as the reason, not a failure. The auto session title fires once, after the first exchange, and only replaces a placeholder title still reading "first 30 characters of the opening message" — anything you renamed yourself is never touched.</p>
           </div>
         </div>
       </div>
@@ -1005,18 +1017,18 @@ python desktop.py</pre>
             <p>首页只讲「与常见托管型 Agent 的四点差异」，完整清单收在这里。以下能力随安装包一起交付，不需要额外插件或订阅。</p>
             <table class="ink-table">
               <tr><th>能力</th><th>一句话说明</th><th>详见</th></tr>
-              <tr><td>统一多模型接入</td><td>GPT / Claude / Gemini、DeepSeek / Kimi / Qwen / GLM 等十余家，加自定义 OpenAI 兼容端点与本地模型（Ollama / LM Studio），一个界面随时换「大脑」</td><td><a href="#ch3">3</a></td></tr>
+              <tr><td>统一多模型接入</td><td>GPT / Claude / Gemini、DeepSeek / Kimi / Qwen / GLM 等十余家，加自定义 OpenAI 兼容端点与本地模型（Ollama / LM Studio），一个界面随时换「大脑」；内置与自己加的模型都按品牌名认，认得出的在模型名旁边按品牌原色画出 LobeHub 品牌 mark（没有彩色原件的画中性灰单色），认不出就留白，不拿别人的 logo 顶替</td><td><a href="#ch3">3</a></td></tr>
               <tr><td>Agent 自动驾驶 + 目标模式</td><td>普通请求自动进入 Agent 循环，默认 24 轮、宽泛项目任务 40 轮；目标模式是显式 80 轮六阶段循环并强制 TODOLIST；干完了由模型调 <code>exit_autopilot</code> / <code>exit_target_mode</code> 收口；轮数用完而活没干完时 Continue Autopilot 追加轮数并催它继续（可关）</td><td><a href="#ch4">4</a></td></tr>
               <tr><td>磨墨模式</td><td><code>/grind</code> + 一个粗略想法，三阶段追问（接 → 磨 → 收，最多 10 轮）产出含目标、交付物、验收标准的任务书</td><td><a href="#ch5">5</a></td></tr>
               <tr><td>35 个内置工具</td><td>文件读写编辑、全项目代码检索、Unicode 安全终端、后台终端任务（起了就走，别轮询）、PPT / Word / Excel、PDF 抽取、图表 / 二维码、代码与文档安全扫描、git 信息、联网搜索与抓取、图像视频生成、浏览器与桌面自动化</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>外部 MCP Server</td><td>SSE 传输接入远端 MCP Server，工具自动发现，与内置工具同列展示、同一接口调用；认得出的品牌按 LobeHub 图标显示 logo，认不出的走通用 MCP mark</td><td><a href="#ch8">8</a></td></tr>
-              <tr><td>审批模式</td><td>三档可逐场切换：手动审批把每条命令与每次联网都拿来问你，自动审批只拦 24 类高危操作，夜间模式全托管——命令、联网、连「缺条件时问你一句」都不问，自己拍板继续；灾难性命令在任何档位都无条件阻止，审批弹窗附带 AI 对这条命令用途的解释</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>审批模式</td><td>四档可逐场切换：手动审批把每条命令与每次联网都拿来问你，自动审批只拦 24 类高危操作，完全访问只关掉审批（命令与联网不问，AI 缺条件时照旧弹选择题），夜间模式再往前一步——连「缺条件时问你一句」也不问，自己拍板继续；灾难性命令在任何档位都无条件阻止，审批弹窗附带 AI 对这条命令用途的解释；夜间模式那一档跑任务时还可以让电脑不睡眠（只挡系统睡眠，屏幕照常熄灭，合盖、手动睡眠、已经睡着的机器都叫不醒，这一版只在 Windows 上生效）</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>全沙箱安全</td><td>路径校验 + 高危规则拦截 + 独立数据目录，删除与覆盖前先给看清楚</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>自定义技能体系</td><td>SKILL.md 即插即用，上传或导入后 <code>@</code> 提及自动注入上下文；其他 Agent 生态的技能目录可原样导入</td><td><a href="#ch9">9</a></td></tr>
               <tr><td>Actions 流程说明书</td><td>把「干某件事的必要流程」写成一份 yml，模型只看到目录、按需读全文再照做；严格子集校验带行号报错，改坏的文件不会凭空消失</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>自进化工具</td><td>工具工厂生成的代码与清单落 <code>data/evolved/</code>（升级覆盖不到这里），在「扩展 → 新功能」里停用、回滚、随时撤销；覆盖与删除都先留底，与内置同名时内置优先并把冲突标出来</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>专家包</td><td>persona.md + rules.md + knowledge/ + skills/ 五个文件打成一个 zip，聊天下拉 / 成员卡 / <code>@</code> 提及三处注入</td><td><a href="#ch9">9</a></td></tr>
-              <tr><td>AI 团队多轮辩论</td><td>提案 / 支持 / 反对 / 反驳 / 决策五种角色，轻模型讨论、重模型定稿，纪要自动生成以省 token</td><td><a href="#ch6">6</a></td></tr>
+              <tr><td>AI 团队多轮辩论</td><td>提案 / 支持 / 反对 / 反驳 / 决策五种角色，轻模型讨论、重模型定稿，纪要自动生成以省 token；决策可以停下来等你拍板才收口，这场在背后跑完也会进任务中心等你跳回</td><td><a href="#ch6">6</a></td></tr>
               <tr><td>团队工作流 DAG</td><td>需求 → 拆解 → 编码 → 审查 → 总结，上游输出流向下游，节点状态与输入输出实时可见，成品自动归档，附 8 个模板</td><td><a href="#ch10">10</a></td></tr>
               <tr><td>定时对话任务</td><td>到点自动发起对话任务，结果归档进专属文件夹，无需人守着</td><td><a href="#ch15">15</a></td></tr>
               <tr><td>白板逻辑链</td><td>卡片 + 箭头 + Mermaid 流程图 + Git 树视图，看板栏支持全屏推进</td><td><a href="#ch7">7</a></td></tr>
@@ -1027,7 +1039,7 @@ python desktop.py</pre>
               <tr><td>Code Review</td><td>对 diff 逐条给问题与修复建议，提交前先过一遍</td><td><a href="#ch12">12</a></td></tr>
               <tr><td>任务完成通知</td><td>长任务跑完发系统通知，切到别的窗口也不漏</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>聊天与数据管理</td><td>历史可搜索 / 导出 / 编辑，一键打包，磁盘占用看得清楚</td><td><a href="#ch16">16</a></td></tr>
-              <tr><td>提示词工厂</td><td>把「帮我做个东西」写成结构化需求文档，再交给外部 Coding Agent 执行</td><td><a href="#ch1">1</a></td></tr>
+              <tr><td>提示词工厂</td><td>把「帮我做个东西」写成结构化需求文档，再交给外部 Coding Agent 执行；入口在「设置 → 上下文与项目」（顶栏页签与输入行的按钮都已腾出），打开是一扇可收起的工作台弹窗</td><td><a href="#ch1">1</a></td></tr>
               <tr><td>局域网遥控</td><td>手机扫码连到本机 8001 端口，带 token 验证，坐在沙发上指挥 AI</td><td><a href="#ch2">2</a></td></tr>
               <tr><td>多语言界面</td><td>安装时选一次语言，之后整个界面跟随</td><td><a href="#ch16">16</a></td></tr>
             </table>
@@ -1065,12 +1077,12 @@ python desktop.py</pre>
             <p>The landing page argues only the four differences from hosted agents; the full inventory lives here. Everything below ships with the installer — no extra plugins, no subscription.</p>
             <table class="ink-table">
               <tr><th>Capability</th><th>In one line</th><th>See</th></tr>
-              <tr><td>Unified multi-model access</td><td>GPT / Claude / Gemini, DeepSeek / Kimi / Qwen / GLM and more, plus custom OpenAI-compatible endpoints and local models (Ollama / LM Studio) — switch brains mid-conversation</td><td><a href="#ch3">3</a></td></tr>
+              <tr><td>Unified multi-model access</td><td>GPT / Claude / Gemini, DeepSeek / Kimi / Qwen / GLM and more, plus custom OpenAI-compatible endpoints and local models (Ollama / LM Studio) — switch brains mid-conversation. Built-ins and models you add yourself are matched by brand name: recognised ones get their LobeHub mark beside the name in the brand's own colours (neutral monochrome when no colour original exists), unrecognised ones simply draw nothing rather than wearing someone else's logo</td><td><a href="#ch3">3</a></td></tr>
               <tr><td>Agent Autopilot + Target Mode</td><td>Ordinary requests enter an agent loop automatically: 24 rounds by default, 40 for broad project tasks; Target Mode is the explicit 80-round six-phase loop with enforced TODOLIST; finished work closes via <code>exit_autopilot</code> / <code>exit_target_mode</code>; when rounds run out with work still open, Continue Autopilot tops up the budget and nudges it on (toggleable)</td><td><a href="#ch4">4</a></td></tr>
               <tr><td>Grind Mode</td><td>Type <code>/grind</code> with a rough idea; three-phase questioning (Receive → Grind → Collect, up to 10 rounds) yields a brief with goals, deliverables and acceptance criteria</td><td><a href="#ch5">5</a></td></tr>
               <tr><td>35 built-in tools</td><td>File read/write/edit, project-wide code search, Unicode-safe terminal, background terminal tasks (start and walk away, get woken when they end), PPT / Word / Excel, PDF extraction, charts &amp; QR codes, code and document security scans, git info, web search &amp; scraping, image &amp; video generation, browser and desktop automation</td><td><a href="#ch8">8</a></td></tr>
               <tr><td>External MCP Server</td><td>Connect remote MCP Servers over SSE; remote tools are auto-discovered and listed beside built-ins, called through the same interface. Recognised brands show their LobeHub mark, everything else falls back to the generic MCP glyph</td><td><a href="#ch8">8</a></td></tr>
-              <tr><td>High-risk command approval</td><td>24 categories of risky operations need your confirmation, catastrophic commands are blocked unconditionally, and the popup carries the AI's explanation of what the command does</td><td><a href="#ch16">16</a></td></tr>
+              <tr><td>Approval modes</td><td>Four tiers you can switch per conversation: Manual brings every command and every network call to you, Auto only gates the 24 high-risk categories, Full Access drops the approvals (the AI still poses one clarifying question when it lacks a condition), Night Mode goes further and answers that question itself; catastrophic commands are blocked unconditionally in every tier, and the popup carries the AI's explanation of what the command does. Night Mode can also keep the machine awake while a task runs — system sleep only, the display still blanks, closing the lid or an already-asleep machine are out of reach, Windows only in this version</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>Sandbox security</td><td>Path validation plus rule-based command interception and an isolated data directory — deletion and overwrite get shown to you first</td><td><a href="#ch16">16</a></td></tr>
               <tr><td>Custom skill system</td><td>SKILL.md is plug-and-play; <code>@</code>mention auto-injects its context. Skill directories from other agent ecosystems import as-is</td><td><a href="#ch9">9</a></td></tr>
               <tr><td>Action playbooks</td><td>Write "the required procedure for a task" as a yml file; the model sees only the catalog, reads the full flow on demand, then actually follows it. A strict YAML-subset validator reports line numbers and never hides a broken file</td><td><a href="#ch8">8</a></td></tr>

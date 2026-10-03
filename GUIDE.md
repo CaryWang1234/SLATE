@@ -90,6 +90,7 @@ SLATE 支持同时接入多个模型，在对话界面顶部下拉框随时切�
 - 点击模型下拉框 → 添加/切换模型
 - 不同对话可使用不同模型
 - 支持本地模型（Ollama / LM Studio 的 OpenAI 兼容端点）
+- 模型名旁边画品牌 mark：内置模型与自己添加的模型都按名字认，认得出的按品牌自己的颜色画（没有彩色原件的画中性灰单色），认不出就什么也不画，不会拿别人的 logo 顶替；自定义主题不会把品牌色染掉
 - 每条回复显示模型名称与 Token 用量
 
 **左侧「任务」列表：**
@@ -127,6 +128,7 @@ Autopilot 是默认的“少打继续”执行层。只要你的消息明显是�
 - 普通任务最多自动推进 24 轮；全面扫描、项目级、多文件任务最多 40 轮
 - 轮数是止损线不是预算：交付并逐项验证通过后，模型调用 `exit_autopilot` 收口，循环随即结束
 - 轮数用完不等于干完：默认开启的 **Continue Autopilot** 在末轮不松手。上一轮还在执行工具时，把上限往后推 8 轮（最多推 3 次），让它把手上的活做完；上一轮空手停笔时，把清单剩余项念回给它，催它继续推进或明确写【任务完成】。不想要这个行为，去「设置 → 自动推进」取消勾选
+- 追加的额度也用完了、循环真的散场时，系统替你按下那颗「继续跑完」：每一场最多自动续 2 次，续出来的那一场照常走完成通道收口，屏幕上会弹出「轮数用尽 · 已自动续跑（第 1/2 次）」告诉你这不是你点的。两种情况它不动手——这一场切到了「手动审批」档（那一档的语义就是每步都要人点头），或「设置 → 自动推进」被关掉了；这时「继续跑完」条原样挂在那里等你点。等这一场真的空闲下来（末轮的压缩、记忆整理还在占着它）才按，切去看别的会话时也不抢那一屏
 
 **它会自动做：**
 1. 读取相关目录、文件、配置或 Git 状态
@@ -207,8 +209,18 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 **流程：**
 1. 选择团队成员（预设 9 种角色组合，或自定义）
 2. 输入问题
-3. 各成员按角色依次发表观点（3 轮辩论）
-4. 输出共识总结
+3. 各成员按角色依次发表观点（最大轮数可选 3 / 5 / 8 / 10，默认 5 轮；决策一出现就收口）
+4. 决策者给出结论；勾着「决策需我拍板」时到这里停住，等你签字
+
+**决策停点：** 「决策需我拍板」默认开着——采纳才算收口；选「继续讨论」则带着「未拍板」再辩一轮
+（重开有上限，不会一直烧 token）。夜间模式（全托管）不弹窗打断，但那一行照画并写明是自动采纳，
+不读成你点过头；取消勾选就回到"决策即结束"。
+
+**发言的账：** 某位成员这轮请求失败或没配 API Key，那一格标「失败」/「未参与」——不进下一位的上下文
+（模型不会把一句报错当成某人的主张接着反驳），也不算进发言数与星图。
+
+**背后跑：** 你切回对话面板时辩论继续跑，待拍板与收口都进右栏任务中心那一张表（与后台终端任务、
+子代理批次同一族），点行上的按钮跳回这一场；手动停止的那场进历史并标「已中断」，点开看得见已完成的发言。
 
 **自定义团队：**
 - 设置 → 团队管理 → 添加/编辑/删除成员
@@ -296,7 +308,7 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 - 格式用的是极简 YAML 子集（2 空格缩进、块数组、`|` 字面量块），Tab 缩进、锚点、多文档等一律拒收；单文件上限 64 KB
 - 面板可编辑：顶部「扩展」页 → Actions 栏，点「＋ 新建 Action」或点已有条目进编辑器；边写边校验，报错按「第 N 行：原因」显示，校验没过就保存不了
 - 每次覆盖或删除都会先把原文留底到 `data/actions/.history/`（每份最多 5 版），编辑器里的「历史版本」可查看任意一版或直接回滚
-- 模型也能写：`actions_write` 工具要求它先在 yml 里声明 `author: model`（面板据此打上「模型代写」徽标），且这一场开着「手动审批」时会弹窗给你审批；切到「自动审批 / 夜间模式」则不弹窗——写坏可以回滚，但格式校验永远会拦住不合格的内容
+- 模型也能写：`actions_write` 工具要求它先在 yml 里声明 `author: model`（面板据此打上「模型代写」徽标），且这一场开着「手动审批」时会弹窗给你审批；切到「自动审批 / 完全访问 / 夜间模式」则不弹窗——写坏可以回滚，但格式校验永远会拦住不合格的内容
 - 聊天框输入 `@<id>` 可把整份流程注入这条消息（注入有 6000 字上限，超出部分提示模型用 `actions_read` 读全）
 
 **自进化工具（工具工厂）：**
@@ -435,14 +447,15 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 | 推理强度 | 点输入框左侧胶囊开滑杆弹窗，按模型能力给出可选档位（自动/关/低/中/高），每档下方小字标注对应墨色（随墨/清墨/淡墨/浓墨/焦墨）；能力分九类：强制思考的模型没有「关」档，只能整体开关的端点标注「低/中/高都按开」，接不住的档位置灰并写明原因，上游 400 点名该字段时剥掉重发一次；拖动松手才落盘 |
 | 上下文预算 | 模型行上「最大上下文」= 按该模型窗口生成的滑杆 + 精确数字框 + 「探测窗口」。自动档取这个模型自己的标称窗口 ×0.8，不再吸附公共档位（8K 的本地模型拿到 6553，而不是把窗口占满没地方写回复）；数字框保留你填的精确值（131072 就是 131072，只在 1K–4M 内夹取）；本地/自定义端点可一键探测真实窗口（Ollama / llama.cpp / vLLM / OpenAI 兼容），探到的值单独存着、可一键清除。同一个值同时决定自动压缩阈值与用量条分母 |
 | 输出控制 | 最大 Token 数、流式输出开关 |
-| 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 / Continue Autopilot（末轮续跑） |
-| 审批模式 | 三档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 24 类高危）/ 夜间模式（全托管：命令、联网、缺条件时反问都不问，自己拍板继续）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改 |
+| 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 / Continue Autopilot（末轮续跑 + 轮数用尽自动续跑，非手动审批档才动手） |
+| 审批模式 | 四档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 24 类高危）/ 完全访问（命令与联网都不问，缺条件时仍弹选择题问你一句，胶囊标红）/ 夜间模式（全托管：命令、联网、连反问都不问，自己拍板继续，胶囊标夜紫）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改。夜间模式下面还有一颗「跑任务时不让电脑睡眠」：只挡系统睡眠，屏幕照常熄灭，合盖、手动睡眠、已经睡着的机器都叫不醒；钉住的是这一场真在跑的那段时间，页面刷新或崩掉后租约最迟 60 秒自动交还；由桌面端界面持有，手机端那一页跑的任务、没有前端在跑的定时任务与后台终端任务都不钉，这一版只在 Windows 上生效 |
 | 局域网遥控 | 查看访问地址与二维码，设置局域网访问密码 |
 | 主题 | 深色/浅色切换（顶栏按钮与 Ctrl+D）；自定义主题开着时这颗按钮会锁定，点下去说明原因而不换色 |
-| 自定义主题 | 四个源色（底色 / 面板 / 正文 / 强调）推导整套配色 + 正文与代码字体 + 本机背景图与遮罩浓度；10 套预设，改任一格即脱离预设高亮，开关跨设备同步、图只留本机 |
+| 自定义主题 | 四个源色（底色 / 面板 / 正文 / 强调）推导整套配色 + 正文与代码字体（也能导入自己的字体文件）+ 板块透明度 + 本机背景图与遮罩浓度；还能取 Wallpaper Engine 正在用的那张壁纸的预览图当背景（只读它的配置与 preview，不启动它、不改它设置，它换了要再点一次）；项目栏文件类型图标也跟着强调色现算（多色图标按色相染色）；10 套预设，改任一格即脱离预设高亮，开关跨设备同步、图与字体只留本机 |
 | 语言 | 中文/English——按钮与区块标题之外，输入框 placeholder 与悬浮提示也走词典；用户与模型写的内容一律不翻，品牌字标「砚」用 `data-i18n-skip` 豁免 |
+| 会话归档 | 「任务」栏每一行悬停都有归档：归档只让这一场从任务列表离场，不是删除；正在生成的那一场会被拦下并说明原因。归档过的会话在这一栏逐条恢复（回到任务栏）或删除——删除前先确认，删下去连消息一起清掉 |
 | 上下文压缩 | 自动/手动压缩历史对话；摘要发给模型的是完整原文，界面上折成一条可展开的折叠条。系统催办与工具结果投喂这类隐藏轮只进上下文、不占消息区，压缩后重建保留段也不会把它们画成气泡 |
-| AI 辅助功能 | 对话以外的 14 项耗 Token 功能逐项开关 + 单独选模型；关掉即一次模型都不发，工具类的三项（子代理/图片/视频）还会从工具目录里消失 |
+| AI 辅助功能 | 对话以外的 15 项耗 Token 功能逐项开关 + 单独选模型（含自动会话标题：新对话跑完首轮补一个短标题，只替换还是「首条消息前 30 字」那种占位标题，手动改过的名字不动）；关掉即一次模型都不发，工具类的三项（子代理/图片/视频）还会从工具目录里消失 |
 | 多任务与项目 | 切走会话是否让它继续在跑（关掉即旧语义：切换即中断）、同时最多跑几场（1–4）、同一项目内最多几场（1–3，默认串行）；排队中的任务在右栏任务中心与输入框上方都看得见 |
 
 ---
@@ -531,6 +544,7 @@ SLATE supports multiple models simultaneously — switch anytime from the top dr
 - Click the model dropdown → Add/switch models
 - Different conversations can use different models
 - Supports local models (Ollama / LM Studio via OpenAI-compatible endpoints)
+- A brand mark sits beside the model name: built-ins and models you add are matched by name; recognised ones are drawn in the brand's own colours (neutral monochrome where no colour original exists), and an unknown one draws nothing instead of wearing another vendor's logo. A custom theme won't recolour them
 - Each reply shows model name and token usage
 
 **Task list on the left:**
@@ -568,6 +582,7 @@ Autopilot is the default "do not make me type continue" execution layer. When yo
 - Ordinary tasks can auto-advance up to 24 rounds; broad project-wide or multi-file tasks can auto-advance up to 40 rounds
 - The round budget is a stop-loss, not a target: once every deliverable is verified the model calls `exit_autopilot` to close the loop
 - Out of rounds is not the same as done: **Continue Autopilot** (on by default) refuses to let go at the last round. If that round was still executing tools, the ceiling moves back by 8 rounds (at most 3 top-ups) so the work in flight can finish; if the model stopped without doing anything, the open TODOLIST items are read back to it and it is told to keep going or write 【任务完成】 explicitly. Don't want it? Uncheck it under Settings → Auto-Advance
+- Once those top-ups are spent too and the loop really dismisses, the system presses "继续跑完" for you — at most 2 auto-resumes per conversation, each announced so you can see it wasn't your click, and the resumed run closes through the normal completion channel. It waits until that conversation is actually idle (post-round compression or memory work can still be holding it) and never steals the screen of another conversation. Two cases keep it hands-off: this conversation is on the Manual approval tier (every step needs a human nod), or Auto-Advance is switched off — then the resume bar just stays on screen for you
 
 **What it does automatically:**
 1. Reads relevant directories, files, config, or Git state
@@ -881,14 +896,15 @@ Let AI automatically execute tasks on schedule or by events.
 | Reasoning Effort | Click the pill left of the input to open a slider; levels follow the model's capability (auto/off/low/medium/high), each tick annotated with its ink shade in small type (free/clear/light/rich/charred). Nine capability classes decide what appears: a model that forces reasoning has no "off", on/off-only endpoints say "low/medium/high are all treated as on", a tick the model cannot take is greyed out with the reason, and a 400 naming the field causes one retry with it stripped. The value is persisted only when you let go |
 | Context Budget | Per-model "max context" = a slider whose ticks are generated from that model's own window, plus an exact number box and a "probe window" button. Auto now takes this model's nominal window × 0.8 with no snapping to shared ticks (an 8K local model gets 6553 instead of eating the whole window with no room for the reply); the box keeps whatever you type (131072 stays 131072, clamped only inside 1K–4M); local/custom endpoints can be probed for their real window (Ollama / llama.cpp / vLLM / OpenAI-compatible), stored as a separate override you can clear with one click. The same value drives both the auto-compress threshold and the usage bar |
 | Output Control | Max tokens, streaming toggle |
-| Auto-Advance | Autopilot / short-reply review / long-stall review / Continue Autopilot |
-| Safety Mode | High-risk command approval policy |
+| Auto-Advance | Autopilot / short-reply review / long-stall review / Continue Autopilot (last-round top-up, plus auto-resume when the rounds run out — it only steps in on tiers other than Manual approval) |
+| Safety Mode | Four tiers you can set per conversation: Manual / Auto (24 high-risk rules only) / Full Access (no approval prompts, the AI still asks one clarifying question, pill turns red) / Night Mode (fully unattended, pill turns night-purple). Below Night Mode sits a "keep this machine awake during night runs" checkbox: it blocks system sleep only — the display still blanks, closing the lid or sleeping by hand still win, and an already-asleep machine cannot be woken; the lease is held for as long as that run is live and lapses within 60 seconds if the page dies. The desktop window holds it — tasks running on the phone page, scheduled tasks with no front-end run and background terminal tasks do not. Windows only in this version |
 | LAN Remote | View LAN URL / QR code, configure remote access password |
 | Theme | Dark/Light toggle (top-bar button and Ctrl+D); while a custom theme is active the button locks and clicking it explains why nothing changed |
-| Custom Theme | Four source colours (background / panel / body text / accent) derive the whole palette, plus body and code fonts and a local background image with an opacity slider; 10 presets, editing any swatch drops the preset highlight, the on/off switch syncs across devices while the image stays on this machine |
+| Custom Theme | Four source colours (background / panel / body text / accent) derive the whole palette, plus body and code fonts (you can import your own font files), a panel-opacity slider, and a local background image with an opacity slider; it can also pull the preview of the wallpaper Wallpaper Engine is currently using (read-only — it never launches or reconfigures that app, and a new wallpaper there does not follow over until you click again); 10 presets, editing any swatch drops the preset highlight, the on/off switch syncs across devices while images and fonts stay on this machine |
+| Session Archive | Every row in the Tasks rail offers Archive on hover — archiving only takes the conversation out of the list, it is not deletion; a conversation that is still generating is blocked with a reason. Archived conversations appear in this settings group, each restorable (back to the Tasks rail) or deletable after a confirmation that also clears its messages |
 | Language | Chinese / English — beyond buttons and section labels, input placeholders and hover titles go through the dictionary too; nothing the user or the model wrote is ever rewritten, and the brand mark 砚 opts out via `data-i18n-skip` |
 | Context Compression | Auto/manual compression of history; the model still receives the summary in full, the transcript folds it into an expandable strip. System nudges and tool-result feeds stay context-only — rebuilding the retained tail after compression never paints them as bubbles |
-| AI Assistance | 14 token-spending features outside the chat loop, each with its own switch and optional pinned model; off means no request at all, and the three tool-driven ones also disappear from the tool catalogue |
+| AI Assistance | 15 token-spending features outside the chat loop, each with its own switch and optional pinned model (including the auto session title: after a new conversation's first exchange the model proposes a short title, and only placeholder titles — the "first 30 characters of the opening message" kind — get replaced); off means no request at all, and the three tool-driven ones also disappear from the tool catalogue |
 | Tasks & Projects | Whether a run keeps going when you switch away (off restores the old "switch means stop"), how many runs may go at once (1-4), and how many within one project (1-3, serial by default); queued sends are visible both in the right-hand task centre and above the input box |
 
 ---
