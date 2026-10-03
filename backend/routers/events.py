@@ -27,6 +27,7 @@ router = APIRouter(prefix="/events", tags=["events"])
 MAX_EVENTS_PER_REQUEST = 500
 MAX_PAYLOAD_CHARS = 8000
 MAX_TURN_DIGEST = 400
+MAX_TURN_FULL = 8000
 MAX_TEAM_TURNS = 400
 
 # 星图的角色标签词表；角度与配色由前端 star_map.js 决定，后端只如实存标签
@@ -68,10 +69,16 @@ def _team_ddl(conn) -> None:
             target_member_id TEXT DEFAULT '',
             run_id TEXT DEFAULT '',
             text_digest TEXT DEFAULT '',
+            text_full TEXT DEFAULT '',
             ts INTEGER DEFAULT 0,
             UNIQUE(session_id, seq)
         )
     """)
+    # 老库补列：CREATE TABLE IF NOT EXISTS 对已存在的表不加新列，沿用 chat.py 的 PRAGMA 迁移法。
+    # 摘要列留给星图与看板渲染，全文列才是"这一场说过什么"的可追溯正文。
+    turn_cols = {str(r["name"]) for r in conn.execute("PRAGMA table_info(team_turns)").fetchall()}
+    if "text_full" not in turn_cols:
+        conn.execute("ALTER TABLE team_turns ADD COLUMN text_full TEXT DEFAULT ''")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_team_turns_session ON team_turns(session_id, seq)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_team_sessions_conv ON team_sessions(conversation_id, created_at_ms)")
 
@@ -310,8 +317,8 @@ async def append_team(body: dict[str, Any]) -> dict[str, Any]:
                     continue
                 cur = conn.execute(
                     "INSERT OR IGNORE INTO team_turns (session_id, seq, round, member_id, member_name, role, "
-                    "model_id, expert_id, action, target_member_id, run_id, text_digest, ts) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "model_id, expert_id, action, target_member_id, run_id, text_digest, text_full, ts) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         session_id[:64],
                         _as_int(turn.get("seq")),
@@ -325,6 +332,7 @@ async def append_team(body: dict[str, Any]) -> dict[str, Any]:
                         str(turn.get("targetMemberId") or "")[:64],
                         str(turn.get("runId") or "")[:64],
                         str(turn.get("text") or "")[:MAX_TURN_DIGEST],
+                        str(turn.get("fullText") or "")[:MAX_TURN_FULL],
                         _as_int(turn.get("ts")) or int(time.time() * 1000),
                     ),
                 )
@@ -370,10 +378,12 @@ def _team_graph(conn, session_row) -> dict[str, Any]:
             "targetMemberId": r["target_member_id"],
             "runId": r["run_id"],
             "digest": r["text_digest"],
+            "fullText": r["text_full"],
             "ts": r["ts"],
         }
         for r in conn.execute(
-            "SELECT seq, round, member_id, member_name, role, action, target_member_id, run_id, text_digest, ts "
+            "SELECT seq, round, member_id, member_name, role, action, target_member_id, run_id, "
+            "text_digest, text_full, ts "
             "FROM team_turns WHERE session_id = ? ORDER BY seq ASC LIMIT ?",
             (session_id, MAX_TEAM_TURNS),
         ).fetchall()
@@ -423,7 +433,8 @@ def _team_graph(conn, session_row) -> dict[str, Any]:
 
     turns_by_member: dict[str, int] = {}
     for turn in turns:
-        if turn["memberId"] in member_ids:
+        # 「失败」「未参与」是留痕不是发言：算进星图会让没开口的成员看起来一样忙
+        if turn["memberId"] in member_ids and turn["action"] not in ("error", "skipped"):
             turns_by_member[turn["memberId"]] = turns_by_member.get(turn["memberId"], 0) + 1
     members = [{**m, "turns": turns_by_member.get(m.get("id"), 0)} for m in members]
     return {
@@ -436,6 +447,8 @@ def _team_graph(conn, session_row) -> dict[str, Any]:
             "endedAtMs": session_row["ended_at_ms"],
             "rounds": session_row["rounds"],
             "verdict": session_row["verdict_text"],
+            # 重读一场旧讨论要能拿回总结正文，否则从库里只能重建发言、重建不了收尾那屏
+            "summaryMarkdown": session_row["summary_markdown"],
         },
         "members": members,
         "edges": edges,

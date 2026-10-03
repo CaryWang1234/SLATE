@@ -3,10 +3,10 @@
  * 后端调度器到点后自动调用模型，结果归档到 [定时] 前缀的专属会话。
  */
 
-import { state } from "../store.js?v=20261001-002";
-import { get, post, del, patch } from "../services/api.js?v=20261001-002";
-import { dlgConfirm } from "../services/dialog.js?v=20261001-002";
-import { t as tr } from "../services/i18n.js?v=20261001-002"; // 任务变量也叫 t，此处别名避免遮蔽
+import { state } from "../store.js?v=20261003-001";
+import { get, post, del, patch } from "../services/api.js?v=20261003-001";
+import { dlgConfirm } from "../services/dialog.js?v=20261003-001";
+import { t as tr } from "../services/i18n.js?v=20261003-001"; // 任务变量也叫 t，此处别名避免遮蔽
 
 let modal, listEl;
 let pollTimer = null;
@@ -26,7 +26,7 @@ function formatTs(ts) {
 
 async function toast(msg) {
   try {
-    const app = await import("../app.js?v=20261001-002");
+    const app = await import("../app.js?v=20261003-001");
     app.toast(msg);
   } catch {}
 }
@@ -129,14 +129,14 @@ async function renderList() {
       try {
         const res = await post(`/schedule/tasks/${t.id}/run`);
         if (res.code === 0) {
-          toast("任务已触发，结果稍后归档到 [定时] 会话");
+          toast(tr("任务已触发，结果稍后归档到 [定时] 会话"));
           startPolling();
         } else {
-          toast(res.message || "触发失败");
+          toast(res.message || tr("触发失败"));
         }
       } catch (e) {
         console.warn("[SLATE] 触发任务失败:", e);
-        toast("触发失败：" + e.message);
+        toast(tr("触发失败: {msg}", { msg: e.message }));
       }
     });
     actions.appendChild(btnRun);
@@ -152,7 +152,7 @@ async function renderList() {
         renderList();
       } catch (e) {
         console.warn("[SLATE] 删除任务失败:", e);
-        toast("删除失败：" + e.message);
+        toast(tr("删除失败: {msg}", { msg: e.message }));
       }
     });
     actions.appendChild(btnDel);
@@ -183,16 +183,16 @@ async function addTask() {
   const time = document.getElementById("schedule-time")?.value || "09:00";
   const every_minutes = parseInt(document.getElementById("schedule-minutes")?.value) || 60;
 
-  if (!name) return toast("请填写任务名称");
-  if (!prompt) return toast("请填写提示词");
-  if (!model_id) return toast("请选择模型");
+  if (!name) return toast(tr("请填写任务名称"));
+  if (!prompt) return toast(tr("请填写提示词"));
+  if (!model_id) return toast(tr("请选择模型"));
 
   try {
     const res = await post("/schedule/tasks", { name, prompt, model_id, mode, time, every_minutes });
-    if (res.code !== 0) return toast(res.message || "添加失败");
+    if (res.code !== 0) return toast(res.message || tr("添加失败"));
     document.getElementById("schedule-name").value = "";
     document.getElementById("schedule-prompt").value = "";
-    toast("定时任务已添加");
+    toast(tr("定时任务已添加"));
     renderList();
   } catch (e) {
     toast(tr("添加失败: {msg}", { msg: e.message }));

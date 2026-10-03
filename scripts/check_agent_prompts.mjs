@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import * as common from "../frontend/js/services/agent_common.js";
 // 版本串必须与 tools.js 里的 import 说明符同形：写成 store.js（无 ?v=）会载入第二个 store 实例，
 // 工具改的是那一份 state，守卫读的是这一份 → 永远假红/假绿
-import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20261001-002";
+import { state, HARNESS_MAX_ROUNDS, setHarnessEnabled, requestLoopExit, takeLoopExit } from "../frontend/js/store.js?v=20261003-001";
 
 const NEXT_OK = "Next: use this result to continue the task. Do not repeat the same tool call unless new parameters are needed.";
 const NEXT_FAIL = "Next: fix the parameters or choose a different tool. Do not repeat the identical failing call.";
@@ -317,15 +317,25 @@ assert.equal(effectiveToolMode("local", "openai", "chat"), "none");
   assert.ok(!/run\.maxRounds\s*(\+?=)/.test(grantBody), "policy 只报预算，放宽循环上限由 kernel 做（两处路径共用同一处落点）");
 
   // 两条触顶路径都要走到同一个判定：空手停笔（emptyRound）与末轮还在动手（atCap）
+  // 两处的 return 长得一模一样，判据按整份源码扫会让"一处被毒、另一处替它续命"（今天就有两条变异空过）。
+  // 所以先把两个钩子各自的函数体切出来，各判各的那一段。
+  const atCapFn = /atCap\(run\) \{([\s\S]*?)\n  \},/.exec(chatSrc);
+  assert.ok(atCapFn, "atCap 那一段要能单独切出来（判据按这一段扫，不按整份源码）");
+  const atCapBody = atCapFn[1];
+  const emptyFn = /emptyRound\(run\) \{([\s\S]*?)\n  \},/.exec(chatSrc);
+  assert.ok(emptyFn, "emptyRound 那一段要能单独切出来（判据按这一段扫，不按整份源码）");
+  const emptyBody = emptyFn[1];
   assert.equal((chatSrc.match(/= takeContinueAutopilotGrant\(run\);/g) || []).length, 2,
     "末轮续跑应恰好有 emptyRound / atCap 两个入口，多一个就重复追加，少一个就有路径漏掉");
-  assert.match(chatSrc, /kind: "continue_autopilot",\s*\n\s*extend: g\.extend,/, "emptyRound 的 nudge 要把 extend 交给 kernel");
-  assert.match(chatSrc, /atCap\(run\) \{[\s\S]{0,1400}?extend: g\.extend,/, "atCap 必须把追加轮数交给 kernel，否则提醒没人执行");
-  assert.match(chatSrc, /atCap\(run\) \{[\s\S]{0,200}?if \(!run\.calls\.length\) return null;/,
+  assert.match(emptyBody, /kind: "continue_autopilot",\s*\n\s*extend: g\.extend,/,
+    "emptyRound 的 nudge 要把 extend 交给 kernel（要落在 emptyRound 那一段里）");
+  assert.match(atCapBody, /extend: g\.extend,\s*\n\s*kind: "continue_autopilot",/,
+    "atCap 必须把追加轮数交给 kernel，否则提醒没人执行（要落在 atCap 那一段里）");
+  assert.match(atCapBody, /if \(!run\.calls\.length\) return null;/,
     "空手轮归 emptyRound 管：atCap 再追加一次就是同一轮加两遍预算");
-  assert.ok(!/atCap\(run\) \{[\s\S]{0,900}?hiddenMsg:/.test(chatSrc),
+  assert.ok(!/hiddenMsg:/.test(atCapBody),
     "atCap 只放宽轮数：末轮那句回复已在队尾，再塞一条 user 消息会把下一轮直接判死");
-  assert.match(chatSrc, /atCap\(run\) \{[\s\S]{0,700}?hasExplicitSettle\(last\.content\)/,
+  assert.match(atCapBody, /hasExplicitSettle\(last\.content\)/,
     "末轮最后一句已按协议写明【任务完成】的，不能再当作没干完去催促跑");
 
   // kernel：循环上限读 run.maxRounds，且只在恰好触顶时问一次 policy
@@ -345,6 +355,40 @@ assert.equal(effectiveToolMode("local", "openai", "chat"), "none");
   assert.match(reminderFn[1], /【任务完成】/, "话术要给完成通道：不然模型只知道继续干活，不知道何时算完");
   assert.match(reminderFn[1], /getTodoLoopState\(\)\.pending/, "话术要念出清单剩余项：只让它继续，等于要它重新规划一遍");
   assert.ok(!/\bt\(/.test(reminderFn[1]), "模型可见字符串不经 t()（约定：t() 只包用户可见文本）");
+
+  // 末轮触顶后的"自动按下继续"：这条是新的退出通道，判据要单独钉，
+  // 否则它会被上面那两条在轮内追加的路径借走分数（轮内追加成功时根本走不到这里）。
+  const resumeFn = /function autoResumeAtCap\(run\) \{([\s\S]*?)\n\}/.exec(chatSrc);
+  assert.ok(resumeFn, "轮数用尽的自动续跑要收在一个判定函数里：散在 finish 里迟早和那颗按钮对不上");
+  const resumeBody = resumeFn ? resumeFn[1] : "";
+  assert.match(chatSrc, /extra\.capReached = true;/, "轮数用尽这一停要被记下来：没有这个标记，自动续跑会把手动停止也接上");
+  assert.match(resumeBody, /!run\.extra\?\.capReached/, "没有 capReached 不许自动续：空转止损与手动停止走的不是这条门");
+  assert.match(resumeBody, /permissionModeFor\(convId\) === "ask"/, "手动审批档必须不自动续：那一档的语义是每步都要人点头");
+  assert.match(resumeBody, /state\.continueAutopilot !== true/, "设置开关对自动续跑同样一票否决");
+  assert.match(resumeBody, /run\.signal\?\.aborted \|\| run\.exitKind === "done"/, "已手动停止或已完成的场次不许自动续");
+  assert.match(chatSrc, /const AUTOPILOT_CAP_RESUME_MAX = \d+;/, "自动续跑次数要有界：跨场续跑没有上限就等于把止损线抹掉");
+  assert.match(chatSrc, /if \(used >= AUTOPILOT_CAP_RESUME_MAX\) return null;/, "额度用完就不再发继续");
+  assert.match(chatSrc, /capResumeLedger\.set\(/, "续跑次数要跨场记（自动续会开新的一场，记在 run.extra 里每场都从 0 开始）");
+  assert.match(chatSrc, /const CAP_RESUME_RETRY_MAX = \d+;/, "延后按下要重试到有界：一次都不等就抢发会顶掉用户那一屏，只试一次又会让这一场两头空");
+  assert.match(resumeBody, /if \(state\.currentConversationId !== convId\) return;/,
+    "用户已经切走时必须罢手：自动续跑不许抢另一场的屏幕");
+  assert.match(resumeBody, /if \(isGenerating\(convId\)\) \{[\s\S]{0,200}?setTimeout\(step, CAP_RESUME_RETRY_MS\);/,
+    "这一场还在跑时要按有界次数重试，不是当场放弃（循环散场后压缩/蒸馏还要占着这场几秒）");
+  assert.match(resumeBody, /messagesOf\(convId\)\.length === settledAt\) showResumeHint\(run\.exitReason\);/,
+    "重试到用尽还没按下，就必须把「继续跑完」交回用户：既没自动续、也没了入口，等于把活悬在半路");
+  assert.match(resumeBody, /if \(isGenerating\(convId\)\)[\s\S]{0,600}?pressContinueResume\(\);/,
+    "自动续跑要在复查之后才按下同一颗出口");
+  assert.match(chatSrc, /function pressContinueResume\(\) \{[\s\S]{0,140}?sendMessage\(\{ text: "继续", files: \[\] \}\);/,
+    "「继续跑完」要收成一个动作：手动那颗按钮与自动续跑共用一处出口");
+  assert.match(chatSrc, /resumeBtn\.addEventListener\("click", \(\) => pressContinueResume\(\)\)/,
+    "那颗「继续跑完」按钮必须走这条出口：自己写一遍发消息迟早和自动续跑分叉");
+  assert.match(resumeBody, /clearCapResumeSlot|takeCapResumeSlot\(convId\)/, "自动续跑要走那份跨场额度");
+  assert.match(chatSrc, /clearCapResumeSlot\(run\.genConvId \|\| state\.currentConversationId\)/,
+    "这一场真结了要把额度清零，否则下次触顶少一次自动续");
+  assert.match(chatSrc, /\} else if \(!autoResumeAtCap\(run\) && !extra\.harnessOn\) \{[\s\S]{0,120}?showResumeHint\(run\.exitReason\);/,
+    "自动续跑没接上时旧的续跑入口要还在");
+  assert.ok(!/autoResumeAtCap|capResumeLedger/.test(mchatSrc), "移动端不接这条自动续跑：别在 m-chat 里另起一份");
+  assert.match(dictSrc, /"轮数用尽 · 已自动续跑（第 \{k\}\/\{n\} 次）"/, "自动续跑的可见回声缺英文词条");
 
   // 开关的存储与回显：只存本机
   assert.match(storeSrc, /continueAutopilot: true,/, "Continue Autopilot 默认开启：默认关就等于没做这个功能");

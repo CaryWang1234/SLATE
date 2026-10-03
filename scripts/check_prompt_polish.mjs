@@ -95,6 +95,23 @@ must(/content: buildPolishPrompt\(draft\)/.test(BODY),
 must(!/\bt\(/.test(fnBody(POLISH, "buildPolishPrompt")),
   "发给模型的话术走了 t()（约定：载荷不经 i18n，否则英文界面下连提示词都被翻译）");
 
+// 思考分片：带思考的模型（DeepSeek / GLM / o 系）把 reasoning 混在同一条流里，
+// 前缀是控制标记；这段输出会原样回填输入框，思考漏进去＝用户报的"大量思考乱码"。
+const API = read("frontend/js/services/api.js");
+must(/import \{[^}]*REASONING_PREFIX[^}]*REASONING_INLINE_PREFIX[^}]*\} from "\.\.\/services\/api\.js\?v=\d{8}-\d+"/.test(POLISH),
+  "prompt_polish.js 没从 api.js 取思考前缀常量（自己另写字面量：上游换了标记就对不上）");
+must(/export const REASONING_PREFIX = "\\x00\\x01R\\x01\\x00";/.test(API)
+  && /export const REASONING_INLINE_PREFIX = "\\x01R\\x01";/.test(API),
+  "api.js 的思考前缀常量不见了或值变了（过滤要跟上游同一份标记）");
+must(/if \(s\.startsWith\(REASONING_PREFIX\) \|\| s\.startsWith\(REASONING_INLINE_PREFIX\)\) continue;/.test(BODY),
+  "polishDraft 的流式循环没丢掉思考分片（reasoning 会被拼进改写结果）");
+must((BODY.match(/out \+= chunk/g) || []).length === 1,
+  "累加 out 的地方不止一处（有支路绕过过滤）", `实际 ${(BODY.match(/out \+= chunk/g) || []).length} 处`);
+const iSkip = BODY.indexOf("startsWith(REASONING_PREFIX)");
+const iAcc = BODY.indexOf("out += chunk");
+must(iSkip !== -1 && iAcc !== -1 && iSkip < iAcc,
+  "过滤排在了累加之后（先拼进去再判断＝白过滤）");
+
 // 写回只有一扇，而且锁在审阅后面
 must((POLISH.match(/applyToInput\(/g) || []).length === 2,
   "applyToInput 的调用点不是「定义 1 处 + 采用后 1 处」", `实际 ${(POLISH.match(/applyToInput\(/g) || []).length} 处`);

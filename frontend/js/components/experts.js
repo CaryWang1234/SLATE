@@ -3,14 +3,14 @@
  * 对话模式通过 #expert-select 注入；团队模式通过成员 expertId 注入
  */
 
-import { state, setActiveExpertId } from "../store.js?v=20261001-002";
+import { state, setActiveExpertId } from "../store.js?v=20261003-001";
 import {
   loadExperts, getExpert, createExpert, saveExpert, deleteExpert,
   importExpertZip, expertExportUrl, uploadExpertFile, deleteExpertFile,
-} from "../services/experts.js?v=20261001-002";
-import { dlgConfirm } from "../services/dialog.js?v=20261001-002";
-import { t } from "../services/i18n.js?v=20261001-002";
-import { setExtCount } from "./extensions.js?v=20261001-002";
+} from "../services/experts.js?v=20261003-001";
+import { dlgConfirm } from "../services/dialog.js?v=20261003-001";
+import { t } from "../services/i18n.js?v=20261003-001";
+import { setExtCount } from "./extensions.js?v=20261003-001";
 
 let modal, expertListEl, extListEl, detailEmpty, detailForm;
 let nameInput, descInput, personaInput, rulesInput;
@@ -27,7 +27,7 @@ function fmtSize(n) {
 
 async function toast(msg) {
   try {
-    const { toast: showToast } = await import("../app.js?v=20261001-002");
+    const { toast: showToast } = await import("../app.js?v=20261003-001");
     showToast(msg);
   } catch {
     console.warn(msg);
@@ -257,7 +257,7 @@ async function handleImport(file) {
     const id = await importExpertZip(file);
     await refreshList();
     await selectExpert(id);
-    await toast("专家包导入成功");
+    await toast(t("专家包导入成功"));
   } catch (e) {
     await toast(t("导入失败: {msg}", { msg: e.message }));
   }
@@ -278,7 +278,7 @@ async function handleSave() {
     if (state.activeExpertId === currentId) {
       setActiveExpertId(currentId, currentDetail);
     }
-    await toast("专家包已保存");
+    await toast(t("专家包已保存"));
   } catch (e) {
     await toast(t("保存失败: {msg}", { msg: e.message }));
   }
@@ -304,7 +304,7 @@ async function handleDelete() {
     if (state.activeExpertId === id) setActiveExpertId("");
     showEmpty();
     await refreshList();
-    await toast("专家包已删除");
+    await toast(t("专家包已删除"));
   } catch (e) {
     await toast(t("删除失败: {msg}", { msg: e.message }));
   }

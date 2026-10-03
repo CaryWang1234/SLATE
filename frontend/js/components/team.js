@@ -8,18 +8,20 @@
  * 历史仍在，只是这场讨论画不进星图（列表里标"仅本机记录"）。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard } from "../store.js?v=20261001-002";
-import { notifyTaskComplete } from "../services/notify.js?v=20261001-002";
-import { streamChat, post } from "../services/api.js?v=20261001-002";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20261001-002";
-import { openRun as openLedgerRun } from "../services/agent_ledger.js?v=20261001-002";
-import { memberHue } from "../services/star_map.js?v=20261001-002";
-import { renderMarkdown } from "../services/markdown.js?v=20261001-002";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20261001-002";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20261001-002";
-import { getExpertsCached } from "./experts.js?v=20261001-002";
-import { t } from "../services/i18n.js?v=20261001-002";
-import { makeId } from "../services/utils.js?v=20261001-002";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard, getModelDefinition, permissionModeFor } from "../store.js?v=20261003-001";
+import { notifyTaskComplete } from "../services/notify.js?v=20261003-001";
+import { dlgChoice } from "../services/dialog.js?v=20261003-001";
+import { upsertLocalTask, pushLocalBgEvent, registerLocalTaskStopper } from "../services/bg_tasks.js?v=20261003-001";
+import { streamChat, post, get } from "../services/api.js?v=20261003-001";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20261003-001";
+import { openRun as openLedgerRun } from "../services/agent_ledger.js?v=20261003-001";
+import { memberHue } from "../services/star_map.js?v=20261003-001";
+import { renderMarkdown } from "../services/markdown.js?v=20261003-001";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20261003-001";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20261003-001";
+import { getExpertsCached } from "./experts.js?v=20261003-001";
+import { t } from "../services/i18n.js?v=20261003-001";
+import { makeId } from "../services/utils.js?v=20261003-001";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -31,8 +33,13 @@ let teamHistory = [];
 let currentTeamUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0, messageCount: 0 };
 let isDiscussing = false;
 let maxRounds = 5;
+let teamSignoffOn = true;
 let discussAbortController = null;
 const TEAM_HISTORY_KEY = "slate_team_history";
+// 人不签字就重开的次数上限：每重开一轮是全员一次真实开销，没有闸就变成无限辩论
+const TEAM_REOPEN_CAP = 2;
+// 事件尾巴带多少字给模型看：够读回那句决策，又不占满唤醒载荷
+const TEAM_TAIL_BUDGET = 300;
 
 // ── 默认团队成员 ────────────────────────────
 
@@ -425,6 +432,9 @@ function recordTeamTurn(ctx, rec, runId = "") {
     targetMemberId: resolveTargetMemberId(ctx, rec.target, memberId),
     runId,
     text: String(rec.text || ""),
+    // 摘要给星图与看板用，全文才是"这一场说过什么"的可追溯正文（本地历史被 50 场上限
+    // 挤掉、或这场是手动停止的那场时，只能靠它重建）
+    fullText: String(rec.full || rec.text || ""),
     ts: Date.now(),
   };
   ctx.speakers.push({ id: memberId, name: rec.member?.name || "" });
@@ -462,7 +472,7 @@ function renderTeamUsage(usage = currentTeamUsage) {
   teamUsageBar.innerHTML = `
     <span class="usage-model">团队讨论</span>
     <span class="usage-sep">|</span>
-    <span class="usage-stat">${t("轮次 {n}", { n: usage.messageCount || 0 })}</span>
+    <span class="usage-stat">${t("发言 {n} 条", { n: usage.messageCount || 0 })}</span>
     <span class="usage-sep">|</span>
     <span class="usage-stat">${t("输入 {n}", { n: fmtTok(usage.promptTokens || 0) })}</span>
     <span class="usage-sep">|</span>
@@ -516,6 +526,13 @@ function renderTeamHistory() {
       badge.className = "team-history-badge";
       badge.textContent = t("仅本机记录");
       badge.title = t("这场讨论未能写入后端，星图里看不到");
+      meta.appendChild(badge);
+    }
+    if (session.stopped) {
+      const badge = document.createElement("span");
+      badge.className = "team-history-badge";
+      badge.textContent = t("已中断");
+      badge.title = t("这场讨论被手动停止，没有走完轮次");
       meta.appendChild(badge);
     }
     item.appendChild(meta);
@@ -670,7 +687,19 @@ const DEBATE_ACTIONS = {
   rebut: "反驳",
   supplement: "补充",
   verdict: "决策",
+  // 这两种是"这一格没人说话"的记录，不是发言：只有界面与落库读得到，模型读不到
+  // （parseDebateAction 的正则不认它们，成员提示词里也只给前六种，所以不会被"演"出来）
+  error: "失败",
+  skipped: "未参与",
+  // 下面三种是"人有没有签字"的记录：同样只有界面与落库写得出，成员演不出来
+  // （拍板行挂的是合成成员 id:"signoff"，星图按名册取发言时天然把它排除在外）
+  awaiting: "待拍板",
+  decided: "已拍板",
+  reopened: "未拍板",
 };
+
+// 摘要与统计只数这些：拍板行不算一次发言（与星图、失败/缺席同一口径）
+const SPEECH_ACTIONS = ["propose", "support", "oppose", "rebut", "supplement", "verdict"];
 
 /** 解析发言的动作前缀与回应对象：【动作】@成员{n}*/
 function parseDebateAction(text) {
@@ -749,6 +778,79 @@ function finalizeEntry(entry, action, target, text) {
   teamOutput.scrollTop = teamOutput.scrollHeight;
 }
 
+// ── 拍板：决策要人签字才算数 ──────────────────────────────
+
+const SIGNOFF_MEMBER = { id: "signoff", name: "我", role: "member", modelId: "" };
+
+function signoffRec(action, text, round) {
+  return {
+    round, member: { ...SIGNOFF_MEMBER, name: t("我") },
+    action, target: "", text, full: text,
+  };
+}
+
+/** 任务中心里的那一行：与后台进程任务同一族（面板不需要认识第二种行），
+ *  family 只是把"这是团队讨论"说清，提醒话术由团队这一侧自己出。 */
+function syncTeamTask(ctx, patch) {
+  upsertLocalTask({
+    task_id: `team:${ctx.id}`,
+    label: `${t("团队讨论")} · ${(ctx.topic || "").slice(0, 24)}`,
+    conversation_id: ctx.conversationId,
+    family: "team",
+    state: "running",
+    exit_code: null,
+    output: "",
+    started_at: ctx.createdAtMs,
+    log_path: "",
+    ...patch,
+  });
+}
+
+/** 决策出来后的"人签字"这一道。返回写进 entries 的那一行（decided/reopened），
+ *  调用方据此决定要不要结束讨论；返回 null 表示这一场已经不需要再问（已停止/夜间模式之外）。 */
+async function requestTeamSignoff(rec, ctx, round) {
+  if (discussAbortController?.signal.aborted) return null;
+  // 夜间模式（全托管）＝不向人提问：直接采纳，与 tools.js 里 user_ask 那条同一口径。
+  // 但这一行照画：没人签字这件事要看得见，不能悄悄读成"用户点过头"
+  if (permissionModeFor(ctx.conversationId) === "night") {
+    const text = t("夜间模式：决策已自动采纳");
+    finalizeEntry(addDebateEntry(SIGNOFF_MEMBER, "decided"), "decided", "", text);
+    return signoffRec("decided", text, round);
+  }
+
+  const row = addDebateEntry(SIGNOFF_MEMBER, "awaiting");
+  row.content.textContent = t("等待你拍板");
+  // 用户可能正在别的会话里干活：这条要进与后台任务同一个池子，等主人回来领
+  pushLocalBgEvent({
+    task_id: `team:${ctx.id}`,
+    label: `${t("团队讨论")} · ${(ctx.topic || "").slice(0, 24)}`,
+    kind: "awaiting",
+    exit_code: null,
+    tail: String(rec.text || ""),
+    tail_budget: TEAM_TAIL_BUDGET,
+    conversation_id: ctx.conversationId,
+    origin: "local",
+  });
+  // 面板就摆在眼前时弹窗本身已经够显眼，只有这场在背后跑才补一条系统通知
+  if (teamPanel?.classList.contains("hidden")) {
+    try {
+      notifyTaskComplete(t("团队讨论等你拍板"), (ctx.topic || "").slice(0, 24), "slate-team-signoff");
+    } catch (e) { /* 通知不是关键路径 */ }
+  }
+
+  const answer = await dlgChoice(
+    t("团队讨论待拍板"),
+    `${t("决策待拍板")}：${String(rec.text || "").slice(0, 120)}`,
+    [{ value: "approve", label: t("采纳拍板") }, { value: "reopen", label: t("继续讨论") }],
+  );
+  // 取消/Esc 算"没签"：用户不点头就不能替他结束这场讨论
+  const approved = answer === "approve";
+  const outcome = approved ? "decided" : "reopened";
+  const text = approved ? t("已采纳这个决策") : t("未拍板：继续讨论");
+  finalizeEntry(row, outcome, "", text);
+  return signoffRec(outcome, text, round);
+}
+
 function buildMemberPrompt(member, topic, boardContext, entries, round, isLastRound, expertDetail = null) {
   let prompt = `${member.persona}\n`;
   // 绑定的专家包：注入专家人格与规则
@@ -764,7 +866,7 @@ function buildMemberPrompt(member, topic, boardContext, entries, round, isLastRo
   if (member.role === "decider") {
     prompt += isLastRound
       ? "\n这是最后一轮：请综合各方观点，以【决策】开头给出最终方案、理由与取舍。"
-      : "\n若各方已达成共识或分歧无法调和，你可以【决策】开头直接给出最终方案（讨论将立即结束）；否则继续正常参与讨论。";
+      : `\n若各方已达成共识或分歧无法调和，你可以【决策】开头直接给出最终方案（${teamSignoffOn ? "之后讨论不会立刻结束：会停下来等用户签字" : "讨论将立即结束"}）；否则继续正常参与讨论。`;
   }
   return prompt;
 }
@@ -802,8 +904,11 @@ async function startDiscussion() {
 
   const entries = [];
   let verdict = null;
+  let reopenUsed = 0;
   // 本场讨论的后端落库上下文（星图数据源）；与 localStorage 历史各走各的
   const teamRemote = createTeamRemote({ topic, members: teamMembers });
+  // 任务中心里给这场讨论占一行：跑在背后时，人回来看得见它还在跑
+  syncTeamTask(teamRemote);
 
   // 预加载成员绑定的专家包
   const expertDetails = new Map();
@@ -829,8 +934,13 @@ async function startDiscussion() {
 
       const apiKey = getModelKey(member.modelId);
       if (!apiKey) {
-        const skipEntry = addDebateEntry(member, "propose");
-        finalizeEntry(skipEntry, "propose", "", "未配置 API Key，已跳过");
+        const why = t("未配置 API Key，已跳过");
+        const skipEntry = addDebateEntry(member, "skipped");
+        finalizeEntry(skipEntry, "skipped", "", why);
+        // 缺席也留一行账：星图上一位"从没开口"的成员和一位"没配 Key"的成员是两回事
+        recordTeamTurn(teamRemote, {
+          round, member: { ...member }, action: "skipped", target: "", text: why, full: why,
+        });
         continue;
       }
 
@@ -839,10 +949,14 @@ async function startDiscussion() {
       const userPrompt = buildMemberPrompt(member, topic, boardContext, entries, round, isLastRound, member.expertId ? expertDetails.get(member.expertId) : null);
 
       let fullText = "";
+      let failure = "";
       try {
         for await (const chunk of streamChat({
           model: member.modelId,
           provider: findModel(member.modelId)?.provider,
+          // 自定义/本地模型的端点只在前端注册表里，代理要靠这一个字段认路；
+          // 少发它就会回「未知模型」，这位成员的每一次发言都变成失败
+          base_url: findModel(member.modelId)?.base_url,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -859,7 +973,17 @@ async function startDiscussion() {
         }
       } catch (e) {
         if (discussAbortController?.signal.aborted) break;
-        fullText = t("请求失败: {msg}", { msg: e.message });
+        failure = String(e?.message || e);
+      }
+
+      if (failure) {
+        // 失败不进 entries：这句一旦被下一位读到，模型会把报错当成"某某的主张"接着反驳。
+        // 它只落两处——黑板上标成「失败」的一行，和账本里 action="error" 的一条。
+        finalizeEntry(entry, "error", "", t("请求失败: {msg}", { msg: failure }));
+        recordTeamTurn(teamRemote, {
+          round, member: { ...member }, action: "error", target: "", text: failure, full: failure,
+        });
+        continue;
       }
 
       // 处理工具调用
@@ -905,16 +1029,39 @@ async function startDiscussion() {
       finalizeEntry(entry, action, parsed.target, parsed.content || "（无内容）");
       addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText);
 
-      const rec = { round, member: { ...member }, action, target: parsed.target, text: parsed.content || fullText };
+      const rec = {
+        round, member: { ...member }, action, target: parsed.target,
+        text: parsed.content || fullText, full: fullText,
+      };
       entries.push(rec);
       recordTeamTurn(teamRemote, rec, runId);
-      if (action === "verdict") verdict = rec;
+      if (action === "verdict") {
+        // 要求拍板时【决策】只是一份待签的草案：人不签字就不结束这场讨论
+        const outcome = teamSignoffOn && reopenUsed < TEAM_REOPEN_CAP
+          ? await requestTeamSignoff(rec, teamRemote, round)
+          : null;
+        if (outcome) {
+          entries.push(outcome);
+          recordTeamTurn(teamRemote, outcome);
+          if (outcome.action === "reopened") reopenUsed += 1;
+        }
+        if (!outcome || outcome.action === "decided") verdict = rec;
+      }
     }
 
     // 轮次用尽仍无决策：决策者强制拍板
     if (!verdict && isLastRound) {
       if (discussAbortController?.signal.aborted) break;
       verdict = await forceVerdict(topic, boardContext, entries, teamRemote);
+      // 强制拍板的那份结论同样要人签字；不签就是"轮次用尽、未拍板"，不替用户结束这场
+      if (verdict && teamSignoffOn) {
+        const outcome = await requestTeamSignoff(verdict, teamRemote, verdict.round);
+        if (outcome) {
+          entries.push(outcome);
+          recordTeamTurn(teamRemote, outcome);
+          if (outcome.action !== "decided") verdict = null;
+        }
+      }
     }
   }
 
@@ -927,6 +1074,13 @@ async function startDiscussion() {
     typeof e.round === "number" && e.round > acc ? e.round : acc
   ), 0);
   const summaryMarkdown = stoppedManually ? "" : renderDebateSummary(topic, entries, verdict);
+  // 任务中心那一行跟着收掉：面板按 origin:"local" 认它，不再多一种行
+  syncTeamTask(teamRemote, {
+    state: stoppedManually ? "stopped" : "exited",
+    exit_code: 0,
+    output: String(verdict?.text || entries.at(-1)?.text || "").slice(-TEAM_TAIL_BUDGET),
+    finished_at: Date.now(),
+  });
   // 收尾先把在飞的落库等干，本地历史才知道这场讨论该不该标"仅本机记录"
   await finishTeamRemote(teamRemote, {
     status: stoppedManually ? "stopped" : verdict ? "decided" : "exhausted",
@@ -934,24 +1088,35 @@ async function startDiscussion() {
     verdictText: verdict?.text || "",
     summaryMarkdown,
   });
-  if (!stoppedManually) {
-    persistTeamSession({
-      id: teamRemote.id,
-      topic,
-      createdAt: Date.now(),
-      members: teamMembers.map(m => ({ ...m })),
-      entries,
-      verdictText: verdict?.text || "",
-      summaryMarkdown,
-      usage: { ...currentTeamUsage },
-      remote: teamRemote.syncState === "ok",
-    });
-  }
+  // 手动停止的那场也要留历史：停在第 2 轮的辩论不是"没发生过"，用户回来要能接着看
+  // （summaryMarkdown 对这种场次刻意留空——没有结论就不编一个结论）
+  persistTeamSession({
+    id: teamRemote.id,
+    topic,
+    createdAt: Date.now(),
+    members: teamMembers.map(m => ({ ...m })),
+    entries,
+    verdictText: verdict?.text || "",
+    summaryMarkdown,
+    usage: { ...currentTeamUsage },
+    remote: teamRemote.syncState === "ok",
+    stopped: stoppedManually,
+  });
 
   isDiscussing = false;
   discussAbortController = null;
   btnStartDiscuss.disabled = false;
   btnStartDiscuss.textContent = "开始讨论";
+  // 面板就摆在眼前时不响第二声：这一场是用户看着跑完的，只有背后跑完的才需要人回来
+  if (teamPanel?.classList.contains("hidden")) {
+    try {
+      notifyTaskComplete(
+        stoppedManually ? t("团队讨论已停止") : t("团队讨论已完成"),
+        topic.slice(0, 24),
+        "slate-team-discussion",
+      );
+    } catch (e) { /* 通知不是关键路径 */ }
+  }
 }
 
 /** 轮次用尽仍无共识时，由决策者（或首位有 Key 的成员）给出最终方案 */
@@ -963,7 +1128,7 @@ function stopDiscussion() {
   discussAbortController.abort();
   // 不在此重置状态：保持 controller 非空，后续成员请求拿到已中止的 signal 立即失败，
   // 不会发出不受控请求；isDiscussing/按钮由循环结束后统一收尾，避免并发第二场辩论
-  notifyTaskComplete(t("团队讨论完成"), t("辩论已结束"));
+  // 提醒也只有一处：循环收尾按"这一场是否在背后结束"统一发，这里再发一次就是响两声
   const stopEl = document.createElement("div");
   stopEl.className = "team-stopped-notice";
   stopEl.textContent = t("讨论已手动停止");
@@ -981,10 +1146,12 @@ async function forceVerdict(topic, boardContext, entries, teamRemote = null) {
   const userPrompt = `${decider.persona}\n\n议题: ${topic}${boardContext}\n\n辩论记录:\n${buildTranscript(entries)}\n\n讨论轮次已用尽。请综合各方观点，以【决策】开头给出最终方案、理由与取舍。`;
 
   let fullText = "";
+  let failure = "";
   try {
     for await (const chunk of streamChat({
       model: decider.modelId,
       provider: findModel(decider.modelId)?.provider,
+      base_url: findModel(decider.modelId)?.base_url,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -1001,7 +1168,16 @@ async function forceVerdict(topic, boardContext, entries, teamRemote = null) {
     }
   } catch (e) {
     if (discussAbortController?.signal.aborted) return null;
-    fullText = t("请求失败: {msg}", { msg: e.message });
+    failure = String(e?.message || e);
+  }
+
+  if (failure) {
+    // 拍板失败不等于拍板：这句要是当成结论存下来，总结里就多出一个谁也没同意过的"最终方案"
+    finalizeEntry(entry, "error", "", t("请求失败: {msg}", { msg: failure }));
+    recordTeamTurn(teamRemote, {
+      round: 0, member: { ...decider }, action: "error", target: "", text: failure, full: failure,
+    });
+    return null;
   }
 
   fullText = stripToolCalls(fullText);
@@ -1009,7 +1185,10 @@ async function forceVerdict(topic, boardContext, entries, teamRemote = null) {
   finalizeEntry(entry, "verdict", parsed.target, parsed.content || fullText);
   addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText);
 
-  const rec = { round: "最终决策", member: { ...decider }, action: "verdict", target: parsed.target, text: parsed.content || fullText };
+  const rec = {
+    round: "最终决策", member: { ...decider }, action: "verdict", target: parsed.target,
+    text: parsed.content || fullText, full: fullText,
+  };
   entries.push(rec);
   // 强制拍板这一行不跑工具（上面只 strip 不 exec），所以没有 run_id，只有发言与边
   recordTeamTurn(teamRemote, rec, "");
@@ -1024,15 +1203,17 @@ function renderDebateSummary(topic, entries, verdict) {
   summaryEl.innerHTML = '<div class="team-summary-title">辩论摘要</div><div class="team-summary-content"></div>';
   teamOutput.appendChild(summaryEl);
 
-  const names = [...new Set(entries.map(e => e.member.name))];
+  // 摘要只数真正发言的那几行：拍板行是"人签了字"的记录，不算一次发言（与星图、失败/缺席同一口径）
+  const speech = entries.filter(e => SPEECH_ACTIONS.includes(e.action));
+  const names = [...new Set(speech.map(e => e.member.name))];
   const actionCount = {};
-  for (const e of entries) actionCount[e.action] = (actionCount[e.action] || 0) + 1;
+  for (const e of speech) actionCount[e.action] = (actionCount[e.action] || 0) + 1;
   const countText = Object.entries(actionCount)
     .map(([k, n]) => `${t(DEBATE_ACTIONS[k] || k)} ${n}`).join(" · ");
 
   let summary = t("**议题**: {topic}", { topic }) + "\n\n";
   summary += t("**参与成员**: {names}", { names: names.join("、") }) + "\n\n";
-  summary += t("**发言统计**: 共 {n} 条（{counts}）", { n: entries.length, counts: countText }) + "\n\n";
+  summary += t("**发言统计**: 共 {n} 条（{counts}）", { n: speech.length, counts: countText }) + "\n\n";
   if (verdict) {
     summary += t("**最终方案**（{name}）:", { name: verdict.member.name }) + "\n" + verdict.text;
   } else {
@@ -1089,14 +1270,53 @@ function renderLoadedSession(session) {
   renderTeamUsage();
 }
 
-function loadTeamSession(sessionId) {
+/** 库里的 team_turns 反推成这一场的样子：本地历史只是缓存（50 场上限、换机器、清过
+ *  localStorage 都会没有），全文落在库里，所以正文以库为准。 */
+function sessionFromRemote(data, local = null) {
+  const s = data?.session || {};
+  const roster = Array.isArray(data?.members) ? data.members : [];
+  const byId = new Map(roster.map(m => [m.id, m]));
+  const entries = (Array.isArray(data?.turns) ? data.turns : [])
+    .filter(turn => turn.fullText || turn.digest)
+    .map(turn => ({
+      round: turn.round,
+      member: byId.get(turn.memberId) || { id: turn.memberId, name: turn.memberName },
+      action: turn.action,
+      target: (byId.get(turn.targetMemberId) || {}).name || "",
+      text: turn.fullText || turn.digest,
+    }));
+  return {
+    id: s.id,
+    topic: s.topic,
+    createdAt: s.createdAtMs,
+    members: roster,
+    entries,
+    verdictText: s.verdict || "",
+    summaryMarkdown: s.summaryMarkdown || "",
+    usage: local?.usage || null,
+    remote: true,
+    stopped: s.status === "stopped",
+  };
+}
+
+async function loadTeamSession(sessionId) {
   if (isDiscussing) return;
-  const session = teamHistory.find(item => item.id === sessionId);
-  if (!session) return;
-  renderLoadedSession(session);
+  const local = teamHistory.find(item => item.id === sessionId);
+  if (local) renderLoadedSession(local);
   teamHistoryList?.querySelectorAll(".team-history-item").forEach(item => {
     item.classList.toggle("active", item.dataset.sessionId === sessionId);
   });
+  // 本地已经有正文就不动画面；只有本地缺（被上限挤掉、老格式、清了缓存）才回库里取
+  if (local && Array.isArray(local.entries) && local.entries.length > 0) return;
+  let res;
+  try {
+    res = await get(`/events/team/${encodeURIComponent(sessionId)}`);
+  } catch (e) {
+    console.warn("[SLATE] 团队会话读取失败:", e?.message || e);
+    return;
+  }
+  if (res?.code !== 0 || !res.data || !local && !res.data.session) return;
+  renderLoadedSession(sessionFromRemote(res.data, local));
 }
 
 function addTeamResponse(member, text) {
@@ -1135,11 +1355,11 @@ function addTeamResponse(member, text) {
 }
 
 function findModel(modelId) {
-  for (const models of Object.values(state.modelRegistry)) {
-    const found = models.find(m => m.id === modelId);
-    if (found) return found;
-  }
-  return null;
+  // 用 store 的统一查法：它先翻注册表分组，再回落到用户自己添加的模型。
+  // 团队面板原来只翻 state.modelRegistry 的分组，自定义/本地模型查不到 →
+  // base_url 发不出去，后端 _find_model 认不出这个 id，只回「未知模型」，
+  // 于是这位成员整场每一句都变成一格失败（界面看不出是配置问题）。
+  return getModelDefinition(modelId);
 }
 
 function renderSimpleMarkdown(text) {
@@ -1454,6 +1674,15 @@ function initTeamPanel() {
     });
   }
 
+  // 决策要不要人签字：与轮数一样是这一场的开关，不落盘
+  const signoffToggle = document.getElementById("team-signoff-toggle");
+  if (signoffToggle) {
+    signoffToggle.checked = teamSignoffOn;
+    signoffToggle.addEventListener("change", () => {
+      teamSignoffOn = !!signoffToggle.checked;
+    });
+  }
+
   btnNewTeamDiscussion?.addEventListener("click", () => {
     if (isDiscussing) return;
     teamOutput.innerHTML = "";
@@ -1487,5 +1716,13 @@ function initTeamPanel() {
     });
   }
 }
+
+// 右栏任务中心点「停止」时，团队这一族由这里收尾（不认识 team: 前缀的一律交回别的登记方）。
+// 与后台子代理共用同一个停止器登记表，就是不再写第二条唤醒链路的代价与好处。
+registerLocalTaskStopper(async (taskId) => {
+  if (!String(taskId || "").startsWith("team:")) return false;
+  stopDiscussion();
+  return true;
+});
 
 export { initTeamPanel, stopDiscussion };

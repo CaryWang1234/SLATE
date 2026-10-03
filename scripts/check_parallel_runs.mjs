@@ -114,6 +114,17 @@ ok("kernel 读写消息数组走 opts.messages（不是硬读 state.messages）"
   && /messages: \(\) => \(genConvId \? messagesOf\(genConvId\) : state\.messages\)/.test(CHAT));
 ok("token 用量按会话归账（后台那场不能刷到屏幕上那场的计数器）",
   /state\.conversationUsage\[key\] = saved;/.test(STORE) && /function addUsage\(usage, convId = state\.currentConversationId\)/.test(STORE));
+ok("进度条的门禁比的是当前会话 id：kernel 的 run 上没有 visible",
+  (() => {
+    const i = CHAT.indexOf("setProgress(text, run = null) {");
+    const body = CHAT.slice(i, CHAT.indexOf("\n  },", i));
+    // 只认那条门禁行：函数里的注释本来就要解释"为什么不能用 run.visible"，
+    // 拿"正文里有没有 visible 字样"当判据会把注释也算成毒。
+    const gate = (body.match(/^\s*if \(run[^\n]*$/m) || [""])[0];
+    return i >= 0 && /run\.genConvId !== state\.currentConversationId/.test(gate)
+      && !gate.includes("run.visible") && /setHarnessProgress\(text\)/.test(body);
+  })(),
+  "拿 run.visible 判会把前台一起挡死：进度条从此永远停在开场那句，屏幕上再没有轮数在动");
 ok("历史数组自带它那一场的现场（项目/宪法/知识）",
   /list\._project = scope \|\| null;/.test(CHAT) && /list\._constitution = r \? constitutionForScope\(scope\)/.test(CHAT)
   && /list\._knowledge = threadKnowledge\.get/.test(CHAT));

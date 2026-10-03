@@ -61,6 +61,9 @@ async def save_shared_state(req: SharedStateRequest):
         "useResponses",
         "onboardingSeen",
         "permissionMode",
+        # 审批档存档版本（v2 起 full 从"夜间模式"改判为"完全访问"）。前端靠它判断要不要
+        # 把老存档里的 full 搬到 night，缺了它每次加载都会误搬用户之后主动挑的完全访问。
+        "permissionModeSchema",
         "chatMode",
         "reasoningEffort",
         # 侧栏任务列表的排序偏好。刻意不收 taskFlags：那条映射记的是"这块屏幕有没有看过"，

@@ -40,7 +40,8 @@ const readBySomeComponent = (id) =>
 
 // ── 1. 页签与面板按约定成对（switchPanel 靠 panel-<name> 拼 id）──────
 
-const TAB_RE = /<button class="tab-btn" data-panel="([^"]+)">([^<]*)<\/button>/g;
+// 首个页签带 active 类，正则要把附加类一起吃掉——只认 class="tab-btn" 会把它漏掉一支
+const TAB_RE = /<button class="tab-btn[^"]*" data-panel="([^"]+)">([^<]*)<\/button>/g;
 const tabs = [...HTML.matchAll(TAB_RE)].map(([, name, label]) => ({ name, label: label.trim() }));
 const tabNames = tabs.map(t => t.name);
 ok("顶栏页签全部在 HTML 里读得到（不写死清单，加了页签这里就会跟着要面板）",
@@ -136,7 +137,11 @@ for (const key of EN_KEYS) ok(`词条：${key}`, DICT.includes(`"${key}"`));
 // 就等于把入口藏了起来；改了卡片措辞却漏了字典，英文界面会直接把中文冒出来。
 
 const ONBOARD = HTML.slice(HTML.indexOf('id="onboarding-modal"'), HTML.indexOf("btn-onboarding-done"));
-const tabCard = (ONBOARD.match(/<p>([^<]*工厂（提示词生产）[^<]*)<\/p>/) || ["", ""])[1];
+// 不锚在某一句话上（页签名与措辞都会变，工厂那页就刚被摘掉）：取"点名了最多页签"的那一段，
+// 再要求它把四个页签全点到
+const onboardParas = [...ONBOARD.matchAll(/<p>([^<]*)<\/p>/g)].map(m => m[1]);
+const tabCard = onboardParas
+  .sort((a, b) => tabs.filter(t => b.includes(t.label)).length - tabs.filter(t => a.includes(t.label)).length)[0] || "";
 ok("新手引导有一张卡逐项点名顶栏页签（页签变了这张卡要跟着变）",
   tabCard !== "" && tabs.every(t => tabCard.includes(t.label)),
   `卡片正文：${tabCard.slice(0, 90)}`);

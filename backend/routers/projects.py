@@ -793,6 +793,12 @@ async def review_diff(req: ReviewDiffRequest):
     except Exception as e:
         return {"code": 1, "message": f"git diff 失败: {e}"}
 
+    # 退出码非 0 就是 git 报了错（SHA 拼错、仓库还没有提交、index 被锁……）。
+    # 这时候 stdout 是空的，但它不是"没有变更"——把失败说成干净，用户就再也不信这个面板了。
+    if result.returncode != 0:
+        first_line = (result.stderr or "").strip().splitlines()
+        return {"code": 1, "message": f"git diff 失败: {first_line[0] if first_line else f'退出码 {result.returncode}'}"}
+
     if not diff_text.strip():
         return {"code": 0, "data": {"files": [], "raw": "", "total_changes": 0, "message": "无变更"}, "message": "ok"}
 

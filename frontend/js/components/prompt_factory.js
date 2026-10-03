@@ -2,12 +2,12 @@
  * SLATE 提示词工厂：将任务、项目约束和上下文整理为可交付 Prompt
  */
 
-import { state, subscribe, addPromptSnippet, effectiveConstitution } from "../store.js?v=20261001-002";
-import { get, post } from "../services/api.js?v=20261001-002";
-import { browseFiles } from "../services/project.js?v=20261001-002";
-import { t } from "../services/i18n.js?v=20261001-002";
-import { iconSvg } from "../services/icons.js?v=20261001-002";
-import { makeId } from "../services/utils.js?v=20261001-002";
+import { state, subscribe, addPromptSnippet, effectiveConstitution } from "../store.js?v=20261003-001";
+import { get, post } from "../services/api.js?v=20261003-001";
+import { browseFiles } from "../services/project.js?v=20261003-001";
+import { t } from "../services/i18n.js?v=20261003-001";
+import { iconSvg } from "../services/icons.js?v=20261003-001";
+import { makeId } from "../services/utils.js?v=20261003-001";
 
 const FACTORY_PRESETS = {
   codex: {
@@ -544,6 +544,34 @@ function initPromptFactory() {
     renderChecklist();
   });
   subscribe("projectFileTree", renderFilePicker);
+  bindModalChannels();
+}
+
+// ── 弹窗：入口在「设置 → 上下文与项目」那颗「打开工作台」（顶栏页签与输入行都腾出来了）──
+// 表单留在 DOM 里，收起只加 .hidden——再打开时草稿、勾选的文件、生成结果都还在。
+
+function factoryModal() {
+  return document.getElementById("factory-modal");
+}
+
+export function openPromptFactory() {
+  const modal = factoryModal();
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  document.getElementById("factory-task")?.focus();
+}
+
+function closePromptFactory() {
+  factoryModal()?.classList.add("hidden");
+}
+
+function bindModalChannels() {
+  const modal = factoryModal();
+  if (!modal) return;
+  document.getElementById("btn-prompt-factory")?.addEventListener("click", openPromptFactory);
+  modal.querySelectorAll("[data-factory-close]").forEach(el => {
+    el.addEventListener("click", closePromptFactory);
+  });
 }
 
 export { initPromptFactory, generatePrompt };

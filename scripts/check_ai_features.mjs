@@ -33,6 +33,7 @@ const RISK = read("frontend/js/services/riskguard.js");
 const WORKFLOW = read("frontend/js/services/workflow.js");
 const TOOLS = read("frontend/js/services/tools.js");
 const MCHAT = read("frontend/js/mobile/m-chat.js");
+const TITLE = read("frontend/js/services/session_title.js");
 const MAUTH = read("frontend/js/mobile/m-auth.js");
 const SETTINGS_PY = read("backend/routers/settings.py");
 const AIF_PY = read("backend/ai_features.py");
@@ -88,6 +89,7 @@ const CONSUMERS = {
   memory_distill: [[MEMORY, "autoRefineMemoryAndProfile"]],
   memory_extract: [[MEMORY, "extractMemoriesFromConversation"]],
   conversation_spark: [[MEMORY, "captureConversationSpark"]],
+  session_title: [[TITLE, "autoGenerateSessionTitle"]],
   code_understand: [[UNDERSTAND, "startUnderstanding"]],
   code_review: [[REVIEW, "startReview"]],
   whiteboard_organize: [[BOARD, "aiOrganize"]],
@@ -193,7 +195,7 @@ ok("设置页有独立区块", has(HTML, 'id="settings-ai-features"'));
 // 左栏条目由 app.js 从区块现读生成（手写清单漏过三块），所以这里钉的是「区块本身在」
 ok("区块在 .settings-main 里（左栏靠它生成条目）",
   has(HTML, '<section class="settings-block" id="settings-ai-features">'));
-ok("行由 JS 渲染进容器（一张表一处渲染，不手抄 13 遍 DOM）",
+ok("行由 JS 渲染进容器（一张表一处渲染，条目数不写死在 HTML 里）",
   has(HTML, 'id="ai-feature-list"') && /export function renderAiFeatureSettings/.test(SERVICE));
 ok("每行是复选框 + 模型下拉",
   /data-ai-enabled/.test(SERVICE) && /data-ai-model/.test(SERVICE));

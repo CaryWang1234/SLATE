@@ -102,7 +102,7 @@ assert.match(ICONS_JS, /import \{ MCP_ICONS, MCP_VIEWBOXES \} from "\.\/mcp_icon
 assert.match(ICONS_JS, /ICONS\[name\] \|\| CUSTOM_ICONS\[name\] \|\| MCP_ICONS\[name\]/, "iconSvg 查表链里漏了 MCP 品牌 mark");
 assert.match(ICONS_JS, /const vb = CUSTOM_VIEWBOXES\[name\] \|\| MCP_VIEWBOXES\[name\]/,
   "viewBox 没认 MCP 表：非 24 网格的图形会被拉变形");
-assert.match(ICONS_JS, /const fill = \(CUSTOM_VIEWBOXES\[name\] \|\| MCP_VIEWBOXES\[name\]\) \? "fill=/,
+assert.match(ICONS_JS, /const fill = \(CUSTOM_VIEWBOXES\[name\] \|\| MCP_VIEWBOXES\[name\] \|\| MODEL_VIEWBOXES\[name\]\) \? "fill=/,
   "填充色没认 MCP 表：品牌 mark 会以 stroke 描边的方式画成一团线");
 
 // 先判"又全画插头"：整段回退时这句更有指向性，别让上面那条 match 先抢着报

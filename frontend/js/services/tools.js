@@ -12,18 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20261001-002";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261001-002";
-import { guardSkillCall } from "./riskguard.js?v=20261001-002";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20261001-002";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261001-002";
-import { t } from "./i18n.js?v=20261001-002";
-import { makeId } from "./utils.js?v=20261001-002";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261001-002";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261001-002";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20261001-002";
-import { isAiToolOff } from "./ai_features.js?v=20261001-002";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261001-002";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20261003-001";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261003-001";
+import { guardSkillCall } from "./riskguard.js?v=20261003-001";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20261003-001";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261003-001";
+import { t } from "./i18n.js?v=20261003-001";
+import { makeId } from "./utils.js?v=20261003-001";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261003-001";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261003-001";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20261003-001";
+import { isAiToolOff } from "./ai_features.js?v=20261003-001";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261003-001";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -420,9 +420,10 @@ const TOOLS = {
       options: { type: "array", description: "选择题选项（2-6 个字符串），用户也可自由输入" },
     },
     async execute({ question, options }, callCtx = {}) {
-      // 这一档对用户的承诺是"没有任何东西在等人"：弹窗挂在一场没人看的对话上，
+      // 只有夜间模式（全托管）对用户的承诺是"没有任何东西在等人"：弹窗挂在一场没人看的对话上，
       // 任务就会停在那道选择题上过夜，所以这里不弹窗，把决定权交回模型。
-      if (permissionModeFor(callCtx.convId) === "full") {
+      // 完全访问（full）不在其列：它只是不问审批，缺条件时照样问一句。
+      if (permissionModeFor(callCtx.convId) === "night") {
         const opts = (Array.isArray(options) ? options : [])
           .map(o => String(o ?? "").trim()).filter(Boolean).slice(0, 6);
         return opts.length

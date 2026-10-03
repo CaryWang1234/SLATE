@@ -1,18 +1,27 @@
 /**
- * 输入框左下的审批模式选择器：三档在**这一场对话**里随时可改。
+ * 输入框左下的审批模式选择器：四档在**这一场对话**里随时可改。
  * 判口（哪一档该问什么）只有一个，在 services/riskguard.approvalNeededFor；
  * 这里只管"屏幕上现在生效的是哪一档"和"改这一场的档"，两边不各存一份判断。
+ *
+ * 完全访问与夜间模式的区别只在"缺条件时问不问你一句"：两者对命令/联网同一口径（都不问），
+ * 夜间模式连 user_ask 也关（那条闸门在 tools.js），所以两者在设置里是两种颜色：
+ * 完全访问红（没有安全网），夜间模式夜紫（这一晚交给它）。
  */
 
-import { state, subscribe, permissionModeFor, setPermissionModeFor } from "../store.js?v=20261001-002";
-import { iconSvgEl } from "../services/icons.js?v=20261001-002";
-import { t } from "../services/i18n.js?v=20261001-002";
+import { state, subscribe, permissionModeFor, setPermissionModeFor } from "../store.js?v=20261003-001";
+import { iconSvgEl } from "../services/icons.js?v=20261003-001";
+import { t } from "../services/i18n.js?v=20261003-001";
 
 const MODES = [
   { id: "ask", icon: "shield", label: "手动审批", hint: "执行命令、访问网络都先问你" },
   { id: "auto", icon: "zap", label: "自动审批", hint: "只在命中高危规则时问你，其余直接放行" },
-  { id: "full", icon: "moon", label: "夜间模式", hint: "全托管：命令、联网、提问都不问（灾难级命令仍由后端拦截）", danger: true },
+  { id: "full", icon: "unlock", label: "完全访问", hint: "命令与联网都不问；缺条件时仍会问你一句（灾难级命令仍由后端拦截）", danger: true },
+  { id: "night", icon: "moon", label: "夜间模式", hint: "全托管：命令、联网、提问都不问（灾难级命令仍由后端拦截）", night: true },
 ];
+
+function modeClass(mode) {
+  return mode?.danger ? "is-danger" : mode?.night ? "is-night" : "";
+}
 
 let popOpen = false;
 let rowsBuilt = false;
@@ -62,7 +71,7 @@ function buildRows() {
   for (const m of MODES) {
     const row = document.createElement("button");
     row.type = "button";
-    row.className = `approval-opt${m.danger ? " is-full" : ""}`;
+    row.className = `approval-opt${modeClass(m) ? ` ${modeClass(m)}` : ""}`;
     row.dataset.mode = m.id;
     row.setAttribute("role", "menuitemradio");
     const ico = document.createElement("span");
@@ -99,8 +108,9 @@ function syncApprovalPicker() {
     iconWrap.textContent = "";
     iconWrap.appendChild(iconSvgEl(mode.icon));
   }
-  // 夜间模式（全托管）：图标和文字一起标红（图标是 currentColor，红在容器上）
-  btn.classList.toggle("is-full", mode.id === "full");
+  // 完全访问标红、夜间模式标夜紫：图标是 currentColor，色落在容器上（与设置页那排按钮同源）
+  btn.classList.toggle("is-danger", mode.id === "full");
+  btn.classList.toggle("is-night", mode.id === "night");
   btn.title = t("{mode}：{hint}", { mode: t(mode.label), hint: t(mode.hint) });
   syncActiveRow();
 }

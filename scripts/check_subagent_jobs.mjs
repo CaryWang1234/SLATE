@@ -93,8 +93,8 @@ ok("「还有活没交接完」看得见本地批次",
   /export function hasBgWork\(\) \{\s*\n\s*return hasBgEvents\(\) \|\| runningBgTasks\(\)\.length > 0;/.test(SERVICE)
   && /export function runningBgTasks\(\) \{\s*\n\s*return bgTasks\(\)\.filter\(t => t\.state === "running"\)/.test(SERVICE),
   "读的是合并后的 state.bgTasks：本地批次不并进那份，空闲续跑就等不到它");
-ok("停止按 origin 分流：本地走 stopper，进程任务才打 /stop",
-  /if \(localTasks\.has\(id\)\) \{[\s\S]{0,300}localStopper \? await localStopper\(id\) : false/.test(SERVICE)
+ok("停止按 origin 分流：本地走 stopper 登记表，进程任务才打 /stop",
+  /if \(localTasks\.has\(id\)\) \{[\s\S]{0,320}for \(const stop of localStoppers\)[\s\S]{0,140}await stop\(id\)/.test(SERVICE)
   && SERVICE.indexOf("localTasks.has(id)") < SERVICE.indexOf("/stop"));
 ok("清掉已结束时先清本地（后端那份由 /clear 管）",
   /for \(const \[id, t\] of \[\.\.\.localTasks\.entries\(\)\]\) \{[\s\S]{0,120}t\.state !== "running"\) localTasks\.delete\(id\)/.test(SERVICE));
@@ -140,10 +140,11 @@ ok("描述写明「不等结果 / 最多 3 批 / 页面寿命」",
   && /结果只在当前页面存活/.test(TOOLS));
 ok("回执劝住模型别等着、别重复派出",
   /现在不要等待、也不要重复派出/.test(TOOLS));
-ok("面板：本地行的两个按钮说人话（看结论 / 停这批）",
+ok("面板：本地行的两个按钮说人话（看结论 / 停这批），团队行也各说各的",
   /const isLocal = task\.origin === "local";/.test(PANEL)
-  && /t\(isLocal \? "看子代理结论" : "看输出（最近 \{n\} 行）",/.test(PANEL)
-  && /t\(isLocal \? "停止这批子代理" : "停止任务（杀整棵进程树）"\)/.test(PANEL));
+  && /const isTeam = task\.family === "team";/.test(PANEL)
+  && /t\(isTeam \? "看这场讨论的结论" : isLocal \? "看子代理结论" : "看输出（最近 \{n\} 行）",/.test(PANEL)
+  && /t\(isTeam \? "停止这场讨论" : isLocal \? "停止这批子代理" : "停止任务（杀整棵进程树）"\)/.test(PANEL));
 ok("面板：本地结论就地读，不打 /bg-tasks（那条路由不认识它）",
   /const local = bgTasks\(\)\.find\(x => x\.task_id === taskId && x\.origin === "local"\);\s*\n\s*if \(local\) \{/.test(PANEL)
   && PANEL.indexOf('x.origin === "local"') < PANEL.indexOf("/bg-tasks/"));

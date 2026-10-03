@@ -2,37 +2,40 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, customThemeActive, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, contextCapStops, contextCapStopIndex, contextWindowSource, getContextWindow, setModelContextWindow, getModelDefinition, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode } from "./store.js?v=20261001-002";
-import { initI18n, t } from "./services/i18n.js?v=20261001-002";
-import { iconSvgEl } from "./services/icons.js?v=20261001-002";
-import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20261001-002";
-import { get, post, put } from "./services/api.js?v=20261001-002";
-import { dlgConfirm } from "./services/dialog.js?v=20261001-002";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20261001-002";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20261001-002";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20261001-002";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20261001-002";
-import { initSkillPanel, refreshSkills, refreshActions } from "./components/skill_panel.js?v=20261001-002";
-import { initExtensions } from "./components/extensions.js?v=20261001-002";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20261001-002";
-import { initTeamPanel } from "./components/team.js?v=20261001-002";
-import { initProjectBar } from "./components/project_bar.js?v=20261001-002";
-import { initSessionSummary } from "./components/session_summary.js?v=20261001-002";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20261001-002";
-import { initTypingGame } from "./components/typing_game.js?v=20261001-002";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20261001-002";
-import { initMemoryPanel } from "./components/memory.js?v=20261001-002";
-import { initExpertsPanel } from "./components/experts.js?v=20261001-002";
-import { initSchedule } from "./components/schedule.js?v=20261001-002";
-import { initRiskGuard } from "./services/riskguard.js?v=20261001-002";
-import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20261001-002";
-import { initThemeSettings, renderThemeSettings } from "./components/theme_settings.js?v=20261001-002";
-import { applyCustomTheme } from "./services/theme_custom.js?v=20261001-002";
-import { initUnderstandPanel } from "./components/understand.js?v=20261001-002";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20261001-002";
-import { setProject, setProjectFileTree } from "./store.js?v=20261001-002";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20261001-002";
-import { installErrorSink } from "./services/error_sink.js?v=20261001-002";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, customThemeActive, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, contextCapStops, contextCapStopIndex, contextWindowSource, getContextWindow, setModelContextWindow, getModelDefinition, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode, setKeepAwakeOnNightRun } from "./store.js?v=20261003-001";
+import { initI18n, t } from "./services/i18n.js?v=20261003-001";
+import { iconSvgEl } from "./services/icons.js?v=20261003-001";
+import { modelIconKey, modelIconLabel } from "./services/model_logos.js?v=20261003-001";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20261003-001";
+import { get, post, put } from "./services/api.js?v=20261003-001";
+import { dlgConfirm } from "./services/dialog.js?v=20261003-001";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20261003-001";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20261003-001";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20261003-001";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20261003-001";
+import { initSkillPanel, refreshSkills, refreshActions } from "./components/skill_panel.js?v=20261003-001";
+import { initExtensions } from "./components/extensions.js?v=20261003-001";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20261003-001";
+import { initTeamPanel } from "./components/team.js?v=20261003-001";
+import { initProjectBar } from "./components/project_bar.js?v=20261003-001";
+import { initSessionSummary } from "./components/session_summary.js?v=20261003-001";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20261003-001";
+import { initTypingGame } from "./components/typing_game.js?v=20261003-001";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20261003-001";
+import { initMemoryPanel } from "./components/memory.js?v=20261003-001";
+import { initExpertsPanel } from "./components/experts.js?v=20261003-001";
+import { initSchedule } from "./components/schedule.js?v=20261003-001";
+import { initRiskGuard } from "./services/riskguard.js?v=20261003-001";
+import { initKeepAwake, keepAwakeStatus, isHoldingAwake, onKeepAwakeStatus } from "./services/keepawake.js?v=20261003-001";
+import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20261003-001";
+import { initThemeSettings, renderThemeSettings } from "./components/theme_settings.js?v=20261003-001";
+import { initSessionArchiveSettings, renderArchivedSessions } from "./components/session_archive.js?v=20261003-001";
+import { applyCustomTheme } from "./services/theme_custom.js?v=20261003-001";
+import { initUnderstandPanel } from "./components/understand.js?v=20261003-001";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20261003-001";
+import { setProject, setProjectFileTree } from "./store.js?v=20261003-001";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20261003-001";
+import { installErrorSink } from "./services/error_sink.js?v=20261003-001";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -98,35 +101,23 @@ const MODEL_GROUP_LABELS = {
   local: "本地模型",
 };
 
-const MODEL_ICON_MAP = {
-  openai: "./images/gpt.svg",
-  anthropic: "./images/claude.svg",
-  google: "./images/gemini.svg",
-  deepseek: "./images/deepseek.svg",
-  moonshot: "./images/kimi.svg",
-  qwen: "./images/qwen.svg",
-  zhipu: "./images/glm.svg",
-  doubao: "./images/doubao.svg",
-  ernie: "./images/ernie.svg",
-  minimax: "./images/minimax.svg",
-};
-
-function getModelIconUrl(model) {
-  if (!model) return "";
-  const id = (model.id || "").toLowerCase();
-  const baseUrl = (model.base_url || "").toLowerCase();
-
-  if (id.includes("gpt") || baseUrl.includes("openai.com")) return MODEL_ICON_MAP.openai;
-  if (id.includes("claude") || baseUrl.includes("anthropic")) return MODEL_ICON_MAP.anthropic;
-  if (id.includes("gemini") || baseUrl.includes("googleapis")) return MODEL_ICON_MAP.google;
-  if (id.includes("deepseek") || baseUrl.includes("deepseek")) return MODEL_ICON_MAP.deepseek;
-  if (id.includes("kimi") || baseUrl.includes("moonshot")) return MODEL_ICON_MAP.moonshot;
-  if (id.includes("qwen") || baseUrl.includes("dashscope")) return MODEL_ICON_MAP.qwen;
-  if (id.includes("glm") || baseUrl.includes("bigmodel")) return MODEL_ICON_MAP.zhipu;
-  if (id.includes("doubao") || baseUrl.includes("volces")) return MODEL_ICON_MAP.doubao;
-  if (id.includes("ernie") || baseUrl.includes("baidubce")) return MODEL_ICON_MAP.ernie;
-  if (id.includes("minimax") || baseUrl.includes("minimax")) return MODEL_ICON_MAP.minimax;
-  return "";
+/**
+ * 品牌 mark：内联 SVG 画进一个 HTML span，而不是 <img src>——这套 mark 靠
+ * fill="currentColor" 描色，作为图片加载只会退化成黑色，暗色主题与自定义主题的
+ * 深色配色下等于没画出来。
+ *
+ * 认不出品牌就返回 null，调用方整个不画：留白比把 Qwen 的模型画成别人的标好。
+ */
+function modelMarkSpan(model, cls = "model-mark") {
+  const key = modelIconKey(model);
+  if (!key) return null;
+  const span = document.createElement("span");
+  span.className = cls;
+  // 把"认成了哪一枚"留在 DOM 上：走查与排障才不用靠肉眼猜品牌判定结果
+  span.dataset.modelIcon = key;
+  span.title = modelIconLabel(key);
+  span.appendChild(iconSvgEl(key));
+  return span;
 }
 
 let _textMeasureCtx = null;
@@ -150,14 +141,19 @@ function sizeModelSelect() {
 }
 
 function updateModelIcon(model) {
-  const iconEl = document.getElementById("model-icon");
-  if (!iconEl) return;
-  const url = getModelIconUrl(model);
-  if (url) {
-    iconEl.src = url;
-    iconEl.style.display = "";
+  const slot = document.getElementById("model-icon");
+  if (!slot) return;
+  slot.textContent = "";
+  const key = modelIconKey(model);
+  if (key) {
+    slot.dataset.modelIcon = key;
+    slot.title = modelIconLabel(key);
+    slot.appendChild(iconSvgEl(key));
+    slot.style.display = "";
   } else {
-    iconEl.style.display = "none";
+    delete slot.dataset.modelIcon;
+    slot.removeAttribute("title");
+    slot.style.display = "none";
   }
   // 长名字：宽度按实算给（sizeModelSelect），超出天花板才由省略号收尾；
   // 收起状态下原生 select 不显示 option 的 title，所以把选中那一项的 title 提到控件上。
@@ -193,8 +189,8 @@ function populateModelSelect() {
         m.name || m.id,
         m.id,
         m.base_url,
-        m.supports_responses === true ? "可在设置中启用 Responses API" : "",
-        modelNeedsKey(m) ? (hasModelKey(m.id) ? "API Key 已配置" : "API Key 未配置") : "本地模型",
+        m.supports_responses === true ? t("可在设置中启用 Responses API") : "",
+        modelNeedsKey(m) ? (hasModelKey(m.id) ? t("API Key 已配置") : t("API Key 未配置")) : t("本地模型"),
       ].filter(Boolean).join(" · ");
       optgroup.appendChild(opt);
     }
@@ -214,7 +210,7 @@ function populateModelSelect() {
         m.name || m.id,
         m.id,
         m.base_url,
-        hasModelKey(m.id) ? "API Key 已配置" : "API Key 未配置",
+        hasModelKey(m.id) ? t("API Key 已配置") : t("API Key 未配置"),
       ].filter(Boolean).join(" · ");
       optgroup.appendChild(opt);
     }
@@ -345,7 +341,7 @@ function saveCustomModel() {
   const ctx = parseInt(document.getElementById("custom-model-ctx").value) || 32768;
 
   if (!name || !baseUrl) {
-    toast("请填写模型名称和 Base URL");
+    toast(t("请填写模型名称和 Base URL"));
     return;
   }
 
@@ -358,7 +354,7 @@ function saveCustomModel() {
   };
   const duplicate = state.customModels.some(m => m.id === name && m.id !== editingCustomModelId);
   if (duplicate) {
-    toast("模型名称已存在");
+    toast(t("模型名称已存在"));
     return;
   }
 
@@ -375,7 +371,7 @@ function saveCustomModel() {
   renderCustomModelManagement();
   renderKeyManagement();
   closeCustomModelModal();
-  toast(t(wasEditing ? "已更新自定义模型: {name}" : "已添加自定义模型: {name}", { name }));
+  toast(t(wasEditing ? t("已更新自定义模型: {name}") : t("已添加自定义模型: {name}"), { name }));
 }
 
 // ── 密钥管理面板（设置弹窗内）──────────────
@@ -544,7 +540,9 @@ function renderCustomModelManagement() {
     info.className = "custom-model-info";
     const name = document.createElement("div");
     name.className = "custom-model-name";
-    name.textContent = model.name;
+    const mark = modelMarkSpan(model);
+    if (mark) name.appendChild(mark);
+    name.appendChild(document.createTextNode(model.name));
     const meta = document.createElement("div");
     meta.className = "custom-model-meta";
     meta.textContent = `${model.base_url} · ${model.context_window || 32768} ctx`;
@@ -602,7 +600,9 @@ function renderKeyManagement() {
     info.className = "key-mgmt-info";
     const nameSpan = document.createElement("span");
     nameSpan.className = "key-mgmt-name";
-    nameSpan.textContent = m.name;
+    const mark = modelMarkSpan(m);
+    if (mark) nameSpan.appendChild(mark);
+    nameSpan.appendChild(document.createTextNode(m.name));
     const urlSpan = document.createElement("span");
     urlSpan.className = "key-mgmt-url";
     urlSpan.textContent = m.base_url;
@@ -616,7 +616,7 @@ function renderKeyManagement() {
     input.className = "setting-input key-mgmt-input";
     input.dataset.modelKey = m.id;
     input.value = getModelKey(m.id) || "";
-    input.placeholder = hasModelKey(m.id) ? "已配置（留空删除）" : "未配置";
+    input.placeholder = hasModelKey(m.id) ? t("已配置 (留空删除)") : t("未配置");
 
     const saveBtn = document.createElement("button");
     saveBtn.className = "icon-btn key-mgmt-save";
@@ -631,7 +631,7 @@ function renderKeyManagement() {
         pendingKeyModel = null;
         populateModelSelect();
       }
-      toast(t(val ? "已保存 {name}" : "已删除 {name}", { name: m.name }));
+      toast(t(val ? t("已保存 {name}") : t("已删除 {name}"), { name: m.name }));
     });
 
     inputWrap.appendChild(input);
@@ -688,12 +688,14 @@ function openSettings(options = {}) {
   renderParallelSettings();
   updateNotifPermissionHint();
   renderPermissionModeSettings();
+  renderKeepAwakeSettings();
   document.getElementById("setting-ui-mode").checked = state.uiMode === "codex";
   renderWebSearchSettings();
   renderImageGenSettings();
   renderVideoGenSettings();
   renderAiFeatureSettings();
   renderThemeSettings();
+  renderArchivedSessions();
   renderConstitutionSettings();
   renderCustomModelManagement();
   renderKeyManagement();
@@ -972,7 +974,7 @@ async function renderLanInfo() {
   document.getElementById("btn-lan-copy")?.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(url);
-      toast("遥控地址已复制");
+      toast(t("遥控地址已复制"));
     } catch {
       const el = document.getElementById("lan-url-text");
       const range = document.createRange();
@@ -980,7 +982,7 @@ async function renderLanInfo() {
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
-      toast("自动复制失败，已为你选中地址");
+      toast(t("自动复制失败，已为你选中地址"));
     }
   });
 }
@@ -1051,7 +1053,7 @@ function initBackupRestore() {
         const base = t("已导出：{a} 会话 / {b} 条消息 / {c} 条记忆 / {d} 条素材", { a: d.conversations?.length || 0, b: d.messages?.length || 0, c: d.memories?.length || 0, d: d.snippets?.length || 0 });
         statusEl.textContent = savedPath ? `${base}；本地备份：${savedPath}` : base;
       }
-      toast(savedPath ? "备份已下载，并已保存到本地 backups 目录" : "备份已下载");
+      toast(savedPath ? t("备份已下载，并已保存到本地 backups 目录") : t("备份已下载"));
     } catch (e) {
       toast(t("导出备份失败: {msg}", { msg: e.message }));
     }
@@ -1079,7 +1081,7 @@ function initBackupRestore() {
       if (statusEl) {
         statusEl.textContent = t("已导入：{a} 会话 / {b} 条消息 / {c} 条记忆 / {d} 条素材（已存在的跳过）", { a: s.conversations || 0, b: s.messages || 0, c: s.memories || 0, d: s.snippets || 0 });
       }
-      toast("恢复完成，正在重载以应用本地设置…");
+      toast(t("恢复完成，正在重载以应用本地设置…"));
       setTimeout(() => location.reload(), 1200);
     } catch (e) {
       toast(t("恢复失败: {msg}", { msg: e.message }));
@@ -1095,9 +1097,9 @@ const GITHUB_URL = "https://github.com/CaryWang1234/SLATE";
 async function openProjectLink(url) {
   try {
     const res = await post("/update/open-url", { url });
-    if (res.code !== 0) toast(res.message || "打开链接失败");
+    if (res.code !== 0) toast(res.message || t("打开链接失败"));
   } catch (e) {
-    toast("打开链接失败");
+    toast(t("打开链接失败"));
   }
 }
 
@@ -1121,10 +1123,10 @@ async function runStorageCleanup(target, btn) {
   btn.disabled = true;
   try {
     const res = await post("/settings/storage/cleanup", { target });
-    if (res.code !== 0) { toast(res.message || "清理失败"); return; }
+    if (res.code !== 0) { toast(res.message || t("清理失败")); return; }
     const freed = res.data?.freed || 0;
     if (statusEl) statusEl.textContent = freed > 0 ? t("已释放 {size}", { size: fmtBytes(freed) }) : "无可释放空间（文件可能被占用，关闭应用后重试）";
-    toast(freed > 0 ? t("已释放 {size}", { size: fmtBytes(freed) }) : "清理完成");
+    toast(freed > 0 ? t("已释放 {size}", { size: fmtBytes(freed) }) : t("清理完成"));
     if (target === "history") {
       // 清空历史后同步侧栏列表
       try { await refreshConversationList(); } catch (e) {}
@@ -1436,7 +1438,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20261001-002").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20261003-001").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1460,7 +1462,8 @@ function initNotificationPersistence() {
 const PERMISSION_MODE_HINTS = {
   ask: "默认逐条确认：AI 执行命令、访问网络前都会弹窗询问",
   auto: "默认只在命中高危规则（删除、提权、强制推送等）时弹窗询问，其余直接放行；灾难级命令（rm -rf /、format 等）仍强制拦截",
-  full: "默认全托管：命令与联网直接执行，AI 缺条件时也不弹选择题问你，自己选定方案继续；灾难级命令（rm -rf /、format 等）仍强制拦截",
+  full: "默认完全访问：命令与联网直接放行，只有 AI 缺条件时还会弹选择题问你；灾难级命令（rm -rf /、format 等）仍强制拦截",
+  night: "默认全托管：命令、联网、连「缺条件时问你一句」都不问，自己选定方案继续；灾难级命令（rm -rf /、format 等）仍强制拦截",
 };
 
 function renderPermissionModeSettings() {
@@ -1482,6 +1485,38 @@ function initPermissionModePersistence() {
   document.querySelectorAll(".permission-mode-row .review-mode-btn").forEach(btn => {
     btn.addEventListener("click", () => applyPermissionMode(btn.dataset.mode));
   });
+}
+
+// 夜间模式跑任务时钉住系统别让电脑睡。真碰电源 API 的是后端那条常驻线程（backend/keepawake.py），
+// 这里只把"这台机器支持吗 / 现在钉着没"翻译成人话——判据一律读后端回答，不读我们自己勾没勾：
+// 勾了但页面没连上后端、或者跑的不是夜间模式那一档，钉住这件事都没发生。
+function renderKeepAwakeSettings() {
+  const box = document.getElementById("setting-keep-awake-night");
+  const hint = document.getElementById("keep-awake-hint");
+  const st = keepAwakeStatus();
+  if (box) {
+    box.checked = state.keepAwakeOnNightRun !== false;
+    // 后端明确说了不支持就置灰：留着一颗永远不兑现的勾比没有这颗更糟
+    box.disabled = Boolean(st && st.supported === false);
+  }
+  if (!hint) return;
+  if (!st) { hint.textContent = ""; return; }
+  if (st.supported === false) {
+    hint.textContent = t("这一版只在 Windows 上生效，当前系统不会阻止睡眠");
+    return;
+  }
+  hint.textContent = isHoldingAwake()
+    ? t("正在替夜间模式的任务钉住系统：电脑不会睡（屏幕仍可正常熄灭；合盖、手动睡眠、已经睡着的机器都叫不醒）")
+    : t("夜间模式的任务在跑时才会钉住系统，任务停了就交还电源策略（屏幕仍可正常熄灭；合盖、手动睡眠、已经睡着的机器都叫不醒）");
+}
+
+function initKeepAwakeSettings() {
+  document.getElementById("setting-keep-awake-night")?.addEventListener("change", (e) => {
+    setKeepAwakeOnNightRun(e.target.checked);
+    renderKeepAwakeSettings();
+  });
+  // 心跳续租/放手都会带回后端的状态，那句"正在钉住"要跟着改，不能等用户重开设置页
+  onKeepAwakeStatus(() => renderKeepAwakeSettings());
 }
 
 // 联网搜索配置：默认引擎 + JS 渲染策略，变更后立即持久化
@@ -1531,7 +1566,6 @@ function initWebSearchPersistence() {
 const CX_ICON_CHAT = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 const CX_ICON_TEAM = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
 const CX_ICON_BOARD = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="7" y1="10" x2="17" y2="10"/></svg>';
-const CX_ICON_FACTORY = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20h20"/><path d="M4 20V8l6 4V8l6 4V4h4v16"/></svg>';
 const CX_ICON_EXT = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v6"/><path d="M12 16v6"/><path d="M2 12h6"/><path d="M16 12h6"/><circle cx="12" cy="12" r="4"/></svg>';
 
 const CODEX_DOCK_GROUPS = [
@@ -1541,7 +1575,6 @@ const CODEX_DOCK_GROUPS = [
       { key: "team", label: "团队", text: "团队", customIcon: CX_ICON_TEAM },
       { key: "whiteboard", label: "黑板", text: "黑板", customIcon: CX_ICON_BOARD },
       { key: "ext", label: "扩展", text: "扩展", customIcon: CX_ICON_EXT },
-      { key: "factory", label: "工厂", text: "工厂", customIcon: CX_ICON_FACTORY },
     ],
   },
   {
@@ -1609,9 +1642,6 @@ function handleCodexDock(key) {
       break;
     case "ext":
       switchPanel("ext");
-      break;
-    case "factory":
-      switchPanel("factory");
       break;
     case "newchat":
       cxChatAction("btn-new-chat");
@@ -1715,7 +1745,6 @@ function updateDockActive() {
   if (panelId === "panel-chat") activeKey = teamActive ? "team" : "chat";
   else if (panelId === "panel-whiteboard") activeKey = "whiteboard";
   else if (panelId === "panel-ext") activeKey = "ext";
-  else if (panelId === "panel-factory") activeKey = "factory";
   else if (panelId === "panel-settings") activeKey = "settings";
   dock.querySelectorAll(".codex-dock-item").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.cxKey === activeKey);
@@ -1887,7 +1916,7 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     open.title = t("切到该项目");
     open.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { switchToProject } = await import("./services/project_scene.js?v=20261001-002");
+      const { switchToProject } = await import("./services/project_scene.js?v=20261003-001");
       const out = await switchToProject(projectId);
       if (!out.ok) toast(out.reason || t("切换失败"));
       await refreshCodexHistory();
@@ -1902,8 +1931,8 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     pin.setAttribute("aria-pressed", entry?.pinned ? "true" : "false");
     pin.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { patchRegistry } = await import("./services/project.js?v=20261001-002");
-      const { refreshRegistry } = await import("./services/project_scene.js?v=20261001-002");
+      const { patchRegistry } = await import("./services/project.js?v=20261003-001");
+      const { refreshRegistry } = await import("./services/project_scene.js?v=20261003-001");
       await patchRegistry(projectId, { pinned: !(entry?.pinned) });
       await refreshRegistry();
       renderCodexHistory();
@@ -1973,10 +2002,10 @@ function applyUiMode() {
 // 只把按钮置灰不解释，最容易让人以为按钮坏了。
 function requestThemeToggle() {
   if (toggleTheme()) {
-    toast(state.theme === "dark" ? "深色模式" : "浅色模式");
+    toast(state.theme === "dark" ? t("深色模式") : t("浅色模式"));
     return true;
   }
-  toast("自定义主题生效中：先在「设置 → 自定义主题」里关掉它，才能切换深色/浅色");
+  toast(t("自定义主题生效中：先在「设置 → 自定义主题」里关掉它，才能切换深色/浅色"));
   return false;
 }
 
@@ -1996,7 +2025,7 @@ function initUiMode() {
     state.uiMode = setting.checked ? "codex" : "classic";
     savePersistent();
     applyUiMode();
-    toast(state.uiMode === "codex" ? "已切换到通用 UI（Codex 风格）" : "已恢复经典布局");
+    toast(state.uiMode === "codex" ? t("已切换到通用 UI（Codex 风格）") : t("已恢复经典布局"));
   });
   window.addEventListener("slate:convs-updated", () => {
     if (state.uiMode === "codex") refreshCodexHistory();
@@ -2130,7 +2159,7 @@ async function saveSettings() {
     if (constData) {
       if (state.project) {
         // 打开着项目就写进项目（.slate/config.json，跟着仓库走），全局版本保持不动
-        const { updateProjectConfig } = await import("./services/project.js?v=20261001-002");
+        const { updateProjectConfig } = await import("./services/project.js?v=20261003-001");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -2143,7 +2172,7 @@ async function saveSettings() {
   }
 
   savePersistent();
-  toast("设置已保存");
+  toast(t("设置已保存"));
 }
 
 // ── 标签页切换 ─────────────────────────────
@@ -2260,7 +2289,7 @@ async function checkAppUpdate() {
 
     const openLink = (url) => async () => {
       const r = await post("/update/open-url", { url });
-      if (r.code !== 0) toast(r.message || "打开链接失败", 3000);
+      if (r.code !== 0) toast(r.message || t("打开链接失败"), 3000);
     };
 
     const dl = document.createElement("button");
@@ -2366,10 +2395,13 @@ async function init() {
   initAutoReviewPersistence();
   initNotificationPersistence();
   initPermissionModePersistence();
+  initKeepAwakeSettings();
+  safeInit("夜间模式保持清醒", initKeepAwake);
   initWebSearchPersistence();
   initGenSettingsPersistence();
   safeInit("AI 辅助功能设置", initAiFeatureSettings);
   safeInit("自定义主题设置", initThemeSettings);
+  safeInit("会话归档设置", initSessionArchiveSettings);
   initUiMode();
   safeInit("API 测试", initApiTest);
   safeInit("打字小游戏", initTypingGame);
@@ -2392,11 +2424,11 @@ async function init() {
   // lastProjectPath 退成第二道：老数据第一次升级到带注册表的版本时，册子是空的，
   // 拿它补登一次，用户不会感到"项目不见了"。
   try {
-    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20261001-002");
+    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20261003-001");
     const res = await getCurrentProject();
     let project = res.code === 0 ? res.data : null;
     if (!project && state._lastProjectPath) {
-      const { openProject } = await import("./services/project.js?v=20261001-002");
+      const { openProject } = await import("./services/project.js?v=20261003-001");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) project = openRes.data;
     }

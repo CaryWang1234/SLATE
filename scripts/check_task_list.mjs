@@ -5,8 +5,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 // 导入必须带与前端一致的 ?v= 串：少了它 Node 里会另起一份模块实例
-import * as tl from "../frontend/js/services/task_list.js?v=20261001-002";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20261001-002";
+import * as tl from "../frontend/js/services/task_list.js?v=20261003-001";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20261003-001";
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
 const NOW_MS = 1_800_000_000_000;
@@ -155,6 +155,16 @@ assert.match(CSS, /--task-needs: #9A5B12;/, "浅色主题的「需要操作」�
 assert.match(CSS, /\[data-theme="dark"\][\s\S]*?--task-needs: #E0A94A;/, "深色主题的「需要操作」要更亮，黑金底上才醒目");
 assert.match(CSS, /\.conv-item-status\[data-status="running"\][\s\S]{0,120}?animation: conv-status-pulse/, "进行中要有呼吸，静止的图标读不出「在跑」");
 assert.match(CSS, /@keyframes conv-status-pulse[\s\S]*?@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.conv-item-status\[data-status="running"\] \{ animation: none; \}/, "减弱动效偏好下必须停掉呼吸动画");
+// 徽标只有图标本身，不许再套圆形外框：按规则块取，别被别的 .conv-item-status 选择器借走
+const badgeBlock = (CSS.match(/\.conv-item-status \{[^}]*\}/) || [""])[0];
+assert.ok(badgeBlock, "CSS 里找不到 .conv-item-status 的基态规则块");
+assert.doesNotMatch(badgeBlock, /\bborder:/, "徽标又画了一圈外框：现在只留图标");
+assert.doesNotMatch(badgeBlock, /border-radius:/, "徽标又画成圆形：现在只留图标");
+const dotBadgeBlock = (CSS.match(/\.codex-hist-dot\.conv-item-status \{[^}]*\}/) || [""])[0];
+assert.match(dotBadgeBlock, /background:\s*none/, "Codex 那枚继承了装饰点的实心圆没清掉：图标外还套着一只圆");
+const unreadBlock = (CSS.match(/\.conv-item-status\[data-status="unread"\] \{[^}]*\}/) || [""])[0];
+assert.doesNotMatch(unreadBlock, /background/, "未读又刷上底色＝图标外多出一只圆底");
+assert.match(unreadBlock, /color:\s*var\(--gold-strong\)/, "去掉金底后未读只剩图标自身的金色，换成 var(--bg) 会画在页面底色上看不见");
 for (const [needle, why] of [[".conv-item.is-unread .conv-item-title", "未读没有标题加重"], [".codex-hist-item.is-unread", "Codex 未读没有标题加重"], [".codex-hist-dot.conv-item-status", "Codex 的状态点没有从装饰点放大成徽标"]]) {
   assert.ok(CSS.includes(needle), `CSS ${why}`);
 }

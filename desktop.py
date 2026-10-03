@@ -7,6 +7,7 @@ import atexit
 import urllib.request
 import socket
 import threading
+from html import escape as html_escape
 
 import desktop_tray
 import desktop_instance
@@ -295,7 +296,7 @@ def main():
             stop_process(uvicorn_process)
             webview.create_window(
                 title=WINDOW_TITLE,
-                html=f'<h2>SLATE backend failed to start</h2><p>{error}</p><p>See desktop_backend.log.</p>',
+                html=f'<h2>SLATE backend failed to start</h2><p>{html_escape(str(error))}</p><p>See desktop_backend.log.</p>',
                 width=720,
                 height=360,
             )

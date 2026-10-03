@@ -226,7 +226,8 @@ ok("SKILL_PARAM_DEFS 有 bg_task 的参数表",
 // ── 11. 面板 ───────────────────────────────────────────────
 ok("没任务时整栏隐藏（不留空壳）",
   // 并行之后的"事"有两类：后台进程与模型生成，两类都没有才收栏（少判一类会让在跑的那场没人看得见）
-  /if \(!tasks\.length && !runs\.length \|\| state\.bgPanelOpen === false\)[\s\S]{0,120}classList\.add\("hidden"\)/.test(PANEL));
+  /function panelRows\(\) \{[\s\S]{0,400}count: tasks\.length \+ runs\.length/.test(PANEL)
+  && /if \(!count \|\| state\.bgPanelOpen === false\)[\s\S]{0,120}classList\.add\("hidden"\)/.test(PANEL));
 ok("停止按钮只在 running 出现",
   /if \(task\.state === "running"\)[\s\S]{0,400}stopBgTask\(task\.task_id\)/.test(PANEL));
 ok("非 0 退出按「退出码 N」显示（不跟「没跑起来」混成一个词）",
@@ -239,6 +240,11 @@ ok("页面里挂了面板容器与工具栏入口",
 ok("工具栏按钮跟着置灰与计数（没任务时不该像能点）",
   /btn\.disabled = !count/.test(PANEL) && /classList\.toggle\("is-na", !count\)/.test(PANEL)
   && /\.bg-rail-count/.test(PANEL));
+ok("按钮置灰与面板标题读的是同一份行数（判据分两处会各说各话）",
+  /function syncBgRailButton\(\) \{[\s\S]{0,200}const \{ count, running \} = panelRows\(\)/.test(PANEL)
+  && /const \{ tasks, runs, count, running \} = panelRows\(\)/.test(PANEL)
+  && /任务中心 \{n\}", \{ n: count \}/.test(PANEL),
+  "只有模型生成在跑、进程表为空时，面板撑开了行而按钮按\"没任务\"置灰＝展开后再也收不回");
 ok("面板在 chat.js 里装配并订阅",
   has(CHAT, 'mountBgTaskPanel(document.getElementById("bg-task-panel"))') && /subscribe\("bgTasks"/.test(CHAT));
 ok("设置里有空闲续跑的开关，且走 store setter",

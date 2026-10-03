@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20261001-002";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261001-002";
+import { makeId } from "./services/utils.js?v=20261003-001";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261003-001";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -32,6 +32,7 @@ function normalizeCustomTheme(value) {
   const c = src.colors && typeof src.colors === "object" ? src.colors : {};
   const f = src.fonts && typeof src.fonts === "object" ? src.fonts : {};
   const b = src.background && typeof src.background === "object" ? src.background : {};
+  const o = src.opacity && typeof src.opacity === "object" ? src.opacity : {};
   return {
     enabled: src.enabled === true,
     preset: typeof src.preset === "string" ? src.preset : "",
@@ -41,10 +42,12 @@ function normalizeCustomTheme(value) {
       text: normalizeThemeHex(c.text, CUSTOM_THEME_DEFAULT_COLORS.text),
       accent: normalizeThemeHex(c.accent, CUSTOM_THEME_DEFAULT_COLORS.accent),
     },
-    // 空串 = 跟随 style.css 的系统字体栈；这里不校验字体名，可选集合由控件本身限定
+    // 空串 = 跟随 style.css 的系统字体栈；这里不校验字体名，可选集合由控件本身限定。
+    // imported 是"导入过哪些字体"的账，文件在不在本机由 theme_custom.js 现问后端。
     fonts: {
       main: typeof f.main === "string" ? f.main : "",
       code: typeof f.code === "string" ? f.code : "",
+      imported: normalizeImportedFonts(f.imported),
     },
     background: {
       enabled: b.enabled === true,
@@ -52,8 +55,43 @@ function normalizeCustomTheme(value) {
       // 高于 95 等于没有图，所以两端都收死。
       veil: normalizeCountInt(b.veil, 40, 95, 72),
     },
+    opacity: {
+      // 板块不透明度（%）：面板/卡片/输入框/助手气泡这一族底色。100 = 完全不透明（旧行为）。
+      // 下限 55：再低就只剩一圈边框线在撑着层级，正文会读成"浮在纸上"。
+      panel: normalizeCountInt(o.panel, 55, 100, 100),
+    },
   };
 }
+
+// 导入字体的 id 形状：后端 _font_id() 生成（f + 内容哈希 10 位）。
+// 状态会从另一台设备同步过来，id 又会被拼进 @font-face 的家庭名与 url()，所以这里必须先验形状。
+// 导出的那份给 theme_custom.js 用——两处必须同一个形状，否则这边收下的 id 那边拼不出样式。
+export const IMPORTED_FONT_ID_RE = /^f[0-9a-f]{10}$/;
+
+function normalizeImportedFonts(value) {
+  const list = Array.isArray(value) ? value : [];
+  const out = [];
+  const seen = new Set();
+  for (const item of list) {
+    const it = item && typeof item === "object" ? item : {};
+    const id = String(it.id || "");
+    if (!IMPORTED_FONT_ID_RE.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    // 标签只做显示（textContent），永远不进 CSS：家庭名由 id 拼，见 theme_custom.js
+    const label = String(it.label || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 64);
+    out.push({ id, label: label || id });
+    if (out.length >= 24) break;   // 一次导入 24 个字体已经远超实际需要
+  }
+  return out;
+}
+
+// 审批四档取值域：ask 手动 / auto 自动 / full 完全访问 / night 夜间模式。
+// full 这个名字历史上指的是"全托管"，这一版把它改判给「完全访问」（命令与联网不问，
+// 缺条件时仍会弹选择题）；「夜间模式」改用新键 night。老存档里的 full 由
+// migratePermissionModes 一次性搬到 night，靠 permissionModeSchema 认版本，见那里的注释。
+// 这两个常量放在 state 之前：state 的默认值要用它，声明在后会踩 TDZ。
+const PERMISSION_MODE_IDS = ["ask", "auto", "full", "night"];
+const PERMISSION_MODE_SCHEMA = 2;
 
 const state = {
   // 主题
@@ -210,14 +248,22 @@ const state = {
   // 首次启动引导：跨 localStorage / 桌面共享配置保存，避免 WebView profile 波动后反复弹出
   onboardingSeen: false,
 
-  // 默认审批模式（设置页那三项改的是它）：ask=手动审批（执行命令/访问网络都问）
-  // auto=自动审批（只在命中高危规则时问）full=夜间模式/全托管（命令、联网、提问都不问；灾难级命令始终由后端硬拦）
+  // 默认审批模式（设置页那四档改的是它）：ask=手动审批（执行命令/访问网络都问）
+  // auto=自动审批（只在命中高危规则时问）full=完全访问（命令、联网直接放行，缺条件时仍会问一句）
+  // night=夜间模式/全托管（命令、联网、提问都不问；灾难级命令始终由后端硬拦）
   permissionMode: "ask",
+  // 审批档存档版本：见 migratePermissionModes。本版是 2，老存档没有这个键。
+  permissionModeSchema: PERMISSION_MODE_SCHEMA,
 
   // 每一场对话自己的审批档（convId → 档）：没单独选过的场沿用上面那个默认档。
   // 键 "" 是"还没建起来的这一场"——发送时会搬给新建的会话（adoptConversationPermissionMode）。
   // 刻意不跨设备同步：审批档是"这台屏幕上谁替我点批准"，手机同步过来只会把桌面的信任档盖到别处。
   permissionModeByConversation: {},
+
+  // 夜间模式跑任务时把电脑钉着别睡（services/keepawake.js 拿去向后端续租电源需求）。
+  // 只存本机：这是"这台机器现在该不该醒着"，同步到手机只会多一个显示已开启却不兑现的开关
+  // （与 continueAutopilot 同一条理由）。
+  keepAwakeOnNightRun: true,
 
   // 回复模式：agent=智能体（可调用工具、多轮自主循环）| chat=对话（单轮直答，不发工具也不注入工具目录）
   chatMode: "agent",
@@ -315,7 +361,9 @@ function buildPersistentData() {
     useResponses: state.useResponses,
     onboardingSeen: state.onboardingSeen === true,
     permissionMode: normalizePermissionMode(state.permissionMode),
+    permissionModeSchema: PERMISSION_MODE_SCHEMA,
     permissionModeByConversation: normalizePermissionModeMap(state.permissionModeByConversation),
+    keepAwakeOnNightRun: state.keepAwakeOnNightRun !== false,
     chatMode: normalizeChatMode(state.chatMode),
     reasoningEffort: state.reasoningEffort,
     webSearch: normalizeWebSearch(state.webSearch),
@@ -346,7 +394,7 @@ function normalizeTheme(value) {
 }
 
 function normalizePermissionMode(value) {
-  return ["ask", "auto", "full"].includes(value) ? value : "ask";
+  return PERMISSION_MODE_IDS.includes(value) ? value : "ask";
 }
 
 // 每场的审批档：脏值（手改 localStorage、旧版本残留）整条丢掉，让它回落到默认档，
@@ -355,7 +403,7 @@ function normalizePermissionModeMap(value) {
   const src = value && typeof value === "object" ? value : {};
   const out = {};
   for (const [k, v] of Object.entries(src)) {
-    if (["ask", "auto", "full"].includes(v)) out[String(k)] = v;
+    if (PERMISSION_MODE_IDS.includes(v)) out[String(k)] = v;
   }
   return out;
 }
@@ -505,6 +553,7 @@ function getSharedPersistentData(data = buildPersistentData()) {
     useResponses: data.useResponses === true,
     onboardingSeen: data.onboardingSeen === true,
     permissionMode: normalizePermissionMode(data.permissionMode),
+    permissionModeSchema: PERMISSION_MODE_SCHEMA,
     chatMode: normalizeChatMode(data.chatMode),
     reasoningEffort: normalizeReasoningEffort(data.reasoningEffort),
     // 排序偏好同步；taskFlags 不同步（未读是本机概念），所以这里刻意没有它
@@ -524,6 +573,23 @@ function saveSharedPersistent(data) {
       body: JSON.stringify({ data: getSharedPersistentData(data) }),
     }).catch(() => {});
   } catch (e) {}
+}
+
+// 审批档的一次性搬迁：老版本把 full 当"夜间模式"，这一版 full 改判给「完全访问」。
+// 为什么不能只看值：升级后用户主动挑「完全访问」存的也是 full，纯按值搬会在下次加载
+// 又把它搬成 night。所以搬迁只认来源数据自己声明的 schema——老存档没有 permissionModeSchema，
+// 搬一次并写上 2，此后 full 就是用户真选的完全访问。
+function migratePermissionModes(source) {
+  const data = source && typeof source === "object" ? source : {};
+  const rawMap = data.permissionModeByConversation && typeof data.permissionModeByConversation === "object"
+    ? data.permissionModeByConversation : {};
+  if (Number(data.permissionModeSchema) === PERMISSION_MODE_SCHEMA) {
+    return { mode: data.permissionMode, map: rawMap, migrated: false };
+  }
+  const move = (v) => (v === "full" ? "night" : v);
+  const map = {};
+  for (const [k, v] of Object.entries(rawMap)) map[k] = move(v);
+  return { mode: move(data.permissionMode), map, migrated: true };
 }
 
 // 注册表中的 id 同时是 API Key 与「当前模型」的存储键，改名后必须把旧键的值搬到新键，
@@ -560,6 +626,7 @@ function loadPersistent() {
     const raw = localStorage.getItem("slate_state");
     if (!raw) return;
     const data = JSON.parse(raw);
+    const perm = migratePermissionModes(data);
     state.theme = normalizeTheme(data.theme);
     state.customTheme = normalizeCustomTheme(data.customTheme);
     state.uiMode = data.uiMode === "codex" ? "codex" : "classic";
@@ -618,8 +685,11 @@ function loadPersistent() {
     state.activeExpertId = data.activeExpertId || "";
     state.useResponses = data.useResponses === true;
     state.onboardingSeen = data.onboardingSeen === true;
-    state.permissionMode = normalizePermissionMode(data.permissionMode);
-    state.permissionModeByConversation = normalizePermissionModeMap(data.permissionModeByConversation);
+    state.permissionMode = normalizePermissionMode(perm.mode);
+    state.permissionModeByConversation = normalizePermissionModeMap(perm.map);
+    state.permissionModeSchema = PERMISSION_MODE_SCHEMA;
+    // 老状态文件没这个键：读成 undefined 时按默认值（开启）走，与 continueAutopilot 同一口径
+    state.keepAwakeOnNightRun = data.keepAwakeOnNightRun !== false;
     state.chatMode = normalizeChatMode(data.chatMode);
     state.reasoningEffort = normalizeReasoningEffort(data.reasoningEffort);
     state.webSearch = normalizeWebSearch(data.webSearch);
@@ -627,6 +697,8 @@ function loadPersistent() {
     state.videoGen = normalizeGenConfig(data.videoGen);
     state.aiHelpers = normalizeAiHelpers(data.aiHelpers);
     migrateModelIds();
+    // 搬迁过审批档就立刻落盘一次（放在末尾：此刻 state 已经整份读完，写回去的不是半成品）
+    if (perm.migrated) savePersistent();
   } catch (e) {}
 }
 
@@ -700,7 +772,8 @@ async function loadSharedPersistent() {
       state.onboardingSeen = data.onboardingSeen === true;
     }
     if (Object.prototype.hasOwnProperty.call(data, "permissionMode")) {
-      state.permissionMode = normalizePermissionMode(data.permissionMode);
+      state.permissionMode = normalizePermissionMode(migratePermissionModes(data).mode);
+      state.permissionModeSchema = PERMISSION_MODE_SCHEMA;
     }
     if (Object.prototype.hasOwnProperty.call(data, "chatMode")) {
       state.chatMode = normalizeChatMode(data.chatMode);
@@ -738,13 +811,14 @@ function setActiveExpertId(id, detail = null) {
 }
 
 // ── 审批模式：这一场生效哪一档 ────────────────────────────────
-// 三档语义（riskguard 是唯一执行处）：ask 命令/联网都问，auto 只问高危，full 一律不问。
+// 四档语义（riskguard 是唯一执行处）：ask 命令/联网都问，auto 只问高危，
+// full 完全访问命令/联网不问，night 夜间模式在完全访问之上连"问你一句"也不问。
 // 单独选过的场记住自己的档，没选过的跟着设置页那个默认档走。
 
 /** 这一场生效的审批档。convId 传空 = 还没建起来的这一场（键 ""）。 */
 function permissionModeFor(convId = state.currentConversationId) {
   const picked = state.permissionModeByConversation[String(convId || "")];
-  if (picked === "ask" || picked === "auto" || picked === "full") return picked;
+  if (PERMISSION_MODE_IDS.includes(picked)) return picked;
   return normalizePermissionMode(state.permissionMode);
 }
 
@@ -765,6 +839,15 @@ function setDefaultPermissionMode(mode) {
   state.permissionMode = next;
   savePersistent();
   notify("permissionMode", permissionModeFor(state.currentConversationId));
+}
+
+/** 夜间模式跑任务时要不要钉住系统别让电脑睡。值没变就不写盘也不通知。 */
+function setKeepAwakeOnNightRun(enabled) {
+  const next = enabled !== false;
+  if ((state.keepAwakeOnNightRun !== false) === next) return;
+  state.keepAwakeOnNightRun = next;
+  savePersistent();
+  notify("keepAwakeOnNightRun", next);
 }
 
 /**
@@ -857,7 +940,7 @@ function toggleTheme() {
   return setTheme(state.theme === "light" ? "dark" : "light");
 }
 
-// 打补丁式改自定义主题：colors/fonts/background 三组各自浅合并，调用方只写要动的那一格，
+// 打补丁式改自定义主题：colors/fonts/background/opacity 四组各自浅合并，调用方只写要动的那一格，
 // 少传一格就把它冲回默认的做法在这里挡掉（合并完再过一遍 normalize，脏值照样回落）。
 function setCustomTheme(patch) {
   const cur = normalizeCustomTheme(state.customTheme);
@@ -868,6 +951,7 @@ function setCustomTheme(patch) {
     colors: { ...cur.colors, ...(p.colors || {}) },
     fonts: { ...cur.fonts, ...(p.fonts || {}) },
     background: { ...cur.background, ...(p.background || {}) },
+    opacity: { ...cur.opacity, ...(p.opacity || {}) },
   });
   savePersistent();
   notify("customTheme", state.customTheme);
@@ -1598,7 +1682,7 @@ export {
   setBgAutoResume, bgResumeUsedOf, markBgResumeUsed,
   setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns,
   // 审批模式：这一场生效哪一档的读与写（判口在 services/riskguard.js）
-  permissionModeFor, setPermissionModeFor, setDefaultPermissionMode,
+  permissionModeFor, setPermissionModeFor, setDefaultPermissionMode, setKeepAwakeOnNightRun,
   adoptConversationPermissionMode, forgetConversationPermissionMode,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage, messagesOf, hasThread, dropThread, bindVisibleThread,

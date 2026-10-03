@@ -35,6 +35,8 @@ hiddenimports = [
     'backend.routers.files',
     'backend.routers.grind',
     'backend.routers.i18n',
+    'backend.routers.keep_awake',
+    'backend.keepawake',
     'backend.routers.knowledge',
     'backend.routers.lan',
     'backend.routers.mcp',

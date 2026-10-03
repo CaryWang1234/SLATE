@@ -17,9 +17,9 @@
  * 没有归属信息的老事件一律就地念 —— 扣住一条真结局不发，比念错地方更糟。
  */
 
-import { get, post } from "./api.js?v=20261001-002";
-import { state, notify, recordTaskFlag, bgResumeUsedOf, markBgResumeUsed } from "../store.js?v=20261001-002";
-import { notifyTaskComplete } from "./notify.js?v=20261001-002";
+import { get, post } from "./api.js?v=20261003-001";
+import { state, notify, recordTaskFlag, bgResumeUsedOf, markBgResumeUsed } from "../store.js?v=20261003-001";
+import { notifyTaskComplete } from "./notify.js?v=20261003-001";
 
 /** 有任务在册时的轮询间隔：够及时，又不至于把 3 秒一次的请求灌满日志 */
 export const POLL_MS = 3000;
@@ -59,7 +59,8 @@ let serverTasks = [];
  * 所以这里刻意不落后端：面板上那条"日志留在 data/bg_tasks/"的说明对本地任务不成立。
  */
 const localTasks = new Map();
-let localStopper = null;
+// 本地任务的停止器不止一家（后台子代理批次、团队讨论），按 id 前缀各自认领
+const localStoppers = [];
 
 export function bgTasks() {
   return Array.isArray(state.bgTasks) ? state.bgTasks : [];
@@ -133,7 +134,9 @@ function addToInbox(events) {
     // 徽标是持久化的：用户可能明天才回那场会话看。消息本身只在内存里（后端已 ack），
     // 所以徽标亮着但详情没了是已知取舍——宁可只留"那场有结局没看"，也不假装有内容。
     const ok = e.kind === "exit" || e.kind === "match";
-    try { recordTaskFlag(owner, { kind: ok ? "done" : e.kind === "stopped" ? "needs" : "error", seen: false }); } catch (err) { /* 同上 */ }
+    // 「等你拍板」与「被停止」一样是要人回来处理，不是失败：徽标该是铃铛而不是红点
+    const needs = e.kind === "stopped" || e.kind === "awaiting";
+    try { recordTaskFlag(owner, { kind: ok ? "done" : needs ? "needs" : "error", seen: false }); } catch (err) { /* 同上 */ }
   }
 }
 
@@ -196,8 +199,10 @@ export function dropLocalTask(taskId) {
   return true;
 }
 
-/** 由 subagent_jobs 注册：面板点"停止"时，本地任务要交给它自己的 abort 处理 */
-export function registerLocalTaskStopper(fn) { localStopper = fn || null; }
+/** 由本地任务的产出方各自注册：面板点"停止"时按 id 分流，返回 true 表示这一族我处理了 */
+export function registerLocalTaskStopper(fn) {
+  if (fn && !localStoppers.includes(fn)) localStoppers.push(fn);
+}
 
 /**
  * 前端产出的结局事件：塞进与后端事件同一个池子。
@@ -278,9 +283,13 @@ function announceFinished(tasks) {
     if (!t || t.state === "running" || announced.has(t.task_id)) continue;
     announced.add(t.task_id);
     const ok = t.state === "exited" && t.exit_code === 0;
-    const title = ok ? "后台任务已完成" : t.state === "stopped" ? "后台任务已停止" : "后台任务异常结束";
-    const body = `${t.label || t.task_id}${t.exit_code === null || t.exit_code === undefined ? "" : `（exit ${t.exit_code}）`}`;
-    try { notifyTaskComplete(title, body); } catch (e) { /* 通知不是关键路径 */ }
+    // 团队讨论的话术由团队面板自己出（这一文件的循环变量就叫 t，把 t() 引进来会被静默遮蔽，
+    // 而且"后台任务已完成"这种标题本来就说不清那是一场辩论）；徽标照记。
+    if (t.family !== "team") {
+      const title = ok ? "后台任务已完成" : t.state === "stopped" ? "后台任务已停止" : "后台任务异常结束";
+      const body = `${t.label || t.task_id}${t.exit_code === null || t.exit_code === undefined ? "" : `（exit ${t.exit_code}）`}`;
+      try { notifyTaskComplete(title, body); } catch (e) { /* 通知不是关键路径 */ }
+    }
     // 归属会话：后端记的 conversation_id 优先（重启后还在），内存登记只兜老数据
     const convId = String(t.conversation_id || owners.get(t.task_id) || "");
     if (convId) {
@@ -340,7 +349,10 @@ export async function stopBgTask(taskId) {
   const id = String(taskId || "");
   if (localTasks.has(id)) {
     // 本地任务没有后端进程可杀：abort 交给登记方，且绝不去打后端路由（那会 404 并假装成功）
-    const stopped = localStopper ? await localStopper(id) : false;
+    let stopped = false;
+    for (const stop of localStoppers) {
+      if (await stop(id)) { stopped = true; break; }
+    }
     return { code: stopped ? 0 : 1, data: null, local: true };
   }
   try {
@@ -396,7 +408,8 @@ function eventKindText(kind) {
     : kind === "exit" ? "正常结束"
       : kind === "fail" ? "异常结束"
         : kind === "stopped" ? "被停止"
-          : String(kind || "有动静");
+          : kind === "awaiting" ? "等你拍板"
+            : String(kind || "有动静");
 }
 
 /**

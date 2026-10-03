@@ -3,7 +3,7 @@
  * 两个开关均可在设置中独立切换
  */
 
-import { state } from "../store.js?v=20261001-002";
+import { state } from "../store.js?v=20261003-001";
 
 // ── 音效（Web Audio API，无需外部文件）─────────────────
 
@@ -58,7 +58,7 @@ export async function requestNotificationPermission() {
 }
 
 /** 显示系统通知 */
-function showSystemNotification(title, body) {
+function showSystemNotification(title, body, tag) {
   if (!("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
 
@@ -67,7 +67,9 @@ function showSystemNotification(title, body) {
       body,
       icon: "./icon.png",
       badge: "./icon.png",
-      tag: "slate-task-complete",
+      // 同 tag 会互相顶掉：团队讨论的"等你拍板"如果被后一条任务完成通知顶掉，
+      // 人就没机会知道该签字了，所以这类通知各用各的 tag。
+      tag: tag || "slate-task-complete",
       requireInteraction: false,
     });
     // 5 秒后自动关闭（部分系统不支持 timeout）
@@ -83,8 +85,9 @@ function showSystemNotification(title, body) {
  * 任务完成时调用：根据设置播放音效 / 显示系统通知
  * @param {string} title - 通知标题
  * @param {string} body  - 通知正文
+ * @param {string} tag   - 系统通知分组 tag（同 tag 会互相顶掉，团队提醒要单开一组）
  */
-export function notifyTaskComplete(title, body) {
+export function notifyTaskComplete(title, body, tag) {
   const cfg = state.notifications || {};
 
   if (cfg.soundEnabled !== false) {
@@ -92,6 +95,6 @@ export function notifyTaskComplete(title, body) {
   }
 
   if (cfg.systemNotifEnabled) {
-    showSystemNotification(title, body);
+    showSystemNotification(title, body, tag);
   }
 }

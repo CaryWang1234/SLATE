@@ -133,6 +133,9 @@ ok("闸门排在起后端之前（晚一步就多出第二个 SQLite 写者）",
 GATE_BRANCH = between(MAIN, "if _instance_lock is None:", "# 1. 启动 uvicorn")
 ok("判定已有实例那条路先交棒再 return（不 return 就是继续往下起服务）",
    0 <= GATE_BRANCH.find("surfaced =") < GATE_BRANCH.find("return"), GATE_BRANCH[:260])
+ok("后端起不来那张失败页把异常文本转义过（不转义＝最重要的那句原因被当标签吞掉）",
+   "from html import escape as html_escape" in DESK and "{html_escape(str(error))}" in DESK,
+   "异常里带 < 时整页 HTML 结构会被吃掉，用户看到的是半截空白窗")
 
 # ── 4. 闸门模块自身的原生调用契约 ────────────────────────────
 INST = src("desktop_instance.py")

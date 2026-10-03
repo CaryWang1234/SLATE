@@ -11,8 +11,8 @@
  * mode 只是给人看的标签：自动 = 后台自己会发请求，手动 = 你点一下才发，模型调用 = 由模型自己决定调不调。
  */
 
-import { state, getModelKey, savePersistent, notify } from "../store.js?v=20261001-002";
-import { t } from "./i18n.js?v=20261001-002";
+import { state, getModelKey, savePersistent, notify } from "../store.js?v=20261003-001";
+import { t } from "./i18n.js?v=20261003-001";
 
 export const AI_FEATURES = [
   {
@@ -30,6 +30,10 @@ export const AI_FEATURES = [
   {
     id: "conversation_spark", name: "对话洞察捕获", mode: "自动", model: true,
     note: "切换会话时把上一场里值得留的决策、方案提炼成灵光卡片；120 秒内不重复",
+  },
+  {
+    id: "session_title", name: "自动会话标题", mode: "自动", model: true,
+    note: "新对话跑完首轮后请模型补一个短标题换上，只替换还是「首条消息前 30 字」那种占位标题，手动改过的名字不动",
   },
   {
     id: "code_understand", name: "代码理解文档", mode: "手动", model: true,
@@ -159,7 +163,7 @@ export function aiFeatureOffTip(id) {
  */
 export function aiFeatureBlocked(id) {
   if (isAiFeatureOn(id)) return false;
-  import("../app.js?v=20261001-002").then(({ toast }) => toast(aiFeatureOffTip(id))).catch(() => {});
+  import("../app.js?v=20261003-001").then(({ toast }) => toast(aiFeatureOffTip(id))).catch(() => {});
   return true;
 }
 

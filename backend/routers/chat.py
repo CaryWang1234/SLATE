@@ -52,7 +52,8 @@ def _get_db() -> sqlite3.Connection:
             message_count INTEGER DEFAULT 0,
             context_tokens INTEGER DEFAULT 0,
             project TEXT DEFAULT '',
-            project_id TEXT DEFAULT ''
+            project_id TEXT DEFAULT '',
+            archived INTEGER DEFAULT 0
         )
     """)
     # 迁移：为已有表添加用量字段
@@ -68,6 +69,10 @@ def _get_db() -> sqlite3.Connection:
     # 而一次性改写全部历史一旦推错就没有回头路。新会话两个字段都写。
     if "project_id" not in cols:
         conn.execute("ALTER TABLE conversations ADD COLUMN project_id TEXT DEFAULT ''")
+    # 归档＝从任务栏里收起来，不是删除：会话与消息都还在库里，设置里能恢复也能真删。
+    # 默认值 0 让老数据一律按"没归档"处理，升级不会把谁的历史藏起来。
+    if "archived" not in cols:
+        conn.execute("ALTER TABLE conversations ADD COLUMN archived INTEGER DEFAULT 0")
     conn.commit()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS messages (
@@ -196,16 +201,23 @@ def _usage_by_project(limit: int = 20) -> list[dict[str, Any]]:
 
 
 @router.get("/conversations")
-async def list_conversations(project_id: str = "", include_unassigned: bool = False) -> dict[str, Any]:
-    """列出对话。给了 project_id 就只列这个项目的（含按名称回落命中的历史会话）。"""
+async def list_conversations(project_id: str = "", include_unassigned: bool = False,
+                             archived: bool = False) -> dict[str, Any]:
+    """列出对话。给了 project_id 就只列这个项目的（含按名称回落命中的历史会话）。
+
+    archived 决定这一页看的是哪一批：默认只看没归档的，归档的那批由设置页用
+    ?archived=1 单独取。两边必须互斥——同一场同时出现在任务栏和归档列表里，
+    "恢复/删除"就会打在用户以为的另一个对象上。
+    """
     conn = _get_db()
     rows = conn.execute(
         "SELECT id, title, created_at, updated_at, total_tokens, prompt_tokens, "
-        "completion_tokens, message_count, context_tokens, project, project_id "
+        "completion_tokens, message_count, context_tokens, project, project_id, archived "
         "FROM conversations ORDER BY updated_at DESC"
     ).fetchall()
     conn.close()
     conversations = [dict(r) for r in rows]
+    conversations = [c for c in conversations if bool(c.get("archived")) is archived]
     if project_id:
         fallback = set(_name_fallbacks(project_id))
         conversations = [
@@ -412,7 +424,9 @@ async def add_message(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
         "SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND role = 'user'",
         (conv_id,),
     ).fetchone()[0]
-    if count == 1 and role == "user":
+    # 正文为空的首条消息（只发了文件）不许参与取名：前端建场时写的是文件名，
+    # 这里照抄 content 会把它抹成空标题，列表里就多一行没有名字的会话。
+    if count == 1 and role == "user" and isinstance(content, str) and content.strip():
         title = content[:30] + ("..." if len(content) > 30 else "")
         conn.execute(
             "UPDATE conversations SET title = ? WHERE id = ?",
@@ -463,16 +477,33 @@ async def delete_conversation(conv_id: str) -> dict[str, Any]:
 
 @router.patch("/conversations/{conv_id}")
 async def rename_conversation(conv_id: str, body: dict[str, Any]) -> dict[str, Any]:
-    """重命名会话标题（历史管理用）。"""
+    """改会话标题与归档标记（历史管理用）。两个字段各给各的，也允许一起给。"""
+    has_title = "title" in body
+    has_archived = "archived" in body
     title = str(body.get("title", "")).strip()
-    if not title:
+    if not has_title and not has_archived:
+        return {"code": 1, "message": "没有要改的字段"}
+    if has_title and not title:
         return {"code": 1, "message": "标题不能为空"}
     title = title[:60]
+    # 归档只认布尔 True：给了 "false" 这种字符串不能被当成真值归档掉
+    archived = 1 if body.get("archived") is True else 0
     conn = _get_db()
-    conn.execute("UPDATE conversations SET title = ? WHERE id = ?", (title, conv_id))
+    if has_title and has_archived:
+        conn.execute("UPDATE conversations SET title = ?, archived = ? WHERE id = ?",
+                     (title, archived, conv_id))
+    elif has_archived:
+        conn.execute("UPDATE conversations SET archived = ? WHERE id = ?", (archived, conv_id))
+    else:
+        conn.execute("UPDATE conversations SET title = ? WHERE id = ?", (title, conv_id))
     conn.commit()
     conn.close()
-    return {"code": 0, "data": {"id": conv_id, "title": title}, "message": "ok"}
+    data: dict[str, Any] = {"id": conv_id}
+    if has_title:
+        data["title"] = title
+    if has_archived:
+        data["archived"] = bool(archived)
+    return {"code": 0, "data": data, "message": "ok"}
 
 
 @router.post("/conversations/batch-delete")

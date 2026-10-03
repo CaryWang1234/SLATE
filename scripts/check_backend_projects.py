@@ -245,6 +245,34 @@ def main() -> int:
         root_sw = c.post("/projects/root", json={"path": str(projB), "project": ws_id}).json()
         check("工作区切根", root_sw.get("code") == 0 and Path(root_sw["data"]["path"]) == projB.resolve(), str(root_sw)[:200])
 
+        # 10b) 审阅差异：git 报错要说成报错，不能把"失败"说成"没有变更"
+        projG = tmp / "projG"
+        projG.mkdir(parents=True)
+        (projG / "g.txt").write_text("one\n", encoding="utf-8")
+        git_env = {**os.environ, "GIT_AUTHOR_NAME": "slate", "GIT_AUTHOR_EMAIL": "s@e",
+                   "GIT_COMMITTER_NAME": "slate", "GIT_COMMITTER_EMAIL": "s@e"}
+        for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "seed"]):
+            subprocess.run(["git", *args], cwd=str(projG), env=git_env,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        if not (projG / ".git").exists():
+            check("审阅差异需要一个 git 仓库当现场", False, "本机 git init 没成，后面三条无从下手")
+        else:
+            id_g = (c.post("/projects/open", json={"path": str(projG)}).json().get("data") or {}).get("project_id") or ""
+            clean = c.post("/projects/review/diff", json={"project": id_g, "mode": "unstaged"}).json()
+            check("干净仓库读出空差异（不当成报错）", clean.get("code") == 0
+                  and not (clean.get("data") or {}).get("files"), str(clean)[:160])
+            (projG / "g.txt").write_text("one\ntwo\n", encoding="utf-8")
+            dirty = c.post("/projects/review/diff", json={"project": id_g, "mode": "unstaged"}).json()
+            check("改动读得出（这一路是通的，下面那条否证才有意义）", dirty.get("code") == 0
+                  and (dirty.get("data") or {}).get("files"), str(dirty)[:160])
+            bogus = c.post("/projects/review/diff",
+                           json={"project": id_g, "mode": "commit", "from_commit": "deadbeef"}).json()
+            check("git 报错时不许谎称\"无变更\"", bogus.get("code") == 1
+                  and "git diff 失败" in str(bogus.get("message") or ""), str(bogus)[:200])
+            notgit = c.post("/projects/review/diff", json={"project": id_a, "mode": "unstaged"}).json()
+            check("不是 git 仓库时直说（不许退化成\"项目没打开\"或空差异）", notgit.get("code") == 1
+                  and "不是 Git 仓库" in str(notgit.get("message") or ""), str(notgit)[:160])
+
         # 11) P1 出处：后台任务/定时任务/用量都要认得"是谁的"
         c.post("/projects/active", json={"project": id_a})
         started = c.post("/skills/execute", json={

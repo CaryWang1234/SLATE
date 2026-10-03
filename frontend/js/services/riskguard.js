@@ -6,10 +6,10 @@
  * - 用户批准后注入 approved 参数放行；拒绝后把拒绝理由原样回给模型
  */
 
-import { state, getModelKey, permissionModeFor } from "../store.js?v=20261001-002";
-import { post } from "./api.js?v=20261001-002";
-import { aiModelFor, isAiFeatureOn } from "./ai_features.js?v=20261001-002";
-import { t } from "./i18n.js?v=20261001-002";
+import { state, getModelKey, permissionModeFor } from "../store.js?v=20261003-001";
+import { post } from "./api.js?v=20261003-001";
+import { aiModelFor, isAiFeatureOn } from "./ai_features.js?v=20261003-001";
+import { t } from "./i18n.js?v=20261003-001";
 
 // 高危命令规则（写死）：命中任一条即要求批准
 const HIGH_RISK_PATTERNS = [
@@ -176,11 +176,12 @@ function denialMessage(subject, risk) {
  * 这一笔在当前档下要不要问人（纯判定，桌面与手机共用同一份口径）。
  * 不用问时返回 null；要问时返回 { subject, risk }。
  *
- * 三档语义（这一场生效哪一档由 store.permissionModeFor 现算）：
+ * 四档语义（这一场生效哪一档由 store.permissionModeFor 现算）：
  * - ask 手动审批：执行命令、访问网络都先弹窗问
  * - auto 自动审批：只在命中高危规则时问，其余直接放行
- * - full 夜间模式（全托管）：命令与联网一律不问（灾难级命令仍由后端硬拦）；
- *   连"缺条件时问用户一句"也不问——那条路在 tools.js 的 user_ask 里，同一档同一个口径
+ * - full 完全访问：命令与联网一律不问（灾难级命令仍由后端硬拦）；
+ *   但"缺条件时问用户一句"这条路照旧——那条路在 tools.js 的 user_ask 里，只有 night 才关
+ * - night 夜间模式（全托管）：与完全访问同一条放行口径，外加连选择题也不问
  *
  * opts.manual：技能面板里用户亲手点的「执行」——命令就是他自己在参数框里填的，
  * 再逐条问一遍等于问他两次，所以这一路只拦高危（与 auto 同一判口）。
@@ -189,7 +190,7 @@ function approvalNeededFor(skill, params, opts = {}) {
   const subject = approvalSubjectOf(skill, params);
   if (!subject) return null;
   const mode = permissionModeFor(opts.convId);
-  if (mode === "full") return null;
+  if (mode === "full" || mode === "night") return null;
   const risk = subject.kind === "command" ? isHighRiskCommand(subject.target) : { risk: false, reason: "" };
   if (!risk.risk && (mode === "auto" || opts.manual)) return null;
   return { subject, risk };

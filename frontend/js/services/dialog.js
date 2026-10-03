@@ -7,13 +7,14 @@
  * - dlgPrompt(message, opts)  -> Promise<string|null>  输入框（取消返回 null，确认返回字符串）
  * - dlgToast(message, duration) 轻量通知，复用页面 #toast-container
  * - dlgUserAsk(question, options) -> Promise<string|null>  模型主动弹窗询问（选择题 chips + 自由输入）
+ * - dlgChoice(title, question, choices) -> Promise<string|null>  只回 value 的选择框（判定方不看标签）
  * - dlgReview({ title, original, revised }) -> Promise<boolean>  原文/改写并排审阅，只有「采用」为 true
  *
  * opts: { title, okText, cancelText, danger, value, placeholder, textarea, rows, options }
  *       options: [{value,label}] 传入时渲染下拉选择（替代手敲枚举值）
  */
 
-import { t } from "./i18n.js?v=20261001-002";
+import { t } from "./i18n.js?v=20261003-001";
 
 // 对话框需要盖在已有模态（卡片编辑、技能执行等，z-index:1000）之上
 let zTop = 2000;
@@ -52,8 +53,17 @@ function buildShell(title) {
   content.appendChild(footer);
   root.appendChild(backdrop);
   root.appendChild(content);
+  // 必须在 appendChild 之前取：模态一挂上，activeElement 就已经是框里的控件了。
+  const opener = document.activeElement && document.activeElement !== document.body
+    ? document.activeElement : null;
   document.body.appendChild(root);
-  return { root, backdrop, closeBtn, body, footer };
+  return { root, backdrop, closeBtn, body, footer, opener };
+}
+
+/** 关窗后把光标还给原来那处：不还原的话焦点掉回 body，接着敲的字符既不进输入框
+ *  也不进聊天框，人只觉得"它吞了我一句话"。元素已被重画掉就算了（没什么可还的）。 */
+function restoreFocus(opener) {
+  if (opener && typeof opener.focus === "function" && document.contains(opener)) opener.focus();
 }
 
 function makeBtn(text, cls) {
@@ -69,7 +79,7 @@ function makeBtn(text, cls) {
  */
 function openDialog({ title, message, okText = "确定", cancelText = "取消", danger = false, withCancel = false, cancelValue = null, buildBody = null }) {
   return new Promise((resolve) => {
-    const { root, backdrop, closeBtn, body, footer } = buildShell(title);
+    const { root, backdrop, closeBtn, body, footer, opener } = buildShell(title);
     let done = false;
 
     const finish = (value) => {
@@ -77,6 +87,7 @@ function openDialog({ title, message, okText = "确定", cancelText = "取消", 
       done = true;
       document.removeEventListener("keydown", onKey, true);
       root.remove();
+      restoreFocus(opener);
       resolve(value);
     };
 
@@ -183,7 +194,7 @@ export function dlgPrompt(message, opts = {}) {
  * 确定返回输入框文本，取消/ESC/×/背景点击返回 null。 */
 export function dlgUserAsk(question, options) {
   return new Promise((resolve) => {
-    const { root, backdrop, closeBtn, body, footer } = buildShell(t("模型需要补充条件"));
+    const { root, backdrop, closeBtn, body, footer, opener } = buildShell(t("模型需要补充条件"));
     let done = false;
 
     const finish = (value) => {
@@ -191,6 +202,7 @@ export function dlgUserAsk(question, options) {
       done = true;
       document.removeEventListener("keydown", onKey, true);
       root.remove();
+      restoreFocus(opener);
       resolve(value);
     };
 
@@ -267,6 +279,58 @@ export function dlgUserAsk(question, options) {
   });
 }
 
+/** 选择框：choices 为 [{value,label}]，点谁就 resolve 谁的 value（不是标签文本）。
+ *  标签会随界面语言翻，判定方只认 value——按标签比的话英文界面下就认不出来了。
+ *  取消/ESC/×/背景点击返回 null，由调用方决定"没选"算什么。 */
+export function dlgChoice(titleText, questionText, choices) {
+  return new Promise((resolve) => {
+    const { root, backdrop, closeBtn, body, footer, opener } = buildShell(String(titleText || ""));
+    let done = false;
+
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey, true);
+      root.remove();
+      restoreFocus(opener);
+      resolve(value);
+    };
+
+    const msg = document.createElement("div");
+    msg.className = "dlg-message";
+    msg.textContent = String(questionText || "").trim();
+    body.appendChild(msg);
+
+    const row = document.createElement("div");
+    row.className = "dlg-options-row";
+    for (const c of (Array.isArray(choices) ? choices : []).slice(0, 6)) {
+      if (!c || !c.value) continue;
+      const btn = makeBtn(String(c.label || c.value), "review-mode-btn dlg-option-btn");
+      btn.dataset.value = c.value;
+      btn.addEventListener("click", () => finish(c.value));
+      row.appendChild(btn);
+    }
+    body.appendChild(row);
+
+    const cancelBtn = makeBtn(t("取消"), "dlg-btn");
+    cancelBtn.addEventListener("click", () => finish(null));
+    footer.appendChild(cancelBtn);
+
+    backdrop.addEventListener("click", () => finish(null));
+    closeBtn.addEventListener("click", () => finish(null));
+
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        finish(null);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+
+    (row.querySelector("button") || cancelBtn).focus();
+  });
+}
+
 /**
  * 审阅弹窗：原文与改写并排，只有点「采用」才返回 true。
  * 其余退出通道（保留原文 / ESC / × / 背景点击）一律返回 false——
@@ -274,7 +338,7 @@ export function dlgUserAsk(question, options) {
  */
 export function dlgReview({ title = "审阅优化结果", original = "", revised = "" }) {
   return new Promise((resolve) => {
-    const { root, backdrop, closeBtn, body, footer } = buildShell(title);
+    const { root, backdrop, closeBtn, body, footer, opener } = buildShell(title);
     root.classList.add("dlg-review-modal");
     let done = false;
 
@@ -283,6 +347,7 @@ export function dlgReview({ title = "审阅优化结果", original = "", revised
       done = true;
       document.removeEventListener("keydown", onKey, true);
       root.remove();
+      restoreFocus(opener);
       resolve(value);
     };
 

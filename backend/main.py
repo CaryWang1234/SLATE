@@ -12,8 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.routers import actions, bg_tasks, chat, constitution, diagnostics, events, evolved, experts, files, grind, i18n, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, theme, typing, update, vault, workflows
-from backend import evolution, mcp_client
+from backend.routers import actions, bg_tasks, chat, constitution, diagnostics, events, evolved, experts, files, grind, i18n, keep_awake, knowledge, lan, mcp, mcp_servers, proxy, projects, scheduler, settings, skills, theme, typing, update, vault, workflows
+from backend import evolution, keepawake, mcp_client
 from backend.skills import bg_task as bg_task_skill
 
 # system_info 需要 psutil，可能不在所有环境中可用
@@ -100,6 +100,7 @@ app.include_router(actions.router, prefix="/api")
 app.include_router(bg_tasks.router, prefix="/api")
 app.include_router(theme.router, prefix="/api")
 app.include_router(evolved.router, prefix="/api")
+app.include_router(keep_awake.router, prefix="/api")
 
 # system_info 路由（需要 psutil，可能不可用）
 if HAS_SYSTEM_INFO:
@@ -149,6 +150,16 @@ async def _shutdown_mcp_clients():
 async def _shutdown_bg_tasks():
     """关闭时收尾在册后台任务：托管在宿主进程里的进程树不该活过宿主。"""
     bg_task_skill.shutdown()
+
+
+@app.on_event("shutdown")
+async def _release_keep_awake():
+    """退出时把"别让电脑睡"的需求清掉。
+
+    进程死亡时 Windows 本来也会回收，但那是兜底不是设计：显式清一次，状态才停在
+    日志和接口里看得见，也不会因为这条线程被别的什么拖着没退而多钉几十秒。
+    """
+    keepawake.stop()
 
 # 挂载前端静态文件
 frontend_dir = PROJECT_ROOT / "frontend"

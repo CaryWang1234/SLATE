@@ -44,6 +44,9 @@
   /* 侧栏任务徽标：四态里只有"需要操作"没有现成色可用（既不是错误也不是完成）*/
   --task-needs: #9A5B12;
   --task-needs-dim: rgba(154, 91, 18, 0.10);
+  /* 夜间模式（全托管）的夜紫：与"完全访问"的红区分开——紫是"这一晚我托管了"，红是"没有安全网" */
+  --night: #6E4E9E;
+  --night-dim: rgba(110, 78, 158, 0.10);
   /* 前两个名字只为 Mac 存在：那边没有微软雅黑，旧串会一路掉到 sans-serif，中文交给系统
      兜底字体、正文的字重层次跟着没。Windows 匹配不到 -apple-system/PingFang SC，
      顺序变了也还是落到微软雅黑，一行都不受影响。 */
@@ -94,6 +97,8 @@
   --ok-dim: rgba(111, 191, 154, 0.12);
   --task-needs: #E0A94A;
   --task-needs-dim: rgba(224, 169, 74, 0.14);
+  --night: #A98BE0;
+  --night-dim: rgba(169, 139, 224, 0.14);
 }
 
 /* ── Reset ────────────────────────────── */
@@ -1179,28 +1184,39 @@ textarea::-webkit-scrollbar-thumb,
   left: 8px;
   width: 16px;
   height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mark-neutral, var(--text-muted));
   pointer-events: none;
   z-index: 1;
 }
 
-/* GPT 图标：深色模式白色，浅色模式原色 */
-.model-icon[src*="gpt.svg"] {
-  filter: brightness(0) invert(0); /* 浅色模式保持原色（黑色） */
+/* mark 认的是"这个模型是谁家的"。取色分两支：
+   ① 有彩色原件的那 47 家——品牌色写死在图形的 fill 上，这里只给 color，压不到它们；
+      这条链上（含后代）不许出现任何 fill 规则，一条给 path 上色的规则就能把整套品牌色抹平。
+   ② 没有彩色版的那 11 家（openai / anthropic / grok / zai …）走 currentColor，取的是那只**中性灰**：
+      --mark-neutral 只在自定义主题下由 deriveTokens 发（按色板自己推的明暗给两只固定灰），
+      内置主题没有它，回落到 --text-muted＝改法之前的样子。为什么不能让这支跟着主题墨色走：
+      自定义配色把 --text-muted 做成墨色的衍色，用户挑米色就出米标、挑蓝灰就出蓝标。
+   明暗那支照旧分开（深底用浅灰），所以深色配色下仍然看得见——
+   旧版按 src 逐只配反转滤镜（gpt / kimi / glm 三条）没有存在的理由，那是 <img> 才需要的。 */
+.model-icon .svg-icon {
+  width: 100%;
+  height: 100%;
 }
 
-[data-theme="dark"] .model-icon[src*="gpt.svg"] {
-  filter: brightness(0) invert(1); /* 深色模式变白 */
+.model-mark {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  color: var(--mark-neutral, var(--text-muted));
+  flex: 0 0 auto;
 }
 
-/* Kimi 图标：源文件为纯黑（浅色模式直接显示黑色），深色模式反转为白 */
-[data-theme="dark"] .model-icon[src*="kimi.svg"] {
-  filter: brightness(0) invert(1); /* 深色模式变白 */
-}
-
-/* GLM(智谱 / Z.ai) 图标：源文件用 currentColor，作为 <img> 引入时恒按黑色绘制，
-   深色底上等于看不见。浅色模式保持原样，深色模式反转为白（与 kimi 同一手法）。 */
-[data-theme="dark"] .model-icon[src*="glm.svg"] {
-  filter: brightness(0) invert(1); /* 深色模式变白 */
+.model-mark .svg-icon {
+  width: 14px;
+  height: 14px;
 }
 
 /* 模型名可长可短：宽度由 app.js 按"当前选中的那一个名字"实算（sizeModelSelect），
@@ -1470,14 +1486,24 @@ textarea::-webkit-scrollbar-thumb,
   height: 13px;
 }
 
-/* 夜间模式：胶囊上的图标和文字一起变红（图标是 stroke:currentColor，跟着 color 走） */
-.approval-pill.is-full {
+/* 完全访问：胶囊上的图标和文字一起变红——没有安全网，红是提醒（图标是 stroke:currentColor，跟 color 走） */
+.approval-pill.is-danger {
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
 }
 
-.approval-pill.is-full .approval-pill-icon {
+.approval-pill.is-danger .approval-pill-icon {
   color: var(--danger);
+}
+
+/* 夜间模式：夜紫。它不是警告，是"这一晚交给它" */
+.approval-pill.is-night {
+  color: var(--night);
+  border-color: color-mix(in srgb, var(--night) 45%, var(--border));
+}
+
+.approval-pill.is-night .approval-pill-icon {
+  color: var(--night);
 }
 
 .approval-pop {
@@ -1563,22 +1589,37 @@ textarea::-webkit-scrollbar-thumb,
   color: var(--text-muted);
 }
 
-/* 夜间模式那一行同样整行标红（图标 + 文字），与胶囊上的处理同一口径 */
-.approval-opt.is-full,
-.approval-opt.is-full .approval-opt-icon {
+/* 完全访问那一行同样整行标红（图标 + 文字），与胶囊上的处理同一口径 */
+.approval-opt.is-danger,
+.approval-opt.is-danger .approval-opt-icon {
   color: var(--danger);
 }
 
-.approval-opt.is-full .approval-opt-hint {
+.approval-opt.is-danger .approval-opt-hint {
   color: color-mix(in srgb, var(--danger) 78%, var(--text-muted));
 }
 
-.approval-opt.is-full.is-on {
+.approval-opt.is-danger.is-on {
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
   background: var(--danger-dim);
 }
 
-/* 设置页那三档里"夜间模式"也标红，两处的红必须是同一个变量 */
+/* 夜间模式那一行走夜紫，和胶囊同源 */
+.approval-opt.is-night,
+.approval-opt.is-night .approval-opt-icon {
+  color: var(--night);
+}
+
+.approval-opt.is-night .approval-opt-hint {
+  color: color-mix(in srgb, var(--night) 78%, var(--text-muted));
+}
+
+.approval-opt.is-night.is-on {
+  border-color: color-mix(in srgb, var(--night) 45%, var(--border));
+  background: var(--night-dim);
+}
+
+/* 设置页那四档里"完全访问"标红、"夜间模式"标夜紫，与输入框胶囊上是同一批变量 */
 .permission-mode-row .review-mode-btn.is-danger {
   color: var(--danger);
 }
@@ -1591,6 +1632,20 @@ textarea::-webkit-scrollbar-thumb,
   background: var(--danger-dim);
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.permission-mode-row .review-mode-btn.is-night {
+  color: var(--night);
+}
+
+.permission-mode-row .review-mode-btn.is-night .svg-icon {
+  color: var(--night);
+}
+
+.permission-mode-row .review-mode-btn.is-night.active {
+  background: var(--night-dim);
+  color: var(--night);
+  border-color: color-mix(in srgb, var(--night) 45%, var(--border));
 }
 
 .chat-input-wrap {
@@ -3159,9 +3214,21 @@ textarea::-webkit-scrollbar-thumb,
   vertical-align: -2px;
 }
 
-/* ── 工厂面板 ─────────────────────────── */
+/* ── 工厂弹窗（原「工厂」页签已撤，改成输入区工具行的按钮 + 这扇弹窗） ── */
 
-#panel-factory {
+/* 选择器带 .modal-content 是必要的：通用 .modal-content{width:460px} 定义在本段之后，
+   同特异度靠后胜出，光写 .factory-modal-content 会被它按回 460px（走查 F2 抓到的真 bug）。 */
+.modal-content.factory-modal-content {
+  width: min(1180px, 94vw);
+  max-width: 94vw;
+  height: min(760px, 88vh);
+  max-height: 88vh;
+}
+
+/* 弹窗里那层 body 不再自己滚：滚动交给 .factory-area（两栏工作台要一起滚） */
+.factory-modal-content .modal-body {
+  display: flex;
+  padding: 0;
   overflow: hidden;
 }
 
@@ -4062,8 +4129,8 @@ textarea::-webkit-scrollbar-thumb,
 }
 
 /* ── 侧栏任务状态徽标：进行中 / 需要操作 / 出错 / 已完成未查看 ──
-   图标形状各不同（波形 / 铃铛 / 警示三角 / 实心圆勾），状态不单靠颜色传达；
-   色调全部走变量，明暗两套主题同一口径，深色下描边与底色同步提亮。 */
+   只画图标本身，不套圆形外框：四态图标形状各不同（波形 / 铃铛 / 警示三角 / 实心勾），
+   状态不单靠颜色传达；色调全部走变量，明暗两套主题同一口径。 */
 .conv-item-status {
   display: inline-flex;
   align-items: center;
@@ -4072,15 +4139,13 @@ textarea::-webkit-scrollbar-thumb,
   height: 15px;
   flex: 0 0 auto;
   margin-right: 6px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
   color: var(--text-muted);
-  background: transparent;
+  background: none;
 }
 
 .conv-item-status .svg-icon {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
 }
 
 .conv-item-status[data-status="running"] {
@@ -4090,19 +4155,15 @@ textarea::-webkit-scrollbar-thumb,
 
 .conv-item-status[data-status="needs"] {
   color: var(--task-needs);
-  background: var(--task-needs-dim);
 }
 
 .conv-item-status[data-status="error"] {
   color: var(--danger);
-  background: var(--danger-dim);
 }
 
-/* 已完成未查看：实心最重的一枚，扫列表时最先看到的就是它 */
+/* 已完成未查看：以前靠实心金底最抢眼，现在只剩图标，就用最重的一档金色压住 */
 .conv-item-status[data-status="unread"] {
-  color: var(--bg);
-  background: var(--gold-strong);
-  border-color: var(--gold-strong);
+  color: var(--gold-strong);
 }
 
 @keyframes conv-status-pulse {
@@ -4540,6 +4601,32 @@ textarea::-webkit-scrollbar-thumb,
   flex-shrink: 0;
 }
 
+/* 讨论的运行选项单独一行：挤进输入行会把 开始/停止 顶到换行 */
+.team-run-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.team-signoff-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.team-signoff-label input {
+  margin: 0;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
 .team-topic-input {
   flex: 1;
   border: 1px solid var(--border);
@@ -4703,6 +4790,13 @@ textarea::-webkit-scrollbar-thumb,
 .debate-entry.action-rebut      { border-left: 3px solid var(--text); background: var(--gold-dim); }
 .debate-entry.action-supplement { border-left: 3px solid var(--text-secondary); }
 .debate-entry.action-verdict    { border-left: 3px solid var(--gold); background: var(--bg-alt); }
+/* 没人说话的两格：失败是"这条请求没成"，未参与是"这位没配 Key"。都不该长得像一条主张 */
+.debate-entry.action-error      { border-left: 3px solid var(--danger); background: var(--danger-dim); }
+.debate-entry.action-skipped    { border-left: 3px dashed var(--border); }
+/* 拍板三格是"人这一侧"的动作：等签字时描金，签了才与决策同色，没签要看得见它没签 */
+.debate-entry.action-awaiting   { border-left: 3px solid var(--gold); background: var(--gold-dim); }
+.debate-entry.action-decided    { border-left: 3px solid var(--gold); background: var(--bg-alt); }
+.debate-entry.action-reopened   { border-left: 3px dashed var(--gold); }
 
 [data-theme="dark"] .debate-entry.action-oppose  { background: rgba(201,169,110,0.04); }
 [data-theme="dark"] .debate-entry.action-rebut   { background: rgba(201,169,110,0.06); }
@@ -4749,6 +4843,11 @@ textarea::-webkit-scrollbar-thumb,
 .debate-action-badge.action-rebut      { background: var(--text); color: var(--bg); }
 .debate-action-badge.action-supplement { background: var(--bg-alt); color: var(--text-secondary); border: 1px solid var(--border); }
 .debate-action-badge.action-verdict    { background: var(--gold); color: var(--bg); }
+.debate-action-badge.action-error      { background: var(--danger); color: #fff; }
+.debate-action-badge.action-skipped    { background: transparent; color: var(--text-muted); border: 1px dashed var(--border); }
+.debate-action-badge.action-awaiting   { background: transparent; color: var(--gold); border: 1px solid var(--gold); }
+.debate-action-badge.action-decided    { background: var(--gold); color: var(--bg); }
+.debate-action-badge.action-reopened   { background: transparent; color: var(--text-muted); border: 1px dashed var(--gold); }
 
 .debate-model {
   font-size: 10px;
@@ -4762,6 +4861,9 @@ textarea::-webkit-scrollbar-thumb,
   margin-bottom: 4px;
   padding-left: 28px;
 }
+
+/* team.js 建出来就带着 hidden，不回应他人时不该占那 4px */
+.debate-reply-ref.hidden { display: none; }
 
 .debate-content {
   font-size: 13px;
@@ -6223,7 +6325,8 @@ textarea::-webkit-scrollbar-thumb,
   cursor: pointer;
 }
 
-.theme-bg-row {
+.theme-bg-row,
+.theme-font-import-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -6233,6 +6336,50 @@ textarea::-webkit-scrollbar-thumb,
 /* 文件控件只用来取文件，长相交给「选择图片」那颗按钮 */
 .theme-file-input {
   display: none;
+}
+
+/* 导入的字体一行一个：名字 + 在不在本机 + 移除 */
+.theme-font-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.theme-font-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.theme-font-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.theme-font-meta {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.theme-font-remove {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.theme-font-remove:hover {
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .theme-veil-slider {
@@ -7998,23 +8145,25 @@ button.project-bar-switch:hover {
   display: block;
 }
 
-/* 颜色统一：多色 vscode 图标统一为单色，随主题调节亮度（浅色深灰 / 深色浅灰） */
+/* 颜色统一：多色 vscode 图标统一为单色，随主题调节亮度（浅色深灰 / 深色浅灰）。
+   自定义主题下 --file-icon-filter 由 theme_custom.js 按用户强调色算出来，图标跟着调色板走；
+   内置主题不注入这个变量，落回原来那两条写死的滤镜，观感一字不变。 */
 img.file-type-icon {
-  filter: grayscale(1) brightness(0.72) contrast(1.05);
+  filter: var(--file-icon-filter, grayscale(1) brightness(0.72) contrast(1.05));
 }
 
 [data-theme="dark"] img.file-type-icon {
   /* 深色主题图标统一为金色（黑金主调） */
-  filter: grayscale(1) sepia(1) saturate(1.35) brightness(1.1);
+  filter: var(--file-icon-filter, grayscale(1) sepia(1) saturate(1.35) brightness(1.1));
 }
 
 /* 兜底图标（文件夹 / 未知类型）：与单色滤镜后的灰阶对齐 */
 .file-icon-fallback {
-  color: #6f6f6f;
+  color: var(--file-icon-color, #6f6f6f);
 }
 
 [data-theme="dark"] .file-icon-fallback {
-  color: var(--gold);
+  color: var(--file-icon-color, var(--gold));
 }
 
 .file-tree-name {
@@ -11076,6 +11225,60 @@ img.file-type-icon {
 
 /* ── 存储空间管理 ────────────────────── */
 
+/* ── 会话归档（设置页）：归档不在任务栏里，只能从这里回去或真删 ── */
+
+.archived-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+  padding: 6px 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.archived-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.archived-item:last-child {
+  border-bottom: none;
+}
+
+.archived-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.archived-title {
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archived-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archived-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .storage-usage {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -11133,9 +11336,11 @@ html.i18n-pending body {
 }
 
 /* 这几颗「停止/运行」按钮只在有事可停时才该在（JS 一律切 hidden），
-   少了配套规则就是开局摊在那儿：点了还会写出一句「正在停止…」的假状态。 */
+   少了配套规则就是开局摊在那儿：点了还会写出一句「正在停止…」的假状态。
+   #btn-api-test 是「开始测试」那一颗：跑起来时它该让位给「停止」，只置灰不算换。 */
 #btn-wf-stop.hidden,
 #btn-stop-discuss.hidden,
+#btn-api-test.hidden,
 #btn-api-test-stop.hidden,
 #btn-run-skill.hidden { display: none; }
 
@@ -11962,17 +12167,19 @@ html[data-ui="codex"] #codex-dock-history {
   flex-shrink: 0;
 }
 
-/* 有状态时这一枚从装饰点变成徽标：放大到能装下图标，透明度交还给各态配色 */
+/* 有状态时这一枚从装饰点变成徽标：放大到能装下图标，透明度交还给各态配色。
+   装饰点那枚 currentColor 实心圆必须清掉，否则徽标外面仍套着一只圆。 */
 .codex-hist-dot.conv-item-status {
   width: 15px;
   height: 15px;
   margin-right: 0;
   opacity: 1;
+  background: none;
 }
 
 .codex-hist-dot.conv-item-status .svg-icon {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
 }
 
 .codex-hist-item.is-unread .codex-hist-item-title { font-weight: 700; }
