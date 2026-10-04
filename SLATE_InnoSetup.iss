@@ -11,7 +11,7 @@
 ; 命令行或 CI 用 /DMyAppVersion=<去掉 v 的 tag> 注入时，本行默认值不生效。
 #ifdef MyAppVersion
 #else
-  #define MyAppVersion "0.4.4-rc1"
+  #define MyAppVersion "0.4.4"
 #endif
 ; VersionInfoVersion 只接受「最多四段数字点分」，后缀会让编译报 invalid，故拆出数字段；
 ; AppVersion、安装包文件名、产品版本仍用带后缀的完整标签。
@@ -24,7 +24,7 @@
 ; 构建号（yyyyMMddHHmm）。发布构建由 CI 用 /DMyAppBuild= 注入，本地构建用下行默认值
 #ifdef MyAppBuild
 #else
-  #define MyAppBuild "202609272109"
+  #define MyAppBuild "202610031959"
 #endif
 #define MyAppPublisher "SLATE"
 #define MyAppURL "https://github.com/CaryWang1234/SLATE"
