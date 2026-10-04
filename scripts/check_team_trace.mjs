@@ -15,7 +15,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20261003-002";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20261003-003";
 
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 const TEAM = read("../frontend/js/components/team.js");

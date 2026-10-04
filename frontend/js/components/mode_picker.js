@@ -10,9 +10,9 @@
 import {
   state, subscribe, modeRegistry, activeModeFor, activeModeIdFor, setModeFor,
   MODE_POPOVER_MAX, MODE_TOOLS_NONE,
-} from "../store.js?v=20261003-002";
-import { iconSvgEl } from "../services/icons.js?v=20261003-002";
-import { t } from "../services/i18n.js?v=20261003-002";
+} from "../store.js?v=20261003-003";
+import { iconSvgEl } from "../services/icons.js?v=20261003-003";
+import { t } from "../services/i18n.js?v=20261003-003";
 
 const EFFORT_LABELS = { low: "低", medium: "中", high: "高" };
 

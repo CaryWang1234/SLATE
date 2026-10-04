@@ -20,8 +20,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { compressedThread } from "../frontend/js/services/thread_compress.js?v=20261003-002";
-import * as store from "../frontend/js/store.js?v=20261003-002";
+import { compressedThread } from "../frontend/js/services/thread_compress.js?v=20261003-003";
+import * as store from "../frontend/js/store.js?v=20261003-003";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");

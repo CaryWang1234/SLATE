@@ -7,24 +7,24 @@
 
 import {
   state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit, effectiveConstitution, activeModeFor,
-} from "../store.js?v=20261003-002";
-import { fmtTokens } from "../services/usage.js?v=20261003-002";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261003-002";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20261003-002";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20261003-002";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20261003-002";
-import { createAgentLoop } from "../services/agent_loop.js?v=20261003-002";
-import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20261003-002";
-import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20261003-002";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20261003-002";
-import { toolLabel } from "../services/tool_meta.js?v=20261003-002";
-import { compressedThread } from "../services/thread_compress.js?v=20261003-002";
-import { autoGenerateSessionTitle } from "../services/session_title.js?v=20261003-002";
-import { renderMarkdown } from "../services/markdown.js?v=20261003-002";
-import { mToast, t } from "./m-ui.js?v=20261003-002";
-import { mountRoundSummary, renderRoundSummary } from "../components/round_summary.js?v=20261003-002";
-import { mHandleStructured } from "./m-auth.js?v=20261003-002";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20261003-002";
+} from "../store.js?v=20261003-003";
+import { fmtTokens } from "../services/usage.js?v=20261003-003";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261003-003";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20261003-003";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20261003-003";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20261003-003";
+import { createAgentLoop } from "../services/agent_loop.js?v=20261003-003";
+import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20261003-003";
+import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20261003-003";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20261003-003";
+import { toolLabel } from "../services/tool_meta.js?v=20261003-003";
+import { compressedThread } from "../services/thread_compress.js?v=20261003-003";
+import { autoGenerateSessionTitle } from "../services/session_title.js?v=20261003-003";
+import { renderMarkdown } from "../services/markdown.js?v=20261003-003";
+import { mToast, t } from "./m-ui.js?v=20261003-003";
+import { mountRoundSummary, renderRoundSummary } from "../components/round_summary.js?v=20261003-003";
+import { mHandleStructured } from "./m-auth.js?v=20261003-003";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20261003-003";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;

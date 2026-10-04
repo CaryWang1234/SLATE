@@ -12,14 +12,14 @@
 import {
   subscribe, modeRegistry, modeById, addMode, updateMode, removeMode,
   MODE_TOOLS_NONE, MODE_READONLY_TOOLS,
-} from "../store.js?v=20261003-002";
-import { TOOLS } from "../services/tools.js?v=20261003-002";
-import { iconSvgEl } from "../services/icons.js?v=20261003-002";
-import { t } from "../services/i18n.js?v=20261003-002";
-import { dlgConfirm } from "../services/dialog.js?v=20261003-002";
-import { allRegisteredModels } from "../services/ai_features.js?v=20261003-002";
-import { setExtCount } from "./extensions.js?v=20261003-002";
-import { modeHint } from "./mode_picker.js?v=20261003-002";
+} from "../store.js?v=20261003-003";
+import { TOOLS } from "../services/tools.js?v=20261003-003";
+import { iconSvgEl } from "../services/icons.js?v=20261003-003";
+import { t } from "../services/i18n.js?v=20261003-003";
+import { dlgConfirm } from "../services/dialog.js?v=20261003-003";
+import { allRegisteredModels } from "../services/ai_features.js?v=20261003-003";
+import { setExtCount } from "./extensions.js?v=20261003-003";
+import { modeHint } from "./mode_picker.js?v=20261003-003";
 
 // 可选图标：够表达"这个模式是干什么的"即可，不做全量图标库（挑花眼反而选不出）。
 const ICON_PALETTE = [
@@ -112,6 +112,7 @@ function fillForm(mode) {
   const isNew = !mode;
   const src = mode || { id: "", label: "", icon: "tool", color: "#7c8cff", prompt: "", tools: null, effort: "", rounds: 0, model: "" };
   fId.value = src.id || "";
+  // id 是引用键（每场会话 + 默认档都按它指），所以只有新建能填；改它等于把引用改断
   fId.disabled = !isNew;
   fLabel.value = src.id && src.label && src.label !== src.id ? src.label : "";
   fPrompt.value = src.prompt || "";
@@ -207,10 +208,12 @@ function syncScopeUi() {
   fTools.classList.toggle("hidden", fScope.value !== "custom");
 }
 
-/** 内置档是产品语义的锚点：整张表单锁住，只让人看它现在长什么样。 */
+/** 内置档是产品语义的锚点：整张表单锁住，只让人看它现在长什么样。
+ *  id 单独定（见 fillForm 的 `fId.disabled = !isNew`）：新建要能自己填，已有/内置锁死——
+ *  它是每场会话与默认档的引用键，改名等于把引用改断。 */
 function setFormDisabled(disabled) {
-  for (const el of [fId, fLabel, fPrompt, fScope, fEffort, fRounds, fModel]) {
-    if (el) el.disabled = disabled || el === fId;
+  for (const el of [fLabel, fPrompt, fScope, fEffort, fRounds, fModel]) {
+    if (el) el.disabled = disabled;
   }
   fColor.disabled = disabled;
   for (const b of iconWrap.querySelectorAll("button")) b.disabled = disabled;

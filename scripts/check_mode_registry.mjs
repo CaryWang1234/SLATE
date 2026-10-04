@@ -191,6 +191,9 @@ ok("内置档在面板里只读：不给保存/删除，整张表单锁住",
   /btnSave\.classList\.toggle\("hidden", editingBuiltin\)/.test(PANEL)
   && /btnDelete\.classList\.toggle\("hidden", editingBuiltin \|\| isNew\)/.test(PANEL)
   && /function setFormDisabled\(disabled\)/.test(PANEL));
+// 反面也钉住：整表锁不能把 id 一起带走——新建填不了 id，save() 又要求 id，等于手建不出模式
+ok("id 只在新建时可填：整表锁不把它一起锁死",
+  /fId\.disabled = !isNew;/.test(PANEL) && !/el === fId/.test(PANEL));
 ok("「模式」栏的列表项显示内置/自定义徽标", /skill-kind-builtin/.test(PANEL) && /内置/.test(PANEL));
 
 // ── 11. 视觉：颜色随模式走、隐藏有规则（桌面无全局 .hidden）─────
