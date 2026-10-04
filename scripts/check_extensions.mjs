@@ -2,13 +2,13 @@
  * 扩展页守卫：scripts/check_extensions.mjs
  *
  * 这一页是把原来散在「设置 → 工具 / 技能」和「设置 → MCP Server」里的东西搬过来拼成的，
- * 拼法是「一个页签 + 左分栏轨 + 六个 .ext-section」，全靠命名约定接线。约定一断就是静默的：
+ * 拼法是「一个页签 + 左分栏轨 + 七个 .ext-section」，全靠命名约定接线。约定一断就是静默的：
  * ① 页签 data-panel 与 #panel-<name> 不一致——点了没反应，页面还是那张页面；
  * ② 分栏轨的 key 与 data-ext 不同源——多出来的那栏永远点不到，少掉的那栏进不去；
  * ③ 栏内标题上的数字与分栏轨上的数字分开写——刷新一次就各说各话；
  * ④ 列表容器的 id 改了但组件还按旧 id 取——渲染进 null，界面只剩表头；
  * ⑤ Codex 布局的入口是三处登记（分组 / 分发 / 高亮），漏一处就是"进得去但亮着别处"；
- * ⑥ 桌面 CSS 没有全局 .hidden，.ext-section.active 少一条规则等于五栏同时铺开。
+ * ⑥ 桌面 CSS 没有全局 .hidden，.ext-section.active 少一条规则等于各栏同时铺开。
  * 所以这里逐条把"约定"钉成断言，而不是只查文件里有没有出现过这些名字。
  *
  * 运行：node scripts/check_extensions.mjs
@@ -79,7 +79,7 @@ for (const key of SECTION_KEYS) {
 
 // ── 4. 栏体里的列表容器：HTML 给了 id，组件就得真的去取 ──────────
 
-const HOSTS = { skills: "ext-skill-list", tools: "ext-tool-list", evolved: "ext-evolved-list", mcp: "mcp-server-list", experts: "ext-expert-list", actions: "ext-action-list" };
+const HOSTS = { skills: "ext-skill-list", tools: "ext-tool-list", modes: "ext-mode-list", evolved: "ext-evolved-list", mcp: "mcp-server-list", experts: "ext-expert-list", actions: "ext-action-list" };
 for (const [key, id] of Object.entries(HOSTS)) {
   ok(`「${key}」的列表容器 #${id} 在 HTML 里`, HTML.includes(`id="${id}"`));
   const owner = readBySomeComponent(id);
@@ -117,7 +117,7 @@ ok("扩展页外壳被 safeInit 拉起（只定义不调用＝左轨是空的）
 // ── 8. CSS：桌面样式没有全局 .hidden，靠自己的规则撑显示 ────────
 
 ok(".ext-section 基态是 display:none", /\.ext-section\s*\{[^}]*display:\s*none/.test(CSS));
-ok(".ext-section.active 才铺开（少这条五栏会同时显示）",
+ok(".ext-section.active 才铺开（少这条各栏会同时显示）",
   /\.ext-section\.active\s*\{[^}]*display:\s*flex/.test(CSS));
 ok(".ext-nav-item.active 有可见差异（没有就看不出选中哪一栏）",
   /\.ext-nav-item\.active\s*\{/.test(CSS));

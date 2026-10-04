@@ -1,16 +1,17 @@
 /**
- * 扩展页外壳：左侧分栏轨（技能 / 工具 / 新功能 / MCP / 专家包 / Actions）＋ 条目计数。
+ * 扩展页外壳：左侧分栏轨（技能 / 工具 / 模式 / 新功能 / MCP / 专家包 / Actions）＋ 条目计数。
  *
  * 这里只管"看哪一栏"和"每栏有几份"，列表内容由各栏数据的主人自己渲染
  * （skill_panel / mcp_server_panel / experts）。计数由主人算完写进来：
  * 分栏轨上的数字与右侧标题上的数字必须是同一个来源，否则一刷新就各说各话。
  */
 
-import { t } from "../services/i18n.js?v=20261003-001";
+import { t } from "../services/i18n.js?v=20261003-002";
 
 const EXT_SECTIONS = [
   { key: "skills", label: "技能" },
   { key: "tools", label: "工具" },
+  { key: "modes", label: "模式" },
   { key: "evolved", label: "新功能" },
   { key: "mcp", label: "MCP" },
   { key: "experts", label: "专家包" },

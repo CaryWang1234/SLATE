@@ -162,11 +162,12 @@ for (const t of toolsOf) {
 ok("文本协议工具目录按开关过滤", /toolEntries[\s\S]{0,300}!isAiToolOff\(key\)/.test(TOOLS));
 ok("精简目录的核心集也按开关过滤",
   /CORE_AGENT_TOOLS\.filter\(key => TOOLS\[key\]\)[\s\S]{0,200}isAiToolOff/.test(TOOLS));
-ok("原生 tools schema 按开关过滤",
-  /function buildOpenAITools[\s\S]{0,300}if \(isAiToolOff\(key\)\) continue/.test(TOOLS));
+ok("原生 tools schema 按开关过滤（并同时按回复模式的工具白名单过滤）",
+  /function buildOpenAITools[\s\S]{0,300}if \(isAiToolOff\(key\) \|\| !modeAllowsTool\(mode, key\)\) continue/.test(TOOLS));
 ok("skill_run 的常用清单按开关过滤", /SKILL_RUN_QUICK_LIST\.filter\(n => !isAiToolOff\(n\)\)/.test(TOOLS));
 ok("工具选择速查里也不提关掉的功能（配方会把模型引向被摘掉的工具）",
-  /offToolNames[\s\S]{0,200}route\.includes\(name\)/.test(TOOLS));
+  /hiddenToolNames[\s\S]{0,120}route\.includes\(name\)/.test(TOOLS)
+  && /hiddenToolNames = Object\.keys\(TOOLS\)\.filter\(name => isAiToolOff\(name\) \|\| !modeAllowsTool\(mode, name\)\)/.test(TOOLS));
 ok("模型凭记忆硬调时给明确停用话术",
   /function executeTool[\s\S]{0,700}isAiToolOff\(name\)/.test(TOOLS)
   && /该功能已由用户在「设置 → AI 辅助功能」中关闭/.test(TOOLS));

@@ -1233,39 +1233,313 @@ textarea::-webkit-scrollbar-thumb,
   font-variant-numeric: tabular-nums;
 }
 
-/* 回复方式 / 推理强度：输入框左侧的紧凑下拉，与 .expert-select 同规格 */
-.input-pill-select {
-  border: 1px solid var(--border);
+/* 回复模式：输入框左下的选择器（智能 / 对话 / 经济 / 狂暴 ＋ 自定义）。
+   每个模式一个主色，落在容器上的 --mode-color 上：图标是 stroke:currentColor，跟 color 走。
+   形状与审批模式同一族，但主色由模式自己带（审批那档是固定四色）。 */
+.mode-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--mode-color, var(--border)) 45%, var(--border));
   border-radius: var(--radius);
-  padding: 4px 5px;
+  padding: 4px 7px;
   font-size: 11px;
   font-family: var(--font-main);
   height: 26px;
   outline: none;
   background: var(--bg-input);
-  color: var(--text-secondary);
+  color: var(--mode-color, var(--text-secondary));
   cursor: pointer;
   flex-shrink: 0;
-  transition: border-color var(--transition);
+  transition: border-color var(--transition), color var(--transition);
 }
 
-.input-pill-select:hover {
+.mode-pill:hover,
+.mode-pill:focus,
+.mode-pill[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--mode-color, var(--gold)) 62%, var(--border));
+}
+
+.mode-pill-icon {
+  display: inline-flex;
+  color: inherit;
+}
+
+.mode-pill-icon .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.mode-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: 300px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 60;
+}
+
+/* 桌面没有全局 .hidden 工具类：自带 hidden 的元素必须自己声明一次，否则摊在输入框上方收不起来 */
+.mode-pop.hidden { display: none; }
+
+.mode-pop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 7px;
+  font-size: 12px;
   color: var(--text);
 }
 
-.input-pill-select:focus {
+.mode-pop-scope {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.mode-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-secondary);
+  font-family: var(--font-main);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.mode-opt:hover {
+  background: var(--bg-input);
+  color: var(--text);
+}
+
+.mode-opt.is-on {
   border-color: var(--gold);
+  background: var(--gold-dim);
+  color: var(--text);
 }
 
-/* 当前模型不支持该档位时置灰：仍在原位说明"为什么不能选"，比直接隐藏更好解释 */
-.input-pill-select:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.mode-opt-icon {
+  display: inline-flex;
+  margin-top: 1px;
+  color: var(--mode-color, currentColor);
 }
 
-.input-pill-select:disabled:hover {
+.mode-opt-icon .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.mode-opt-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mode-opt-hint {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ── 扩展页「模式」栏与编辑器 ─────────────────────────────
+   桌面 CSS 没有全局 .hidden，这里出现的每一处隐藏都得自己配一条规则。 */
+.mode-item {
+  align-items: flex-start;
+}
+
+.mode-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  margin-right: 10px;
+  color: var(--mode-color, currentColor);
+}
+
+.mode-item-icon .svg-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.skill-kind-builtin {
+  background: var(--bg-alt);
   color: var(--text-secondary);
 }
+
+.mode-modal-content {
+  width: min(560px, 92vw);
+}
+
+.mode-builtin-note {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.mode-builtin-note.hidden { display: none; }
+
+.mode-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mode-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mode-form-inline {
+  flex-direction: row;
+  gap: 12px;
+}
+
+.mode-form-inline > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mode-prompt-input {
+  resize: vertical;
+  min-height: 76px;
+  font-family: var(--font-main);
+  line-height: 1.6;
+}
+
+.mode-icon-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mode-icon-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.mode-icon-opt:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.mode-icon-opt.is-on {
+  border-color: var(--text);
+  background: var(--bg-alt);
+  color: var(--text);
+}
+
+.mode-color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mode-color-input {
+  width: 40px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+}
+
+.mode-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mode-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.mode-swatch.is-on {
+  border-color: var(--text);
+}
+
+.mode-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 10px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.mode-tools-grid.hidden { display: none; }
+
+.mode-tool-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.mode-tool-opt span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mode-form-msg {
+  min-height: 14px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mode-form-msg.is-bad {
+  color: var(--danger);
+}
+
+.mode-modal-content .send-btn.hidden,
+.mode-modal-content .dlg-btn.hidden { display: none; }
 
 /* 推理强度：点开后是一根滑杆，档位为主、墨色小字为辅。
    明暗两套主题都只由 --ink（透明度）表达浓淡，避免深色下"越浓越看不见"。 */

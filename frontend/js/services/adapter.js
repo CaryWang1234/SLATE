@@ -3,9 +3,9 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20261003-001";
-import { getToolsSystemPrompt } from "./tools.js?v=20261003-001";
-import { catalogForScope } from "./project_scope.js?v=20261003-001";
+import { state } from "../store.js?v=20261003-002";
+import { getToolsSystemPrompt } from "./tools.js?v=20261003-002";
+import { catalogForScope } from "./project_scope.js?v=20261003-002";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -167,7 +167,18 @@ function getActionsSystemPrompt(project = null) {
 }
 
 /**
- * 组装发往模型的完整系统提示：角色定义 → 项目宪法 → 专家包/记忆/知识 → 工具目录。
+ * 回复模式的追加提示：模式可以改系统提示词（工具白名单在 tools.js 过滤，三条旋钮在调用点）。
+ * 载荷语言固定中文、不经 t()：这是发给模型的一段，跟着界面语言变会让同一模式的用法两样。
+ * 没有 prompt 的模式（智能 / 对话）不加任何东西，保持历史提示词一字不变。
+ */
+function getModeSystemPrompt(mode = null) {
+  const text = String(mode?.prompt || "").trim();
+  if (!text) return "";
+  return `\n\n[回复模式· ${mode.label || mode.id}] ${text}\n`;
+}
+
+/**
+ * 组装发往模型的完整系统提示：角色定义 → 项目宪法 → 专家包/记忆/知识 → 工具目录 → 模式追加。
  * 上下文估算与实际载荷共用此函数，避免两处口径漂移。
  * opts.withTools === false：本轮没有工具（对话模式或磨墨轮），基底换成不含 Agent 协议
  * 与工具纪律的版本，也不注入工具目录（没有工具可调用时注入只会诱导模型伪造 ◈◈◈ 调用块）。
@@ -208,8 +219,12 @@ function buildSystemContent(modelId, constitution, opts = {}) {
     // Actions 目录贴着工具说明注入：对话态没有 actions_read，
     // 只给目录读不到正文，反而诱导模型声称"已按流程执行"。
     systemContent += getActionsSystemPrompt(opts.project);
-    systemContent += getToolsSystemPrompt({ compact: true, project: opts.project || null });
+    // 工具目录按这一场的模式裁剪：模式没开放的工具连目录都不出现（白名单见 tools.js modeAllowsTool）
+    systemContent += getToolsSystemPrompt({ compact: true, project: opts.project || null, mode: opts.mode || null });
   }
+
+  // 模式追加放在最后：它是"这一场怎么跑"的语气与侧重，贴着最近处才不容易被长目录冲淡
+  systemContent += getModeSystemPrompt(opts.mode);
 
   return systemContent;
 }
@@ -234,6 +249,8 @@ function buildMessages(userMessages, constitution, toolMode = "text", opts = {})
       // 屏幕上正在看的另一个项目，读全局等于把 B 项目的知识塞进 A 项目的请求。
       knowledge: opts.knowledge ?? (Array.isArray(userMessages._knowledge) ? userMessages._knowledge : null),
       project: opts.project || userMessages._project || null,
+      // 回复模式：只带"追加提示词"用；工具白名单与三条旋钮在各自的调用点生效
+      mode: opts.mode || userMessages._mode || null,
     }),
   });
 

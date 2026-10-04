@@ -21,7 +21,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20261003-001";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20261003-002";
 
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");

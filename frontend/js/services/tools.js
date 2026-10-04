@@ -12,18 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor } from "../store.js?v=20261003-001";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261003-001";
-import { guardSkillCall } from "./riskguard.js?v=20261003-001";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20261003-001";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261003-001";
-import { t } from "./i18n.js?v=20261003-001";
-import { makeId } from "./utils.js?v=20261003-001";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261003-001";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261003-001";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20261003-001";
-import { isAiToolOff } from "./ai_features.js?v=20261003-001";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261003-001";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor, MODE_TOOLS_NONE, MODE_READONLY_TOOLS, BUILTIN_MODES, addMode, updateMode, removeMode, modeById } from "../store.js?v=20261003-002";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261003-002";
+import { guardSkillCall } from "./riskguard.js?v=20261003-002";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20261003-002";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261003-002";
+import { t } from "./i18n.js?v=20261003-002";
+import { makeId } from "./utils.js?v=20261003-002";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261003-002";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261003-002";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20261003-002";
+import { isAiToolOff } from "./ai_features.js?v=20261003-002";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261003-002";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -159,6 +159,25 @@ function exitAgentLoop(mode, summary) {
   const closed = mode === "target" ? "目标模式开关已关闭，后续消息不再自动推进。" : "";
   return `已登记收口，本次自主循环将在你给出最终汇报后停止。${closed}`
     + "下一条回复不要再调用工具：直接写明交付了什么、每项用什么方式验证、验证结果是什么。";
+}
+
+// 回复模式的工具范围字符串 → 模式注册表认的形状（null=不限制 / "none" / 工具名数组）。
+// 只认运行时那套词表：模型给脏值一律按"不限制"处理，宁可多给不给错删。
+function parseModeToolsParam(raw) {
+  const v = String(raw ?? "").trim().toLowerCase();
+  if (!v || v === "all") return null;
+  if (v === "none") return MODE_TOOLS_NONE;
+  if (v === "readonly") return [...MODE_READONLY_TOOLS];
+  const names = v.split(/[,，、\s]+/).map(s => s.trim()).filter(Boolean).slice(0, 80);
+  const known = names.filter(n => TOOLS[n]);
+  return known.length ? known : null;
+}
+
+/** 回话给人看的一行工具范围说明（与输入框浮层的措辞同一套）。 */
+function describeModeTools(tools) {
+  if (tools === MODE_TOOLS_NONE) return "不调用工具（单轮直答）";
+  if (Array.isArray(tools)) return `只读/白名单工具（${tools.length} 个）`;
+  return "全部工具";
 }
 
 const TOOLS = {
@@ -676,6 +695,101 @@ const TOOLS = {
         return lines.join("\n");
       } catch (e) {
         return `写入 Action 出错: ${e.message}`;
+      }
+    },
+  },
+
+  mode_write: {
+    name: "写入回复模式",
+    description: "创建 / 更新 / 删除一个「回复模式」。回复模式决定这一场对话用什么追加提示词、开放哪些工具、推理强度与工具循环轮数上限；模型也能用它给用户长出一个量身的工作方式。内置四档 smart（智能）/ chat（对话）/ eco（经济）/ turbo（狂暴）是产品语义的锚点，只读不可改删。只在用户明确要求「以后有个 XX 模式」时使用，不要擅自替用户发明模式。这一场开着手动审批时会弹确认框给用户看这次改动，用户拒绝即不写——此时不要反复重试，把要点讲清楚即可。改完用户可在「扩展 → 模式」里看到并手动调整。",
+    params: {
+      action: { type: "string", description: '"create" 新建 / "update" 改已有自定义模式 / "delete" 删除', required: true },
+      id: { type: "string", description: "模式 id：小写字母开头的 a-z0-9_-，不超过 40 字，如 deep_focus。create/update 均必填", required: true },
+      label: { type: "string", description: "给人看的名字（不超过 24 字）。create 必填，update 不传则保留原名" },
+      prompt: { type: "string", description: "追加到系统提示的要求，只写这个模式比默认多出来的约束（如「先给结论再给依据」）；没有就不传" },
+      tools: { type: "string", description: '工具范围："all" 不限制 / "readonly" 只读工具集 / "none" 不调用工具；也可以给逗号分隔的工具名白名单（如 project_read_file,code_search）' },
+      icon: { type: "string", description: "图标名，如 leaf / flame / zap / target；不确定就留空用默认" },
+      color: { type: "string", description: "主色，形如 #3fb950（不传用默认灰）" },
+      effort: { type: "string", description: '"low" / "medium" / "high"；不传＝跟随设置里的推理强度' },
+      rounds: { type: "number", description: "工具循环轮数上限 0-200；0 或不传＝跟随默认" },
+      model: { type: "string", description: "固定用哪个模型（填模型 id）；不传＝跟随当前主模型" },
+    },
+    async execute({ action, id, label, prompt, tools, icon, color, effort, rounds, model }, callCtx = {}) {
+      try {
+        const act = String(action || "").trim().toLowerCase();
+        if (!["create", "update", "delete"].includes(act)) {
+          return `无效的 action: ${action}。只能是 create / update / delete。`;
+        }
+        const clean = String(id || "").trim();
+        if (!/^[a-z][a-z0-9_-]{0,39}$/.test(clean)) {
+          return `无效的模式 id: ${id}。id 只能是小写字母开头的 a-z0-9_-（不超过 40 字），如 deep_focus。`;
+        }
+        if (BUILTIN_MODES.some(m => m.id === clean)) {
+          return `模式 ${clean} 是内置档（智能/对话/经济/狂暴），不能改也不能删。请换一个 id，或让用户在「扩展 → 模式」里新建一个。`;
+        }
+        const convId = callCtx.convId !== undefined ? callCtx.convId : state.currentConversationId;
+        const exists = (state.customModes || []).some(m => m.id === clean);
+
+        if (act === "delete") {
+          if (!exists) return `模式 ${clean} 不存在（内置档也删不了）。请先用正确的 id。`;
+          if (permissionModeFor(convId) === "ask") {
+            const okDel = await dlgConfirm(
+              `模型要删除回复模式「${clean}」。正选着它的会话会回落到默认模式。`,
+              { title: "删除回复模式", okText: "允许删除", cancelText: "拒绝" },
+            );
+            if (!okDel) return `用户拒绝了删除回复模式 ${clean}（未改动）。请不要重复调用本工具。`;
+          }
+          removeMode(clean);
+          return `已删除回复模式 ${clean}。正选着它的会话已回落到默认模式。`;
+        }
+
+        if (act === "update" && !exists) {
+          return `模式 ${clean} 不存在，不能 update。若是新建请用 action=create；若只是改内置档的形状，内置档不可改，请改用别的 id 新建。`;
+        }
+
+        const spec = {
+          id: clean,
+          label: typeof label === "string" && label.trim() ? label.trim() : (exists ? undefined : clean),
+          prompt: typeof prompt === "string" ? prompt : undefined,
+          icon: typeof icon === "string" ? icon : undefined,
+          color: typeof color === "string" ? color : undefined,
+          effort: typeof effort === "string" ? effort : undefined,
+          rounds: rounds === undefined || rounds === null || rounds === "" ? undefined : Number(rounds),
+          model: typeof model === "string" ? model : undefined,
+        };
+        // tools 只在真传了才动：update 不传工具范围 ＝ 保留原来的限制，而不是悄悄放开成"全部"
+        if (tools !== undefined && tools !== null) spec.tools = parseModeToolsParam(tools);
+        // undefined 的字段不进 patch：update 时未传的项保留原值
+        for (const k of Object.keys(spec)) if (spec[k] === undefined) delete spec[k];
+
+        if (permissionModeFor(convId) === "ask") {
+          const okWrite = await dlgConfirm(
+            `模型要${act === "create" ? "新建" : "修改"}回复模式「${clean}」。\n\n`
+            + `名称：${spec.label || clean}\n`
+            + `工具范围：${describeModeTools(spec.tools)}\n`
+            + `追加提示词：${spec.prompt ? (spec.prompt.length > 500 ? `${spec.prompt.slice(0, 500)}…` : spec.prompt) : "（无，沿用默认）"}\n`
+            + (spec.effort ? `推理强度：${spec.effort}\n` : "")
+            + (spec.rounds ? `最多轮数：${spec.rounds}\n` : "")
+            + "确认后可在 扩展 → 模式 里看到并继续手动调整。",
+            { title: act === "create" ? "新建回复模式" : "修改回复模式", okText: "允许写入", cancelText: "拒绝" },
+          );
+          if (!okWrite) {
+            return `用户拒绝了本次回复模式写入（${clean} 未改动）。请不要重复调用本工具，可在回复里说明这个模式的要点，或询问用户想改哪里。`;
+          }
+        }
+
+        const saved = act === "create" ? addMode(spec) : updateMode(clean, spec);
+        if (!saved) {
+          return act === "create"
+            ? `未创建：id ${clean} 与内置档或已有自定义模式冲突，或字段不合法。换一个 id（或先 update）后重发。`
+            : `未更新：字段不合法（id 不可改，其余字段请检查）。`;
+        }
+        const lines = [`已${act === "create" ? "创建" : "更新"}回复模式 ${clean}（${saved.label}）。`];
+        lines.push(`工具范围：${describeModeTools(saved.tools)}${saved.effort ? `；推理强度：${saved.effort}` : ""}${saved.rounds ? `；最多 ${saved.rounds} 轮` : ""}。`);
+        lines.push("用户可在输入框左下「回复模式」浮层里对某一场选用它，也可在 扩展 → 模式 里继续调整。");
+        return lines.join("\n");
+      } catch (e) {
+        return `写入回复模式出错: ${e.message}`;
       }
     },
   },
@@ -1379,6 +1493,7 @@ const TOOL_USE_RECIPES = [
   ["需要技能但不知名字", "skill_search 搜索 -> skill_run 调用"],
   ["用户的事像某个既有流程/说过要固化流程", "actions_list keyword=关键词 -> actions_read id=... -> 按步骤实际执行"],
   ["用户要求把流程固化成以后可复用", "actions_list 查重（有则 actions_read 读原文再覆盖）-> actions_write id=... content=SAY-1 原文（含 author: model）"],
+  ["用户要求固化一种工作方式（模式）", "mode_write action=create/update/delete id=小写 a-z0-9_- label=名称 prompt=追加要求 tools=all/readonly/none（或逗号分隔的工具名）；icon/color/effort/rounds/model 可选；内置 smart/chat/eco/turbo 只读不可改"],
   ["任务缺少关键条件（风格/受众/格式/语言等）", "user_ask question=问题 options=[选项]"],
   ["事实性问答（可查证）", "有本地证据先本地：project_files/project_read_file；查不到再 web_search 佐证，然后基于事实回答"],
   ["在海量代码中定位关键字/函数/符号", "code_search query=关键词（可 scope 缩小范围）-> project_read_file 精读"],
@@ -1816,6 +1931,22 @@ function stripToolCalls(text) {
 
 // ── 工具执行 ──────────────────────────────────
 
+/**
+ * 回复模式的工具白名单判定：null/undefined=全部；"none"=一个都不给；数组=只给这些。
+ * 收口工具（exit_target_mode / exit_autopilot）任何时候都保留——弱端点缺了它们只能靠轮数耗尽退出。
+ * 模式只由输入框那条链路显式带进来（ctx.mode）；团队 / 子代理 / 工作流 / 记忆这些
+ * 绕过输入框的后台路径一律不带，免得把"这一场少给几个工具"悄悄带进没人看着的运行里。
+ */
+function modeAllowsTool(mode, key) {
+  if (!mode) return true;
+  const allow = mode.tools;
+  if (allow === null || allow === undefined) return true;
+  if (allow === MODE_TOOLS_NONE) return false;
+  if (!Array.isArray(allow)) return true;
+  if (key === "exit_target_mode" || key === "exit_autopilot") return true;
+  return allow.includes(key);
+}
+
 async function executeTool(name, params, callCtx = {}) {
   name = normalizeToolName(name);
   params = normalizeToolParams(name, params || {});
@@ -1824,6 +1955,10 @@ async function executeTool(name, params, callCtx = {}) {
   // 关掉的工具就算模型凭记忆调了也不执行：给一句明确的停用话术，别让它反复重试烧轮数
   if (isAiToolOff(name)) {
     return { success: false, output: `[工具 ${name}] 未执行：该功能已由用户在「设置 → AI 辅助功能」中关闭，本轮请勿再调用。` };
+  }
+  // 回复模式没开放的工具同样不执行（模型照记忆调了也一样）：说清是模式所限，不是工具不存在
+  if (!modeAllowsTool(callCtx.mode, name)) {
+    return { success: false, output: `[工具 ${name}] 未执行：当前回复模式没有开放这个工具（可换用模式内已开放的工具，或让用户切到更高的模式）。` };
   }
   const validationError = validateToolCall(name, params);
   if (validationError) {
@@ -1905,6 +2040,8 @@ async function executeToolCalls(calls, ctx = {}) {
         // 归属项目：后台那一场要按它自己的项目落文件/开终端，
         // 不能拿「屏幕上那个」当根（callProject 读的就是这一项）。
         project: ctx.project || null,
+        // 回复模式的工具白名单：只有输入框那条链路显式带 mode 进来，后台路径不带＝不限制
+        mode: ctx.mode || null,
         onEvent: ctx.onEvent ? (env => ctx.onEvent(env, call, i)) : null,
       });
       // 本轮标识随结果走：预览没自动落盘时，「接受」按钮/移动 sheet 手里只有 structured，
@@ -1920,7 +2057,7 @@ async function executeToolCalls(calls, ctx = {}) {
 
 // ── 系统提示词工具段 ──────────────────────────
 
-function getToolsSystemPrompt({ minimal = false, compact = false, project = null } = {}) {
+function getToolsSystemPrompt({ minimal = false, compact = false, project = null, mode = null } = {}) {
   let s = "\n\n[可用工具]\n";
   s += "你拥有工具，可以直接操作用户的工作环境。有一条边界先说清楚：灾难级命令（清空根目录、格式化磁盘一类）由后端无条件硬拦，任何审批档位都不放行——撞到这类拒绝不要重试、不要换写法绕，直接告诉用户被拦与你的替代方案。\n\n";
   s += "**Agent 调用纪律**\n";
@@ -1933,11 +2070,11 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
   s += "6. 不确定技能是否存在时，先 skill_search 搜索确认，再决定是否 skill_run；搜到的技能与任务无关时，绝不强行使用。\n";
   s += "7. 收口纪律（循环何时结束以本条为准，其他地方提到收口都按这里）：干完活的标志是回复首行写【任务完成】，再逐项列出交付内容与验证方式——既不调收口工具也不写这个标记，系统判定为仍在推进并自动续跑。写标记之前先按模式显式收口：目标模式调 exit_target_mode、Autopilot 调 exit_autopilot（summary 写清交付了什么、怎么验证、结果如何），然后在下一条回复里给出那份最终汇报。干完了就停，不要继续多读多改来“再确认一遍”；反过来，任务没做完时不要靠停发工具、只说“已完成”或反复复述计划来结束循环。\n\n";
   s += "**工具选择速查**\n";
-  // 关掉的功能连"速查"都不提：留着配方等于把模型往一个已经摘掉的工具上引，
-  // 模型照着调只会换来一句"该功能已关闭"，白花一轮。
-  const offToolNames = Object.keys(TOOLS).filter(isAiToolOff);
+  // 关掉的功能与模式没开放的工具，连"速查"都不提：留着配方等于把模型往一个调不到的工具上引，
+  // 模型照着调只会换来一句"未开放"，白花一轮。
+  const hiddenToolNames = Object.keys(TOOLS).filter(name => isAiToolOff(name) || !modeAllowsTool(mode, name));
   for (const [scene, route] of TOOL_USE_RECIPES) {
-    if (offToolNames.some(name => route.includes(name))) continue;
+    if (hiddenToolNames.some(name => route.includes(name))) continue;
     s += `- ${scene}: ${route}\n`;
   }
   s += "\n";
@@ -1969,9 +2106,9 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
   const toolEntries = (compact || minimal
     ? CORE_AGENT_TOOLS.filter(key => TOOLS[key]).map(key => [key, TOOLS[key]])
     : Object.entries(TOOLS)
-  // 「AI 辅助功能」关掉的那几项（子代理 / 图片 / 视频）连目录里都不出现：
-  // 模型看不到的工具才不会去调，比调完被拒少烧一轮。
-  ).filter(([key]) => !isAiToolOff(key));
+  // 「AI 辅助功能」关掉的那几项（子代理 / 图片 / 视频）与当前模式没开放的工具，
+  // 连目录里都不出现：模型看不到的工具才不会去调，比调完被拒少烧一轮。
+  ).filter(([key]) => !isAiToolOff(key) && modeAllowsTool(mode, key));
 
   s += compact || minimal ? "**核心 Agent 工具**\n" : "**工具目录**\n";
   // 自进化工具是用户自己长出来的能力，模型不看目录就不知道它们存在。
@@ -2004,7 +2141,7 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
   }
 
   if (compact || minimal) {
-    const extraNames = Object.keys(TOOLS).filter(key => !CORE_AGENT_TOOLS.includes(key) && !isAiToolOff(key));
+    const extraNames = Object.keys(TOOLS).filter(key => !CORE_AGENT_TOOLS.includes(key) && !isAiToolOff(key) && modeAllowsTool(mode, key));
     if (extraNames.length) {
       s += `其他可用工具名：${extraNames.join(", ")}。不确定参数时优先使用 skill_run 调用内置技能或先读取相关上下文。\n\n`;
     }
@@ -2012,10 +2149,11 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
 
   // 远程 MCP 工具（动态注入）：按这一场的项目取生效那份（掩码关掉的整个不进目录）
   const remoteTools = catalogForScope(project).remoteTools;
-  if (remoteTools.length > 0) {
+  const visibleRemote = mode ? remoteTools.filter(rt => modeAllowsTool(mode, `mcp__${rt.serverId}__${rt.name}`)) : remoteTools;
+  if (visibleRemote.length > 0) {
     s += "### \u8fdc\u7a0b MCP \u5de5\u5177\uff08\u901a\u8fc7 skill_run \u8c03\u7528\uff09\n";
     s += "\u4ee5\u4e0b\u5de5\u5177\u6765\u81ea\u5df2\u8fde\u63a5\u7684\u5916\u90e8 MCP Server\uff0c\u901a\u8fc7 skill_run \u8c03\u7528\uff0cskill \u53c2\u6570\u683c\u5f0f\u4e3a mcp__serverId__toolName\n";
-    for (const rt of remoteTools) {
+    for (const rt of visibleRemote) {
       s += `- mcp__${rt.serverId}__${rt.name}: [${rt.server}] ${rt.description}\n`;
     }
     s += "\n";
@@ -2064,11 +2202,11 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
 // OpenAI 工具名约束 ^[a-zA-Z0-9_-]+$：直接使用 TOOLS 对象键（ASCII），
 // 中文 name 拼进 description 首行，模型仍能理解工具语义。
 
-function buildOpenAITools() {
+function buildOpenAITools(mode = null) {
   const tools = [];
   for (const [key, tool] of Object.entries(TOOLS)) {
-    // 关掉的功能连原生 schema 都不出，否则模型看得到就照样会调
-    if (isAiToolOff(key)) continue;
+    // 关掉的功能与模式没开放的工具，连原生 schema 都不出，否则模型看得到就照样会调
+    if (isAiToolOff(key) || !modeAllowsTool(mode, key)) continue;
     const properties = {};
     const required = [];
     for (const [pkey, pval] of Object.entries(tool.params || {})) {

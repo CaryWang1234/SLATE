@@ -169,9 +169,9 @@ assert.doesNotMatch(CHAT, /const REASONING_LEVELS_BY_CAP = \{/,
   "档位表只能在 store 一份：桌面再抄一份就会与后端漂移");
 assert.match(CHAT, /import \{[^}]*\breasoningCapabilityOf\b[^}]*\} from "\.\.\/store\.js/,
   "桌面必须从 store 取能力判定，本地再抄一份就会与后端漂移");
-assert.match(CHAT, /reasoning_effort: state\.reasoningEffort \|\| "auto"/,
-  "桌面每条链路都要带上档位，否则 UI 选了等于没选");
-assert.match(MCHAT, /reasoning_effort: state\.reasoningEffort \|\| "auto"/,
+assert.match(CHAT, /reasoning_effort: mode\?\.effort \|\| state\.reasoningEffort \|\| "auto"/,
+  "桌面每条链路都要带上档位（回复模式可覆盖，模式没写才回落用户档位），否则 UI 选了等于没选");
+assert.match(MCHAT, /reasoning_effort: mode\.effort \|\| state\.reasoningEffort \|\| "auto"/,
   "手机遥控发出去的请求必须走同一个档位：不带上游就按模型默认思考");
 assert.match(MSET, /\brenderEffortSection\b\([\s\S]*?\breasoningLevelsOf\(/,
   "移动端设置页要有推理强度区块，且档位来自同一张表");

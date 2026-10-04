@@ -15,13 +15,13 @@
  */
 
 import {
-  state, subscribe, setChatMode, setReasoningEffort,
+  state, subscribe, setModeFor, activeModeIdFor, modeRegistry, setReasoningEffort,
   reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS,
-} from "../store.js?v=20261003-001";
-import { get } from "../services/api.js?v=20261003-001";
-import { t } from "../services/i18n.js?v=20261003-001";
-import { iconSvgEl } from "../services/icons.js?v=20261003-001";
-import { renderStarMap, highlightStar, memberHue } from "../services/star_map.js?v=20261003-001";
+} from "../store.js?v=20261003-002";
+import { get } from "../services/api.js?v=20261003-002";
+import { t } from "../services/i18n.js?v=20261003-002";
+import { iconSvgEl } from "../services/icons.js?v=20261003-002";
+import { renderStarMap, highlightStar, memberHue } from "../services/star_map.js?v=20261003-002";
 
 const PREF_KEY = "slate_board_wf_prefs";
 const TICK_MS = 1000;
@@ -318,15 +318,9 @@ function buildRunBar() {
 
   const modeSel = document.createElement("select");
   modeSel.className = "bw-select";
-  modeSel.title = t("回复方式");
-  for (const [value, label] of [["chat", t("对话态")], ["agent", t("智能体态")]]) {
-    const o = document.createElement("option");
-    o.value = value;
-    o.textContent = label;
-    modeSel.appendChild(o);
-  }
-  // 只走 setter：聊天框那侧的同名控件与本控件共享同一份 state
-  modeSel.addEventListener("change", () => setChatMode(modeSel.value));
+  modeSel.title = t("回复模式");
+  // 只走 setter：输入框那颗胶囊与本控件共享同一份 state，改的是"这一场"的模式
+  modeSel.addEventListener("change", () => setModeFor(state.currentConversationId, modeSel.value));
 
   const effortSel = document.createElement("select");
   effortSel.className = "bw-select";
@@ -339,7 +333,7 @@ function buildRunBar() {
   bar.append(stop, resume, autopilot, modeSel, effortSel);
   bar.append(
     btn(t("去团队"), t("到对话面板的团队模式"), async () => {
-      const { openTeamConversation } = await import("../app.js?v=20261003-001");
+      const { openTeamConversation } = await import("../app.js?v=20261003-002");
       openTeamConversation?.();
     }),
   );
@@ -351,7 +345,26 @@ function buildRunBar() {
   wfRefs.autopilot = autopilot;
   wfRefs.modeSel = modeSel;
   wfRefs.effortSel = effortSel;
+  syncModeOptions();
   return bar;
+}
+
+// 模式下拉的选项来自注册表（内置四个 + 自定义），增删模式后要重画：
+// 用 id 串当签名，变了才重建，避免每次 tick 都动 DOM。
+function syncModeOptions() {
+  const sel = wfRefs?.modeSel;
+  if (!sel) return;
+  const all = modeRegistry();
+  const sig = all.map(m => m.id).join("|");
+  if (sel.dataset.sig === sig) return;
+  sel.textContent = "";
+  for (const m of all) {
+    const o = document.createElement("option");
+    o.value = m.id;
+    o.textContent = t(m.label);
+    sel.appendChild(o);
+  }
+  sel.dataset.sig = sig;
 }
 
 function syncEffortOptions() {
@@ -435,7 +448,9 @@ function patchWorkflowLive() {
   refs.resume.disabled = !wfApi?.canResume?.();
   refs.autopilot.classList.toggle("is-on", state.harness?.enabled === true);
   refs.autopilot.textContent = state.harness?.enabled === true ? t("自动推进 · 开") : t("自动推进 · 关");
-  if (refs.modeSel && refs.modeSel.value !== state.chatMode) refs.modeSel.value = state.chatMode;
+  const activeMode = activeModeIdFor(state.currentConversationId);
+  syncModeOptions();
+  if (refs.modeSel && refs.modeSel.value !== activeMode) refs.modeSel.value = activeMode;
   syncEffortOptions();
 
   const steps = Array.isArray(snap.steps) ? snap.steps : [];

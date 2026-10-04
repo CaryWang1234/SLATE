@@ -6,25 +6,25 @@
  */
 
 import {
-  state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit, effectiveConstitution,
-} from "../store.js?v=20261003-001";
-import { fmtTokens } from "../services/usage.js?v=20261003-001";
-import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261003-001";
-import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20261003-001";
-import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20261003-001";
-import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20261003-001";
-import { createAgentLoop } from "../services/agent_loop.js?v=20261003-001";
-import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20261003-001";
-import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20261003-001";
-import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20261003-001";
-import { toolLabel } from "../services/tool_meta.js?v=20261003-001";
-import { compressedThread } from "../services/thread_compress.js?v=20261003-001";
-import { autoGenerateSessionTitle } from "../services/session_title.js?v=20261003-001";
-import { renderMarkdown } from "../services/markdown.js?v=20261003-001";
-import { mToast, t } from "./m-ui.js?v=20261003-001";
-import { mountRoundSummary, renderRoundSummary } from "../components/round_summary.js?v=20261003-001";
-import { mHandleStructured } from "./m-auth.js?v=20261003-001";
-import { setTopbarTitle, switchTab } from "./m-app.js?v=20261003-001";
+  state, getModelKey, setMessages, addMessage, updateLastAssistantMessage, subscribe, estimateTokens, contextBudgetOf, takeLoopExit, effectiveConstitution, activeModeFor,
+} from "../store.js?v=20261003-002";
+import { fmtTokens } from "../services/usage.js?v=20261003-002";
+import { get, post, patch, streamChat, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261003-002";
+import { buildMessages, getDefaultParams, getOutputMaxTokens } from "../services/adapter.js?v=20261003-002";
+import { detectToolCalls, detectDsmlCalls, hasToolMarkup, stripToolCalls, hasTruncatedTail, executeToolCalls } from "../services/tools.js?v=20261003-002";
+import { dedupeToolCalls, MOBILE_TOOL_RESULT_STATUS, MOBILE_FAILED_LINE, formatToolResultForModel, buildToolFollowupInstruction, isHistorySummary } from "../services/agent_common.js?v=20261003-002";
+import { createAgentLoop } from "../services/agent_loop.js?v=20261003-002";
+import { takeBgEvents, bgWakeText, startBgPolling } from "../services/bg_tasks.js?v=20261003-002";
+import { aiModelFor, isAiFeatureOn } from "../services/ai_features.js?v=20261003-002";
+import { openRun as openLedgerRun, projectChat } from "../services/agent_ledger.js?v=20261003-002";
+import { toolLabel } from "../services/tool_meta.js?v=20261003-002";
+import { compressedThread } from "../services/thread_compress.js?v=20261003-002";
+import { autoGenerateSessionTitle } from "../services/session_title.js?v=20261003-002";
+import { renderMarkdown } from "../services/markdown.js?v=20261003-002";
+import { mToast, t } from "./m-ui.js?v=20261003-002";
+import { mountRoundSummary, renderRoundSummary } from "../components/round_summary.js?v=20261003-002";
+import { mHandleStructured } from "./m-auth.js?v=20261003-002";
+import { setTopbarTitle, switchTab } from "./m-app.js?v=20261003-002";
 
 const MAX_TOOL_ROUNDS = 8;
 const MAX_CONTINUE_ROUNDS = 6;
@@ -268,7 +268,10 @@ async function mStreamAssistant({ wrap, modelId, apiKey, baseUrl, params, signal
   let panel = null;
   const meta = {};
   const contentEl = wrap?.querySelector(".m-msg-content");
-  const messages = buildMessages(history, effectiveConstitution());
+  // 与桌面同口径：这一场生效的模式决定"有没有工具"、追加哪段提示词、推理强度用哪档
+  const mode = activeModeFor();
+  const toolMode = mode.id === "chat" ? "none" : "text";
+  const messages = buildMessages(history, effectiveConstitution(), toolMode, { mode });
   try {
     for await (const chunk of streamChat({
       model: modelId,
@@ -278,8 +281,9 @@ async function mStreamAssistant({ wrap, modelId, apiKey, baseUrl, params, signal
       base_url: baseUrl,
       temperature: params?.temperature ?? 0.7,
       max_tokens: params?.max_tokens ?? getOutputMaxTokens(),
-      // 与桌面同源：档位存在 store 里（desktop_state.json），手机遥控时不该回落到 auto
-      reasoning_effort: state.reasoningEffort || "auto",
+      // 与桌面同源：档位存在 store 里（desktop_state.json），手机遥控时不该回落到 auto；
+      // 模式强制档（经济 low / 狂暴 high）优先于输入栏选的那档
+      reasoning_effort: mode.effort || state.reasoningEffort || "auto",
       stream: true,
       signal,
       meta,
@@ -492,6 +496,7 @@ const mobileAgentLoop = createAgentLoop({ policy: mobilePolicy, view: mobileView
  */
 async function mRunToolLoop(wrap, modelId, apiKey, baseUrl, params, signal) {
   // 本循环归属会话：之后即使切换到新会话，旧循环也只读写自己的会话
+  const mode = activeModeFor();
   await mobileAgentLoop({
     bubble: wrap,
     modelId,
@@ -499,7 +504,10 @@ async function mRunToolLoop(wrap, modelId, apiKey, baseUrl, params, signal) {
     baseUrl,
     params,
     signal,
-    maxRounds: MAX_TOOL_ROUNDS,
+    // 模式给了轮数就用它（经济 12 / 狂暴 40），没给才用移动端默认的 8
+    maxRounds: Number(mode.rounds) > 0 ? Number(mode.rounds) : MAX_TOOL_ROUNDS,
+    // 白名单一路带到工具执行（mobileIo.execute → executeToolCalls → tools.js modeAllowsTool）
+    mode,
     genConvId: state.currentConversationId,
   });
 }
@@ -563,9 +571,12 @@ export async function mSendMessage(rawText) {
     return;
   }
 
-  const modelId = state.currentModel.id;
+  // 模式也可以指定模型（自定义模式才有）：连 base_url / Key 一起换
+  const mobileMode = activeModeFor();
+  const sendModel = (mobileMode.model && findModelById(mobileMode.model)) || state.currentModel;
+  const modelId = sendModel.id;
   const apiKey = getModelKey(modelId) || "";
-  const baseUrl = state.currentModel.base_url || "";
+  const baseUrl = sendModel.base_url || "";
   const params = getDefaultParams(modelId);
   _generating = true;
   _abortCtrl = new AbortController();

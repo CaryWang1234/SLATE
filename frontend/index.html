@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20261003-001">
+  <link rel="stylesheet" href="./css/style.css?v=20261003-002">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -170,10 +170,15 @@
                       </div>
                     </div>
                   </div>
-                  <select id="chat-mode-select" class="input-pill-select" title="回复方式">
-                    <option value="agent">智能体</option>
-                    <option value="chat">对话</option>
-                  </select>
+                  <!-- 回复模式：这一场随时可改，模式本体（提示词/工具/旋钮）见 store.js 注册表，
+                       浮层由 components/mode_picker.js 渲染 -->
+                  <div class="mode-picker" id="mode-picker">
+                    <button id="btn-mode" class="mode-pill" type="button" title="回复模式" aria-haspopup="dialog" aria-expanded="false" aria-controls="mode-pop">
+                      <span class="mode-pill-icon" id="mode-pill-icon"></span>
+                      <span class="mode-pill-label" id="mode-pill-label">智能</span>
+                    </button>
+                    <div id="mode-pop" class="mode-pop hidden" role="dialog" aria-label="回复模式"></div>
+                  </div>
                   <!-- 审批模式：这一场随时可改，四档语义见 components/approval_picker.js -->
                   <div class="approval-picker" id="approval-picker">
                     <button id="btn-approval" class="approval-pill" type="button" title="审批模式：AI 什么时候该停下来问你可不可以" aria-haspopup="dialog" aria-expanded="false" aria-controls="approval-pop">
@@ -431,6 +436,20 @@
               </div>
             </div>
             <div id="ext-tool-list" class="skill-list ext-list"></div>
+          </section>
+
+          <section class="ext-section" data-ext="modes">
+            <div class="ext-head">
+              <div class="ext-head-text">
+                <h2>模式 <span class="ext-count" id="ext-modes-count">0</span></h2>
+                <p>回复模式决定这一场用哪套提示词、开放哪些工具；内置四档只读，自定义模式可增改删</p>
+              </div>
+              <div class="skill-upload">
+                <button id="btn-ext-mode-new" class="icon-btn" title="新建自定义回复模式">+ 新建模式</button>
+                <button id="btn-ext-mode-refresh" class="icon-btn" title="重新读取模式表"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>刷新</span></button>
+              </div>
+            </div>
+            <div id="ext-mode-list" class="skill-list ext-list"></div>
           </section>
 
           <section class="ext-section" data-ext="evolved">
@@ -1135,6 +1154,79 @@
     </div>
   </div>
 
+  <!-- ══ 回复模式编辑器（内置四档只读，自定义模式在这里增改删）══ -->
+  <div id="mode-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content mode-modal-content">
+      <div class="modal-header">
+        <span id="mode-modal-title">回复模式</span>
+        <button class="modal-close icon-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="mode-builtin-note" class="mode-builtin-note hidden"></div>
+        <div class="mode-form">
+          <div class="mode-form-row">
+            <label class="setting-label" for="mode-f-id">id</label>
+            <input id="mode-f-id" class="setting-input" type="text" spellcheck="false" placeholder="deep_focus（小写字母开头，创建后不可改）">
+          </div>
+          <div class="mode-form-row">
+            <label class="setting-label" for="mode-f-label">名称</label>
+            <input id="mode-f-label" class="setting-input" type="text" placeholder="深度专注">
+          </div>
+          <div class="mode-form-row">
+            <label class="setting-label">图标</label>
+            <div id="mode-f-icons" class="mode-icon-pick"></div>
+          </div>
+          <div class="mode-form-row">
+            <label class="setting-label" for="mode-f-color">颜色</label>
+            <div class="mode-color-row">
+              <input id="mode-f-color" class="mode-color-input" type="color" value="#7c8cff">
+              <div id="mode-f-swatches" class="mode-swatches"></div>
+            </div>
+          </div>
+          <div class="mode-form-row">
+            <label class="setting-label" for="mode-f-prompt">追加提示词</label>
+            <textarea id="mode-f-prompt" class="setting-input mode-prompt-input" rows="5" spellcheck="false" placeholder="写在这个模式下发前追加给模型的要求；留空则不加"></textarea>
+          </div>
+          <div class="mode-form-row">
+            <label class="setting-label" for="mode-f-tools-scope">可用工具</label>
+            <select id="mode-f-tools-scope" class="setting-input">
+              <option value="all">全部工具（不限制）</option>
+              <option value="readonly">只读工具（读文件 / 搜索 / 查看，不改不动）</option>
+              <option value="none">不调用工具（单轮直答）</option>
+              <option value="custom">自定义白名单…</option>
+            </select>
+            <div id="mode-f-tools-pick" class="mode-tools-grid hidden"></div>
+          </div>
+          <div class="mode-form-row mode-form-inline">
+            <div>
+              <label class="setting-label" for="mode-f-effort">推理强度</label>
+              <select id="mode-f-effort" class="setting-input">
+                <option value="">跟随设置</option>
+                <option value="low">低</option>
+                <option value="medium">中</option>
+                <option value="high">高</option>
+              </select>
+            </div>
+            <div>
+              <label class="setting-label" for="mode-f-rounds">最多轮数</label>
+              <input id="mode-f-rounds" class="setting-input" type="number" min="0" max="200" step="1" placeholder="0 = 跟随默认">
+            </div>
+            <div>
+              <label class="setting-label" for="mode-f-model">指定模型</label>
+              <select id="mode-f-model" class="setting-input"></select>
+            </div>
+          </div>
+          <div id="mode-form-msg" class="mode-form-msg"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-mode-delete" class="dlg-btn dlg-btn-danger">删除</button>
+        <button id="btn-mode-save" class="send-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ 打开项目弹窗 ══ -->
   <div id="project-open-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
@@ -1657,7 +1749,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20261003-001"></script>
+  <script type="module" src="./js/app.js?v=20261003-002"></script>
 
 </body>
 </html>

@@ -19,8 +19,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20261003-001";
-import { memberHue, roleRank, starPositions } from "../frontend/js/services/star_map.js?v=20261003-001";
+import { EN_DICT } from "../frontend/js/services/i18n_dict.js?v=20261003-002";
+import { memberHue, roleRank, starPositions } from "../frontend/js/services/star_map.js?v=20261003-002";
 
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 const WF = read("../frontend/js/components/board_workflow.js");
@@ -65,7 +65,7 @@ for (const banned of ["setBoardCards(", "renderAllCards(", "drawArrows(", "state
 // 只读比较（=== true）可以，赋值会把 store 的 notify 绕过
 assert.ok(!/state\.(chatMode|reasoningEffort|harness(?:\.\w+)?)\s*=[^=]/.test(WF),
   "不得直接改 state 字段，走 store 的 setter");
-assert.match(WF, /setChatMode\(modeSel\.value\)/, "回复方式必须经 setChatMode");
+assert.match(WF, /setModeFor\(state\.currentConversationId, modeSel\.value\)/, "回复模式必须经 setModeFor（改的是这一场）");
 assert.match(WF, /setReasoningEffort\(effortSel\.value\)/, "思考档位必须经 setReasoningEffort");
 // 运行现场由 chat.js 注入而不是反向 import：chat.js 已 import whiteboard.js
 assert.ok(!WF.includes('from "../components/chat.js"'), "board_workflow 不得 import chat.js（会成环）");

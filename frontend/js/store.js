@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20261003-001";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261003-001";
+import { makeId } from "./services/utils.js?v=20261003-002";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261003-002";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -92,6 +92,47 @@ function normalizeImportedFonts(value) {
 // 这两个常量放在 state 之前：state 的默认值要用它，声明在后会踩 TDZ。
 const PERMISSION_MODE_IDS = ["ask", "auto", "full", "night"];
 const PERMISSION_MODE_SCHEMA = 2;
+
+// ── 回复模式注册表：输入栏那个选择器认的取值 ──────────────────
+// 内置四模式由这张表定义，输入栏浮层与扩展页都从这里取（一处改、两处同）。
+// 字段含义：
+//   id      稳定标识；也是自定义模式的键与"每场覆盖"的键
+//   label   显示名（i18n 键由 id 拼，见 i18n_dict）
+//   icon    services/icons.js 里的图标名
+//   color   胶囊主色（CSS 变量或 hex）
+//   prompt  追加到系统提示词末尾的一段（空 = 不加）
+//   tools   null=全部工具；"none"=一个都不给；数组=白名单（收口的 exit_* 始终保留，见 tools.js）
+//   effort  ""=沿用输入栏选的推理强度；low/medium/high=这一档强制覆盖（后端仍按模型能力映射）
+//   rounds  0=沿用全局轮数上限；否则覆盖这一场目标模式的轮数上限
+//   model   ""=沿用当前模型；否则覆盖（内置一律不带，避免切模式时悄悄换模型）
+// 前两个就是旧的 chatMode 两值：smart≈agent，chat≈chat，所以老存档零迁移。
+const MODE_TOOLS_NONE = "none";
+// 经济模式只给"读"的工具：看得到项目与技能目录，写不了盘、跑不了命令、花不了生成额度。
+// 收口工具（exit_target_mode / exit_autopilot）由 tools.js 的白名单过滤无条件保留。
+const MODE_READONLY_TOOLS = [
+  "project_info", "project_files", "project_read_file", "project_find_file",
+  "code_search", "skill_search", "board_read", "knowledge_search",
+  "actions_list", "actions_read", "system_info", "chat_context",
+  "todo_manage", "user_ask",
+];
+// 输入栏浮层最多同时显示几个（内置四个常驻，剩下的位子留给最近建的自定义模式）。
+const MODE_POPOVER_MAX = 7;
+
+const BUILTIN_MODES = [
+  { id: "smart", label: "智能", icon: "tool", color: "var(--text)", prompt: "", tools: null, effort: "", rounds: 0, model: "" },
+  { id: "chat", label: "对话", icon: "message-circle", color: "#2fd4c4", prompt: "", tools: MODE_TOOLS_NONE, effort: "", rounds: 1, model: "" },
+  {
+    id: "eco", label: "经济", icon: "leaf", color: "#3fb950",
+    prompt: "用最少步骤和最少 token 完成任务，能直接回答就直接回答，不要为了交代过程而绕远。",
+    tools: MODE_READONLY_TOOLS, effort: "low", rounds: 12, model: "",
+  },
+  {
+    id: "turbo", label: "狂暴", icon: "flame", color: "#ff7a45",
+    prompt: "尽快把任务做完，必要时多轮并行调用工具，中途不要停下来等确认；只有确实缺关键条件时才提问。",
+    tools: null, effort: "high", rounds: 40, model: "",
+  },
+];
+const BUILTIN_MODE_IDS = BUILTIN_MODES.map(m => m.id);
 
 const state = {
   // 主题
@@ -265,12 +306,24 @@ const state = {
   // （与 continueAutopilot 同一条理由）。
   keepAwakeOnNightRun: true,
 
-  // 回复模式：agent=智能体（可调用工具、多轮自主循环）| chat=对话（单轮直答，不发工具也不注入工具目录）
+  // 旧 chatMode 键：现在只是"这一场是不是对话模式"的二值投影（由 activeModeId 推出，
+  // 见 legacyChatModeOf）。存档里留着它是为了让老版本/老读取点照旧工作；
+  // 读模式请用 activeModeFor / activeModeIdFor。
   chatMode: "agent",
 
   // 推理强度：auto=沿用模型默认（不下发字段）| off=关 | low/medium/high=档位递增
   // 实际下发字段由后端按模型 reasoning 能力映射；能力为 none 的模型一律不下发
   reasoningEffort: "auto",
+
+  // 回复模式注册表：内置四模式固定在 store.js 的 BUILTIN_MODES，这里只放用户/模型自建的。
+  // 每个条目是 normalizeModeSpec 归一后的形状（id/label/icon/color/prompt/tools/effort/rounds/model）。
+  customModes: [],
+  // 全局默认模式（设置页/扩展页改的是它）：没单独挑过的场跟着走。与 permissionMode 同层。
+  activeModeId: "smart",
+  // 每一场对话自己的回复模式（convId → modeId）：没单独选过的场沿用上面那个默认档。
+  // 键 "" 是"还没建起来的这一场"——发送时会搬给新建的会话（adoptConversationMode）。
+  // 刻意不跨设备同步：与 permissionModeByConversation 同一条理由，模式还牵着这一场用哪些工具。
+  modeByConversation: {},
 
   // 联网搜索配置：engine=auto（Bing+DDG 合并）/ bing / ddg；renderJs=auto（正文过短自动渲染）/ on / off
   webSearch: { engine: "auto", renderJs: "auto" },
@@ -366,6 +419,9 @@ function buildPersistentData() {
     keepAwakeOnNightRun: state.keepAwakeOnNightRun !== false,
     chatMode: normalizeChatMode(state.chatMode),
     reasoningEffort: state.reasoningEffort,
+    customModes: normalizeCustomModes(state.customModes),
+    activeModeId: normalizeModeId(state.activeModeId),
+    modeByConversation: normalizeModeMap(state.modeByConversation),
     webSearch: normalizeWebSearch(state.webSearch),
     imageGen: normalizeGenConfig(state.imageGen),
     videoGen: normalizeGenConfig(state.videoGen),
@@ -416,6 +472,78 @@ function normalizeChatMode(value) {
 // 推理强度取值域：auto=不下发；off/low/medium/high=后端按模型能力映射成厂商字段
 function normalizeReasoningEffort(value) {
   return ["auto", "off", "low", "medium", "high"].includes(value) ? value : "auto";
+}
+
+// 模式 → 旧 chatMode 二值投影：只有「对话」模式是单轮直答，其余都按智能体跑。
+// 旧的 chatMode 键在存档里留着（老版本读到它也照旧工作），但写只写这个投影，读以模式为准。
+function legacyChatModeOf(modeId) {
+  return modeId === "chat" ? "chat" : "agent";
+}
+
+// 模式色：只接受 hex 或 var(--x)，别的一律回落中性灰——它要直接进 CSS，脏字符串不能进。
+function normalizeModeColor(value) {
+  const v = String(value || "").trim();
+  if (/^#[0-9a-fA-F]{3,8}$/.test(v)) return v;
+  if (/^var\(--[a-z0-9-]+\)$/.test(v)) return v;
+  return "#8b949e";
+}
+
+// 自定义模式条目归一：脏字段丢干净；id 与内置冲突或为空一律判废（返回 null）。
+function normalizeModeSpec(raw) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  const text = (v, n) => String(v || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, n);
+  const id = text(src.id, 40).replace(/[^\w-]/g, "");
+  if (!id || BUILTIN_MODE_IDS.includes(id)) return null;
+  let tools = src.tools;
+  if (tools !== null && tools !== MODE_TOOLS_NONE) {
+    tools = Array.isArray(tools) ? tools.map(x => text(x, 40)).filter(Boolean).slice(0, 80) : null;
+  }
+  return {
+    id,
+    label: text(src.label, 24) || id,
+    icon: text(src.icon, 32) || "tool",
+    color: normalizeModeColor(src.color),
+    prompt: text(src.prompt, 2000),
+    tools,
+    effort: ["low", "medium", "high"].includes(src.effort) ? src.effort : "",
+    rounds: Math.min(200, Math.max(0, Math.round(Number(src.rounds) || 0))),
+    model: text(src.model, 80),
+  };
+}
+
+/** 自定义模式表：逐条归一、按 id 去重、上限 60（再多选择器也放不下，还会拖慢每次读） */
+function normalizeCustomModes(value) {
+  const src = Array.isArray(value) ? value : [];
+  const out = [];
+  const seen = new Set();
+  for (const raw of src) {
+    const spec = normalizeModeSpec(raw);
+    if (!spec || seen.has(spec.id)) continue;
+    seen.add(spec.id);
+    out.push(spec);
+    if (out.length >= 60) break;
+  }
+  return out;
+}
+
+/** 模式 id 值域：认不出的（手改存档、旧版本残留）一律回落 smart。 */
+function normalizeModeId(value) {
+  const id = String(value || "").trim();
+  if (!id) return "smart";
+  if (BUILTIN_MODE_IDS.includes(id)) return id;
+  return (state.customModes || []).some(m => m.id === id) ? id : "smart";
+}
+
+// 每场的模式选择：这里刻意宽松（只要是非空字符串就留着），因为加载时自定义模式可能还没到位；
+// 真正认不出的 id 由 activeModeIdFor 读的时候回落 smart，不会拿脏值去查表白名单。
+function normalizeModeMap(value) {
+  const src = value && typeof value === "object" ? value : {};
+  const out = {};
+  for (const [k, v] of Object.entries(src)) {
+    const id = String(v || "").trim();
+    if (id) out[String(k)] = id;
+  }
+  return out;
 }
 
 // ── 模型能力 → 可选推理强度档位 ──────────────────────────────
@@ -556,6 +684,10 @@ function getSharedPersistentData(data = buildPersistentData()) {
     permissionModeSchema: PERMISSION_MODE_SCHEMA,
     chatMode: normalizeChatMode(data.chatMode),
     reasoningEffort: normalizeReasoningEffort(data.reasoningEffort),
+    // 模式注册表与全局默认档跟着同步：内置四模式在每个设备都一样，自定义模式与"默认挑哪个"
+    // 是账号级偏好，手机上该看到同一套（这一场挑的模式不同步，见 state.modeByConversation）。
+    customModes: normalizeCustomModes(data.customModes),
+    activeModeId: normalizeModeId(data.activeModeId),
     // 排序偏好同步；taskFlags 不同步（未读是本机概念），所以这里刻意没有它
     taskListSort: normalizeTaskListSort(data.taskListSort),
     webSearch: normalizeWebSearch(data.webSearch),
@@ -690,7 +822,16 @@ function loadPersistent() {
     state.permissionModeSchema = PERMISSION_MODE_SCHEMA;
     // 老状态文件没这个键：读成 undefined 时按默认值（开启）走，与 continueAutopilot 同一口径
     state.keepAwakeOnNightRun = data.keepAwakeOnNightRun !== false;
-    state.chatMode = normalizeChatMode(data.chatMode);
+    state.customModes = normalizeCustomModes(data.customModes);
+    if (Object.prototype.hasOwnProperty.call(data, "activeModeId")) {
+      state.activeModeId = normalizeModeId(data.activeModeId);
+      state.chatMode = legacyChatModeOf(state.activeModeId);
+    } else {
+      // 更老的本地快照只有 chatMode 两值：按 agent/chat 落到 smart/chat
+      state.chatMode = normalizeChatMode(data.chatMode);
+      state.activeModeId = state.chatMode === "chat" ? "chat" : "smart";
+    }
+    state.modeByConversation = normalizeModeMap(data.modeByConversation);
     state.reasoningEffort = normalizeReasoningEffort(data.reasoningEffort);
     state.webSearch = normalizeWebSearch(data.webSearch);
     state.imageGen = normalizeGenConfig(data.imageGen);
@@ -775,8 +916,17 @@ async function loadSharedPersistent() {
       state.permissionMode = normalizePermissionMode(migratePermissionModes(data).mode);
       state.permissionModeSchema = PERMISSION_MODE_SCHEMA;
     }
-    if (Object.prototype.hasOwnProperty.call(data, "chatMode")) {
+    if (Array.isArray(data.customModes)) {
+      state.customModes = normalizeCustomModes(data.customModes);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "activeModeId")) {
+      // 有新模式键就以它为准（自定义模式此刻已装配好，normalizeModeId 能查到它们）
+      state.activeModeId = normalizeModeId(data.activeModeId);
+      state.chatMode = legacyChatModeOf(state.activeModeId);
+    } else if (Object.prototype.hasOwnProperty.call(data, "chatMode")) {
+      // 老存档没有 activeModeId：按旧 chatMode 两值落到 smart/chat，零迁移
       state.chatMode = normalizeChatMode(data.chatMode);
+      state.activeModeId = state.chatMode === "chat" ? "chat" : "smart";
     }
     if (Object.prototype.hasOwnProperty.call(data, "reasoningEffort")) {
       state.reasoningEffort = normalizeReasoningEffort(data.reasoningEffort);
@@ -876,12 +1026,132 @@ function forgetConversationPermissionMode(convId) {
   savePersistent();
 }
 
-function setChatMode(mode) {
-  const next = normalizeChatMode(mode);
-  if (state.chatMode === next) return;
-  state.chatMode = next;
+// ── 回复模式：注册表与这一场生效哪一个 ────────────────────────
+// 内置四模式不可删改（语义来自用户指定）；自定义模式可增删改。每场可各挑一个，
+// 没挑过的场沿用全局默认 activeModeId；新会话从默认档重新开始（搬走不复制，与审批档同）。
+
+/** 全部模式的只读视图：内置四个在前，自定义在后（新建的在前，浮层先看到最新的）。 */
+function modeRegistry() {
+  return [...BUILTIN_MODES.map(m => ({ ...m })), ...(state.customModes || []).map(m => ({ ...m }))];
+}
+
+/** 按 id 取模式；认不出的 id 回落 smart，绝不返回 undefined 让调用点自己防。 */
+function modeById(id) {
+  const key = String(id || "");
+  return modeRegistry().find(m => m.id === key) || { ...BUILTIN_MODES[0] };
+}
+
+/** 这一场生效的模式 id。convId 传空 = 还没建起来的这一场（键 ""）。 */
+function activeModeIdFor(convId = state.currentConversationId) {
+  const picked = state.modeByConversation[String(convId || "")];
+  if (picked && modeRegistry().some(m => m.id === picked)) return picked;
+  const def = String(state.activeModeId || "");
+  return modeRegistry().some(m => m.id === def) ? def : "smart";
+}
+
+/** 这一场生效的模式对象（含 prompt / tools / effort / rounds / model）。 */
+function activeModeFor(convId = state.currentConversationId) {
+  return modeById(activeModeIdFor(convId));
+}
+
+/** 只给这一场挑一个模式；不传 convId 就是给"屏幕上这一场"挑。 */
+function setModeFor(convId, id) {
+  const key = String(convId || "");
+  const next = String(id || "");
+  if (!modeRegistry().some(m => m.id === next)) return;
+  if (state.modeByConversation[key] === next) return;
+  state.modeByConversation = { ...state.modeByConversation, [key]: next };
   savePersistent();
+  notify("mode", activeModeIdFor(key));
+}
+
+/** 扩展页/浮层改的是全局默认模式：没单独挑过的场跟着变，所以订阅者要重画。 */
+function setDefaultMode(id) {
+  const next = modeRegistry().some(m => m.id === String(id)) ? String(id) : "smart";
+  if (state.activeModeId === next) return;
+  state.activeModeId = next;
+  state.chatMode = legacyChatModeOf(next);
+  savePersistent();
+  notify("mode", activeModeIdFor(state.currentConversationId));
   notify("chatMode", state.chatMode);
+}
+
+/**
+ * 发送途中才建出会话：把"还没建起来的这一场"选的模式搬给它。
+ * 与审批档同理——搬走而非复制，否则一次"这轮用狂暴跑"会悄悄生效到以后每一场新对话。
+ */
+function adoptConversationMode(convId) {
+  const key = String(convId || "");
+  if (!key || !Object.prototype.hasOwnProperty.call(state.modeByConversation, "")) return;
+  const pending = state.modeByConversation[""];
+  const rest = { ...state.modeByConversation };
+  delete rest[""];
+  state.modeByConversation = { ...rest, [key]: pending };
+  savePersistent();
+  notify("mode", activeModeIdFor(key));
+}
+
+/** 会话删掉了，它那份模式选择跟着清掉（不然残留键会一直躺在状态文件里）。 */
+function forgetConversationMode(convId) {
+  const key = String(convId || "");
+  if (!Object.prototype.hasOwnProperty.call(state.modeByConversation, key)) return;
+  const rest = { ...state.modeByConversation };
+  delete rest[key];
+  state.modeByConversation = rest;
+  savePersistent();
+}
+
+/** 新建自定义模式（扩展页手写或模型自建都走这里）。id 重复或与内置冲突则判废返回 null。 */
+function addMode(spec) {
+  const clean = normalizeModeSpec(spec);
+  if (!clean) return null;
+  if ((state.customModes || []).some(m => m.id === clean.id)) return null;
+  state.customModes = [clean, ...(state.customModes || [])].slice(0, 60);
+  savePersistent();
+  notify("modes", modeRegistry());
+  notify("mode", activeModeIdFor(state.currentConversationId));
+  return clean;
+}
+
+/** 改一个自定义模式：只补进来的字段，id 不可改（它同时是别人选中它的键）。 */
+function updateMode(id, patch) {
+  const key = String(id || "");
+  const idx = (state.customModes || []).findIndex(m => m.id === key);
+  if (idx < 0) return null;
+  const merged = normalizeModeSpec({ ...state.customModes[idx], ...(patch || {}), id: key });
+  if (!merged) return null;
+  const next = [...state.customModes];
+  next[idx] = merged;
+  state.customModes = next;
+  savePersistent();
+  notify("modes", modeRegistry());
+  notify("mode", activeModeIdFor(state.currentConversationId));
+  return merged;
+}
+
+/** 删一个自定义模式：谁正选着它就回落默认档，不然会留下指向不存在模式的悬空选择。 */
+function removeMode(id) {
+  const key = String(id || "");
+  if (!(state.customModes || []).some(m => m.id === key)) return false;
+  state.customModes = state.customModes.filter(m => m.id !== key);
+  const rest = {};
+  for (const [k, v] of Object.entries(state.modeByConversation)) if (v !== key) rest[k] = v;
+  state.modeByConversation = rest;
+  if (state.activeModeId === key) {
+    state.activeModeId = "smart";
+    state.chatMode = legacyChatModeOf("smart");
+    notify("chatMode", state.chatMode);
+  }
+  savePersistent();
+  notify("modes", modeRegistry());
+  notify("mode", activeModeIdFor(state.currentConversationId));
+  return true;
+}
+
+// 旧的二值入口（agent/chat）保留为薄封装：内部就是 setDefaultMode(smart|chat)，
+// 单一真源不让两套写法各自跑偏。新代码请直接用 setDefaultMode / setModeFor。
+function setChatMode(mode) {
+  setDefaultMode(normalizeChatMode(mode) === "chat" ? "chat" : "smart");
 }
 
 function setReasoningEffort(level) {
@@ -1674,6 +1944,11 @@ export {
   getContextWindow, setModelContextWindow, contextWindowSource, normalizeContextWindow, CONTEXT_WINDOW_MIN, CONTEXT_WINDOW_MAX,
   setActiveExpertId,
   setChatMode, setReasoningEffort, normalizeChatMode, normalizeReasoningEffort,
+  // 回复模式注册表：输入栏浮层与扩展页共用的读与写（提示词/白名单/旋钮接线见 tools.js 与 adapter.js）
+  BUILTIN_MODES, MODE_READONLY_TOOLS, MODE_POPOVER_MAX, MODE_TOOLS_NONE,
+  modeRegistry, modeById, activeModeIdFor, activeModeFor,
+  setModeFor, setDefaultMode, adoptConversationMode, forgetConversationMode,
+  addMode, updateMode, removeMode,
   setHarnessEnabled, requestLoopExit, takeLoopExit,
   REASONING_LEVELS_BY_CAP, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS, getModelDefinition,
   resetUsage, restoreUsageForConversation, setConversationUsage, addUsage, estimateTokens,

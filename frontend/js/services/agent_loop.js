@@ -21,9 +21,9 @@
  * 约定：policy 返回的模型可见字符串不被 t() 包裹（t() 只包用户可见文本）。
  */
 
-import { state, addMessage } from "../store.js?v=20261003-001";
-import { stripToolCalls } from "./tools.js?v=20261003-001";
-import { _pendingToolMsgs, releasePendingFor } from "./agent_common.js?v=20261003-001";
+import { state, addMessage } from "../store.js?v=20261003-002";
+import { stripToolCalls } from "./tools.js?v=20261003-002";
+import { _pendingToolMsgs, releasePendingFor } from "./agent_common.js?v=20261003-002";
 
 export function createAgentLoop({ policy = {}, view = {}, io }) {
   const reasonOf = (key) => policy.exitReasons?.[key] ?? "";
@@ -167,6 +167,9 @@ export function createAgentLoop({ policy = {}, view = {}, io }) {
               convId: genConvId || state.currentConversationId || "",
               // 归属项目：后台那场要按它自己的项目根落文件/开终端（见 services/tools.js callProject）
               project: opts.project || null,
+              // 回复模式的工具白名单：宿主（输入框那条链路）显式带进来才生效，
+              // 团队 / 子代理这些自己起循环的路径没有这一项＝不限制工具
+              mode: opts.mode || null,
               // 账本 callId 交给执行器透传：派生型工具（subagent_run）据此把 spawn 边
               // 挂到自己的那一行上，星图才认得出谁派生了谁
               callIdFor: (i) => (ledger ? ledger.callId(run.round, i) : ""),

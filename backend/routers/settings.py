@@ -66,6 +66,11 @@ async def save_shared_state(req: SharedStateRequest):
         "permissionModeSchema",
         "chatMode",
         "reasoningEffort",
+        # 回复模式注册表：内置四模式写死在前端，这里只同步用户/模型自建的条目与
+        # "默认挑哪个"（activeModeId）。每一场各挑的模式刻意不收：它牵着这一场用哪些
+        # 工具、追加哪段提示词，是"这一场怎么跑"，同步到别的设备只会张冠李戴。
+        "customModes",
+        "activeModeId",
         # 侧栏任务列表的排序偏好。刻意不收 taskFlags：那条映射记的是"这块屏幕有没有看过"，
         # 跨设备同步只会把另一台机器的阅读进度盖过来。
         "taskListSort",

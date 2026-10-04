@@ -23,9 +23,9 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   MAX_ROUNDS, COLLECT_RE, firstRoundPrompt, grindRoundPrompt, collectingPrompt,
-} from "../frontend/js/services/grind.js?v=20261003-001";
+} from "../frontend/js/services/grind.js?v=20261003-002";
 // 与 chat.js 用同一条 ?v= 说明符，否则 Node 里载入的是第二份实例（纯函数也读不到同一份状态）
-const { effectiveToolMode, detectToolCalls, TOOLS } = await import("../frontend/js/services/tools.js?v=20261003-001");
+const { effectiveToolMode, detectToolCalls, TOOLS } = await import("../frontend/js/services/tools.js?v=20261003-002");
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 let checks = 0;
@@ -78,7 +78,7 @@ must(new RegExp(`async function autoAdvanceIfStalled\\([^)]*\\)${stallGap}\\{${s
   "停顿合工具（autoAdvance）在磨墨场次里关掉：它会把「系统建议的最小动作」塞回给模型");
 must(new RegExp(`async function autoReviewIfStalled\\([^)]*\\)${stallGap}\\{${stallGap}if \\(grindGuardOn\\(genConvId\\)\\) return msgEl;`).test(chat),
   "停顿审查（autoReview）在磨墨场次里关掉：审查模型的提示词就是「如果需要推进，只输出工具调用块」——那等于系统自己催磨墨开工");
-must(/runToolLoop\(msgEl, modelId, apiKey, baseUrl, params, signal, toolRounds, \{ autopilot: autopilotOn \}, run\)/.test(chat),
+must(/runToolLoop\(msgEl, modelId, apiKey, baseUrl, params, signal, toolRounds, \{ autopilot: autopilotOn(?:, mode: sendMode)? \}, run\)/.test(chat),
   "内核拿到的 autopilot 就是上面这个被压过的值（没在别处被写回 true）");
 const gate = `grindSession && grindSession\\.state !== "done"\\s*&& state\\.currentConversationId === grindSession\\.conversation_id`;
 const near = "[\\s\\S]{0,600}?";
@@ -120,10 +120,10 @@ must(/送入目标模式/.test(noToolBranch),
 must(/withTools: toolMode !== "none",\s*grindTurn: opts\.grindTurn === true,/.test(adapter),
   "buildMessages 把磨墨标记交给 buildSystemContent（否则分岔永远走对话那条）");
 must(/meta: streamMeta, grindTurn: grindTurnOn/.test(chat)
-  && /let toolMode = effectiveToolMode\(model, provider, state\.chatMode, grindTurn\)/.test(chat),
-  "首轮请求把这一轮的认定交给统一流式入口，入口据此算 toolMode");
+  && /let toolMode = effectiveToolMode\(model, provider, modeChat, grindTurn\)/.test(chat),
+  "首轮请求把这一轮的认定交给统一流式入口，入口据此算 toolMode（对话态由生效模式推出）");
 must(/const grindTurn = grindGuardOn\(convId\);/.test(chat)
-  && /effectiveToolMode\(modelId, [^,]+, state\.chatMode, grindTurn\)/.test(chat),
+  && /effectiveToolMode\(modelId, [^,]+, mode\.id === "chat" \? "chat" : "agent", grindTurn\)/.test(chat),
   "长墨稿被截断后的续写请求同样不带工具（续写时把目录发回去，禁令就成了上一轮说过的话）");
 must(/meta: regenMeta, grindTurn: grindGuardOn\(regenConvId\)/.test(chat),
   "重新生成那一笔请求现读归属会话是否还在磨墨（不是照屏幕上那场算）");
