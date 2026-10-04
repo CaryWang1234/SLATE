@@ -6,7 +6,7 @@
 ;       应用界面语言在后续步骤另选（见 [Code] LangPage）
 ; ─────────────────────────────────────────────────────────────
 
-#define MyAppName "SLATE 砚"
+#define MyAppName "SLATE"
 ; 版本号唯一事实源，允许预发布后缀：0.4.5 / 0.4.5-beta1 / 0.4.5-rc1。
 ; 命令行或 CI 用 /DMyAppVersion=<去掉 v 的 tag> 注入时，本行默认值不生效。
 #ifdef MyAppVersion
