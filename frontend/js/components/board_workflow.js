@@ -2,7 +2,7 @@
  * SLATE 黑板 · 工作流视图
  *
  * 一屏三件事：这一场对话的**运行控制**（启停 / 续跑 / 自动推进 / 回复方式 / 思考档位）、
- * **可跑的流程说明书**（data/actions/*.yml，卡片人类可读、就地可操作）、
+ * **可运行的流程说明书**（data/actions/*.yml，卡片人类可读、就地可操作）、
  * **团队星图**（分角色的真实历史，见 services/star_map.js）。
  *
  * 三条硬约束（都是这个仓库踩过的坑）：
@@ -17,11 +17,11 @@
 import {
   state, subscribe, setModeFor, activeModeIdFor, modeRegistry, setReasoningEffort,
   reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS,
-} from "../store.js?v=20261003-003";
-import { get } from "../services/api.js?v=20261003-003";
-import { t } from "../services/i18n.js?v=20261003-003";
-import { iconSvgEl } from "../services/icons.js?v=20261003-003";
-import { renderStarMap, highlightStar, memberHue } from "../services/star_map.js?v=20261003-003";
+} from "../store.js?v=20261005-001";
+import { get } from "../services/api.js?v=20261005-001";
+import { t } from "../services/i18n.js?v=20261005-001";
+import { iconSvgEl } from "../services/icons.js?v=20261005-001";
+import { renderStarMap, highlightStar, memberHue } from "../services/star_map.js?v=20261005-001";
 
 const PREF_KEY = "slate_board_wf_prefs";
 const TICK_MS = 1000;
@@ -149,7 +149,7 @@ async function ensureTeamData(conversationId) {
 // ── 卡片墙 ──────────────────────────────────────────────
 
 function authorLabel(action) {
-  return action.author === "model" ? t("模型写的") : t("你写的");
+  return action.author === "model" ? t("模型编写") : t("用户编写");
 }
 
 function stepItem(s) {
@@ -243,7 +243,7 @@ function actionCard(action) {
   const actionsRow = document.createElement("div");
   actionsRow.className = "bw-card-actions";
   actionsRow.append(
-    btn(t("跑这条"), t("以 @提及 方式发进当前对话"), () => runAction(action), "bw-btn-primary"),
+    btn(t("运行此流程"), t("以 @提及 方式发进当前对话"), () => runAction(action), "bw-btn-primary"),
     btn(pinned ? t("取消置顶") : t("置顶"), t("置顶的卡片排在前面"), () => {
       wfPrefs.pinned = pinned
         ? wfPrefs.pinned.filter(id => id !== action.id)
@@ -333,7 +333,7 @@ function buildRunBar() {
   bar.append(stop, resume, autopilot, modeSel, effortSel);
   bar.append(
     btn(t("去团队"), t("到对话面板的团队模式"), async () => {
-      const { openTeamConversation } = await import("../app.js?v=20261003-003");
+      const { openTeamConversation } = await import("../app.js?v=20261005-001");
       openTeamConversation?.();
     }),
   );
@@ -583,7 +583,7 @@ function paintStarSection(body, key) {
     body.appendChild(p);
     const tip = document.createElement("p");
     tip.className = "bw-hint bw-hint-sub";
-    tip.textContent = t("在对话面板点「团队」即可多角色讨论，讨论过程会落进这里");
+    tip.textContent = t("在对话面板点「团队」即可发起多角色讨论，讨论过程会记录在此");
     body.appendChild(tip);
     return;
   }
@@ -654,7 +654,7 @@ function appendBroken(grid) {
   if (!wfActionsBroken.length) return;
   const warn = document.createElement("p");
   warn.className = "bw-hint bw-hint-warn";
-  warn.textContent = t("有 {n} 份说明书解析失败，去工厂看行号报错", { n: wfActionsBroken.length });
+  warn.textContent = t("有 {n} 份说明书解析失败，请在工厂查看行号报错", { n: wfActionsBroken.length });
   grid.appendChild(warn);
 }
 
@@ -666,7 +666,7 @@ function renderGrid(grid) {
     const p = document.createElement("p");
     p.className = "bw-hint";
     p.textContent = wfActionsLoaded
-      ? t("还没有流程说明书：在工厂的 Actions 里新建一份，或让模型用 actions_write 写一份")
+      ? t("还没有流程说明书：在工厂的 Actions 中新建，或让模型用 actions_write 生成")
       : t("读不到 Action 目录（后端未就绪？）");
     grid.appendChild(p);
     appendBroken(grid);
@@ -701,7 +701,7 @@ export async function renderWorkflowView(container, metaEl) {
   const toolbar = document.createElement("div");
   toolbar.className = "bw-toolbar";
   const title = document.createElement("strong");
-  title.textContent = t("可跑的流程");
+  title.textContent = t("可运行的流程");
   const onlyPinned = btn(
     wfPrefs.onlyPinned ? t("只看置顶") : t("全部流程"),
     t("把卡片墙收窄到置顶的几条"),

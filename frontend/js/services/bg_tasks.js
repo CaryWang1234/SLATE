@@ -17,9 +17,9 @@
  * 没有归属信息的老事件一律就地念 —— 扣住一条真结局不发，比念错地方更糟。
  */
 
-import { get, post } from "./api.js?v=20261003-003";
-import { state, notify, recordTaskFlag, bgResumeUsedOf, markBgResumeUsed } from "../store.js?v=20261003-003";
-import { notifyTaskComplete } from "./notify.js?v=20261003-003";
+import { get, post } from "./api.js?v=20261005-001";
+import { state, notify, recordTaskFlag, bgResumeUsedOf, markBgResumeUsed } from "../store.js?v=20261005-001";
+import { notifyTaskComplete } from "./notify.js?v=20261005-001";
 
 /** 有任务在册时的轮询间隔：够及时，又不至于把 3 秒一次的请求灌满日志 */
 export const POLL_MS = 3000;
@@ -433,6 +433,6 @@ export function bgWakeText(events) {
   const localHint = list.some(e => e.origin === "local")
     ? "结论已完整附在上面，这一类任务没有日志可查"
     : "用 bg_task action=status/log 取更完整的输出";
-  const tail = `\n\n请先判断这些结果对当前任务意味着什么：需要接着干就直接输出下一步工具调用（${localHint}）；已经完事就简短汇报结果，不要在没必要时重新跑一遍命令。`;
+  const tail = `\n\n请先判断这些结果对当前任务意味着什么：需要继续处理就直接输出下一步工具调用（${localHint}）；已经完成就简短汇报结果，不要在没必要时重新执行一遍命令。`;
   return head + "\n" + lines.join("\n") + tail;
 }

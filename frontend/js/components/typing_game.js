@@ -10,8 +10,8 @@
  * 哪些行算题目在这里判（后端只管存文本），所以外部编辑器改完点「重新读取」即生效。
  */
 
-import { get, post } from "../services/api.js?v=20261003-003";
-import { t } from "../services/i18n.js?v=20261003-003";
+import { get, post } from "../services/api.js?v=20261005-001";
+import { t } from "../services/i18n.js?v=20261005-001";
 
 // git / shell
 const BUILTIN = [
@@ -107,7 +107,7 @@ let pasted = false;
 let timer = 0;
 
 function notify(msg) {
-  import("../app.js?v=20261003-003").then(({ toast }) => toast(msg)).catch(() => {});
+  import("../app.js?v=20261005-001").then(({ toast }) => toast(msg)).catch(() => {});
 }
 
 function span(cls, text) {
@@ -238,7 +238,7 @@ function finish() {
   if (record) writeBest(wpm);
   bestEl.textContent = String(readBest());
   resultEl.textContent = record
-    ? t("本局 {wpm} WPM · 准确率 {acc}% · 新纪录！", { wpm, acc: accuracy() })
+    ? t("本局 {wpm} WPM · 准确率 {acc}% · 新纪录", { wpm, acc: accuracy() })
     : (pasted
       ? t("本局 准确率 {acc}%（粘贴不计纪录）", { acc: accuracy() })
       : t("本局 {wpm} WPM · 准确率 {acc}% · 最佳 {best} WPM", { wpm, acc: accuracy(), best: Math.max(best, wpm) }));

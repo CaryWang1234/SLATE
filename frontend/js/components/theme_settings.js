@@ -5,16 +5,16 @@
  * app.js 那一份订阅调 applyCustomTheme 注入样式。这里不再自己调 apply——
  * 两处各注入一次会打架，还会让"改了什么"和"页面上看到什么"对不上。
  */
-import { state, setCustomTheme } from "../store.js?v=20261003-003";
+import { state, setCustomTheme } from "../store.js?v=20261005-001";
 import {
   THEME_FONTS_MAIN, THEME_FONTS_CODE, THEME_PRESETS, MAX_FONT_BYTES,
   uploadBackground, removeBackground, probeBackground,
   probeWallpaperEngine, pullWallpaperEngineBackground,
   uploadFont, removeFont, probeFonts,
-} from "../services/theme_custom.js?v=20261003-003";
-import { dlgToast } from "../services/dialog.js?v=20261003-003";
-import { t } from "../services/i18n.js?v=20261003-003";
-import { reportError } from "../services/error_sink.js?v=20261003-003";
+} from "../services/theme_custom.js?v=20261005-001";
+import { dlgToast } from "../services/dialog.js?v=20261005-001";
+import { t } from "../services/i18n.js?v=20261005-001";
+import { reportError } from "../services/error_sink.js?v=20261005-001";
 
 // 背景图上限与后端 theme.py 的 MAX_BACKGROUND_BYTES 同一个数
 const MAX_BG_BYTES = 4 * 1024 * 1024;
@@ -137,7 +137,7 @@ async function renderFontState() {
   }
   if (hint) {
     if (!imported.length) hint.textContent = t("本机还没有导入的字体");
-    else if (!index) hint.textContent = t("字体清单读不出来：后端没起来，或这台机器还没导入过");
+    else if (!index) hint.textContent = t("无法读取字体清单：后端未运行，或本机尚未导入字体");
     else hint.textContent = t("已导入 {n} 个，在上面的下拉里选用它", { n: imported.length });
   }
   syncFontOptions();
@@ -164,7 +164,7 @@ async function handlePickFont(file) {
   if (!file) return;
   const picker = el("theme-font-file");
   if (file.size > MAX_FONT_BYTES) {
-    dlgToast(t("字体文件不能超过 16MB，换一个小的"));
+    dlgToast(t("字体文件不能超过 16MB，请更换更小的文件"));
     if (picker) picker.value = "";
     return;
   }
@@ -225,7 +225,7 @@ async function handlePullWallpaperEngine() {
     dlgToast(t("已取用 Wallpaper Engine 当前壁纸（屏幕 {n}）", { n: got.monitor || "1" }));
   } catch (e) {
     reportError(e, "theme_we_pull");
-    dlgToast(t("取 Wallpaper Engine 壁纸失败：那张预览图可能读不出来，或正被它重写"));
+    dlgToast(t("取 Wallpaper Engine 壁纸失败：预览图可能无法读取，或正被 Wallpaper Engine 重写"));
   }
   await renderBgState();
   await renderWeState();
@@ -263,7 +263,7 @@ export function renderThemeSettings() {
 async function handlePick(file) {
   if (!file) return;
   if (file.size > MAX_BG_BYTES) {
-    dlgToast(t("背景图不能超过 4MB，换一张小一点的"));
+    dlgToast(t("背景图不能超过 4MB，请更换更小的图片"));
     return;
   }
   const picker = el("theme-bg-file");
@@ -274,7 +274,7 @@ async function handlePick(file) {
     dlgToast(t("背景图已换"));
   } catch (e) {
     reportError(e, "theme_background_upload");
-    dlgToast(t("背景图上传失败，请换一张再试"));
+    dlgToast(t("背景图上传失败，请更换后重试"));
   }
   // 清空 value：同一张图第二次选也要能触发 change
   if (picker) picker.value = "";

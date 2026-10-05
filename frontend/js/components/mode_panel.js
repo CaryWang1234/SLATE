@@ -12,14 +12,14 @@
 import {
   subscribe, modeRegistry, modeById, addMode, updateMode, removeMode,
   MODE_TOOLS_NONE, MODE_READONLY_TOOLS,
-} from "../store.js?v=20261003-003";
-import { TOOLS } from "../services/tools.js?v=20261003-003";
-import { iconSvgEl } from "../services/icons.js?v=20261003-003";
-import { t } from "../services/i18n.js?v=20261003-003";
-import { dlgConfirm } from "../services/dialog.js?v=20261003-003";
-import { allRegisteredModels } from "../services/ai_features.js?v=20261003-003";
-import { setExtCount } from "./extensions.js?v=20261003-003";
-import { modeHint } from "./mode_picker.js?v=20261003-003";
+} from "../store.js?v=20261005-001";
+import { TOOLS } from "../services/tools.js?v=20261005-001";
+import { iconSvgEl } from "../services/icons.js?v=20261005-001";
+import { t } from "../services/i18n.js?v=20261005-001";
+import { dlgConfirm } from "../services/dialog.js?v=20261005-001";
+import { allRegisteredModels } from "../services/ai_features.js?v=20261005-001";
+import { setExtCount } from "./extensions.js?v=20261005-001";
+import { modeHint } from "./mode_picker.js?v=20261005-001";
 
 // 可选图标：够表达"这个模式是干什么的"即可，不做全量图标库（挑花眼反而选不出）。
 const ICON_PALETTE = [
@@ -268,7 +268,7 @@ async function del() {
   if (!editingId) return;
   const mode = modeById(editingId);
   const ok = await dlgConfirm(
-    t("确定删除回复模式「{name}」？正在用它跑过的会话会回落到默认模式。", { name: t(mode.label) }),
+    t("确定删除回复模式「{name}」？正在使用它的会话会回落到默认模式。", { name: t(mode.label) }),
     { title: t("删除回复模式"), okText: t("删除"), cancelText: t("取消") },
   );
   if (!ok) return;

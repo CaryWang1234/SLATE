@@ -3,10 +3,10 @@
  * 遥控地址 + 二维码 / 模型选择 / 密钥管理 / 主题切换
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, toggleTheme, customThemeActive, contextBudgetOf, fmtContextTokens, setReasoningEffort, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS } from "../store.js?v=20261003-003";
-import { get } from "../services/api.js?v=20261003-003";
-import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20261003-003";
-import { onTab } from "./m-app.js?v=20261003-003";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, toggleTheme, customThemeActive, contextBudgetOf, fmtContextTokens, setReasoningEffort, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS } from "../store.js?v=20261005-001";
+import { get } from "../services/api.js?v=20261005-001";
+import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20261005-001";
+import { onTab } from "./m-app.js?v=20261005-001";
 
 function $id(id) { return document.getElementById(id); }
 
@@ -93,7 +93,7 @@ async function renderLanInfo() {
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
-      mToast(t("自动复制失败，已为你选中地址"));
+      mToast(t("自动复制失败，地址已选中"));
     }
   });
   urlRow.appendChild(main);

@@ -11,8 +11,8 @@
  * mode 只是给人看的标签：自动 = 后台自己会发请求，手动 = 你点一下才发，模型调用 = 由模型自己决定调不调。
  */
 
-import { state, getModelKey, savePersistent, notify } from "../store.js?v=20261003-003";
-import { t } from "./i18n.js?v=20261003-003";
+import { state, getModelKey, savePersistent, notify } from "../store.js?v=20261005-001";
+import { t } from "./i18n.js?v=20261005-001";
 
 export const AI_FEATURES = [
   {
@@ -33,15 +33,15 @@ export const AI_FEATURES = [
   },
   {
     id: "session_title", name: "自动会话标题", mode: "自动", model: true,
-    note: "新对话跑完首轮后请模型补一个短标题换上，只替换还是「首条消息前 30 字」那种占位标题，手动改过的名字不动",
+    note: "新对话首轮结束后请模型补一个短标题换上，仅替换「首条消息前 30 字」形式的占位标题，手动修改过的名称不变",
   },
   {
     id: "code_understand", name: "代码理解文档", mode: "手动", model: true,
-    note: "扫描项目后生成「导览·百科」与「规则手册」两份文档，一次两趟请求，是全表里最贵的一项",
+    note: "扫描项目后生成「导览·百科」与「规则手册」两份文档，一次两趟请求，是全表中开销最大的一项",
   },
   {
     id: "code_review", name: "代码审查", mode: "手动", model: true,
-    note: "读 git diff 做四维度结构化审查；取 diff 本身不调模型，只有审查那一趟调",
+    note: "读 git diff 做四维度结构化审查；取 diff 本身不调模型，仅审查环节调用",
   },
   {
     id: "whiteboard_organize", name: "黑板 AI 整理", mode: "手动", model: true,
@@ -49,15 +49,15 @@ export const AI_FEATURES = [
   },
   {
     id: "prompt_polish", name: "提示词优化", mode: "手动", model: true,
-    note: "输入框「优化提示词」按钮：把草稿交给模型改写一遍，改完必须比对确认才回填，不确认就一个字都不改",
+    note: "输入框「优化提示词」按钮：把草稿交给模型改写一遍，须比对确认后才回填，未确认则不修改任何内容",
   },
   {
     id: "subagent", name: "子代理并行", mode: "模型调用", tool: "subagent_run", model: true,
-    note: "主模型一次派出多个子代理并行干活的工具。关闭后该工具不再出现在工具目录里，模型看不到也就不会调",
+    note: "主模型一次派出多个子代理并行执行的工具。关闭后该工具不再出现在工具目录中，模型无法调用",
   },
   {
     id: "command_explain", name: "高危命令目的说明", mode: "自动", model: true,
-    note: "审批弹窗里那句「这条命令是干什么的」由模型生成。关掉后弹窗照常拦，只是不再发请求，只显示规则命中的原因",
+    note: "审批弹窗中「这条命令的用途」由模型生成。关闭后弹窗照常拦截，只是不再发送请求，仅显示规则命中的原因",
   },
   {
     id: "workflow_dag", name: "团队工作流执行", mode: "手动", model: true,
@@ -66,7 +66,7 @@ export const AI_FEATURES = [
   {
     id: "scheduled_task", name: "定时与事件任务", mode: "自动", model: false,
     modelNote: "模型在每个任务里各自选",
-    note: "到点或命中事件时由后端自己发一次模型请求，结果存成专属会话。关掉后任务不再执行（触发记录仍保留）",
+    note: "到点或命中事件时由后端发起一次模型请求，结果存成专属会话。关闭后任务不再执行（触发记录仍保留）",
   },
   {
     id: "image_gen", name: "AI 图片生成", mode: "模型调用", tool: "image_gen", model: false,
@@ -163,7 +163,7 @@ export function aiFeatureOffTip(id) {
  */
 export function aiFeatureBlocked(id) {
   if (isAiFeatureOn(id)) return false;
-  import("../app.js?v=20261003-003").then(({ toast }) => toast(aiFeatureOffTip(id))).catch(() => {});
+  import("../app.js?v=20261005-001").then(({ toast }) => toast(aiFeatureOffTip(id))).catch(() => {});
   return true;
 }
 

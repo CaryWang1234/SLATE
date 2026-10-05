@@ -10827,7 +10827,7 @@ img.file-type-icon {
   max-width: calc(var(--settings-control-w) * 2 + 10px);
 }
 
-/* 「同时最多跑几场」这类「说明—下拉」行：整行限宽，下拉靠右自成一线 */
+/* 「同时最多运行几场」这类「说明—下拉」行：整行限宽，下拉靠右自成一线 */
 .settings-block .setting-row {
   display: flex;
   align-items: center;

@@ -3,14 +3,14 @@
  * + Actions（data/actions/*.yml 流程说明书：可编辑、试校验、删除、留底回滚）。
  */
 
-import { state, subscribe, setSkills, setActions } from "../store.js?v=20261003-003";
-import { get, post, put, del, upload } from "../services/api.js?v=20261003-003";
-import { guardSkillCall } from "../services/riskguard.js?v=20261003-003";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20261003-003";
-import { t } from "../services/i18n.js?v=20261003-003";
-import { setIconText } from "../services/icons.js?v=20261003-003";
-import { forgetScopeCatalog } from "../services/project_scope.js?v=20261003-003";
-import { setExtCount } from "./extensions.js?v=20261003-003";
+import { state, subscribe, setSkills, setActions } from "../store.js?v=20261005-001";
+import { get, post, put, del, upload } from "../services/api.js?v=20261005-001";
+import { guardSkillCall } from "../services/riskguard.js?v=20261005-001";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20261005-001";
+import { t } from "../services/i18n.js?v=20261005-001";
+import { setIconText } from "../services/icons.js?v=20261005-001";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20261005-001";
+import { setExtCount } from "./extensions.js?v=20261005-001";
 
 let skillList, toolList, mcpToolList, actionList;
 let btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
@@ -319,7 +319,7 @@ function renderEvolvedSection() {
   evolvedListEl.innerHTML = "";
   for (const item of evolvedCache) evolvedListEl.appendChild(createEvolvedItem(item));
   if (!evolvedCache.length) {
-    extEmpty(evolvedListEl, t("还没有自产工具。让模型用「工具工厂」生成一个，产物会出现在这里，可随时停用或撤销"));
+    extEmpty(evolvedListEl, t("还没有自产工具。用「工具工厂」生成一个，产物会出现在此处，可随时停用或撤销"));
   }
   setExtCount("evolved", evolvedCache.length);
 }
@@ -363,7 +363,7 @@ function createEvolvedItem(item) {
 
   const delBtn = document.createElement("button");
   delBtn.className = "skill-item-del";
-  delBtn.title = t("撤销这个工具（删前留底）");
+  delBtn.title = t("撤销这个工具（删除前存入历史版本）");
   delBtn.textContent = "×";
   delBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
@@ -379,7 +379,7 @@ async function toggleEvolved(name, enabled) {
   try {
     const res = await post(`/evolved/${encodeURIComponent(name)}/toggle`, { enabled });
     if (res.code !== 0) { showToast(t("操作失败: {msg}", { msg: res.message || t("未知错误") })); return; }
-    showToast(enabled ? t("已启用 {name}", { name }) : t("已停用 {name}，模型目录里已摘掉", { name }));
+    showToast(enabled ? t("已启用 {name}", { name }) : t("已停用 {name}，已从模型目录移除", { name }));
     await refreshEvolved();
     refreshSkills();
   } catch (e) {
@@ -418,7 +418,7 @@ async function openEvolvedModal(name) {
     item.created_at ? t("创建于 {t}", { t: item.created_at }) : "",
     item.updated_at ? t("最后改动 {t}", { t: item.updated_at }) : "",
     item.bytes ? `${item.bytes} B` : "",
-    item.versions ? t("留底 {n} 版", { n: item.versions }) : "",
+    item.versions ? t("保留 {n} 版", { n: item.versions }) : "",
   ].filter(Boolean).join(" · ");
   const states = evolvedStates(item).map(s => s.text).join("；");
   evolvedModalMeta.textContent = [meta, states].filter(Boolean).join(" · ");
@@ -836,7 +836,7 @@ async function saveAction(targetScope = "") {
   const scope = targetScope === "project" ? "project" : (currentActionScope || "global");
   const pid = activeProjectId();
   if (scope === "project" && !pid) {
-    showToast(t("要先打开一个项目，才能写进项目那一份"));
+    showToast(t("需先打开项目，才能写入项目版本"));
     return;
   }
   btnActionSave.disabled = true;

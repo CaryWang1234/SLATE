@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
-  <link rel="stylesheet" href="./css/style.css?v=20261003-003">
+  <link rel="stylesheet" href="./css/style.css?v=20261005-001">
   <script>
     // i18n：英文模式先遮蔽页面，翻译完成后由app.js 显示；兜底超时强显避免白屏
     document.documentElement.classList.add("i18n-pending");
@@ -181,7 +181,7 @@
                   </div>
                   <!-- 审批模式：这一场随时可改，四档语义见 components/approval_picker.js -->
                   <div class="approval-picker" id="approval-picker">
-                    <button id="btn-approval" class="approval-pill" type="button" title="审批模式：AI 什么时候该停下来问你可不可以" aria-haspopup="dialog" aria-expanded="false" aria-controls="approval-pop">
+                    <button id="btn-approval" class="approval-pill" type="button" title="审批模式：AI 何时应停下并征求你的同意" aria-haspopup="dialog" aria-expanded="false" aria-controls="approval-pop">
                       <span class="approval-pill-icon" id="approval-pill-icon"></span>
                       <span class="approval-pill-label" id="approval-pill-label">手动审批</span>
                     </button>
@@ -406,7 +406,7 @@
     <section id="panel-ext" class="panel ext-panel">
       <div class="panel-header">
         <span class="panel-title">扩展</span>
-        <span class="panel-sub">模型能用什么，在这一页决定</span>
+        <span class="panel-sub">模型可用的能力在此页决定</span>
       </div>
       <div class="ext-layout">
         <nav class="ext-nav" id="ext-nav"></nav>
@@ -456,7 +456,7 @@
             <div class="ext-head">
               <div class="ext-head-text">
                 <h2>新功能 <span class="ext-count" id="ext-evolved-count">0</span></h2>
-                <p>SLATE 自己生产的工具，落在 data/evolved/；可停用、可回滚、可随时撤销</p>
+                <p>SLATE 自行生成的工具，存放于 data/evolved/；可停用、可回滚、可随时撤销</p>
               </div>
               <div class="skill-upload">
                 <button id="btn-ext-evolved-refresh" class="icon-btn" title="重新读取 data/evolved/"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>刷新</span></button>
@@ -498,7 +498,7 @@
             <div class="ext-head">
               <div class="ext-head-text">
                 <h2>Actions · 流程说明书 <span class="ext-count" id="ext-actions-count">0</span></h2>
-                <p>把一件常做的事写成必要流程，模型照着走；每一版都留底，可随时回滚</p>
+                <p>把常规操作写成必需流程，模型按流程执行；每一版均保留，可随时回滚</p>
               </div>
               <div class="skill-upload">
                 <button id="btn-ext-action-new" class="icon-btn" title="新建 Action">+ 新建 Action</button>
@@ -667,7 +667,7 @@
             <div>
               <button id="btn-prompt-factory" class="send-btn send-btn-sm" type="button"><span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20h20"/><path d="M4 20V8l6 4V8l6 4V4h4v16"/></svg>打开工作台</span></button>
             </div>
-            <div class="setting-hint">把宪法摘要、上下文片段、任务描述、约束与交付要求整合成一份可交付 Prompt。收起后再打开，写过的内容还在。</div>
+            <div class="setting-hint">把宪法摘要、上下文片段、任务描述、约束与交付要求整合成一份可交付 Prompt。收起后再次打开，已写内容仍保留。</div>
           </div>
         </section>
 
@@ -735,14 +735,14 @@
           <div class="settings-block-head">
             <div>
               <h2>后台任务</h2>
-              <p>跑长耗时命令（实验服务器、编译训练）的独立通道：起了就走，不占住对话；结束或命中触发条件时把消息送回来</p>
+              <p>长耗时命令（实验服务器、编译训练）的独立通道：启动后立即返回，不占用对话；结束或命中触发条件时回传消息</p>
             </div>
           </div>
           <label class="setting-check">
             <input id="setting-bg-auto-resume" type="checkbox" checked>
-            <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 12h-4l-3 8-4-16-3 8h-4"/></svg>任务有消息时自动叫醒模型（不必由你说“继续”）</span>
+            <span class="icon-text"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.5 12h-4l-3 8-4-16-3 8h-4"/></svg>任务有消息时自动唤醒模型（无需手动发送「继续」）</span>
           </label>
-          <div class="setting-hint">每个对话最多自动续跑 3 次；关掉后消息仍然保留，下次你说话时一并交给模型</div>
+          <div class="setting-hint">每个对话最多自动续跑 3 次；关闭后消息仍保留，下次发送时一并交给模型</div>
         </section>
 
         <section class="settings-block" id="settings-parallel">
@@ -758,7 +758,7 @@
           </label>
           <div class="setting-hint">关闭后恢复原行为：切换会话即中断当前生成。停止按钮在任何设置下都只停当前这一场</div>
           <label class="setting-row">
-            <span>同时最多跑几场</span>
+            <span>同时最多运行几场</span>
             <select id="setting-max-parallel-runs" class="setting-input">
               <option value="1">1（退回一次一场）</option>
               <option value="2" selected>2</option>
@@ -795,7 +795,7 @@
           <div class="settings-block-head">
             <div>
               <h2>自定义主题</h2>
-              <p>改配色、板块透明度、字体（可导入自己的字体文件）与背景图；开启期间深色/浅色切换锁定，关闭即整套回到内置主题</p>
+              <p>改配色、板块透明度、字体（可导入自定义字体文件）与背景图；开启期间深色/浅色切换锁定，关闭即整套回到内置主题</p>
             </div>
           </div>
           <label class="setting-check">
@@ -823,7 +823,7 @@
               <label class="theme-color-field"><span>正文</span><select id="theme-font-main" class="setting-input"></select></label>
               <label class="theme-color-field"><span>代码</span><select id="theme-font-code" class="setting-input"></select></label>
             </div>
-            <div class="setting-hint">系统里已有的字体族直接按名字用；下面还能把自己手上的字体文件导进来。某台机器上没装也没导入的字体，会回落到系统默认</div>
+            <div class="setting-hint">系统已安装的字体族按名称直接使用；下方可导入本机字体文件。某台机器上既未安装也未导入的字体将回落到系统默认</div>
             <div class="theme-font-import-row">
               <button id="theme-font-pick" class="send-btn send-btn-sm" type="button">导入字体</button>
               <input id="theme-font-file" class="theme-file-input" type="file" accept=".woff2,.woff,.ttf,.otf">
@@ -839,7 +839,7 @@
               <input id="theme-panel-alpha" class="theme-veil-slider" type="range" min="55" max="100" step="1">
               <output id="theme-panel-alpha-value" class="theme-veil-value">100%</output>
             </label>
-            <div class="setting-hint">面板、卡片、输入框与助手气泡这一层底色的不透明度。100% 是实色；调低会透出页面底色，铺了背景图时也能透出图。你自己的气泡和代码块始终保持实色，正文不会因此读不清</div>
+            <div class="setting-hint">面板、卡片、输入框与助手气泡这一层底色的不透明度。100% 是实色；调低会透出页面底色，铺了背景图时也能透出图。用户自己的气泡与代码块始终保持实色，正文不受影响</div>
           </div>
           <div class="setting-section">
             <label class="setting-label">背景图</label>
@@ -855,7 +855,7 @@
               <output id="theme-bg-veil-value" class="theme-veil-value">72%</output>
             </label>
             <div class="setting-hint" id="theme-bg-state">本机还没有背景图</div>
-            <div class="setting-hint">图片存在本机 data/theme/ 里，不进对话记录、也不复制到另一台设备。遮罩浓度是底色压在图上的不透明度：太低正文会骑在图上，太高就等于没有图。</div>
+            <div class="setting-hint">图片存在本机 data/theme/ 里，不进对话记录、也不复制到另一台设备。遮罩浓度是底色压在图上的不透明度：过低会使正文压在图上，过高则等于没有背景图。</div>
           </div>
           <div class="setting-section">
             <label class="setting-label">Wallpaper Engine</label>
@@ -864,7 +864,7 @@
               <button id="theme-we-refresh" class="send-btn send-btn-sm" type="button">重新检测</button>
               <span class="setting-hint" id="theme-we-state">正在问 Wallpaper Engine…</span>
             </div>
-            <div class="setting-hint">把 Wallpaper Engine 正在用的那张壁纸的预览图取过来当上面的背景图。只读它写在自己目录里的配置和 preview 图，不启动它，也不改它的设置。它换了壁纸这里不会跟着换，要再点一次；视频与场景壁纸取到的是那张静态预览，只有动态预览时取 gif（它会在界面后面一直动）。</div>
+            <div class="setting-hint">把 Wallpaper Engine 当前壁纸的预览图取来作为上方背景图。只读取它在自己目录中写入的配置与 preview 图，不启动它，也不更改它的设置。Wallpaper Engine 更换壁纸后此处不会自动跟随，需再次点取；视频与场景壁纸取到的是其静态预览，仅有动态预览时取 gif（该图会在界面后持续播放）。</div>
           </div>
           <button id="theme-reset" class="send-btn send-btn-sm" type="button">恢复默认色板</button>
         </section>
@@ -948,7 +948,7 @@
           <div class="settings-block-head">
             <div>
               <h2>审批模式</h2>
-              <p>新对话的默认审批模式。单个对话可在输入框的选择器里改，改过后不再跟随这里；完全访问只放开命令与联网（缺条件时仍会问你一句），夜间模式连「缺条件时问你一句」都不问，适合挂着跑完再看；灾难级命令（rm -rf /、format 等）任何模式都强制拦截</p>
+              <p>新对话的默认审批模式。单个对话可在输入框的选择器里改，改过后不再跟随这里；完全访问只放开命令与联网（缺条件时仍会向你确认），夜间模式连「缺少条件时向你确认」也不询问，适合保持运行、事后再查看；灾难级命令（rm -rf /、format 等）任何模式都强制拦截</p>
             </div>
           </div>
           <div class="permission-mode-row">
@@ -960,7 +960,7 @@
           <div id="permission-mode-hint" class="setting-hint"></div>
           <label class="setting-check">
             <input id="setting-keep-awake-night" type="checkbox" checked>
-            <span>夜间模式跑任务时不让电脑睡眠</span>
+            <span>夜间模式运行任务时保持系统唤醒</span>
           </label>
           <div id="keep-awake-hint" class="setting-hint"></div>
         </section>
@@ -990,7 +990,7 @@
           <div class="settings-block-head">
             <div>
               <h2>会话归档</h2>
-              <p>这里是从「任务」栏归档起来的会话：恢复后重新出现在任务栏；删除会连同消息一起清掉，找不回来</p>
+              <p>此处是自「任务」栏归档的会话：恢复后重新出现在任务栏；删除会连同消息一并清除，无法恢复</p>
             </div>
             <button id="btn-archived-refresh" class="send-btn send-btn-sm" type="button">刷新</button>
           </div>
@@ -1749,7 +1749,7 @@
   <!-- ══ Toast 容器 ══ -->
   <div id="toast-container"></div>
 
-  <script type="module" src="./js/app.js?v=20261003-003"></script>
+  <script type="module" src="./js/app.js?v=20261005-001"></script>
 
 </body>
 </html>

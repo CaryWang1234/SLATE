@@ -29,10 +29,10 @@
  * 不留可见入口，也不写提示文案——这是彩蛋，不是功能按钮。
  */
 
-import { t } from "../services/i18n.js?v=20261003-003";
-import { fmtTokens } from "../services/usage.js?v=20261003-003";
-import { animateNumber, prefersReducedMotion } from "../services/anim.js?v=20261003-003";
-import { mount2048 } from "./game_2048.js?v=20261003-003";
+import { t } from "../services/i18n.js?v=20261005-001";
+import { fmtTokens } from "../services/usage.js?v=20261005-001";
+import { animateNumber, prefersReducedMotion } from "../services/anim.js?v=20261005-001";
+import { mount2048 } from "./game_2048.js?v=20261005-001";
 
 const WEEKS = 53;
 const METRICS = ["count", "tokens"];
@@ -345,7 +345,7 @@ export function renderActivityHeatmap(host, daily, opts = {}) {
     if (next === "tokens" && estimated) {
       note.textContent = recordedFrom
         ? t("逐日真实记账自 {date} 起；更早的 token 为估算（按对话累计摊分）", { date: recordedFrom })
-        : t("token 暂全为估算（按对话累计摊分），从下次对话起逐日真实记账");
+        : t("token 暂全部为估算（按对话累计摊分），从下次对话起按日真实记账");
       note.classList.remove("hidden");
     } else {
       note.textContent = "";

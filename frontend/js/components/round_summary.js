@@ -6,12 +6,12 @@
  * 这一对键——存一份文件清单的副本，刷新一次就跟现场不一致了。
  */
 
-import { get, patch, post } from "../services/api.js?v=20261003-003";
-import { roundQuery } from "../services/tools.js?v=20261003-003";
-import { t } from "../services/i18n.js?v=20261003-003";
-import { iconSvgEl } from "../services/icons.js?v=20261003-003";
-import { fileTypeIcon } from "../services/file_icons.js?v=20261003-003";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20261003-003";
+import { get, patch, post } from "../services/api.js?v=20261005-001";
+import { roundQuery } from "../services/tools.js?v=20261005-001";
+import { t } from "../services/i18n.js?v=20261005-001";
+import { iconSvgEl } from "../services/icons.js?v=20261005-001";
+import { fileTypeIcon } from "../services/file_icons.js?v=20261005-001";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20261005-001";
 
 const VISIBLE_FILES = 3;    // 默认只铺前三行，其余收成「再显示 N 个文件」
 
@@ -220,7 +220,7 @@ export function renderRoundSummary(binding, { readOnly = false } = {}) {
   async function onRevert(btn) {
     const n = data?.totals?.files || data?.files?.length || 0;
     const ok = await dlgConfirm(
-      t("撤回本轮的 {n} 个文件改动？这些文件会回到本轮开始前的内容，本轮新建的文件会被删除。本轮之后你自己改过的文件会跳过，不会被覆盖。", { n }),
+      t("撤回本轮的 {n} 个文件改动？这些文件会回到本轮开始前的内容，本轮新建的文件会被删除。本轮之后手动修改过的文件将跳过，不会被覆盖。", { n }),
       { title: t("撤回本轮改动"), okText: t("撤回"), danger: true },
     );
     if (!ok) return;

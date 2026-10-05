@@ -16,8 +16,8 @@
  * 不进后端设置项，免得为一局小游戏做三处联动。
  */
 
-import { t } from "../services/i18n.js?v=20261003-003";
-import { animateNumber, prefersReducedMotion } from "../services/anim.js?v=20261003-003";
+import { t } from "../services/i18n.js?v=20261005-001";
+import { animateNumber, prefersReducedMotion } from "../services/anim.js?v=20261005-001";
 
 const BEST_KEY = "slate_2048_best";
 const SIZE = 4;
@@ -314,7 +314,7 @@ export function mount2048(host, { onClose } = {}) {
   function checkState() {
     if (!won && maxTile(board) >= WIN_TILE) {
       won = true;
-      hint.textContent = t("合出 2048 了！可以接着往上刷");
+      hint.textContent = t("已合成 2048，可继续挑战更高");
       boardEl.classList.remove("is-win");
       void boardEl.offsetWidth;
       boardEl.classList.add("is-win");
@@ -322,7 +322,7 @@ export function mount2048(host, { onClose } = {}) {
     }
     if (isOver(board) && !over) {
       over = true;
-      hint.textContent = t("无步可走，点「新游戏」再来一局");
+      hint.textContent = t("无可移动方向，点「新游戏」重新开始");
       boardEl.classList.add("is-over");
       setTimeout(() => boardEl.classList.remove("is-over"), 420);
     }
@@ -445,8 +445,8 @@ export function mount2048(host, { onClose } = {}) {
   // 上一局存档可能就是终局/已过关：状态静默对齐，别开面板就闪一次金光
   won = maxTile(board) >= WIN_TILE;
   over = isOver(board);
-  if (over) hint.textContent = t("无步可走，点「新游戏」再来一局");
-  else if (won) hint.textContent = t("合出 2048 了！可以接着往上刷");
+  if (over) hint.textContent = t("无可移动方向，点「新游戏」重新开始");
+  else if (won) hint.textContent = t("已合成 2048，可继续挑战更高");
   measure();
   rebuild();
   paintScore(0);

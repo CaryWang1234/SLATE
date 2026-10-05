@@ -8,14 +8,14 @@
  * 完全访问红（没有安全网），夜间模式夜紫（这一晚交给它）。
  */
 
-import { state, subscribe, permissionModeFor, setPermissionModeFor } from "../store.js?v=20261003-003";
-import { iconSvgEl } from "../services/icons.js?v=20261003-003";
-import { t } from "../services/i18n.js?v=20261003-003";
+import { state, subscribe, permissionModeFor, setPermissionModeFor } from "../store.js?v=20261005-001";
+import { iconSvgEl } from "../services/icons.js?v=20261005-001";
+import { t } from "../services/i18n.js?v=20261005-001";
 
 const MODES = [
-  { id: "ask", icon: "shield", label: "手动审批", hint: "执行命令、访问网络都先问你" },
-  { id: "auto", icon: "zap", label: "自动审批", hint: "只在命中高危规则时问你，其余直接放行" },
-  { id: "full", icon: "unlock", label: "完全访问", hint: "命令与联网都不问；缺条件时仍会问你一句（灾难级命令仍由后端拦截）", danger: true },
+  { id: "ask", icon: "shield", label: "手动审批", hint: "执行命令与访问网络前均先询问" },
+  { id: "auto", icon: "zap", label: "自动审批", hint: "仅在命中高危规则时询问，其余直接放行" },
+  { id: "full", icon: "unlock", label: "完全访问", hint: "命令与联网均不询问；缺条件时仍会向你确认一次（灾难级命令仍由后端拦截）", danger: true },
   { id: "night", icon: "moon", label: "夜间模式", hint: "全托管：命令、联网、提问都不问（灾难级命令仍由后端拦截）", night: true },
 ];
 

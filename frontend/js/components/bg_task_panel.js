@@ -15,13 +15,13 @@
  * "切过去看"，不是"在这儿接着演"。
  */
 
-import { state, notify } from "../store.js?v=20261003-003";
-import { t } from "../services/i18n.js?v=20261003-003";
-import { iconSvgEl } from "../services/icons.js?v=20261003-003";
-import { get } from "../services/api.js?v=20261003-003";
-import { switchToProject } from "../services/project_scene.js?v=20261003-003";
-import { bgTasks, stopBgTask, clearFinishedBgTasks, peekBgEvents, bgInbox, startBgPolling, refreshBgTasks } from "../services/bg_tasks.js?v=20261003-003";
-import { abortRun } from "../services/run_registry.js?v=20261003-003";
+import { state, notify } from "../store.js?v=20261005-001";
+import { t } from "../services/i18n.js?v=20261005-001";
+import { iconSvgEl } from "../services/icons.js?v=20261005-001";
+import { get } from "../services/api.js?v=20261005-001";
+import { switchToProject } from "../services/project_scene.js?v=20261005-001";
+import { bgTasks, stopBgTask, clearFinishedBgTasks, peekBgEvents, bgInbox, startBgPolling, refreshBgTasks } from "../services/bg_tasks.js?v=20261005-001";
+import { abortRun } from "../services/run_registry.js?v=20261005-001";
 
 /** 展开的输出最多往回看多少行：面板是瞄一眼用的，不是完整日志阅读器 */
 const TAIL_LINES = 200;
@@ -101,7 +101,7 @@ export function renderBgTaskPanel() {
   const title = document.createElement("span");
   title.className = "todo-panel-title";
   title.textContent = t("任务中心 {n}", { n: count })
-    + (running ? t(" · 跑着 {n}", { n: running }) : "")
+    + (running ? t(" · 运行中 {n}", { n: running }) : "")
     + (unread ? t(" · 未读 {n}", { n: unread }) : "");
   const spacer = document.createElement("span");
   spacer.className = "bg-panel-spacer";
@@ -184,7 +184,7 @@ function renderRunRow(run) {
       try {
         const pid = String(run.project_id || "");
         if (pid && pid !== String(state.project?.project_id || "")) await switchToProject(pid);
-        const { openConversation } = await import("./chat.js?v=20261003-003");
+        const { openConversation } = await import("./chat.js?v=20261005-001");
         await openConversation(run.conv_id);
       } finally {
         goBtn.disabled = false;
@@ -319,7 +319,7 @@ function renderRow(task) {
     teamBtn.addEventListener("click", async () => {
       teamBtn.disabled = true;
       try {
-        const { openTeamConversation } = await import("../app.js?v=20261003-003");
+        const { openTeamConversation } = await import("../app.js?v=20261005-001");
         openTeamConversation?.();
         const sid = teamBtn.dataset.sessionId;
         const item = [...document.querySelectorAll(".team-history-item")].find(el => el.dataset.sessionId === sid);
@@ -344,7 +344,7 @@ function renderRow(task) {
       try {
         const pid = String(task.project_id || "");
         if (pid && pid !== String(state.project?.project_id || "")) await switchToProject(pid);
-        const { openConversation } = await import("./chat.js?v=20261003-003");
+        const { openConversation } = await import("./chat.js?v=20261005-001");
         await openConversation(owner);
       } finally {
         goBtn.disabled = false;
@@ -355,7 +355,7 @@ function renderRow(task) {
   if (task.state === "running") {
     const stopBtn = document.createElement("button");
     stopBtn.className = "bg-icon-btn bg-icon-danger";
-    stopBtn.title = t(isTeam ? "停止这场讨论" : isLocal ? "停止这批子代理" : "停止任务（杀整棵进程树）");
+    stopBtn.title = t(isTeam ? "停止这场讨论" : isLocal ? "停止这批子代理" : "停止任务（终止整棵进程树）");
     stopBtn.appendChild(iconSvgEl("ban"));
     stopBtn.addEventListener("click", async () => {
       stopBtn.disabled = true;
@@ -417,7 +417,7 @@ function syncBgRailButton() {
   btn.classList.toggle("has-unread", unread > 0);
   btn.setAttribute("aria-pressed", state.bgPanelOpen !== false ? "true" : "false");
   btn.title = (!count ? t("当前没有后台任务")
-    : running ? t("后台任务 {n} 个（{m} 个在跑）", { n: count, m: running })
+    : running ? t("后台任务 {n} 个（{m} 个运行中）", { n: count, m: running })
       : t("后台任务 {n} 个（都结束了）", { n: count }))
     + (unread ? t(" · {n} 条消息在别的会话没看", { n: unread }) : "");
   const label = btn.querySelector(".bg-rail-count");

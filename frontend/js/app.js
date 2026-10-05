@@ -2,41 +2,41 @@
  * SLATE 主控 v4：AI 团队、文件上传、上下文压缩
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, customThemeActive, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, contextCapStops, contextCapStopIndex, contextWindowSource, getContextWindow, setModelContextWindow, getModelDefinition, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode, setKeepAwakeOnNightRun } from "./store.js?v=20261003-003";
-import { initI18n, t } from "./services/i18n.js?v=20261003-003";
-import { iconSvgEl } from "./services/icons.js?v=20261003-003";
-import { modelIconKey, modelIconLabel } from "./services/model_logos.js?v=20261003-003";
-import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20261003-003";
-import { get, post, put } from "./services/api.js?v=20261003-003";
-import { dlgConfirm } from "./services/dialog.js?v=20261003-003";
-import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20261003-003";
-import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20261003-003";
-import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20261003-003";
-import { initPromptFactory } from "./components/prompt_factory.js?v=20261003-003";
-import { initSkillPanel, refreshSkills, refreshActions } from "./components/skill_panel.js?v=20261003-003";
-import { initExtensions } from "./components/extensions.js?v=20261003-003";
-import { initModePanel } from "./components/mode_panel.js?v=20261003-003";
-import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20261003-003";
-import { initTeamPanel } from "./components/team.js?v=20261003-003";
-import { initProjectBar } from "./components/project_bar.js?v=20261003-003";
-import { initSessionSummary } from "./components/session_summary.js?v=20261003-003";
-import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20261003-003";
-import { initTypingGame } from "./components/typing_game.js?v=20261003-003";
-import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20261003-003";
-import { initMemoryPanel } from "./components/memory.js?v=20261003-003";
-import { initExpertsPanel } from "./components/experts.js?v=20261003-003";
-import { initSchedule } from "./components/schedule.js?v=20261003-003";
-import { initRiskGuard } from "./services/riskguard.js?v=20261003-003";
-import { initKeepAwake, keepAwakeStatus, isHoldingAwake, onKeepAwakeStatus } from "./services/keepawake.js?v=20261003-003";
-import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20261003-003";
-import { initThemeSettings, renderThemeSettings } from "./components/theme_settings.js?v=20261003-003";
-import { initSessionArchiveSettings, renderArchivedSessions } from "./components/session_archive.js?v=20261003-003";
-import { applyCustomTheme } from "./services/theme_custom.js?v=20261003-003";
-import { initUnderstandPanel } from "./components/understand.js?v=20261003-003";
-import { getCurrentProject, browseFiles } from "./services/project.js?v=20261003-003";
-import { setProject, setProjectFileTree } from "./store.js?v=20261003-003";
-import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20261003-003";
-import { installErrorSink } from "./services/error_sink.js?v=20261003-003";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, hasModelKey, addCustomModel, updateCustomModel, removeCustomModel, setModelRegistry, loadPersistent, loadSharedPersistent, savePersistent, toggleTheme, customThemeActive, getContextCap, setModelContextCap, contextBudgetOf, declaredContextWindow, defaultContextCap, fmtContextTokens, contextCapStops, contextCapStopIndex, contextWindowSource, getContextWindow, setModelContextWindow, getModelDefinition, setTaskListSort, effectiveConstitution, constitutionScope, setConstitution, setBgAutoResume, setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns, setDefaultPermissionMode, setKeepAwakeOnNightRun } from "./store.js?v=20261005-001";
+import { initI18n, t } from "./services/i18n.js?v=20261005-001";
+import { iconSvgEl } from "./services/icons.js?v=20261005-001";
+import { modelIconKey, modelIconLabel } from "./services/model_logos.js?v=20261005-001";
+import { groupConversationsByProject, taskStatusOf, statusBadge, statusMark, STATUS, SORT_MODES, normalizeTaskListSort } from "./services/task_list.js?v=20261005-001";
+import { get, post, put } from "./services/api.js?v=20261005-001";
+import { dlgConfirm } from "./services/dialog.js?v=20261005-001";
+import { fmtTokens, tokenEquivalence } from "./services/usage.js?v=20261005-001";
+import { initChat, refreshConversationList, openConversation } from "./components/chat.js?v=20261005-001";
+import { initWhiteboard, refreshWhiteboard } from "./components/whiteboard.js?v=20261005-001";
+import { initPromptFactory } from "./components/prompt_factory.js?v=20261005-001";
+import { initSkillPanel, refreshSkills, refreshActions } from "./components/skill_panel.js?v=20261005-001";
+import { initExtensions } from "./components/extensions.js?v=20261005-001";
+import { initModePanel } from "./components/mode_panel.js?v=20261005-001";
+import { initMcpServerPanel } from "./components/mcp_server_panel.js?v=20261005-001";
+import { initTeamPanel } from "./components/team.js?v=20261005-001";
+import { initProjectBar } from "./components/project_bar.js?v=20261005-001";
+import { initSessionSummary } from "./components/session_summary.js?v=20261005-001";
+import { initApiTest, refreshApiTestModels } from "./components/api_test.js?v=20261005-001";
+import { initTypingGame } from "./components/typing_game.js?v=20261005-001";
+import { renderActivityHeatmap } from "./components/usage_heatmap.js?v=20261005-001";
+import { initMemoryPanel } from "./components/memory.js?v=20261005-001";
+import { initExpertsPanel } from "./components/experts.js?v=20261005-001";
+import { initSchedule } from "./components/schedule.js?v=20261005-001";
+import { initRiskGuard } from "./services/riskguard.js?v=20261005-001";
+import { initKeepAwake, keepAwakeStatus, isHoldingAwake, onKeepAwakeStatus } from "./services/keepawake.js?v=20261005-001";
+import { initAiFeatureSettings, renderAiFeatureSettings } from "./services/ai_features.js?v=20261005-001";
+import { initThemeSettings, renderThemeSettings } from "./components/theme_settings.js?v=20261005-001";
+import { initSessionArchiveSettings, renderArchivedSessions } from "./components/session_archive.js?v=20261005-001";
+import { applyCustomTheme } from "./services/theme_custom.js?v=20261005-001";
+import { initUnderstandPanel } from "./components/understand.js?v=20261005-001";
+import { getCurrentProject, browseFiles } from "./services/project.js?v=20261005-001";
+import { setProject, setProjectFileTree } from "./store.js?v=20261005-001";
+import { cxDockIn, cxPanelIn, cxHistReveal } from "./services/cx_motion.js?v=20261005-001";
+import { installErrorSink } from "./services/error_sink.js?v=20261005-001";
 
 // 异常兜底最先装：启动期任何未捕获错误都要留下栈迹
 installErrorSink();
@@ -983,7 +983,7 @@ async function renderLanInfo() {
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
-      toast(t("自动复制失败，已为你选中地址"));
+      toast(t("自动复制失败，地址已选中"));
     }
   });
 }
@@ -1439,7 +1439,7 @@ function applyNotificationSettings() {
   savePersistent();
   // 开启系统通知时自动请求权限
   if (state.notifications.systemNotifEnabled && "Notification" in window && Notification.permission === "default") {
-    import("./services/notify.js?v=20261003-003").then(({ requestNotificationPermission }) => {
+    import("./services/notify.js?v=20261005-001").then(({ requestNotificationPermission }) => {
       return requestNotificationPermission();
     }).then((perm) => {
       updateNotifPermissionHint();
@@ -1463,8 +1463,8 @@ function initNotificationPersistence() {
 const PERMISSION_MODE_HINTS = {
   ask: "默认逐条确认：AI 执行命令、访问网络前都会弹窗询问",
   auto: "默认只在命中高危规则（删除、提权、强制推送等）时弹窗询问，其余直接放行；灾难级命令（rm -rf /、format 等）仍强制拦截",
-  full: "默认完全访问：命令与联网直接放行，只有 AI 缺条件时还会弹选择题问你；灾难级命令（rm -rf /、format 等）仍强制拦截",
-  night: "默认全托管：命令、联网、连「缺条件时问你一句」都不问，自己选定方案继续；灾难级命令（rm -rf /、format 等）仍强制拦截",
+  full: "默认完全访问：命令与联网直接放行，仅在 AI 缺少条件时向你提问；灾难级命令（rm -rf /、format 等）仍强制拦截",
+  night: "默认全托管：命令、联网，连「缺少条件时向你确认」也不询问，自行选定方案继续；灾难级命令（rm -rf /、format 等）仍强制拦截",
 };
 
 function renderPermissionModeSettings() {
@@ -1507,8 +1507,8 @@ function renderKeepAwakeSettings() {
     return;
   }
   hint.textContent = isHoldingAwake()
-    ? t("正在替夜间模式的任务钉住系统：电脑不会睡（屏幕仍可正常熄灭；合盖、手动睡眠、已经睡着的机器都叫不醒）")
-    : t("夜间模式的任务在跑时才会钉住系统，任务停了就交还电源策略（屏幕仍可正常熄灭；合盖、手动睡眠、已经睡着的机器都叫不醒）");
+    ? t("正在替夜间模式的任务保持系统唤醒：系统不会进入睡眠（屏幕仍可正常熄灭；合盖、手动睡眠、已经入睡的机器无法唤醒）")
+    : t("仅在夜间模式任务运行期间保持系统唤醒，任务结束后交还电源策略（屏幕仍可正常熄灭；合盖、手动睡眠、已经入睡的机器无法唤醒）");
 }
 
 function initKeepAwakeSettings() {
@@ -1917,7 +1917,7 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     open.title = t("切到该项目");
     open.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { switchToProject } = await import("./services/project_scene.js?v=20261003-003");
+      const { switchToProject } = await import("./services/project_scene.js?v=20261005-001");
       const out = await switchToProject(projectId);
       if (!out.ok) toast(out.reason || t("切换失败"));
       await refreshCodexHistory();
@@ -1932,8 +1932,8 @@ function buildCodexHistGroup(name, convs, ctx, meta = {}) {
     pin.setAttribute("aria-pressed", entry?.pinned ? "true" : "false");
     pin.addEventListener("click", async (e) => {
       e.stopPropagation();
-      const { patchRegistry } = await import("./services/project.js?v=20261003-003");
-      const { refreshRegistry } = await import("./services/project_scene.js?v=20261003-003");
+      const { patchRegistry } = await import("./services/project.js?v=20261005-001");
+      const { refreshRegistry } = await import("./services/project_scene.js?v=20261005-001");
       await patchRegistry(projectId, { pinned: !(entry?.pinned) });
       await refreshRegistry();
       renderCodexHistory();
@@ -2160,7 +2160,7 @@ async function saveSettings() {
     if (constData) {
       if (state.project) {
         // 打开着项目就写进项目（.slate/config.json，跟着仓库走），全局版本保持不动
-        const { updateProjectConfig } = await import("./services/project.js?v=20261003-003");
+        const { updateProjectConfig } = await import("./services/project.js?v=20261005-001");
         const config = { ...(state.project.config || {}), constitution: constData };
         const res = await updateProjectConfig(config);
         if (res.code === 0) setProject(res.data);
@@ -2426,11 +2426,11 @@ async function init() {
   // lastProjectPath 退成第二道：老数据第一次升级到带注册表的版本时，册子是空的，
   // 拿它补登一次，用户不会感到"项目不见了"。
   try {
-    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20261003-003");
+    const { refreshRegistry, restoreScene } = await import("./services/project_scene.js?v=20261005-001");
     const res = await getCurrentProject();
     let project = res.code === 0 ? res.data : null;
     if (!project && state._lastProjectPath) {
-      const { openProject } = await import("./services/project.js?v=20261003-003");
+      const { openProject } = await import("./services/project.js?v=20261005-001");
       const openRes = await openProject(state._lastProjectPath);
       if (openRes.code === 0) project = openRes.data;
     }
