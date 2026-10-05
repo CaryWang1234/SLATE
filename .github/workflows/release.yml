@@ -8,7 +8,7 @@ on:
       version:
         description: '版本号（可带预发布后缀，如 0.4.5-rc1 / 0.4.5-beta2）'
         required: true
-        default: '0.4.4'
+        default: '0.4.5'
 
 permissions:
   contents: write

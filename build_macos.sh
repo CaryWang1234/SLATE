@@ -2,7 +2,7 @@
 # ─────────────────────────────────────────────────────────────
 # SLATE macOS 构建与打包脚本
 # 用法：bash build_macos.sh [version]
-#   version: 可选，如 "0.4.4"，默认从 InnoSetup 读取
+#   version: 可选，如 "0.4.5"，默认从 InnoSetup 读取
 # ─────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -26,7 +26,7 @@ if [ -z "$VERSION" ]; then
     fi
 fi
 if [ -z "$VERSION" ]; then
-    log_error "无法确定版本号，请手动传入: bash build_macos.sh 0.4.4"
+    log_error "无法确定版本号，请手动传入: bash build_macos.sh 0.4.5"
 fi
 
 # 把同一个版本串（含 -rc1/-beta1 后缀）交给 SLATE_macos.spec 写进 Info.plist
