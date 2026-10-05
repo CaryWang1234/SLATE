@@ -28,3 +28,7 @@ repo-doctor.py
 /PROJECT-TASKS-DESIGN.md
 /DEEP_RESEARCH_AI-AGENT-TOOL-CALLING.md
 /BUG_REPORT.md
+# 开发期自检/生成脚本：本机留存，不进仓库分发。
+# 例外：check_mojibake.mjs 由 .github/workflows/mojibake.yml 在 CI 上跑，必须留在仓库里。
+/scripts/*
+!/scripts/check_mojibake.mjs
