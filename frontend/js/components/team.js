@@ -8,20 +8,20 @@
  * 历史仍在，只是这场讨论画不进星图（列表里标"仅本机记录"）。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard, getModelDefinition, permissionModeFor } from "../store.js?v=20261006-001";
-import { notifyTaskComplete } from "../services/notify.js?v=20261006-001";
-import { dlgChoice } from "../services/dialog.js?v=20261006-001";
-import { upsertLocalTask, pushLocalBgEvent, registerLocalTaskStopper } from "../services/bg_tasks.js?v=20261006-001";
-import { streamChat, post, get } from "../services/api.js?v=20261006-001";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20261006-001";
-import { openRun as openLedgerRun } from "../services/agent_ledger.js?v=20261006-001";
-import { memberHue } from "../services/star_map.js?v=20261006-001";
-import { renderMarkdown } from "../services/markdown.js?v=20261006-001";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20261006-001";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20261006-001";
-import { getExpertsCached } from "./experts.js?v=20261006-001";
-import { t } from "../services/i18n.js?v=20261006-001";
-import { makeId } from "../services/utils.js?v=20261006-001";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard, getModelDefinition, permissionModeFor } from "../store.js?v=20261006-002";
+import { notifyTaskComplete } from "../services/notify.js?v=20261006-002";
+import { dlgChoice } from "../services/dialog.js?v=20261006-002";
+import { upsertLocalTask, pushLocalBgEvent, registerLocalTaskStopper } from "../services/bg_tasks.js?v=20261006-002";
+import { streamChat, post, get } from "../services/api.js?v=20261006-002";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20261006-002";
+import { openRun as openLedgerRun } from "../services/agent_ledger.js?v=20261006-002";
+import { memberHue } from "../services/star_map.js?v=20261006-002";
+import { renderMarkdown } from "../services/markdown.js?v=20261006-002";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20261006-002";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20261006-002";
+import { getExpertsCached } from "./experts.js?v=20261006-002";
+import { t } from "../services/i18n.js?v=20261006-002";
+import { makeId } from "../services/utils.js?v=20261006-002";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -502,17 +502,23 @@ function renderTeamHistory() {
   if (!teamHistoryList) return;
   teamHistoryList.innerHTML = "";
   if (teamHistory.length === 0) {
-    teamHistoryList.innerHTML = '<div class="team-history-empty">暂无团队历史</div>';
+    const empty = document.createElement("div");
+    empty.className = "team-history-empty";
+    empty.textContent = t("暂无团队历史");
+    teamHistoryList.appendChild(empty);
     return;
   }
   for (const session of teamHistory) {
     const item = document.createElement("div");
     item.className = "team-history-item";
     item.dataset.sessionId = session.id;
+    // 这个 div 就是"打开那一场"的按钮：补上角色与键盘激活，读屏和纯键盘都够得着
+    item.setAttribute("role", "button");
+    item.tabIndex = 0;
 
     const title = document.createElement("div");
     title.className = "team-history-title";
-    title.textContent = session.topic || "未命名讨论";
+    title.textContent = session.topic || t("未命名讨论");
     item.appendChild(title);
 
     const meta = document.createElement("div");
@@ -538,6 +544,12 @@ function renderTeamHistory() {
     item.appendChild(meta);
 
     item.addEventListener("click", () => loadTeamSession(session.id));
+    item.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        loadTeamSession(session.id);
+      }
+    });
     teamHistoryList.appendChild(item);
   }
 }
@@ -593,9 +605,12 @@ function renderTeamMembers() {
     header.appendChild(info);
 
     const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
     removeBtn.className = "team-member-remove";
     removeBtn.textContent = "×";
-    removeBtn.title = "移除";
+    removeBtn.title = t("移除");
+    // 只有 × 一个字形：读屏要有个名字，不然只会念出"乘号"
+    removeBtn.setAttribute("aria-label", t("移除"));
     removeBtn.addEventListener("click", () => {
       teamMembers.splice(i, 1);
       renderTeamMembers();
@@ -655,7 +670,7 @@ function populateModelOptions(select, selectedId) {
     for (const m of models) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      opt.textContent = m.name + (hasModelKey(m.id) ? "" : "（未配置 Key）");
+      opt.textContent = m.name + (hasModelKey(m.id) ? "" : t("（未配置 Key）"));
       if (m.id === selectedId) opt.selected = true;
       optgroup.appendChild(opt);
     }
@@ -670,7 +685,7 @@ function populateModelOptions(select, selectedId) {
     for (const m of state.customModels) {
       const opt = document.createElement("option");
       opt.value = m.id;
-      opt.textContent = m.name + (hasModelKey(m.id) ? "" : "（未配置 Key）");
+      opt.textContent = m.name + (hasModelKey(m.id) ? "" : t("（未配置 Key）"));
       if (m.id === selectedId) opt.selected = true;
       optgroup.appendChild(opt);
     }
@@ -715,10 +730,21 @@ function buildTranscript(entries) {
   ).join("\n");
 }
 
-function addRoundHeader(round) {
+// 空态渲染成真实节点，而不是留在 CSS 的 :empty::before 里——伪元素里的中文过不了
+// i18n 的文本观察器，英文界面会一直显示中文。
+function showTeamEmptyState() {
+  if (!teamOutput) return;
+  const el = document.createElement("div");
+  el.className = "team-empty-state";
+  el.textContent = t("输入议题后开始团队讨论。");
+  teamOutput.appendChild(el);
+}
+
+function addRoundHeader(round, final = false) {
   const el = document.createElement("div");
   el.className = "debate-round-header";
-  el.textContent = t("—— 第 {n} 轮 ——", { n: round });
+  // 终局那格不是"第 N 轮"：套进轮次模板会渲染成「第 最终决策 轮」，而且整串没有词典键、英文界面照样是中文
+  el.textContent = final ? t("最终决策") : t("—— 第 {n} 轮 ——", { n: round });
   teamOutput.appendChild(el);
 }
 
@@ -1140,7 +1166,7 @@ async function forceVerdict(topic, boardContext, entries, teamRemote = null) {
   const apiKey = decider ? getModelKey(decider.modelId) : "";
   if (!decider || !apiKey) return null;
 
-  addRoundHeader("最终决策");
+  addRoundHeader(null, true);
   const entry = addDebateEntry(decider, "verdict");
   const systemPrompt = `你是 SLATE 团队协作成员：始终从自己的角色立场出发发表独立观点，直接给观点，不寒暄、不复述他人。${getToolsSystemPrompt({ minimal: true })}`;
   const userPrompt = `${decider.persona}\n\n议题: ${topic}${boardContext}\n\n辩论记录:\n${buildTranscript(entries)}\n\n讨论轮次已用尽。请综合各方观点，以【决策】开头给出最终方案、理由与取舍。`;
@@ -1503,7 +1529,20 @@ function renderWfNodeRows(wf) {
     const detail = document.createElement("div");
     detail.className = "wf-node-detail hidden";
 
-    head.addEventListener("click", () => detail.classList.toggle("hidden"));
+    // 这一行本身就是"展开/收起"的按钮：补角色、键盘与 aria-expanded（▸ 只是装饰）
+    head.setAttribute("role", "button");
+    head.tabIndex = 0;
+    head.setAttribute("aria-expanded", "false");
+    const toggleDetail = () => {
+      head.setAttribute("aria-expanded", String(detail.classList.toggle("hidden") === false));
+    };
+    head.addEventListener("click", toggleDetail);
+    head.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleDetail();
+      }
+    });
     row.appendChild(head);
     row.appendChild(detail);
     wfNodeList.appendChild(row);
@@ -1609,6 +1648,7 @@ function initTeamPanel() {
   teamTopicInput = document.getElementById("team-topic-input");
   btnStartDiscuss = document.getElementById("btn-start-discuss");
   teamOutput = document.getElementById("team-output");
+  showTeamEmptyState();
   btnAddMember = document.getElementById("btn-add-member");
   teamHistoryList = document.getElementById("team-history-list");
   teamUsageBar = document.getElementById("team-usage-bar");
@@ -1686,6 +1726,7 @@ function initTeamPanel() {
   btnNewTeamDiscussion?.addEventListener("click", () => {
     if (isDiscussing) return;
     teamOutput.innerHTML = "";
+    showTeamEmptyState();
     teamTopicInput.value = "";
     resetTeamUsage();
     teamHistoryList?.querySelectorAll(".team-history-item.active").forEach(item => item.classList.remove("active"));

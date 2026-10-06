@@ -1264,6 +1264,7 @@ export const EN_DICT = {
   "暂无团队历史": "No team history",
   "未命名讨论": "Untitled discussion",
   " · {n} 条发言 · ~{tok} tok": " · {n} statements · ~{tok} tok",
+  "输入议题后开始团队讨论。": "Enter a topic to begin the team discussion.",
   "暂无团队成员，点击 + 添加": "No team members — click + to add",
   "分": "A",
   "创": "C",
