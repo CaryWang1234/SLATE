@@ -3,10 +3,10 @@
  * 遥控地址 + 二维码 / 模型选择 / 密钥管理 / 主题切换
  */
 
-import { state, subscribe, setCurrentModel, setModelKey, getModelKey, toggleTheme, customThemeActive, contextBudgetOf, fmtContextTokens, setReasoningEffort, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS } from "../store.js?v=20261005-001";
-import { get } from "../services/api.js?v=20261005-001";
-import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20261005-001";
-import { onTab } from "./m-app.js?v=20261005-001";
+import { state, subscribe, setCurrentModel, setModelKey, getModelKey, toggleTheme, customThemeActive, contextBudgetOf, fmtContextTokens, setReasoningEffort, reasoningCapabilityOf, reasoningLevelsOf, REASONING_COLLAPSED_CAPS } from "../store.js?v=20261006-001";
+import { get } from "../services/api.js?v=20261006-001";
+import { t, mToast, mShowPrompt, mShowConfirm, mIcon } from "./m-ui.js?v=20261006-001";
+import { onTab } from "./m-app.js?v=20261006-001";
 
 function $id(id) { return document.getElementById(id); }
 
@@ -63,7 +63,7 @@ async function renderLanInfo() {
     const res = await get("/lan/info");
     if (res?.code === 0) data = res.data;
   } catch {}
-  if (!data || !data.enabled) {
+  if (!data || !data.running) {
     const err = document.createElement("div");
     err.className = "m-setting-row-sub";
     err.textContent = t("遥控服务未启动") + (data?.error ? ": " + data.error : t("，请重启应用"));

@@ -102,11 +102,23 @@ if [ ! -d "dist/${BUNDLE_NAME}/Contents/MacOS" ]; then
     log_error ".app 包结构不完整"
 fi
 
-# ── 签名（可选，需要开发者证书）──────────────────────────────
-# 如果有 Apple Developer ID，取消下面注释并替换证书名称
-# log_info "代码签名..."
-# codesign --force --deep --sign "Developer ID Application: Your Name (TEAM_ID)" \
-#     "dist/${BUNDLE_NAME}"
+# ── 代码签名（ad-hoc）────────────────────────────────────────
+# 顺序不能提前：上面刚把 frontend/、图标、LICENSE 拷进 Contents/Resources，
+# 往 bundle 里再写任何文件都会让签名当场失效——签名必须是"最后一次落盘"之后的事。
+#
+# 为什么非签不可：未签名的 .app 下载后带上 com.apple.quarantine，Gatekeeper 直接判
+# 「已损坏，无法打开」，那个对话框只有"取消 / 移到废纸篓"，连"右键 → 打开"都不给。
+# ad-hoc（也就是 "-"）不需要任何证书，能把它降级成可放行的「无法验证开发者」。
+#
+# 升级到正式分发（需 Apple Developer 会员）：把 "-" 换成
+# "Developer ID Application: <你的名字> (<TEAM_ID>)"，同时把 --timestamp=none 换成
+# --timestamp（公证要求安全时间戳），之后再做 notarytool submit --wait 与 stapler staple。
+log_info "代码签名（ad-hoc）..."
+codesign --force --deep --sign - --timestamp=none "dist/${BUNDLE_NAME}"
+if ! codesign --verify --deep --strict "dist/${BUNDLE_NAME}"; then
+    log_error "签名自检失败——多半是有东西在签名之后又写进了 .app（顺序错了），别把这一版发出去"
+fi
+log_info "签名自检通过"
 
 # ── 创建 DMG 安装包 ─────────────────────────────────────────
 log_info "创建 DMG 安装包..."
@@ -174,7 +186,11 @@ log_info ""
 log_info "安装说明："
 log_info "1. 双击打开 ${DMG_FILENAME}"
 log_info "2. 将 ${BUNDLE_NAME} 拖入 Applications 文件夹"
-log_info "3. 首次运行可能需要右键点击 → 打开（绕过 Gatekeeper）"
+log_info "3. 首次打开若被拦下（ad-hoc 签名，未公证），二选一："
+log_info "   · 访达里右键（或长按）图标 → 「打开」 → 再点一次「打开」；"
+log_info "   · 若看到的是「已损坏，无法打开」（这句只给「移到废纸篓」，没有「打开」按钮），"
+log_info "     说明系统没吃到签名，用去隔离标记那条路："
+log_info "     sudo xattr -dr com.apple.quarantine \"/Applications/${BUNDLE_NAME}\""
 log_info ""
-log_info "如需代码签名，请在脚本中配置 Apple Developer ID"
+log_info "想让用户下载即开、零提示，需要 Developer ID 签名 + 公证（见上面签名一节的注释）"
 log_info "=========================================="

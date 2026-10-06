@@ -1,3 +1,6 @@
+import argparse
+import json
+import signal
 import sys
 import subprocess
 import time
@@ -253,8 +256,115 @@ def attach_tray(window, log=lambda message: None) -> TrayHandle:
             log('tray unavailable; closing the window exits as before')
     return handle
 
+# ── --remote：无界面模式 ─────────────────────────────────────
+# 没有桌面环境的机器（Linux 服务器、树莓派、容器）上 pywebview 起不来，而遥控真正
+# 需要的只是后端与那个局域网副服务。这个模式把它们跑起来、把地址交到终端上，
+# 窗口与托盘一概不碰。
+
+REMOTE_READY_TIMEOUT = 20
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(
+        prog='SLATE',
+        description='SLATE 砚：不带参数打开桌面窗口；--remote 只起服务，供局域网遥控。',
+    )
+    parser.add_argument(
+        '--remote', action='store_true',
+        help='不开窗口、不起托盘，只起后端与局域网遥控，并把带授权的遥控地址打印到终端',
+    )
+    return parser.parse_args(argv)
+
+
+def _ensure_utf8_stdout():
+    """无头 Linux 上 stdout 常是 POSIX locale（ascii），直接写中文会 UnicodeEncodeError
+    把进程带走。改成 UTF-8 且编码失败也不抛；没有 reconfigure 的流（比如打包版
+    console=False 时的 None）跳过即可。"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except (AttributeError, ValueError, OSError):
+            pass
+
+
+def _say(message):
+    """远程模式的输出去处：有终端就写终端（无头 Linux 的主用法），没有就落到日志
+    ——打包版 console=False，sys.stdout 是 None，直接 print 会把进程干掉。"""
+    line = message + '\n'
+    stream = sys.stdout
+    if stream is not None:
+        try:
+            stream.write(line)
+            stream.flush()
+            return
+        except (OSError, ValueError):
+            pass
+    try:
+        with open(LOG_PATH, 'a', encoding='utf-8') as f:
+            f.write(line)
+    except OSError:
+        pass
+
+
+def fetch_lan_info(app_url, timeout=REMOTE_READY_TIMEOUT):
+    """从主端口读遥控信息。副服务由后端 startup 起，比主端口就绪略晚，故重试。
+
+    只等到"接口答得上话"为止，不等到"遥控确实在听"：开关关着时后者永远等不来，
+    而这个模式该做的是把真实状态说清楚，不是白等 20 秒。
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(f'{app_url}/api/lan/info', timeout=1) as response:
+                if response.status == 200:
+                    payload = json.loads(response.read().decode('utf-8'))
+                    data = payload.get('data') if isinstance(payload, dict) else None
+                    if isinstance(payload, dict) and payload.get('code') == 0 and isinstance(data, dict):
+                        return data
+        except Exception:
+            pass
+        time.sleep(0.3)
+    return None
+
+
+def run_remote(app_url):
+    """--remote 的主循环：等 Ctrl+C（或 SIGTERM），返回即收尾。"""
+    _ensure_utf8_stdout()
+    _say('SLATE 已进入远程模式（无界面）。')
+    _say(f'  本机地址：{app_url}')
+    info = fetch_lan_info(app_url)
+    # 以 urls 为准而不是某个状态字段：有地址就等于副服务真的在听，这一条在新旧后端上
+    # 含义一致，读到空串才是真没起来（开关关着、端口没抢到都归这里）。
+    urls = (info or {}).get('urls') or []
+    if urls:
+        for url in urls:
+            _say(f'  遥控地址：{url}')
+        _say('  在同一局域网内用手机或另一台电脑的浏览器打开上面的遥控地址即可操作。')
+    else:
+        _say('  未取到遥控地址：遥控开关可能关着，或副服务没起来，详见 desktop_backend.log。')
+    _say('按 Ctrl+C 停止。')
+
+    stop = threading.Event()
+
+    def _on_signal(signum, frame):
+        stop.set()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(sig, _on_signal)
+        except (ValueError, OSError, AttributeError):
+            pass
+    try:
+        while not stop.is_set():
+            stop.wait(0.5)
+    except KeyboardInterrupt:
+        pass
+    _say('正在停止 SLATE。')
+
+
 def main():
     global _instance_lock
+    args = parse_args()
     # 0. 单实例闸门：必须排在清日志与起后端之前。晚一步就已经多起一份服务、
     #    多一个写同一座 SQLite 的进程，还会把主实例正在写的 desktop_backend.log 清空。
     _instance_lock = desktop_instance.try_acquire(BASE_DIR)
@@ -265,6 +375,12 @@ def main():
         print('SLATE 已在运行：' + ('已切回已有窗口。' if surfaced else '已交给正在启动的那个实例。'))
         return
 
+    # --remote 要赶在起后端之前把强制开关塞进环境变量：源码态后端是子进程，
+    # 环境在 Popen 那一刻就被继承定了。
+    if args.remote:
+        from backend.routers.lan import FORCE_ENV
+        os.environ[FORCE_ENV] = '1'
+
     # 1. 启动 uvicorn 服务器
     open(LOG_PATH, 'w', encoding='utf-8').close()
     os.makedirs(STORAGE_PATH, exist_ok=True)
@@ -274,7 +390,10 @@ def main():
     uvicorn_process = None
     frozen = FROZEN
 
-    if not frozen and can_reuse_server(preferred_url):
+    # --remote 不复用别人的后端：强制开遥控那个环境变量只对自己起的后端生效，
+    # 复用了就保证不了"这次一定有遥控"——而远程模式下用户手上没有界面可以补救。
+    # 端口被占时下面会退到回退端口，照样起自己那份。
+    if not frozen and not args.remote and can_reuse_server(preferred_url):
         port = preferred_port
         app_url = preferred_url
         log(f'reusing existing backend: {app_url}')
@@ -294,6 +413,10 @@ def main():
         if not ready:
             log(f'backend failed: {error}')
             stop_process(uvicorn_process)
+            if args.remote:
+                # 无界面模式下没有窗口可以承载失败页，把原因交给终端或日志
+                _say(f'后端启动失败：{error}（详见 desktop_backend.log）')
+                return
             webview.create_window(
                 title=WINDOW_TITLE,
                 html=f'<h2>SLATE backend failed to start</h2><p>{html_escape(str(error))}</p><p>See desktop_backend.log.</p>',
@@ -303,7 +426,15 @@ def main():
             webview.start(debug=False)
             return
 
-    # 2. 创建 pywebview 窗口，加载本地地址
+    # 2. 无界面模式（--remote）：不起窗口、不起托盘，把遥控地址交给终端
+    if args.remote:
+        try:
+            run_remote(app_url)
+        finally:
+            stop_process(uvicorn_process)
+        return
+
+    # 3. 创建 pywebview 窗口，加载本地地址
     log('creating window')
     window = webview.create_window(
         title=WINDOW_TITLE,
@@ -314,10 +445,10 @@ def main():
         confirm_close=False
     )
 
-    # 3. 托盘：关掉窗口不停机，缩到系统通知区域继续跑（先只做 Windows）
+    # 4. 托盘：关掉窗口不停机，缩到系统通知区域继续跑（先只做 Windows）
     tray_handle = attach_tray(window, log)
 
-    # 4. 启动 pywebview 事件循环（阻塞）
+    # 5. 启动 pywebview 事件循环（阻塞）
     log('starting webview')
     webview.start(
         debug=False,
@@ -327,7 +458,7 @@ def main():
     )
     log('webview closed')
 
-    # 5. 退出收尾：先摘掉托盘图标（别在通知区域留个按不动的死图标），再确保子进程终止
+    # 6. 退出收尾：先摘掉托盘图标（别在通知区域留个按不动的死图标），再确保子进程终止
     tray_handle.shutdown()
     stop_process(uvicorn_process)
 

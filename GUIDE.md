@@ -51,7 +51,7 @@ SLATE（砚）是一款**本地优先**的 AI 协作调度台。它把主流大�
 
 #### macOS
 
-前往 [GitHub Releases](https://github.com/CaryWang1234/SLATE/releases) 下载 `SLATE-Setup-x.x.x.dmg`，双击挂载后把「SLATE 砚」拖进「应用程序」。这个 `.dmg` 由 CI 直接产出，还没有做代码签名与公证，首次打开会被 Gatekeeper 拦下：在访达里右键（或长按）图标 → 「打开」 → 再点一次「打开」，此后就能双击启动。
+前往 [GitHub Releases](https://github.com/CaryWang1234/SLATE/releases) 下载 `SLATE-Setup-x.x.x.dmg`，双击挂载后把「SLATE 砚」拖进「应用程序」。这个 `.dmg` 由 CI 直接产出，只做了 ad-hoc 签名、没有公证，首次打开会被 Gatekeeper 拦一次：在访达里右键（或长按）图标 → 「打开」 → 再点一次「打开」，此后就能双击启动。如果对话框写的是「已损坏，无法打开」（只有「移到废纸篓」，没有「打开」按钮），说明系统没认到签名，改用这条命令去掉隔离标记再打开：`sudo xattr -dr com.apple.quarantine "/Applications/SLATE 砚.app"`。
 
 安装版的数据不在 `.app` 包里，而在 `~/Library/Application Support/SLATE`：对话历史、API Key、后端日志和 WebView 的个人资料都在这里。替换 `.app` 升级不会动你的数据，包体也不会在运行时被写脏——将来真签名公证时，那种改动是会废掉签名的。源码运行仍然把数据放在仓库的 `data/`。
 
@@ -450,7 +450,7 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 | 自动推进 | Autopilot / 短回复审阅 / 长回复停顿审阅 / Continue Autopilot（末轮续跑 + 轮数用尽自动续跑，非手动审批档才动手） |
 | 审批模式 | 四档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 24 类高危）/ 完全访问（命令与联网都不问，缺条件时仍弹选择题问你一句，胶囊标红）/ 夜间模式（全托管：命令、联网、连反问都不问，自己拍板继续，胶囊标夜紫）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改。夜间模式下面还有一颗「跑任务时不让电脑睡眠」：只挡系统睡眠，屏幕照常熄灭，合盖、手动睡眠、已经睡着的机器都叫不醒；钉住的是这一场真在跑的那段时间，页面刷新或崩掉后租约最迟 60 秒自动交还；由桌面端界面持有，手机端那一页跑的任务、没有前端在跑的定时任务与后台终端任务都不钉，这一版只在 Windows 上生效 |
 | 回复模式 | 输入框左下的模式胶囊，内置四档且各有图标与颜色：智能（全部工具，提示词与旋钮都不动，默认）/ 对话（不调用工具、单轮直答）/ 经济（只读工具白名单 + 低推理强度 + 收紧轮数）/ 狂暴（全工具 + 高推理 + 放宽轮数）；切换只改这一场，换会话各用各的，新对话从默认档起。默认档与自定义模式都在「扩展 → 模式」里建与管理；模型也能用 `mode_write` 建 / 改 / 删模式（追加提示词 + 工具白名单 + 推理强度 + 轮数上限），手动审批档下弹窗把这次改动给你看。白名单是真拦：没开放的工具既不下发到原生 schema 与文本目录，凭记忆硬调也在执行口被挡下并说明是模式所限 |
-| 局域网遥控 | 查看访问地址与二维码，设置局域网访问密码 |
+| 局域网遥控 | 开关 + 访问地址与二维码；关掉即释放监听端口（不是藏起地址），开关只能在本机拨，手机端拨不动；无桌面环境的机器可 `SLATE --remote` 直接起遥控、不开窗口 |
 | 主题 | 深色/浅色切换（顶栏按钮与 Ctrl+D）；自定义主题开着时这颗按钮会锁定，点下去说明原因而不换色 |
 | 自定义主题 | 四个源色（底色 / 面板 / 正文 / 强调）推导整套配色 + 正文与代码字体（也能导入自己的字体文件）+ 板块透明度 + 本机背景图与遮罩浓度；还能取 Wallpaper Engine 正在用的那张壁纸的预览图当背景（只读它的配置与 preview，不启动它、不改它设置，它换了要再点一次）；项目栏文件类型图标也跟着强调色现算（多色图标按色相染色）；10 套预设，改任一格即脱离预设高亮，开关跨设备同步、图与字体只留本机 |
 | 语言 | 中文/English——按钮与区块标题之外，输入框 placeholder 与悬浮提示也走词典；用户与模型写的内容一律不翻，品牌字标「砚」用 `data-i18n-skip` 豁免 |
@@ -506,7 +506,7 @@ One install opens exactly one SLATE window: if the window is already open, or al
 
 #### macOS
 
-Download `SLATE-Setup-x.x.x.dmg` from [GitHub Releases](https://github.com/CaryWang1234/SLATE/releases), mount it, and drag "SLATE 砚" into "Applications". The `.dmg` comes straight out of CI and is neither code-signed nor notarised yet, so the first launch is stopped by Gatekeeper: right-click (or long-press) the icon in Finder → Open → Open again. A plain double-click works from then on.
+Download `SLATE-Setup-x.x.x.dmg` from [GitHub Releases](https://github.com/CaryWang1234/SLATE/releases), mount it, and drag "SLATE 砚" into "Applications". The `.dmg` comes straight out of CI and is ad-hoc signed but not notarised, so Gatekeeper stops the first launch once: right-click (or long-press) the icon in Finder → Open → Open again. A plain double-click works from then on. If the dialog instead reads "「SLATE 砚」已损坏，无法打开" (only a "Move to Trash" button, no "Open"), the signature was not picked up — clear the quarantine flag first: `sudo xattr -dr com.apple.quarantine "/Applications/SLATE 砚.app"`.
 
 An installed build keeps its data outside the `.app`, under `~/Library/Application Support/SLATE`: chat history, API keys, the backend log and the WebView profile all live there. Replacing the `.app` to upgrade therefore leaves your data alone, and the bundle is never written to at runtime — the kind of change that would void a signature once the app is signed. Running from source still uses `data/` inside the repo.
 

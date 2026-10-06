@@ -6,17 +6,27 @@
   副服务在守护线程中运行 uvicorn.Server，lifespan="off" 避免重复触发启动事件；
 - 默认端口 8001，被占用时向上扫描，实际端口经 /info 返回；
 - /info 返回局域网地址供前端醒目展示，/qrcode 生成地址二维码。
+- 开关：偏好记在 data/desktop_state.json 的 lanRemote，缺键或读坏都按"开"处理
+  （升级前的行为就是一直开着，默认关会让现有装机的人突然发现手机连不上）；
+  设置页可实时启停，关掉是真的把监听端口释放掉，不只是藏起地址。
+  SLATE_LAN_FORCE=1 是 desktop.py --remote 用的一次性强制开，只在本次进程内生效，不落盘。
 """
 
 from __future__ import annotations
 
+import json
+import os
 import socket
 import secrets
 import threading
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, Response
+from pydantic import BaseModel
+
+from backend.data_io import atomic_write_json
 
 router = APIRouter(prefix="/lan", tags=["lan"])
 
@@ -27,8 +37,54 @@ TOKEN_QUERY = "slate_lan_token"
 TOKEN_COOKIE = "slate_lan_auth"
 TOKEN_HEADER = "x-slate-lan-token"
 
-_state: dict[str, Any] = {"port": None, "error": "", "thread": None, "token": secrets.token_urlsafe(24)}
+STATE_PATH = Path(os.environ.get("SLATE_DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data")) / "desktop_state.json"
+PREF_KEY = "lanRemote"
+FORCE_ENV = "SLATE_LAN_FORCE"
+
+_state: dict[str, Any] = {"port": None, "error": "", "thread": None, "server": None, "token": secrets.token_urlsafe(24)}
 _lock = threading.Lock()
+
+
+def _read_pref() -> bool:
+    """遥控开关的偏好。文件不在、内容坏了、没这个键，都按"开"走。"""
+    if not STATE_PATH.exists():
+        return True
+    try:
+        shared = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return True
+    if not isinstance(shared, dict):
+        return True
+    return shared.get(PREF_KEY, True) is not False
+
+
+def _write_pref(enabled: bool) -> bool:
+    """合并式写入：只动这一个键，别把设置页刚存的其他字段抹掉。"""
+    existing: dict[str, Any] = {}
+    if STATE_PATH.exists():
+        try:
+            loaded = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                existing = loaded
+        except (OSError, json.JSONDecodeError):
+            existing = {}
+    existing[PREF_KEY] = bool(enabled)
+    try:
+        STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_json(STATE_PATH, existing)
+        return True
+    except OSError:
+        return False
+
+
+def force_requested() -> bool:
+    """本次进程是否被 --remote 强制开启（环境变量，不落盘）。"""
+    return os.environ.get(FORCE_ENV, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def should_start_on_boot() -> bool:
+    """启动时要不要起副服务：被强制，或者用户偏好是开。"""
+    return force_requested() or _read_pref()
 
 
 def _port_free(port: int) -> bool:
@@ -186,31 +242,82 @@ def start_lan_server(app: Any) -> None:
         _state["port"] = port
         _state["error"] = ""
         _state["thread"] = t
+        _state["server"] = server
+
+
+def stop_lan_server() -> None:
+    """停掉副服务并释放端口（幂等）。
+
+    只置 should_exit 不行：线程退出后 _state["port"] 还留着旧端口，
+    is_lan_request 就会继续把主端口的请求当成局域网请求去拦。
+    """
+    with _lock:
+        server = _state.get("server")
+        thread = _state.get("thread")
+        _state["port"] = None
+        _state["server"] = None
+        _state["thread"] = None
+        _state["error"] = ""
+    if server is not None:
+        try:
+            server.should_exit = True
+        except Exception:
+            pass
+    if thread is not None:
+        thread.join(timeout=5)
+
+
+def set_enabled(app: Any, enabled: bool) -> None:
+    """应用开关：先落偏好再启停，顺序反过来的话起不来的一刻偏好已经丢了。"""
+    _write_pref(enabled)
+    if enabled:
+        start_lan_server(app)
+    else:
+        stop_lan_server()
+
+
+def _info_data() -> dict[str, Any]:
+    port = _state["port"]
+    ip = get_lan_ip()
+    return {
+        # enabled = 用户那个开关；running = 副服务是不是真的在听。两者在 --remote
+        # 强制开启时会不一致（开关关着但服务在听），前端据此把原因说清楚。
+        "enabled": _read_pref(),
+        "running": port is not None,
+        "forced": force_requested(),
+        "port": port,
+        "ip": ip,
+        "urls": [_remote_url(ip, port)] if port else [],
+        "plainUrls": [f"http://{ip}:{port}"] if port else [],
+        "auth": {
+            "enabled": True,
+            "query": TOKEN_QUERY,
+        },
+        "error": _state["error"],
+    }
 
 
 @router.get("/info")
 async def lan_info() -> dict[str, Any]:
-    """返回局域网遥控地址（前端设置页醒目展示）。"""
-    port = _state["port"]
-    ip = get_lan_ip()
-    urls = [f"http://{ip}:{port}"] if port else []
-    auth_urls = [_remote_url(ip, port)] if port else []
-    return {
-        "code": 0,
-        "data": {
-            "enabled": port is not None,
-            "port": port,
-            "ip": ip,
-            "urls": auth_urls,
-            "plainUrls": urls,
-            "auth": {
-                "enabled": True,
-                "query": TOKEN_QUERY,
-            },
-            "error": _state["error"],
-        },
-        "message": "ok",
-    }
+    """返回局域网遥控地址与开关状态（前端设置页醒目展示）。"""
+    return {"code": 0, "data": _info_data(), "message": "ok"}
+
+
+class LanToggleRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/enabled")
+async def lan_set_enabled(req: LanToggleRequest, request: Request) -> dict[str, Any]:
+    """设置页的遥控开关。
+
+    只认桌面主端口：从遥控副端口调用的设备正靠这条连接做事，关掉就是把自己关在
+    门外；而"打开"方向在服务停掉之后根本不可达。留着那种调用只会让人以为按钮坏了。
+    """
+    if is_lan_request(request):
+        return {"code": 1, "message": "遥控开关只能在运行 SLATE 的主机上操作"}
+    set_enabled(request.app, req.enabled)
+    return {"code": 0, "data": _info_data(), "message": "ok"}
 
 
 @router.get("/qrcode")

@@ -130,7 +130,12 @@ async def _migrate_legacy_tools():
 
 @app.on_event("startup")
 async def _start_lan_remote():
-    """启动局域网遥控副服务（0.0.0.0:8001，共享本 app）。"""
+    """启动局域网遥控副服务（0.0.0.0:8001，共享本 app）。
+
+    设置页把开关关掉后不再起；desktop.py --remote 用环境变量强制开，只影响本次进程。
+    """
+    if not lan.should_start_on_boot():
+        return
     lan.start_lan_server(app)
 
 
