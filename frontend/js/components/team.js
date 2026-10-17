@@ -8,20 +8,21 @@
  * 历史仍在，只是这场讨论画不进星图（列表里标"仅本机记录"）。
  */
 
-import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard, getModelDefinition, permissionModeFor } from "../store.js?v=20261006-002";
-import { notifyTaskComplete } from "../services/notify.js?v=20261006-002";
-import { dlgChoice } from "../services/dialog.js?v=20261006-002";
-import { upsertLocalTask, pushLocalBgEvent, registerLocalTaskStopper } from "../services/bg_tasks.js?v=20261006-002";
-import { streamChat, post, get } from "../services/api.js?v=20261006-002";
-import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20261006-002";
-import { openRun as openLedgerRun } from "../services/agent_ledger.js?v=20261006-002";
-import { memberHue } from "../services/star_map.js?v=20261006-002";
-import { renderMarkdown } from "../services/markdown.js?v=20261006-002";
-import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20261006-002";
-import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20261006-002";
-import { getExpertsCached } from "./experts.js?v=20261006-002";
-import { t } from "../services/i18n.js?v=20261006-002";
-import { makeId } from "../services/utils.js?v=20261006-002";
+import { state, subscribe, getModelKey, hasModelKey, estimateTokens, addBoardCard, getModelDefinition, permissionModeFor } from "../store.js?v=20261006-003";
+import { notifyTaskComplete } from "../services/notify.js?v=20261006-003";
+import { dlgChoice } from "../services/dialog.js?v=20261006-003";
+import { upsertLocalTask, pushLocalBgEvent, registerLocalTaskStopper } from "../services/bg_tasks.js?v=20261006-003";
+import { streamChat, post, get, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261006-003";
+import { iconSvg } from "../services/icons.js?v=20261006-003";
+import { detectToolCalls, stripToolCalls, executeToolCalls, getToolsSystemPrompt } from "../services/tools.js?v=20261006-003";
+import { openRun as openLedgerRun } from "../services/agent_ledger.js?v=20261006-003";
+import { memberHue } from "../services/star_map.js?v=20261006-003";
+import { renderMarkdown } from "../services/markdown.js?v=20261006-003";
+import { loadWorkflows, getWorkflow, runWorkflow, stopWorkflow, saveRunToKnowledge } from "../services/workflow.js?v=20261006-003";
+import { getExpert, buildExpertPrompt } from "../services/experts.js?v=20261006-003";
+import { getExpertsCached } from "./experts.js?v=20261006-003";
+import { t } from "../services/i18n.js?v=20261006-003";
+import { makeId } from "../services/utils.js?v=20261006-003";
 
 // 当模型列表加载完成后，重新渲染团队成员（填充下拉选项）
 subscribe("modelRegistry", () => renderTeamMembers());
@@ -801,7 +802,73 @@ function finalizeEntry(entry, action, target, text) {
     entry.replyRef.classList.remove("hidden");
   }
   entry.content.textContent = text;
+  collapseEntryReasoning(entry);
   teamOutput.scrollTop = teamOutput.scrollHeight;
+}
+
+// ── 思考内容：与 chat.js 同一套约定 ─────────────────────
+// 流式分片里 reasoning 以 REASONING_PREFIX 打头（控制字符）。团队这一格只画"发言本身"：
+// 不区分这个前缀就会把控制字符直接写进正文（屏幕上就是乱码），而且这段思考还会被当成
+// 发言喂给下一位成员、跟着 fullText 落库。所以思考单独折进一格，正文只收 content。
+
+const REASONING_MARK_RE = /\x00?\x01R\x01\x00?/g;
+
+function stripReasoningMarks(text) {
+  return String(text || "").replace(REASONING_MARK_RE, "");
+}
+
+/** 切开一个分片：整片是思考，或"正文 + 标记 + 思考"混在一处（标记之后都算思考）。
+ *  刻意不写成 exec 循环：stripReasoningMarks 里的 replace（带 g）会把 lastIndex 归零，
+ *  边扫边 replace 会退化成死循环。 */
+function splitReasoningChunk(chunk) {
+  const text = String(chunk || "");
+  if (!text) return [];
+  if (text.startsWith(REASONING_PREFIX)) {
+    return [{ reasoning: true, text: stripReasoningMarks(text.slice(REASONING_PREFIX.length)) }];
+  }
+  if (text.startsWith(REASONING_INLINE_PREFIX)) {
+    return [{ reasoning: true, text: stripReasoningMarks(text.slice(REASONING_INLINE_PREFIX.length)) }];
+  }
+  REASONING_MARK_RE.lastIndex = 0;
+  const match = REASONING_MARK_RE.exec(text);
+  if (!match) return [{ reasoning: false, text }];
+  const parts = [];
+  if (match.index > 0) parts.push({ reasoning: false, text: stripReasoningMarks(text.slice(0, match.index)) });
+  const rest = stripReasoningMarks(text.slice(match.index));
+  if (rest) parts.push({ reasoning: true, text: rest });
+  return parts;
+}
+
+/** 第一次收到思考才建那格，插在正文之前；流在跑时展开，收尾由 collapseEntryReasoning 折起 */
+function appendEntryReasoning(entry, text) {
+  if (!text) return;
+  if (!entry.thinking) {
+    const panel = document.createElement("div");
+    panel.className = "thinking-panel";
+    panel.innerHTML = `
+      <div class="thinking-header">
+        <span class="thinking-icon">${iconSvg("message-circle")}</span>
+        <span class="thinking-label">${t("思考过程")}</span>
+        <span class="thinking-toggle">▾</span>
+      </div>
+      <div class="thinking-body"></div>
+    `;
+    panel.querySelector(".thinking-header").addEventListener("click", () => {
+      panel.classList.toggle("collapsed");
+      panel.querySelector(".thinking-toggle").textContent = panel.classList.contains("collapsed") ? "▸" : "▾";
+    });
+    entry.el.insertBefore(panel, entry.content);
+    entry.thinking = panel;
+  }
+  const body = entry.thinking.querySelector(".thinking-body");
+  body.textContent += text;
+  body.scrollTop = body.scrollHeight;
+}
+
+function collapseEntryReasoning(entry) {
+  if (!entry.thinking) return;
+  entry.thinking.classList.add("collapsed");
+  entry.thinking.querySelector(".thinking-toggle").textContent = "▸";
 }
 
 // ── 拍板：决策要人签字才算数 ──────────────────────────────
@@ -975,6 +1042,7 @@ async function startDiscussion() {
       const userPrompt = buildMemberPrompt(member, topic, boardContext, entries, round, isLastRound, member.expertId ? expertDetails.get(member.expertId) : null);
 
       let fullText = "";
+      let reasoningText = "";
       let failure = "";
       try {
         for await (const chunk of streamChat({
@@ -993,7 +1061,14 @@ async function startDiscussion() {
           stream: true,
           signal: discussAbortController?.signal,
         })) {
-          fullText += chunk;
+          for (const part of splitReasoningChunk(chunk)) {
+            if (part.reasoning) {
+              reasoningText += part.text;
+              appendEntryReasoning(entry, part.text);
+            } else {
+              fullText += part.text;
+            }
+          }
           entry.content.textContent = fullText;
           teamOutput.scrollTop = teamOutput.scrollHeight;
         }
@@ -1053,7 +1128,7 @@ async function startDiscussion() {
       // 非决策者不允许越权拍板
       const action = parsed.action === "verdict" && member.role !== "decider" ? "propose" : parsed.action;
       finalizeEntry(entry, action, parsed.target, parsed.content || "（无内容）");
-      addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText);
+      addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText + reasoningText);
 
       const rec = {
         round, member: { ...member }, action, target: parsed.target,
@@ -1172,6 +1247,7 @@ async function forceVerdict(topic, boardContext, entries, teamRemote = null) {
   const userPrompt = `${decider.persona}\n\n议题: ${topic}${boardContext}\n\n辩论记录:\n${buildTranscript(entries)}\n\n讨论轮次已用尽。请综合各方观点，以【决策】开头给出最终方案、理由与取舍。`;
 
   let fullText = "";
+  let reasoningText = "";
   let failure = "";
   try {
     for await (const chunk of streamChat({
@@ -1188,7 +1264,14 @@ async function forceVerdict(topic, boardContext, entries, teamRemote = null) {
       stream: true,
       signal: discussAbortController?.signal,
     })) {
-      fullText += chunk;
+      for (const part of splitReasoningChunk(chunk)) {
+        if (part.reasoning) {
+          reasoningText += part.text;
+          appendEntryReasoning(entry, part.text);
+        } else {
+          fullText += part.text;
+        }
+      }
       entry.content.textContent = fullText;
       teamOutput.scrollTop = teamOutput.scrollHeight;
     }
@@ -1209,7 +1292,7 @@ async function forceVerdict(topic, boardContext, entries, teamRemote = null) {
   fullText = stripToolCalls(fullText);
   const parsed = parseDebateAction(fullText);
   finalizeEntry(entry, "verdict", parsed.target, parsed.content || fullText);
-  addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText);
+  addTeamUsage(`${systemPrompt}\n\n${userPrompt}`, fullText + reasoningText);
 
   const rec = {
     round: "最终决策", member: { ...decider }, action: "verdict", target: parsed.target,
