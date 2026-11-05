@@ -319,6 +319,9 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "expression": {"type": "string", "description": "JS 表达式"},
                 "headless": {"type": "boolean", "description": "无头模式"},
                 "full_page": {"type": "boolean", "description": "全页截图"},
+                "timeout": {"type": "integer", "description": "操作超时毫秒数（默认 30000）"},
+                # 刻意不收 allow_headed：被拦后开可见窗口是本机用户在设置里点的头，
+                # 远程调用方不该替桌面那头同意（前端按偏好注入，见 services/tools.js）
             },
             "required": ["action"],
         },

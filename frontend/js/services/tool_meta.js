@@ -9,10 +9,10 @@
  * （git / node / curl…）挑对应品牌图标，命令行 / 文件 / 工具三类行共用这套识别链。
  */
 
-import { TOOLS } from "./tools.js?v=20261006-003";
-import { t } from "./i18n.js?v=20261006-003";
-import { state } from "../store.js?v=20261006-003";
-import { mcpIconKeyFromTool } from "./mcp_logos.js?v=20261006-003";
+import { TOOLS } from "./tools.js?v=20261006-005";
+import { t } from "./i18n.js?v=20261006-005";
+import { state } from "../store.js?v=20261006-005";
+import { mcpIconKeyFromTool } from "./mcp_logos.js?v=20261006-005";
 
 const SUMMARY_MAX = 60;
 
@@ -68,6 +68,7 @@ const TOOL_LABELS = {
   board_batch: "批量操作",
   board_clear: "清空黑板",
   knowledge_search: "知识检索",
+  history_search: "历史检索",
   knowledge_add: "知识添加",
   prompt_gen: "提示词生成",
   chat_context: "对话上下文",
@@ -156,6 +157,7 @@ const TOOL_ICONS = {
   board_batch: "scroll",
   board_clear: "scroll",
   knowledge_search: "database",
+  history_search: "clock",
   knowledge_add: "database",
   prompt_gen: "pen-tool",
   python_api_extract: "python",

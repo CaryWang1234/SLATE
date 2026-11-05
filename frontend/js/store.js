@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20261006-003";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261006-003";
+import { makeId } from "./services/utils.js?v=20261006-005";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261006-005";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -111,7 +111,7 @@ const MODE_TOOLS_NONE = "none";
 // 收口工具（exit_target_mode / exit_autopilot）由 tools.js 的白名单过滤无条件保留。
 const MODE_READONLY_TOOLS = [
   "project_info", "project_files", "project_read_file", "project_find_file",
-  "code_search", "skill_search", "board_read", "knowledge_search",
+  "code_search", "skill_search", "board_read", "knowledge_search", "history_search",
   "actions_list", "actions_read", "system_info", "chat_context",
   "todo_manage", "user_ask",
 ];
@@ -306,6 +306,11 @@ const state = {
   // （与 continueAutopilot 同一条理由）。
   keepAwakeOnNightRun: true,
 
+  // 浏览器自动化被站点挡下时，允许自己开一个可见窗口重试一次（默认关）。
+  // 默认关的理由：窗口会凭空出现在用户桌面上，模型判断"该重试"不该等于用户同意被打扰。
+  // 只存本机：可见窗口是那台机器的事，手机上开不出这个口子（与 keepAwakeOnNightRun 同一条理由）。
+  browserHeadedRetry: false,
+
   // 旧 chatMode 键：现在只是"这一场是不是对话模式"的二值投影（由 activeModeId 推出，
   // 见 legacyChatModeOf）。存档里留着它是为了让老版本/老读取点照旧工作；
   // 读模式请用 activeModeFor / activeModeIdFor。
@@ -417,6 +422,7 @@ function buildPersistentData() {
     permissionModeSchema: PERMISSION_MODE_SCHEMA,
     permissionModeByConversation: normalizePermissionModeMap(state.permissionModeByConversation),
     keepAwakeOnNightRun: state.keepAwakeOnNightRun !== false,
+    browserHeadedRetry: state.browserHeadedRetry === true,
     chatMode: normalizeChatMode(state.chatMode),
     reasoningEffort: state.reasoningEffort,
     customModes: normalizeCustomModes(state.customModes),
@@ -822,6 +828,8 @@ function loadPersistent() {
     state.permissionModeSchema = PERMISSION_MODE_SCHEMA;
     // 老状态文件没这个键：读成 undefined 时按默认值（开启）走，与 continueAutopilot 同一口径
     state.keepAwakeOnNightRun = data.keepAwakeOnNightRun !== false;
+    // 默认关：老状态文件没这个键读成 undefined，按"没同意"走（与上面那条相反，因为这条默认是关）
+    state.browserHeadedRetry = data.browserHeadedRetry === true;
     state.customModes = normalizeCustomModes(data.customModes);
     if (Object.prototype.hasOwnProperty.call(data, "activeModeId")) {
       state.activeModeId = normalizeModeId(data.activeModeId);
@@ -998,6 +1006,15 @@ function setKeepAwakeOnNightRun(enabled) {
   state.keepAwakeOnNightRun = next;
   savePersistent();
   notify("keepAwakeOnNightRun", next);
+}
+
+/** 浏览器被站点挡下时要不要开一个可见窗口重试。默认关：那个窗口是摆在用户桌面上的打扰。值没变就不写盘也不通知。 */
+function setBrowserHeadedRetry(enabled) {
+  const next = enabled === true;
+  if ((state.browserHeadedRetry === true) === next) return;
+  state.browserHeadedRetry = next;
+  savePersistent();
+  notify("browserHeadedRetry", next);
 }
 
 /**
@@ -1957,7 +1974,7 @@ export {
   setBgAutoResume, bgResumeUsedOf, markBgResumeUsed,
   setMaxParallelRuns, setMaxConcurrentRunsPerProject, setBackgroundRuns,
   // 审批模式：这一场生效哪一档的读与写（判口在 services/riskguard.js）
-  permissionModeFor, setPermissionModeFor, setDefaultPermissionMode, setKeepAwakeOnNightRun,
+  permissionModeFor, setPermissionModeFor, setDefaultPermissionMode, setKeepAwakeOnNightRun, setBrowserHeadedRetry,
   adoptConversationPermissionMode, forgetConversationPermissionMode,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage, messagesOf, hasThread, dropThread, bindVisibleThread,

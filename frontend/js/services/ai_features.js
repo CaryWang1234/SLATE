@@ -11,13 +11,18 @@
  * mode 只是给人看的标签：自动 = 后台自己会发请求，手动 = 你点一下才发，模型调用 = 由模型自己决定调不调。
  */
 
-import { state, getModelKey, savePersistent, notify } from "../store.js?v=20261006-003";
-import { t } from "./i18n.js?v=20261006-003";
+import { state, getModelKey, savePersistent, notify } from "../store.js?v=20261006-005";
+import { t } from "./i18n.js?v=20261006-005";
 
 export const AI_FEATURES = [
   {
     id: "context_compress", name: "上下文压缩摘要", mode: "自动", model: true,
     note: "每轮回复后判断是否超出上下文预算，超了就把旧消息压成一段历史摘要（手动点「压缩」也走这一档）",
+  },
+  {
+    id: "history_search", name: "历史原文检索", mode: "模型调用", tool: "history_search", model: false,
+    modelNote: "只查本机对话库，不消耗 token",
+    note: "压缩只把旧消息折成摘要、库里的原文没删，这一项让模型按关键词查回被折掉的原文（默认只查这一场）。关闭后该工具不再出现在工具目录中",
   },
   {
     id: "memory_distill", name: "记忆自动蒸馏", mode: "自动", model: true,
@@ -163,7 +168,7 @@ export function aiFeatureOffTip(id) {
  */
 export function aiFeatureBlocked(id) {
   if (isAiFeatureOn(id)) return false;
-  import("../app.js?v=20261006-003").then(({ toast }) => toast(aiFeatureOffTip(id))).catch(() => {});
+  import("../app.js?v=20261006-005").then(({ toast }) => toast(aiFeatureOffTip(id))).catch(() => {});
   return true;
 }
 

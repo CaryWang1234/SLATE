@@ -3,14 +3,14 @@
  * + Actions（data/actions/*.yml 流程说明书：可编辑、试校验、删除、留底回滚）。
  */
 
-import { state, subscribe, setSkills, setActions } from "../store.js?v=20261006-003";
-import { get, post, put, del, upload } from "../services/api.js?v=20261006-003";
-import { guardSkillCall } from "../services/riskguard.js?v=20261006-003";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20261006-003";
-import { t } from "../services/i18n.js?v=20261006-003";
-import { setIconText } from "../services/icons.js?v=20261006-003";
-import { forgetScopeCatalog } from "../services/project_scope.js?v=20261006-003";
-import { setExtCount } from "./extensions.js?v=20261006-003";
+import { state, subscribe, setSkills, setActions } from "../store.js?v=20261006-005";
+import { get, post, put, del, upload } from "../services/api.js?v=20261006-005";
+import { guardSkillCall } from "../services/riskguard.js?v=20261006-005";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20261006-005";
+import { t } from "../services/i18n.js?v=20261006-005";
+import { setIconText } from "../services/icons.js?v=20261006-005";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20261006-005";
+import { setExtCount } from "./extensions.js?v=20261006-005";
 
 let skillList, toolList, mcpToolList, actionList;
 let btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
@@ -184,6 +184,7 @@ const SKILL_PARAM_DEFS = {
     { key: "expression", label: "JS 表达式", type: "text", placeholder: "document.title" },
     { key: "headless", label: "无头模式 (true/false)", type: "text", placeholder: "true" },
     { key: "full_page", label: "全页截图 (true/false)", type: "text", placeholder: "false" },
+    { key: "timeout", label: "超时毫秒数", type: "text", placeholder: "30000" },
   ],
   computer_use: [
     { key: "action", label: "操作类型", type: "text", placeholder: "screenshot/click/type/press/hotkey/wait/locate/clipboard/window_list/window_focus 等" },

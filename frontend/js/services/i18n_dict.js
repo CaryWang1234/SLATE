@@ -852,6 +852,7 @@ export const EN_DICT = {
   "读取文件": "Read File",
   "查找文件": "Find File",
   "知识检索": "Search Knowledge",
+  "历史检索": "Search History",
   "知识添加": "Add Knowledge",
   "提示词生成": "Prompt Generation",
   "对话上下文": "Chat Context",
@@ -918,6 +919,7 @@ export const EN_DICT = {
   "续写失败: {msg}": "Continue failed: {msg}",
   "已达 {n} 轮上限": "Reached the {n}-round limit",
   "轮数用尽 · 已自动续跑（第 {k}/{n} 次）": "Round limit hit · auto-resumed ({k}/{n})",
+  "生成中断 · 已自动续跑（第 {k}/{n} 次）": "Generation interrupted · auto-resumed ({k}/{n})",
   " · 目标模式保持开启，下一条消息继续自主执行（点「目标模式」手动退出）": " · Target Mode stays on; the next message continues autonomous execution (click Target Mode to exit)",
   "已加入输入队列（{n}）": "Added to input queue ({n})",
   "目标模式闭环校验 · 清单剩余 {n} 项，自动催办（第 {k} 次）": "Target Mode loop check · {n} items left on the list, auto-nudging (attempt {k})",
@@ -1768,6 +1770,9 @@ export const EN_DICT = {
   "网页正文过短或直连失败时，自动用无头浏览器渲染后再提取（推荐）": "When page content is too short or direct fetch fails, automatically render with a headless browser before extracting (recommended)",
   "所有网页都先用无头浏览器渲染再提取，速度较慢": "Always render pages with a headless browser before extracting; slower",
   "不做 JS 渲染，只抓静态内容，动态页面可能为空": "No JS rendering; only static content, dynamic pages may be empty",
+  "浏览器被站点拦下时自动开可见窗口重试一次": "Retry once in a visible window when a site blocks the browser",
+  "已允许：无头浏览器被站点拦下时，自动开一个可见窗口重试一次（桌面上会真的出现浏览器窗口）": "Allowed: when a site blocks the headless browser, retry once in a visible window (a browser window really appears on your desktop).",
+  "未允许：被站点拦下时只如实报告「被拦」并给出替代路径，不会自动开可见窗口": "Not allowed: when a site blocks the page, the tool reports the block and suggests an alternative instead of opening a visible window.",
 
   // ── 文库（Vault）─────────────────────────────
   "文库": "Vault",
@@ -2064,6 +2069,10 @@ export const EN_DICT = {
   "上下文压缩摘要": "Context compression summary",
   "每轮回复后判断是否超出上下文预算，超了就把旧消息压成一段历史摘要（手动点「压缩」也走这一档）":
     "After each reply, checks whether the context budget is exceeded and folds older messages into a summary (the manual \"Compress\" button uses this switch too)",
+  "历史原文检索": "Original message search",
+  "压缩只把旧消息折成摘要、库里的原文没删，这一项让模型按关键词查回被折掉的原文（默认只查这一场）。关闭后该工具不再出现在工具目录中":
+    "Compression folds older messages into a summary but never deletes the stored originals. This lets the model query them back by keyword (within this conversation by default). Turning it off removes the tool from the catalogue",
+  "只查本机对话库，不消耗 token": "Reads the local conversation database only; costs no tokens",
   "记忆自动蒸馏": "Automatic memory distillation",
   "每轮回复后静默读最近对话，沉淀长期记忆与用户资料；45 秒内不重复":
     "Silently reads the recent turns after each reply to distil long-term memory and your profile; at most once per 45 s",

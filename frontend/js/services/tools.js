@@ -12,18 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor, MODE_TOOLS_NONE, MODE_READONLY_TOOLS, BUILTIN_MODES, addMode, updateMode, removeMode, modeById } from "../store.js?v=20261006-003";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261006-003";
-import { guardSkillCall } from "./riskguard.js?v=20261006-003";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20261006-003";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261006-003";
-import { t } from "./i18n.js?v=20261006-003";
-import { makeId } from "./utils.js?v=20261006-003";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261006-003";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261006-003";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20261006-003";
-import { isAiToolOff } from "./ai_features.js?v=20261006-003";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261006-003";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor, MODE_TOOLS_NONE, MODE_READONLY_TOOLS, BUILTIN_MODES, addMode, updateMode, removeMode, modeById } from "../store.js?v=20261006-005";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261006-005";
+import { guardSkillCall } from "./riskguard.js?v=20261006-005";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20261006-005";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261006-005";
+import { t } from "./i18n.js?v=20261006-005";
+import { makeId } from "./utils.js?v=20261006-005";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261006-005";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261006-005";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20261006-005";
+import { isAiToolOff, isAiFeatureOn } from "./ai_features.js?v=20261006-005";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261006-005";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -504,7 +504,7 @@ const TOOLS = {
 
   skill_run: {
     name: "执行工具",
-    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/replace_range按行号范围替换（start_line/end_line/content，推荐先view确认行号）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(终端会话：支持多会话管理、状态保持（cd/$env: 跨命令保持，PowerShell 变量不跨命令）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，Windows 每条命令一个 PowerShell 进程：多行块与 &&/|| 均可用，交互式 REPL（裸 python/node）拿不到输入会拖到超时，不应使用，高危命令双层拦截；是否每条命令都先征求用户批准，看这一场对话的审批模式（手动=逐条问，自动=只问高危，夜间模式=都不问且也不会向你提问）), bg_task(后台终端任务：用于长耗时命令（实验服务器后端、编译训练、长测试），不占用对话，action=start启动任务（command命令、label任务名、work_dir工作目录、timeout秒数可选，>0到点自动终止、trigger事件传 {on:「exit」结束事件 / on:「match」命中正则，后者必须带 pattern 正则}、notify默认false，置true时命中/结束会回传消息唤醒模型）/status查状态（不传task_id则列全部）/log取输出（since_offset只取新增，tail_lines取最后N行，grep过滤）/stop终止整棵进程树。start 立刻返回不等命令跑完，返回里有 pid、开头一小段输出和 tail；此后不要轮询。要成果就用 status/log 主动问，或靠 trigger+notify 让系统送你消息。进程寿命等于 SLATE 后端寿命，日志落在 data/bg_tasks/<id>.log；宁可用后台任务也不要让 terminal 空等，命令走的审批档与 terminal 完全一致（后台 ≠ 免审批）), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，engine可选auto（Bing+DuckDuckGo并发合并去重，推荐）/bing/ddg，mode=fetch时query为URL；联网与开浏览器都算「访问网络」，手动审批档下会先征求用户同意，被拒时不要重试，改用本地证据或问用户), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文Markdown，支持JS渲染页面与PDF，mode=html时返回原始HTML，render_js可选auto（正文过短自动渲染）/on/off，max_chars截断长度默认20000上限60000), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新工具，产物存放于 data/evolved/ 并在「扩展 → 新功能」里管理，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有的自产工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果), image_gen(AI图片生成：prompt描述必填、size尺寸可选如1024x1024、n数量默认1最多4，需先在设置中配置模型与Key，返回preview_url可预览), video_gen(AI视频生成：prompt描述必填、duration时长秒数默认5最多30，需先在设置中配置模型与Key，返回preview_url可预览)。也可传入 SKILL.md 技能名读取其定义内容",
+    description: "调用内置工具。可用：file_tree(目录扫描：支持递归recursive、深度depth、glob过滤pattern如*.py、包含隐藏文件include_hidden，使用os.scandir快速扫描), file_peek(读文件：支持多编码encoding如utf-8/gbk/gb2312、自动检测编码auto_detect、行范围start_line/end_line、tail模式读最后N行、快速模式fast不统计总行数), file_edit(文件编辑：action=edit基于diff精确修改（edits JSON数组每项含old_text和new_text）/replace_range按行号范围替换（start_line/end_line/content，推荐先view确认行号）/read读取内容（start_line/end_line行号范围）/insert在指定行插入（content内容、start_line行号）/delete删除行范围（start_line/end_line）/copy复制到剪贴板（start_line/end_line可选、clipboard_name剪贴板名）/paste从剪贴板粘贴（start_line行号、clipboard_name）/cut剪切到剪贴板（start_line/end_line、clipboard_name）), file_create(创建新文件), terminal(终端会话：支持多会话管理、状态保持（cd/$env: 跨命令保持，PowerShell 变量不跨命令）、进程管理，action=create创建会话/list列出所有会话/close关闭会话/kill终止进程/空串执行命令，command要执行的命令、work_dir工作目录、session_id会话ID默认default、timeout超时秒数默认30，Windows 每条命令一个 PowerShell 进程：多行块与 &&/|| 均可用，交互式 REPL（裸 python/node）拿不到输入会拖到超时，不应使用，高危命令双层拦截；是否每条命令都先征求用户批准，看这一场对话的审批模式（手动=逐条问，自动=只问高危，夜间模式=都不问且也不会向你提问）), bg_task(后台终端任务：用于长耗时命令（实验服务器后端、编译训练、长测试），不占用对话，action=start启动任务（command命令、label任务名、work_dir工作目录、timeout秒数可选，>0到点自动终止、trigger事件传 {on:「exit」结束事件 / on:「match」命中正则，后者必须带 pattern 正则}、notify默认false，置true时命中/结束会回传消息唤醒模型）/status查状态（不传task_id则列全部）/log取输出（since_offset只取新增，tail_lines取最后N行，grep过滤）/stop终止整棵进程树。start 立刻返回不等命令跑完，返回里有 pid、开头一小段输出和 tail；此后不要轮询。要成果就用 status/log 主动问，或靠 trigger+notify 让系统送你消息。进程寿命等于 SLATE 后端寿命，日志落在 data/bg_tasks/<id>.log；宁可用后台任务也不要让 terminal 空等，命令走的审批档与 terminal 完全一致（后台 ≠ 免审批）), html_render(生成HTML), css_color(CSS配色), doc_write(文档骨架), ppt_create(生成.pptx演示文稿：title标题、outline逗号分隔章节或slides传JSON数组[{title,points}]精确控制每页，theme可选slate/blue/green/wine/gray十六进制色值，返回文件路径), word_create(生成.docx Word文档：title标题、content正文支持#标题/-列表/1.有序列表标记，或sections传JSON数组[{heading,level,paragraphs,bullets}]，返回文件路径), text_summarize(文本摘要), json_tool(JSON处理), regex_test(正则测试), repo_stats(项目统计), todo_scan(待办扫描), web_search(联网搜索/网页抓取，获取实时信息：mode=search时query为关键词，engine可选auto（Bing+DuckDuckGo并发合并去重，推荐）/bing/ddg，mode=fetch时query为URL；联网与开浏览器都算「访问网络」，手动审批档下会先征求用户同意，被拒时不要重试，改用本地证据或问用户), web_fetch(获取指定网页内容：url为完整URL，返回标题/描述/正文Markdown，支持JS渲染页面与PDF，mode=html时返回原始HTML，render_js可选auto（正文过短自动渲染）/on/off，max_chars截断长度默认20000上限60000), chart_create(生成SVG图表：type=bar柱状图/hbar条形图/line折线图/pie饼图，data支持JSON数组[{label,value}]、JSON对象{标签:数值}或文本A:1, B:2（逗号/换行分隔），title图表标题可选，theme配色可选slate/blue/green/warm/gray或逗号分隔色值，返回preview_url可预览), qrcode_create(生成SVG二维码：text为文本或URL，size模块像素大小默认8，返回preview_url可预览), python_api_extract(提取Python库公共API文档：target为已安装包名如requests或本地py文件/包目录路径，depth子模块递归深度默认1，-1不限，format可选json或代码，输出函数签名、类方法、属性、源码位置，落盘返回file_path，代码附带preview_url), html_bundle(便携网页打包：src为源html路径，将该页面相对路径引用的css/js内联合并为单个html便于分发，out输出路径可选、缺省为源同目录原名.bundled.html，CDN/绝对路径保留外链并在warnings中警告，返回file_path与内联清单), code_scan(代码安全扫描：扫描项目检测硬编码密钥/SQL注入/XSS/弱加密/调试残留等，severity过滤critical/high/medium/low，category过滤类别), doc_scan(文档安全扫描：扫描文档检测不安全信息，支持md/docx/pptx/xlsx/csv/pdf/txt，检测身份证号/手机号/邮箱/密码/密钥/银行账号/薪资/机密标记/内网URL等，directory扫描目录或file_path扫描单文件，severity过滤级别，category过滤类别如'身份证号'/'硬编码密码'，max_files最大扫描文件数默认50), mcp_factory(工具工厂：根据描述自动生成新工具，产物存放于 data/evolved/ 并在「扩展 → 新功能」里管理，tool_name工具名称英文、description工具描述、params参数规格JSON数组、body核心逻辑代码、overwrite是否覆盖已有的自产工具), browser_automation(浏览器自动化：Playwright控制Chromium，action=launch启动/navigate导航/screenshot截图/click点击/type输入/get_text获取文字/get_html取HTML/evaluate执行JS/scroll滚动/wait等待元素/close关闭，url目标URL、selector CSS选择器、text输入文字、expression JS表达式、headless无头模式、full_page全页截图、timeout超时毫秒数；被站点拒绝时返回 status=blocked 并附页面证据，此时不要在同一张被拦的页面上反复重试), computer_use(桌面自动化：pyautogui控制鼠标键盘与窗口，默认快速模式，action=screenshot截图/click点击/double_click双击/right_click右键/type输入（非ASCII自动走剪贴板）/press单键按压/hotkey组合键/scroll滚动/move移动/drag拖拽/wait等待秒数/position鼠标位置/screen_size屏幕分辨率/locate图像定位/clipboard剪贴板读写/window_list列出窗口/window_focus/window_minimize/window_maximize/window_restore/window_close窗口操作，x/y坐标、text文字、keys按键、button鼠标按键、region截图区域x,y,w,h、fast快速模式默认true、screenshot_format默认jpeg可选png、quality默认80、max_width/max_height截图缩放上限、seconds等待秒数、repeats按键次数、scroll_amount滚动格数、image_path参考图片、confidence置信度、title窗口标题关键词，截图返回preview_url可内联预览), excel_tool(办公表格：action=create生成.xlsx（title标题、sheet工作表名、headers表头JSON数组或逗号分隔、rows数据JSON二维数组，或data传CSV文本首行表头），read读取.xlsx/.csv（file_path、sheet工作表、limit预览行数默认50，返回表头与数据预览），convert为csv与xlsx互转（file_path、out输出路径可选）), pdf_tool(PDF办公文档：action=info元信息页数/extract提取文本（pages页码范围如1-3,5）/tables提取表格数据，file_path必填，max_chars最大字符数默认30000), git_tool(Git只读信息：action=status分支与工作区变更/log最近提交（limit默认10）/diff变更统计（scope=unstaged未暂存/staged已暂存/all）/branches本地与远程分支/remotes远程仓库，directory仓库目录必填), screenshot_to_code(截图转代码：读取图片文件编码为base64供AI视觉分析，image_path图片路径必填、style风格偏好可选如tailwind/plain css/responsive，AI根据截图生成HTML/CSS代码还原视觉效果), image_gen(AI图片生成：prompt描述必填、size尺寸可选如1024x1024、n数量默认1最多4，需先在设置中配置模型与Key，返回preview_url可预览), video_gen(AI视频生成：prompt描述必填、duration时长秒数默认5最多30，需先在设置中配置模型与Key，返回preview_url可预览)。也可传入 SKILL.md 技能名读取其定义内容",
     params: {
       skill: { type: "string", description: "工具或技能名称", required: true },
       params: { type: "object", description: "工具参数" },
@@ -544,6 +544,9 @@ const TOOLS = {
         // 联网搜索默认配置：模型未显式指定时注入设置面板的默认引擎 / JS 渲染策略
         if (skill === "web_search" && !p.engine && state.webSearch) p.engine = state.webSearch.engine;
         if (skill === "web_fetch" && !p.render_js && state.webSearch) p.render_js = state.webSearch.renderJs;
+        // 可见窗口重试由用户在设置里点头，模型自己传的 allow_headed 一律覆盖：
+        // 「我觉得该重试」不等于「用户同意桌面上凭空出现一个浏览器窗口」。
+        if (skill === "browser_automation") p.allow_headed = state.browserHeadedRetry === true;
         // 一笔一流：进度/输出实时回推，signal 关闭即取消该笔；
         // 仅在「连接从未建立」时回落 /execute，避免重放已经发生的副作用。
         const streamed = await runSkillStream(skill, p, {
@@ -1437,6 +1440,24 @@ const TOOLS = {
     },
   },
 
+  history_search: {
+    name: "检索历史原文",
+    description: "按关键词查回更早的消息原文。上下文压缩只是把旧消息折成一段摘要，库里的原文一条没删：摘要没写到的细节不要凭它猜，用本工具查。action=search（默认）返回带出处的摘录，多个关键词用空格分隔且要求同一条消息里都出现；action=read 按 message_id 取那条前后的完整原文。默认只搜这一场对话（被折掉的原文就在这场的库里），确实要翻别的会话才用 scope=project 或 all。结果按「谁说的 · 时间 · 哪一场」标注出处，引用时要照出处说明，不要把别场的话当本场说过的。",
+    params: {
+      action: { type: "string", description: "search 检索摘录（默认）/ read 取原文窗口" },
+      query: { type: "string", description: "关键词，多个用空格分隔（同一条消息里都要出现）；search 必填" },
+      scope: { type: "string", description: "search 视野：current 只这一场（默认）/ project 本项目全部会话 / all 所有会话" },
+      role: { type: "string", description: "只看某一方：user 或 assistant，默认都要" },
+      limit: { type: "number", description: "search 返回条数，默认 8，最多 30" },
+      message_id: { type: "string", description: "read 必填：检索结果里的消息编号" },
+      before: { type: "number", description: "read 向前取几条，默认 4，最多 20" },
+      after: { type: "number", description: "read 向后取几条，默认 4，最多 20" },
+    },
+    async execute(args, callCtx = {}) {
+      return runHistorySearch(args || {}, callCtx);
+    },
+  },
+
   exit_autopilot: {
     name: "退出自主推进",
     description: "Autopilot 自主推进的显式收口：结束本次自动续跑，把主动权交回用户（不改动目标模式开关）。仅在任务确实完成并已用工具验证后调用；没做完不要调用，也不要靠轮数耗尽或反复复述计划来结束循环。调用后下一条回复直接把 summary 展开成最终汇报，不要再调用工具。",
@@ -1448,6 +1469,73 @@ const TOOLS = {
     },
   },
 };
+
+/**
+ * 无限上下文的取回通道：压缩只折不删，被折掉的原文按关键词查得回来。
+ * 只读本机对话库、不发模型请求，所以登记表里那一项是 model:false。
+ * 会话归属按**这一场**取，不是按屏幕上那一个：并行跑时后台那一场的检索拿错 convId，
+ * 就会把 A 会话压掉的话当成 B 会话的历史喂回去。
+ */
+async function runHistorySearch(args = {}, callCtx = {}) {
+  if (!isAiFeatureOn("history_search")) {
+    return "[工具 history_search] 未执行：该功能已由用户在「设置 → AI 辅助功能」中关闭，本轮请勿再调用。";
+  }
+  const convId = String(callCtx.convId || state.currentConversationId || "");
+  const action = String(args.action || "").trim().toLowerCase();
+  // 只给了 message_id 没给 action：按 read 走。模型常在"取原文"那一步漏写动作名，
+  // 判成 search 只会拿到一句"query 不能为空"，白烧一轮。
+  const isRead = action === "read" || action === "window" || (!action && !!args.message_id);
+  const who = (role) => (role === "user" ? "用户" : role === "assistant" ? "助手" : role || "未知");
+
+  if (isRead) {
+    if (!args.message_id) return "read 需要 message_id（来自 action=search 的结果里那条消息编号）。";
+    const res = await post("/chat/history/window", {
+      message_id: String(args.message_id),
+      before: args.before, after: args.after, max_chars: args.max_chars,
+    });
+    if (res.code !== 0) return `取原文失败: ${res.message}`;
+    const list = res.data?.messages || [];
+    if (!list.length) return `这条消息附近没有内容：${args.message_id}`;
+    const same = String(res.data?.conversation_id || "") === convId;
+    const lines = list.map((m, i) => {
+      const mark = m.is_target ? ">>" : "  ";
+      const body = String(m.content || "").replace(/\r\n/g, "\n");
+      const cut = m.truncated ? `（截断：全文 ${m.chars} 字，可放大 max_chars）` : "";
+      return `${mark} ${i + 1}. ${who(m.role)} · ${m.when || "时间未知"}${cut}\n${body}`;
+    });
+    return [
+      `[历史原文] 出自${same ? "这一场" : `另一场「${res.data.conversation_title}」`} · 共 ${list.length} 条 · >> 是检索命中的那条`,
+      ...lines,
+    ].join("\n\n");
+  }
+
+  const query = String(args.query || "").trim();
+  if (!query) return "search 需要 query（关键词，多个用空格分隔）。";
+  const scope = ["current", "project", "all"].includes(args.scope) ? args.scope : "current";
+  const res = await post("/chat/history/search", {
+    query, scope, role: args.role || "", limit: args.limit,
+    snippet_chars: args.snippet_chars, conversation_id: convId,
+  });
+  if (res.code !== 0) return `检索历史失败: ${res.message}`;
+  const hits = res.data?.hits || [];
+  if (!hits.length) {
+    return scope === "current"
+      ? `这一场没有含「${query}」的消息。可换关键词，或用 scope=project / all 扩大视野。`
+      : `视野内没有含「${query}」的消息，可换关键词再试。`;
+  }
+  const scopeLabel = { current: "这一场", project: "本项目", all: "所有会话" }[scope];
+  const lines = hits.map((h, i) => {
+    const from = String(h.conversation_id) === convId ? "本场" : `另一场「${h.conversation_title}」`;
+    const archived = h.archived ? " · 已归档" : "";
+    const cut = h.truncated ? `（截断：全文 ${h.chars} 字）` : `（${h.chars} 字）`;
+    return `${i + 1}. ${who(h.role)} · ${h.when || "时间未知"} · ${from}${archived} · ${h.message_id}${cut}\n${h.snippet}`;
+  });
+  return [
+    `[历史检索] 关键词「${query}」· 视野=${scopeLabel} · 命中 ${hits.length} 条${res.data.has_more ? "（还有更多，可加大 limit）" : ""}`,
+    ...lines,
+    "要完整上下文：history_search action=read message_id=<上面的编号>。引用时照上面的出处说明，别把另一场的话当这一场说过的。",
+  ].join("\n\n");
+}
 
 // ── 工具调用检测 ──────────────────────────────
 

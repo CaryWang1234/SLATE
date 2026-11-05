@@ -581,6 +581,228 @@ async def search_messages(q: str = "", limit: int = 30) -> dict[str, Any]:
     return {"code": 0, "data": hits, "message": "ok"}
 
 
+# ── 无限上下文：压掉的历史要还能查回来 ─────────────────────
+# 上下文压缩只把旧消息折成一段摘要，库里的行一条没删（/compress 只算保留段，
+# 不 DELETE）。缺的不是存储，是**通道**：模型手上没有查回旧原文的入口，摘要写漏的
+# 那句「当时你定的第三版配色」就永久丢了。这两个端点就是那条通道：
+# /history/search 按关键词找摘录，/history/window 拿摘录那一条前后的原文。
+# 刻意不引 FTS5：中文没有内置成词分词，装上分词器要么失效要么多一个依赖，
+# 而这里的检索是"几个词都在同一条消息里"，LIKE 就够。
+
+_HISTORY_SCOPES = ("current", "project", "all")
+_HISTORY_MAX_TERMS = 8
+_HISTORY_MAX_SNIPPET = 320
+_HISTORY_MAX_WINDOW = 20
+
+
+def _like_terms(query: str) -> list[str]:
+    """检索词切分：按空白拆开、去重、封顶，并把 LIKE 的通配符转义掉。
+
+    不转义，搜「100%」等于搜任意含 100 的内容；多个词必须同条命中，
+    拼成一条 LIKE 就退化成"只要沾上一个词就算"。
+    """
+    terms: list[str] = []
+    for raw in (query or "").split():
+        term = raw.strip()
+        if not term:
+            continue
+        key = term.casefold()
+        if key in (t.casefold() for t in terms):
+            continue
+        terms.append(term)
+        if len(terms) >= _HISTORY_MAX_TERMS:
+            break
+    return terms
+
+
+def _escape_like(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _excerpt(content: str, terms: list[str], radius: int) -> tuple[str, bool]:
+    """围绕最先命中的那个词取一段摘录；返回 (摘录, 是否截断)。"""
+    if not content:
+        return "", False
+    positions = [content.lower().find(t.lower()) for t in terms]
+    positions = [p for p in positions if p >= 0]
+    pos = min(positions) if positions else 0
+    half = max(40, min(_HISTORY_MAX_SNIPPET, radius)) // 2
+    start = max(0, pos - half)
+    end = min(len(content), start + half * 2)
+    text = content[start:end].replace("\n", " ").strip()
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(content) else ""
+    return prefix + text + suffix, bool(prefix or suffix)
+
+
+def _when(ts: Any) -> str:
+    try:
+        return datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M")
+    except (TypeError, ValueError, OSError):
+        return ""
+
+
+def _int_arg(body: dict[str, Any], key: str, default: int) -> int:
+    """取整型参数。写成 body.get(key) or default 会把显式传的 0 吃掉——
+    "向前取 0 条"变成"默认取 4 条"，窗口就成了模型没要的东西。"""
+    try:
+        return int(body.get(key, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _project_scope_ids(conv_id: str) -> tuple[str, list[str]] | None:
+    """这一场所属项目 → (project_id, 可按名字回落命中的名称串)；这一场没项目就返回 None。
+
+    与 list_conversations 的项目口径一致：老会话只记了目录名没记 id，
+    所以还要拿那个项目的名称与别名去认一次。
+    """
+    conn = _get_db()
+    row = conn.execute("SELECT project_id, project FROM conversations WHERE id = ?", (conv_id,)).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    pid = str(row["project_id"] or "")
+    if not pid:
+        return None
+    return pid, _name_fallbacks(pid)
+
+
+@router.post("/history/search")
+async def search_history(body: dict[str, Any]) -> dict[str, Any]:
+    """按关键词检索历史消息原文，返回带出处的摘录（模型侧 history_search 工具的后台）。
+
+    scope：current＝只在这一场（默认，压缩压掉的那些就在这条会话的库行里）；
+    project＝这一场所属项目的全部会话；all＝所有会话。默认收窄到本场，
+    因为"另一场对话里说过什么"通常是用户没授权模型去翻的东西。
+    """
+    terms = _like_terms(str(body.get("query") or ""))
+    if not terms:
+        return {"code": -1, "data": None, "message": "query 不能为空（检索词至少一个）"}
+    scope = str(body.get("scope") or "current")
+    if scope not in _HISTORY_SCOPES:
+        return {"code": -1, "data": None,
+                "message": f"scope 只认 {'/'.join(_HISTORY_SCOPES)}，收到的是 {scope}"}
+    conv_id = str(body.get("conversation_id") or "")
+    if scope != "all" and not conv_id:
+        return {"code": -1, "data": None, "message": f"scope={scope} 需要 conversation_id"}
+    limit = max(1, min(30, _int_arg(body, "limit", 8)))
+    radius = max(40, min(_HISTORY_MAX_SNIPPET, _int_arg(body, "snippet_chars", 160)))
+    role = str(body.get("role") or "")
+
+    where = " AND ".join("m.content LIKE ? ESCAPE '\\'" for _ in terms)
+    args: list[Any] = [f"%{_escape_like(t)}%" for t in terms]
+    if scope == "current":
+        where += " AND m.conversation_id = ?"
+        args.append(conv_id)
+    elif scope == "project":
+        names = _project_scope_ids(conv_id)
+        if names is None:
+            return {"code": -1, "data": None,
+                    "message": f"这一场（{conv_id}）不在册或没归属项目，改用 scope=current 检索"}
+        pid, fallbacks = names
+        clause = "c.project_id = ?"
+        if fallbacks:
+            clause = "(" + " OR ".join([clause] + [f"(COALESCE(c.project_id,'')='' AND c.project = ?)"
+                                                   for _ in fallbacks]) + ")"
+        where += f" AND {clause}"
+        args.append(pid)
+        args.extend(fallbacks)
+    if role in ("user", "assistant"):
+        where += " AND m.role = ?"
+        args.append(role)
+
+    conn = _get_db()
+    rows = conn.execute(
+        f"SELECT m.id AS message_id, m.conversation_id, m.role, m.content, m.created_at, "
+        f"c.title AS conversation_title, c.archived AS archived "
+        f"FROM messages m JOIN conversations c ON c.id = m.conversation_id "
+        f"WHERE {where} ORDER BY m.created_at DESC LIMIT ?",
+        (*args, limit + 1),
+    ).fetchall()
+    conn.close()
+
+    hits = []
+    for r in rows[:limit]:
+        snippet, cut = _excerpt(r["content"] or "", terms, radius)
+        hits.append({
+            "message_id": r["message_id"],
+            "conversation_id": r["conversation_id"],
+            "conversation_title": r["conversation_title"] or r["conversation_id"],
+            "archived": bool(r["archived"]),
+            "role": r["role"],
+            "when": _when(r["created_at"]),
+            "chars": len(r["content"] or ""),
+            "truncated": cut,
+            "snippet": snippet,
+        })
+    return {
+        "code": 0,
+        "data": {"hits": hits, "has_more": len(rows) > limit, "scope": scope, "terms": terms},
+        "message": "ok",
+    }
+
+
+@router.post("/history/window")
+async def read_history_window(body: dict[str, Any]) -> dict[str, Any]:
+    """取某条消息前后的原文。摘录只有 ±80 字，模型要看完整上下文时走这一条。"""
+    msg_id = str(body.get("message_id") or "")
+    if not msg_id:
+        return {"code": -1, "data": None, "message": "message_id 不能为空"}
+    before = max(0, min(_HISTORY_MAX_WINDOW, _int_arg(body, "before", 4)))
+    after = max(0, min(_HISTORY_MAX_WINDOW, _int_arg(body, "after", 4)))
+    max_chars = max(200, min(8000, _int_arg(body, "max_chars", 1200)))
+
+    conn = _get_db()
+    target = conn.execute(
+        "SELECT m.id, m.conversation_id, m.created_at, m.rowid AS rid, c.title AS conversation_title "
+        "FROM messages m JOIN conversations c ON c.id = m.conversation_id WHERE m.id = ?",
+        (msg_id,),
+    ).fetchone()
+    if target is None:
+        conn.close()
+        return {"code": -1, "data": None, "message": f"没有这条消息：{msg_id}"}
+    # 位置按 (created_at, rowid) 算：同一秒写入的两条只有 rowid 分得出先后，
+    # 只按 created_at 排序会让窗口里的两条互换甚至都落空。
+    pos = conn.execute(
+        "SELECT COUNT(*) FROM messages "
+        "WHERE conversation_id = ? AND (created_at < ? OR (created_at = ? AND rowid < ?))",
+        (target["conversation_id"], target["created_at"], target["created_at"], target["rid"]),
+    ).fetchone()[0]
+    # 向前够不满时就按够得到的条数取：拿 before+after+1 当 limit 而 offset 夹到 0，
+    # 会把多出来的名额滑到目标之后，"after=0"就变成"后面也带几条"。
+    actual_before = min(pos, before)
+    rows = conn.execute(
+        "SELECT id, role, content, model, created_at FROM messages "
+        "WHERE conversation_id = ? ORDER BY created_at, rowid LIMIT ? OFFSET ?",
+        (target["conversation_id"], actual_before + after + 1, pos - actual_before),
+    ).fetchall()
+    conn.close()
+
+    items = []
+    for r in rows:
+        content = r["content"] or ""
+        items.append({
+            "message_id": r["id"],
+            "role": r["role"],
+            "model": r["model"] or "",
+            "when": _when(r["created_at"]),
+            "is_target": r["id"] == msg_id,
+            "chars": len(content),
+            "truncated": len(content) > max_chars,
+            "content": content[:max_chars],
+        })
+    return {
+        "code": 0,
+        "data": {
+            "conversation_id": target["conversation_id"],
+            "conversation_title": target["conversation_title"] or target["conversation_id"],
+            "messages": items,
+        },
+        "message": "ok",
+    }
+
+
 @router.get("/export")
 async def export_all() -> dict[str, Any]:
     """导出全部对话、消息、记忆与提示词素材（数据备份用）。"""

@@ -129,6 +129,7 @@ Autopilot 是默认的“少打继续”执行层。只要你的消息明显是�
 - 轮数是止损线不是预算：交付并逐项验证通过后，模型调用 `exit_autopilot` 收口，循环随即结束
 - 轮数用完不等于干完：默认开启的 **Continue Autopilot** 在末轮不松手。上一轮还在执行工具时，把上限往后推 8 轮（最多推 3 次），让它把手上的活做完；上一轮空手停笔时，把清单剩余项念回给它，催它继续推进或明确写【任务完成】。不想要这个行为，去「设置 → 自动推进」取消勾选
 - 追加的额度也用完了、循环真的散场时，系统替你按下那颗「继续跑完」：每一场最多自动续 2 次，续出来的那一场照常走完成通道收口，屏幕上会弹出「轮数用尽 · 已自动续跑（第 1/2 次）」告诉你这不是你点的。两种情况它不动手——这一场切到了「手动审批」档（那一档的语义就是每步都要人点头），或「设置 → 自动推进」被关掉了；这时「继续跑完」条原样挂在那里等你点。等这一场真的空闲下来（末轮的压缩、记忆整理还在占着它）才按，切去看别的会话时也不抢那一屏
+- 另一种中断不用等到轮数用尽：这一边只出了思考、没有正文，或上游提前把连接收了（正文没写完）时，自动审批及以上档由系统自己按下那颗「继续」，每一场最多自动续 2 次，屏幕弹出「生成中断 · 已自动续跑（第 1/2 次）」写明这不是你点的。这一条只看审批档，不看「设置 → 自动推进」那颗开关：切到「手动审批」档时把「继续跑完」条原样留给你点，你亲手按下的停止它永不代替
 
 **它会自动做：**
 1. 读取相关目录、文件、配置或 Git 状态
@@ -455,8 +456,8 @@ SLATE 内置 35 个 MCP 工具，模型在对话中自主决定何时使用。
 | 自定义主题 | 四个源色（底色 / 面板 / 正文 / 强调）推导整套配色 + 正文与代码字体（也能导入自己的字体文件）+ 板块透明度 + 本机背景图与遮罩浓度；还能取 Wallpaper Engine 正在用的那张壁纸的预览图当背景（只读它的配置与 preview，不启动它、不改它设置，它换了要再点一次）；项目栏文件类型图标也跟着强调色现算（多色图标按色相染色）；10 套预设，改任一格即脱离预设高亮，开关跨设备同步、图与字体只留本机 |
 | 语言 | 中文/English——按钮与区块标题之外，输入框 placeholder 与悬浮提示也走词典；用户与模型写的内容一律不翻，品牌字标「砚」用 `data-i18n-skip` 豁免 |
 | 会话归档 | 「任务」栏每一行悬停都有归档：归档只让这一场从任务列表离场，不是删除；正在生成的那一场会被拦下并说明原因。归档过的会话在这一栏逐条恢复（回到任务栏）或删除——删除前先确认，删下去连消息一起清掉 |
-| 上下文压缩 | 自动/手动压缩历史对话；摘要发给模型的是完整原文，界面上折成一条可展开的折叠条。系统催办与工具结果投喂这类隐藏轮只进上下文、不占消息区，压缩后重建保留段也不会把它们画成气泡 |
-| AI 辅助功能 | 对话以外的 15 项耗 Token 功能逐项开关 + 单独选模型（含自动会话标题：新对话跑完首轮补一个短标题，只替换还是「首条消息前 30 字」那种占位标题，手动改过的名字不动）；关掉即一次模型都不发，工具类的三项（子代理/图片/视频）还会从工具目录里消失 |
+| 上下文压缩 | 自动/手动压缩历史对话；摘要发给模型的是完整原文，界面上折成一条可展开的折叠条。系统催办与工具结果投喂这类隐藏轮只进上下文、不占消息区，压缩后重建保留段也不会把它们画成气泡。压缩只折不删：摘要尾部写明原文还在本机这一场的记录里，模型按关键词能把被折掉的原文查回来，需要上下文再取那条前后 |
+| AI 辅助功能 | 对话以外的 16 项辅助功能（其中 12 项耗 Token）逐项开关 + 单独选模型（含自动会话标题：新对话跑完首轮补一个短标题，只替换还是「首条消息前 30 字」那种占位标题，手动改过的名字不动）；关掉即一次模型都不发，工具类的四项（子代理/图片/视频/历史检索）还会从工具目录里消失 |
 | 多任务与项目 | 切走会话是否让它继续在跑（关掉即旧语义：切换即中断）、同时最多运行几场（1–4）、同一项目内最多几场（1–3，默认串行）；排队中的任务在右栏任务中心与输入框上方都看得见 |
 
 ---
@@ -584,6 +585,7 @@ Autopilot is the default "do not make me type continue" execution layer. When yo
 - The round budget is a stop-loss, not a target: once every deliverable is verified the model calls `exit_autopilot` to close the loop
 - Out of rounds is not the same as done: **Continue Autopilot** (on by default) refuses to let go at the last round. If that round was still executing tools, the ceiling moves back by 8 rounds (at most 3 top-ups) so the work in flight can finish; if the model stopped without doing anything, the open TODOLIST items are read back to it and it is told to keep going or write 【任务完成】 explicitly. Don't want it? Uncheck it under Settings → Auto-Advance
 - Once those top-ups are spent too and the loop really dismisses, the system presses "继续跑完" for you — at most 2 auto-resumes per conversation, each announced so you can see it wasn't your click, and the resumed run closes through the normal completion channel. It waits until that conversation is actually idle (post-round compression or memory work can still be holding it) and never steals the screen of another conversation. Two cases keep it hands-off: this conversation is on the Manual approval tier (every step needs a human nod), or Auto-Advance is switched off — then the resume bar just stays on screen for you
+- A different interruption doesn't wait for the round budget: when a reply carries only thinking and no body, or upstream closes the stream before the body is finished, every tier above Manual presses that "继续" by itself — at most 2 auto-resumes per conversation, announced as 生成中断 · 已自动续跑（第 1/2 次） so you can see it wasn't your click. This one is gated by the approval tier alone, not by the Auto-Advance switch: on the Manual tier the resume bar stays yours, and a stop you pressed is never overridden
 
 **What it does automatically:**
 1. Reads relevant directories, files, config, or Git state
@@ -905,8 +907,8 @@ Let AI automatically execute tasks on schedule or by events.
 | Custom Theme | Four source colours (background / panel / body text / accent) derive the whole palette, plus body and code fonts (you can import your own font files), a panel-opacity slider, and a local background image with an opacity slider; it can also pull the preview of the wallpaper Wallpaper Engine is currently using (read-only — it never launches or reconfigures that app, and a new wallpaper there does not follow over until you click again); 10 presets, editing any swatch drops the preset highlight, the on/off switch syncs across devices while images and fonts stay on this machine |
 | Session Archive | Every row in the Tasks rail offers Archive on hover — archiving only takes the conversation out of the list, it is not deletion; a conversation that is still generating is blocked with a reason. Archived conversations appear in this settings group, each restorable (back to the Tasks rail) or deletable after a confirmation that also clears its messages |
 | Language | Chinese / English — beyond buttons and section labels, input placeholders and hover titles go through the dictionary too; nothing the user or the model wrote is ever rewritten, and the brand mark 砚 opts out via `data-i18n-skip` |
-| Context Compression | Auto/manual compression of history; the model still receives the summary in full, the transcript folds it into an expandable strip. System nudges and tool-result feeds stay context-only — rebuilding the retained tail after compression never paints them as bubbles |
-| AI Assistance | 15 token-spending features outside the chat loop, each with its own switch and optional pinned model (including the auto session title: after a new conversation's first exchange the model proposes a short title, and only placeholder titles — the "first 30 characters of the opening message" kind — get replaced); off means no request at all, and the three tool-driven ones also disappear from the tool catalogue |
+| Context Compression | Auto/manual compression of history; the model still receives the summary in full, the transcript folds it into an expandable strip. System nudges and tool-result feeds stay context-only — rebuilding the retained tail after compression never paints them as bubbles. Compression folds, it never deletes: the summary says the originals are still in this conversation's local record, and the model can query them back by keyword and pull the surrounding turns |
+| AI Assistance | 16 assistance features outside the chat loop (12 of them token-spending), each with its own switch and optional pinned model (including the auto session title: after a new conversation's first exchange the model proposes a short title, and only placeholder titles — the "first 30 characters of the opening message" kind — get replaced); off means no request at all, and the four tool-driven ones also disappear from the tool catalogue |
 | Tasks & Projects | Whether a run keeps going when you switch away (off restores the old "switch means stop"), how many runs may go at once (1-4), and how many within one project (1-3, serial by default); queued sends are visible both in the right-hand task centre and above the input box |
 
 ---
