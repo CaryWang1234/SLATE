@@ -1,0 +1,418 @@
+/* ═══════════════════════════════════════════════════════════════
+   SLATE UI 现代化 · 「砚 · 静中有动」（P0 + P1）
+   ───────────────────────────────────────────────────────────────
+   这一层只做三件事：把度量收进令牌、把壳层顺序重排、给状态切换
+   加克制的位移。业务语义、i18n、组件标、团队面板的 --tp-* 都不在
+   这里改。
+
+   规则：
+   · 颜色只取既有语义令牌（--bg / --text / --border / --gold…），
+     自定义主题由 theme_custom.js 内联覆盖，本文件不另建色板；
+   · 动效只动 transform / opacity / 颜色，时长三档；
+   · 新规则不许写死 px 字号（令牌除外）与十六进制色值。
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* 度量 */
+  --r-1: 4px;
+  --r-2: 8px;
+  --r-3: 12px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* 字号：10 只给徽标 */
+  --fs-micro: 10px;
+  --fs-meta: 11px;
+  --fs-ui: 13px;
+  --fs-body: 14px;
+  --fs-title: 15px;
+  --fs-section: 18px;
+  --fs-page: 24px;
+
+  /* 动效 */
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 240ms;
+
+  /* 纵深 */
+  --sh-1: 0 1px 2px rgba(30, 25, 18, .06);
+  --sh-2: 0 8px 24px rgba(30, 25, 18, .10), 0 1px 2px rgba(30, 25, 18, .06);
+  --sh-3: 0 24px 64px rgba(20, 16, 10, .18);
+
+  /* 壳层：48 顶栏、4px 基准圆角；codex 另抬一档 */
+  --topbar-h: 48px;
+  --radius: 4px;
+  --transition: var(--dur-2) var(--ease);
+}
+
+[data-theme="dark"] {
+  --sh-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --sh-2: 0 8px 24px rgba(0, 0, 0, .45), 0 1px 2px rgba(0, 0, 0, .30);
+  --sh-3: 0 24px 64px rgba(0, 0, 0, .55);
+}
+
+html[data-ui="codex"] {
+  --radius: 10px;
+}
+
+/* ── 基础：焦点、滚动条、降低动效 ─────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+  background-clip: content-box;
+}
+
+/* ── 壳层：顶栏与页签 ─────────────────────────────────── */
+
+#topbar {
+  padding: 0 var(--sp-4);
+  gap: var(--sp-4);
+}
+
+.topbar-center {
+  position: relative;
+  height: 100%;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.tab-btn {
+  height: 32px;
+  padding: 0 14px;
+  border-bottom: 0;
+  border-radius: var(--radius);
+  font-size: var(--fs-ui);
+  letter-spacing: .02em;
+  color: var(--text-muted);
+  transition: color var(--dur-1) var(--ease),
+              background-color var(--dur-1) var(--ease);
+}
+
+.tab-btn:hover {
+  color: var(--text);
+  background: var(--bg-alt);
+}
+
+.tab-btn.active {
+  color: var(--text);
+  background: var(--gold-dim);
+  border-bottom-color: transparent;
+}
+
+#tab-ink {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--gold);
+  pointer-events: none;
+  transform: translateX(0);
+  transition: transform var(--dur-2) var(--ease),
+              width var(--dur-2) var(--ease);
+}
+
+/* ── 壳层：面板头与扩展分栏轨 ─────────────────────────── */
+
+.panel-header {
+  min-height: 44px;
+  padding: var(--sp-1) var(--sp-4);
+}
+
+.panel-title {
+  font-size: 12px;
+  letter-spacing: 1.2px;
+}
+
+.ext-main {
+  padding: var(--sp-5) var(--sp-5) var(--sp-6);
+}
+
+.ext-section {
+  gap: var(--sp-4);
+  max-width: 960px;
+}
+
+.ext-head {
+  padding-bottom: var(--sp-3);
+}
+
+.ext-head-text h2 {
+  font-size: var(--fs-section);
+  letter-spacing: 0;
+}
+
+.ext-nav {
+  padding: var(--sp-3) var(--sp-2);
+}
+
+.ext-nav-item {
+  min-height: 32px;
+  padding: 6px var(--sp-2);
+  border-left: 0;
+  border-radius: 6px;
+  font-size: 12px;
+  letter-spacing: .01em;
+  transition: color var(--dur-1) var(--ease),
+              background-color var(--dur-1) var(--ease);
+}
+
+.ext-nav-item:hover {
+  background: var(--bg-alt);
+  color: var(--text);
+}
+
+.ext-nav-item.active {
+  background: var(--gold-dim);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--gold);
+}
+
+.settings-nav-item {
+  min-height: 32px;
+  padding: 6px var(--sp-3);
+  border-left: 0;
+  border-radius: 6px;
+  transition: color var(--dur-1) var(--ease),
+              background-color var(--dur-1) var(--ease);
+}
+
+.settings-nav-item.active {
+  background: var(--gold-dim);
+  color: var(--text);
+  box-shadow: inset 2px 0 0 var(--gold);
+}
+
+/* ── 控件 ─────────────────────────────────────────────── */
+
+.send-btn, .generate-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  letter-spacing: .02em;
+  transition: opacity var(--dur-1) var(--ease),
+              background-color var(--dur-1) var(--ease),
+              transform var(--dur-1) var(--ease);
+}
+
+.send-btn:active, .generate-btn:active {
+  transform: scale(.985);
+}
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  transition: background-color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease),
+              color var(--dur-1) var(--ease);
+}
+
+.icon-btn:hover {
+  background: var(--bg-alt);
+  border-color: var(--border-hover);
+}
+
+select,
+.setting-input,
+.settings-search-input,
+.exp-textarea {
+  border-radius: var(--radius);
+  transition: border-color var(--dur-1) var(--ease),
+              box-shadow var(--dur-1) var(--ease);
+}
+
+select:focus,
+.setting-input:focus,
+.settings-search-input:focus,
+.exp-textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-dim);
+  outline: none;
+}
+
+/* ── 对话 ─────────────────────────────────────────────── */
+
+.msg {
+  max-width: min(72ch, 86%);
+  padding: 12px var(--sp-4);
+  font-size: var(--fs-body);
+  line-height: 1.65;
+}
+
+.msg-user {
+  border-radius: 12px 12px 4px 12px;
+}
+
+.msg-assistant {
+  border-radius: 12px 12px 12px 4px;
+  transition: border-color var(--dur-1) var(--ease),
+              background-color var(--dur-1) var(--ease);
+}
+
+#chat-input-area {
+  margin: 0 var(--sp-4) 14px;
+  border-radius: var(--r-3);
+  transition: border-color var(--dur-1) var(--ease),
+              box-shadow var(--dur-1) var(--ease);
+}
+
+#chat-input-area:focus-within {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-dim);
+}
+
+#chat-input {
+  border-radius: var(--r-3) var(--r-3) 0 0;
+  font-size: var(--fs-ui);
+}
+
+/* ── 黑板 / 看板 ──────────────────────────────────────── */
+
+.board-card {
+  border-radius: var(--radius);
+  transition: border-color var(--dur-1) var(--ease),
+              box-shadow var(--dur-1) var(--ease),
+              background-color var(--dur-1) var(--ease);
+}
+
+.board-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--sh-1);
+}
+
+.bw-card {
+  border-radius: var(--r-2);
+  transition: border-color var(--dur-1) var(--ease),
+              box-shadow var(--dur-1) var(--ease);
+}
+
+.bw-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--sh-1);
+}
+
+/* ── 设置 ─────────────────────────────────────────────── */
+
+.settings-page {
+  padding: var(--sp-5) var(--sp-5) var(--sp-6);
+  grid-template-columns: 196px minmax(0, 1fr);
+  gap: var(--sp-5);
+}
+
+.settings-main {
+  gap: var(--sp-5);
+  max-width: 780px;
+  margin-inline: auto;
+}
+
+.settings-block {
+  padding: 18px;
+  border-radius: var(--r-2);
+}
+
+.settings-block-head {
+  margin-bottom: var(--sp-4);
+}
+
+.settings-block-head h2 {
+  font-size: 16px;
+}
+
+.settings-block-head p {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.settings-block .setting-row,
+.settings-main .setting-group > .setting-input {
+  font-size: 12.5px;
+}
+
+/* ── 弹窗与 Toast ─────────────────────────────────────── */
+
+.modal-content {
+  border-radius: var(--r-3);
+  background: var(--bg-card);
+  box-shadow: var(--sh-3);
+}
+
+.modal-header {
+  padding: var(--sp-3) var(--sp-4);
+  font-size: 12.5px;
+  letter-spacing: .02em;
+}
+
+.modal-body {
+  padding: var(--sp-4);
+}
+
+.modal:not(.hidden) .modal-content {
+  animation: ui-pop var(--dur-2) var(--ease) both;
+}
+
+.modal:not(.hidden) .modal-backdrop {
+  animation: ui-fade var(--dur-2) var(--ease) both;
+}
+
+@keyframes ui-pop {
+  from { opacity: 0; transform: translateY(6px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes ui-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.toast {
+  border-radius: var(--r-2);
+  box-shadow: var(--sh-2);
+  animation-duration: var(--dur-2);
+  animation-timing-function: var(--ease);
+}
+
+.toast.out {
+  animation-duration: var(--dur-2);
+  animation-timing-function: var(--ease-in);
+}
+
+/* ── 降低动效：全站统一兜底 ───────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  #tab-ink {
+    transition: none;
+  }
+}

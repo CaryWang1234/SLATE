@@ -6,8 +6,8 @@
  * 分栏轨上的数字与右侧标题上的数字必须是同一个来源，否则一刷新就各说各话。
  */
 
-import { t } from "../services/i18n.js?v=20261106-002";
-import { componentMarkHTML } from "../services/component_marks.js?v=20261106-002";
+import { t } from "../services/i18n.js?v=20261106-003";
+import { componentMarkHTML } from "../services/component_marks.js?v=20261106-003";
 
 const EXT_SECTIONS = [
   { key: "skills", label: "技能", mark: "skills" },
