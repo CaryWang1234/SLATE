@@ -232,6 +232,14 @@ code {
   color: var(--text-muted);
   transition: color var(--transition), border-color var(--transition);
   letter-spacing: 1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tab-btn .cmp-mark {
+  width: 17px;
+  height: 17px;
 }
 
 .tab-btn:hover {
@@ -315,6 +323,16 @@ select:focus {
 .send-btn .svg-icon {
   width: 1.05em;
   height: 1.05em;
+}
+
+/* 组件标：24 栅格线标，颜色随 currentColor；尺寸只在这里定，JS 不写 px */
+.cmp-mark {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  vertical-align: -2px;
+  pointer-events: none;
 }
 
 /* 右上角四个按钮：图标在左、文字在右（横向） */
@@ -484,7 +502,7 @@ textarea:focus-visible {
 .ext-nav-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 6px;
   padding: 7px 10px;
   border: 0;
@@ -519,6 +537,23 @@ textarea:focus-visible {
   font-size: 10px;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+
+.ext-nav-mark {
+  display: inline-flex;
+}
+
+.ext-nav-mark .cmp-mark {
+  width: 15px;
+  height: 15px;
+}
+
+.ext-nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ext-nav-item.active .ext-nav-count {
@@ -558,6 +593,14 @@ textarea:focus-visible {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.ext-head-text h2 .cmp-mark {
+  width: 19px;
+  height: 19px;
 }
 
 .ext-head-text p {
@@ -12795,6 +12838,11 @@ html[data-ui="codex"] #codex-dock-history {
 }
 
 .codex-dock-icon .svg-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.codex-dock-icon .cmp-mark {
   width: 18px;
   height: 18px;
 }

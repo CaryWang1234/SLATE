@@ -6,16 +6,17 @@
  * 分栏轨上的数字与右侧标题上的数字必须是同一个来源，否则一刷新就各说各话。
  */
 
-import { t } from "../services/i18n.js?v=20261006-005";
+import { t } from "../services/i18n.js?v=20261106-002";
+import { componentMarkHTML } from "../services/component_marks.js?v=20261106-002";
 
 const EXT_SECTIONS = [
-  { key: "skills", label: "技能" },
-  { key: "tools", label: "工具" },
-  { key: "modes", label: "模式" },
-  { key: "evolved", label: "新功能" },
-  { key: "mcp", label: "MCP" },
-  { key: "experts", label: "专家包" },
-  { key: "actions", label: "Actions" },
+  { key: "skills", label: "技能", mark: "skills" },
+  { key: "tools", label: "工具", mark: "tools" },
+  { key: "modes", label: "模式", mark: "modes" },
+  { key: "evolved", label: "新功能", mark: "evolved" },
+  { key: "mcp", label: "MCP", mark: "mcp" },
+  { key: "experts", label: "专家包", mark: "experts" },
+  { key: "actions", label: "Actions", mark: "actions" },
 ];
 
 let currentKey = "skills";
@@ -53,12 +54,17 @@ export function initExtensions() {
       btn.type = "button";
       btn.className = "ext-nav-item";
       btn.dataset.ext = s.key;
+      const mark = document.createElement("span");
+      mark.className = "ext-nav-mark";
+      mark.innerHTML = componentMarkHTML(s.mark);
       const label = document.createElement("span");
+      label.className = "ext-nav-label";
       label.textContent = t(s.label);
       const count = document.createElement("span");
       count.className = "ext-nav-count";
       count.id = `ext-nav-count-${s.key}`;
       count.textContent = "0";
+      btn.appendChild(mark);
       btn.appendChild(label);
       btn.appendChild(count);
       btn.addEventListener("click", () => selectExtSection(s.key));
