@@ -3,15 +3,15 @@
  * 在扩展页中展示已配置的外部 MCP Server，支持添加/删除/连接/断开。
  */
 
-import { get, post, del } from "../services/api.js?v=20261107-001";
-import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20261107-001";
-import { refreshSkills } from "./skill_panel.js?v=20261107-001";
-import { setExtCount } from "./extensions.js?v=20261107-001";
-import { iconSvgEl } from "../services/icons.js?v=20261107-001";
-import { mcpIconKey } from "../services/mcp_logos.js?v=20261107-001";
-import { state, subscribe } from "../store.js?v=20261107-001";
-import { t } from "../services/i18n.js?v=20261107-001";
-import { forgetScopeCatalog } from "../services/project_scope.js?v=20261107-001";
+import { get, post, del } from "../services/api.js?v=20261107-003";
+import { dlgPrompt, dlgConfirm } from "../services/dialog.js?v=20261107-003";
+import { refreshSkills } from "./skill_panel.js?v=20261107-003";
+import { setExtCount } from "./extensions.js?v=20261107-003";
+import { iconSvgEl } from "../services/icons.js?v=20261107-003";
+import { mcpIconKey } from "../services/mcp_logos.js?v=20261107-003";
+import { state, subscribe } from "../store.js?v=20261107-003";
+import { t } from "../services/i18n.js?v=20261107-003";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20261107-003";
 
 let serverListEl, btnAdd, btnRefresh;
 
@@ -90,8 +90,12 @@ function renderServerList(servers) {
 
     const urlRow = document.createElement("div");
     urlRow.className = "mcp-server-url";
-    urlRow.textContent = srv.url;
-    urlRow.title = srv.url;
+    // stdio 那路没有 URL，第二行画启动命令；npm 生态的 Server 大多长这样
+    const secondLine = srv.transport === "stdio"
+      ? [srv.command, ...(srv.args || [])].filter(Boolean).join(" ")
+      : srv.url;
+    urlRow.textContent = secondLine;
+    urlRow.title = secondLine;
 
     info.appendChild(nameRow);
     info.appendChild(urlRow);
@@ -210,15 +214,47 @@ async function handleAddServer() {
   const name = await dlgPrompt("MCP Server 名称：", { title: "添加 MCP Server", placeholder: "例如：filesystem" });
   if (!name || !name.trim()) return;
 
-  const url = await dlgPrompt("MCP Server SSE 地址：", {
-    title: "添加 MCP Server",
-    placeholder: "http://localhost:3000",
+  // 两条传输二选一：本地命令（stdio，npx 启动的 npm 包走这条）或 SSE 地址
+  const useStdio = await dlgConfirm(t("用本地命令启动（stdio）？选「取消」则填 SSE 地址。"), {
+    title: t("添加 MCP Server"),
+    okText: t("本地命令"),
+    cancelText: t("SSE 地址"),
   });
-  if (!url || !url.trim()) return;
+
+  let payload;
+  if (useStdio) {
+    const command = await dlgPrompt(t("启动命令（整行，含参数）："), {
+      title: t("添加 MCP Server"),
+      placeholder: "npx -y @modelcontextprotocol/server-filesystem C:/path/to/dir",
+    });
+    if (!command || !command.trim()) return;
+    const envText = await dlgPrompt(t("环境变量（JSON，可留空）："), {
+      title: t("添加 MCP Server"),
+      placeholder: '{"API_KEY": "..."}',
+    });
+    let env = {};
+    if (envText && envText.trim()) {
+      try {
+        env = JSON.parse(envText.trim());
+        if (!env || typeof env !== "object" || Array.isArray(env)) throw new Error("not an object");
+      } catch (e) {
+        showToast(t("环境变量不是合法的 JSON 对象"));
+        return;
+      }
+    }
+    payload = { name: name.trim(), transport: "stdio", command: command.trim(), env, auto_connect: true };
+  } else {
+    const url = await dlgPrompt("MCP Server SSE 地址：", {
+      title: "添加 MCP Server",
+      placeholder: "http://localhost:3000",
+    });
+    if (!url || !url.trim()) return;
+    payload = { name: name.trim(), url: url.trim(), auto_connect: true };
+  }
 
   showToast("正在连接 MCP Server…");
   try {
-    const res = await post("/mcp-servers", { name: name.trim(), url: url.trim(), auto_connect: true });
+    const res = await post("/mcp-servers", payload);
     if (res.code === 0) {
       const data = res.data;
       if (data.status === "connected") {

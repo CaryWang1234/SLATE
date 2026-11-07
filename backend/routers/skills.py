@@ -23,7 +23,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from backend import evolution
+from backend import evolution, scope_overlay
 from backend.skills import plugin_adapter
 from backend.skills.call_ctx import CallCancelled, CallContext
 from backend.skills.sandbox import validate_skill_params, sanitize_param, MAX_PARAM_LENGTH
@@ -113,12 +113,18 @@ async def list_skills(project: str = "") -> dict[str, Any]:
         # 远程工具名称加 server 前缀防止冲突
         key = f"mcp__{t['serverId']}__{t['name']}"
         remote_dict[key] = f"[MCP:{t['server']}] {t['description']}"
+    # .agents/skills 直读（工作区 + 家目录）：不复制进 data/skills，别家工具更新了下一次请求就看得见。
+    # 与已安装技能同名时已安装那份赢——用户显式导入的版本不该被目录里的旧版悄悄盖掉。
+    installed = _list_md_skills()
+    external = [e for e in plugin_adapter.list_external_skills(scope_overlay.host_dir_of(project))
+                if e["name"] not in installed]
     return {
         "code": 0,
         "data": {
             "mcp": BUILTIN_SKILLS,
             "evolved": evolution.catalog(),
-            "skills": _list_md_skills(),
+            "skills": installed,
+            "externalSkills": external,
             "remote": remote_dict,
             "remoteTools": remote_tools,
         },
@@ -180,6 +186,18 @@ async def execute_skill(body: dict[str, Any]) -> dict[str, Any]:
                 "message": "ok",
             }
 
+    # 已安装里没有，再去 .agents/skills 直读（工作区优先于家目录）
+    external_dir = plugin_adapter.resolve_external_skill(clean_skill, scope_overlay.host_dir_of(body.get("project")))
+    if external_dir:
+        skill_md = plugin_adapter._find_skill_md(external_dir)
+        if skill_md:
+            content = skill_md.read_text(encoding="utf-8")
+            return {
+                "code": 0,
+                "data": {"type": "custom_skill", "content": content},
+                "message": "ok",
+            }
+
     # 查找远程 MCP 工具（格式: mcp__serverId__toolName）
     if skill_name.startswith("mcp__"):
         parts = skill_name.split("__", 2)
@@ -203,7 +221,7 @@ def _sse_frame(envelope: dict[str, Any]) -> str:
     return f"data: {json.dumps(envelope, ensure_ascii=False, default=str)}\n\n"
 
 
-def _resolve_stream_target(skill_name: str, params: dict[str, Any]) -> tuple[str, Any, str]:
+def _resolve_stream_target(skill_name: str, params: dict[str, Any], project_id: str = "") -> tuple[str, Any, str]:
     """定位执行体。返回 (kind, target, error)，kind ∈ builtin / custom / mcp / ''。
 
     自进化工具也按 builtin 这条路回（都是"一个带 execute 的模块"），区别只在装载方式：
@@ -238,6 +256,11 @@ def _resolve_stream_target(skill_name: str, params: dict[str, Any]) -> tuple[str
     skill_md = USER_SKILLS_DIR / clean_skill / "SKILL.md"
     if skill_md.is_file():
         return "custom", skill_md, ""
+    external_dir = plugin_adapter.resolve_external_skill(clean_skill, scope_overlay.host_dir_of(project_id))
+    if external_dir:
+        external_md = plugin_adapter._find_skill_md(external_dir)
+        if external_md:
+            return "custom", external_md, ""
     return "", None, f"未知技能: {skill_name}"
 
 
@@ -261,7 +284,7 @@ async def stream_skill(request: Request, body: dict[str, Any]) -> Any:
     param_error = validate_skill_params(params)
     kind, target, resolve_error = ("", None, "")
     if not param_error:
-        kind, target, resolve_error = _resolve_stream_target(skill_name, params)
+        kind, target, resolve_error = _resolve_stream_target(skill_name, params, project_id)
         param_error = resolve_error
 
     def _envelope(seq: int, event_type: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -565,6 +588,20 @@ class ImportFromGithubRequest(BaseModel):
 async def import_from_github(req: ImportFromGithubRequest) -> dict[str, Any]:
     """从 GitHub 仓库导入技能。"""
     result = plugin_adapter.import_from_github(req.url, USER_SKILLS_DIR, req.subpath)
+    if "error" in result:
+        return {"code": 1, "message": result["error"]}
+    return {"code": 0, "data": result, "message": "ok"}
+
+
+class ImportFromNpmRequest(BaseModel):
+    package: str
+    name: str = ""
+
+
+@router.post("/import-npm")
+async def import_from_npm(req: ImportFromNpmRequest) -> dict[str, Any]:
+    """从 npm 包导入技能：只取 tarball 找 SKILL.md，不执行任何安装脚本。"""
+    result = await run_in_threadpool(plugin_adapter.import_from_npm, req.package, USER_SKILLS_DIR, req.name)
     if "error" in result:
         return {"code": 1, "message": result["error"]}
     return {"code": 0, "data": result, "message": "ok"}

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import shlex
 from typing import Any
 
 from fastapi import APIRouter
@@ -29,18 +30,42 @@ async def list_mcp_servers(project: str = "") -> dict[str, Any]:
 
 class AddServerRequest(BaseModel):
     name: str
-    url: str
+    url: str = ""
     auto_connect: bool = True
+    transport: str = "sse"
+    command: str = ""
+    env: dict[str, str] = {}
 
 
 @router.post("")
 async def add_mcp_server(req: AddServerRequest) -> dict[str, Any]:
-    """添加并连接一个新的外部 MCP Server。"""
+    """添加并连接一个新的外部 MCP Server：SSE 给 url，stdio 给整行命令。"""
     if not req.name or not req.name.strip():
         return {"code": 1, "message": "名称不能为空"}
-    if not req.url or not req.url.strip():
-        return {"code": 1, "message": "URL 不能为空"}
-    result = await mcp_client.add_server(req.name.strip(), req.url.strip(), req.auto_connect)
+    if req.transport == "stdio":
+        line = req.command.strip()
+        if not line:
+            return {"code": 1, "message": "命令不能为空"}
+        if len(line) > 2000:
+            return {"code": 1, "message": "命令过长（上限 2000 字符）"}
+        try:
+            # Windows 路径的反斜杠先翻倍再按 POSIX 引号规则拆：
+            # 引号里的空格路径保住，裸反斜杠不被当转义吃掉
+            parts = shlex.split(line.replace("\\", "\\\\"))
+        except ValueError as e:
+            return {"code": 1, "message": f"命令解析失败（引号不配对？）: {e}"}
+        if not parts:
+            return {"code": 1, "message": "命令不能为空"}
+        if any(c in mcp_client._SHELL_META for tok in parts for c in tok):
+            return {"code": 1, "message": "命令或参数含 shell 特殊字符（& | < > 等），拒绝启动"}
+        if any(len(str(v)) > 4000 for v in req.env.values()):
+            return {"code": 1, "message": "环境变量值过长（上限 4000 字符）"}
+        result = await mcp_client.add_server(req.name.strip(), "", req.auto_connect,
+                                             command=parts[0], args=parts[1:], env=req.env)
+    else:
+        if not req.url or not req.url.strip():
+            return {"code": 1, "message": "URL 不能为空"}
+        result = await mcp_client.add_server(req.name.strip(), req.url.strip(), req.auto_connect)
     if "error" in result and "id" not in result:
         return {"code": 1, "message": result["error"]}
     return {"code": 0, "data": result, "message": "ok"}
@@ -50,7 +75,10 @@ async def add_mcp_server(req: AddServerRequest) -> dict[str, Any]:
 async def connect_mcp_server(server_id: str) -> dict[str, Any]:
     """连接指定的 MCP Server。"""
     result = await mcp_client.connect_server(server_id)
-    if "error" in result and result.get("status") != "error":
+    # to_dict() 恒带 error 键（成功时是空串），不能用 "error" in result 判失败——
+    # 那会把每次成功重连都洗成 code 1。只有「服务器不存在」这类不带 id 的才是路由级错误；
+    # 连接本身的成败装在 data.status 里，由面板照着画。
+    if "error" in result and "id" not in result:
         return {"code": 1, "message": result["error"]}
     return {"code": 0, "data": result, "message": "ok"}
 

@@ -3,14 +3,14 @@
  * + Actions（data/actions/*.yml 流程说明书：可编辑、试校验、删除、留底回滚）。
  */
 
-import { state, subscribe, setSkills, setActions } from "../store.js?v=20261107-001";
-import { get, post, put, del, upload } from "../services/api.js?v=20261107-001";
-import { guardSkillCall } from "../services/riskguard.js?v=20261107-001";
-import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20261107-001";
-import { t } from "../services/i18n.js?v=20261107-001";
-import { setIconText } from "../services/icons.js?v=20261107-001";
-import { forgetScopeCatalog } from "../services/project_scope.js?v=20261107-001";
-import { setExtCount } from "./extensions.js?v=20261107-001";
+import { state, subscribe, setSkills, setActions } from "../store.js?v=20261107-003";
+import { get, post, put, del, upload } from "../services/api.js?v=20261107-003";
+import { guardSkillCall } from "../services/riskguard.js?v=20261107-003";
+import { dlgConfirm, dlgPrompt } from "../services/dialog.js?v=20261107-003";
+import { t } from "../services/i18n.js?v=20261107-003";
+import { setIconText } from "../services/icons.js?v=20261107-003";
+import { forgetScopeCatalog } from "../services/project_scope.js?v=20261107-003";
+import { setExtCount } from "./extensions.js?v=20261107-003";
 
 let skillList, toolList, mcpToolList, actionList;
 let btnUpload, btnImport, btnDiscover, btnGithubImport, skillModal, skillModalTitle, skillParams, skillResult, btnRunSkill;
@@ -265,12 +265,16 @@ function extEmpty(host, text) {
 
 function renderSkillList() {
   const skills = Object.entries(state.skills.skills || {});
+  // .agents/skills 直读那份跟在已安装后面： badge 写明出处，没有删除按钮——
+  // 真身在别的工具目录里，SLATE 只是读，不该伸手删
+  const external = state.skills.externalSkills || [];
   if (skillList) {
     skillList.innerHTML = "";
     for (const [name, desc] of skills) skillList.appendChild(createSkillItem(name, desc, "Skill"));
-    if (!skills.length) extEmpty(skillList, t("暂无技能，可点右上「导入技能」或「新建技能」"));
+    for (const e of external) skillList.appendChild(createSkillItem(e.name, e.description || e.name, ".agents"));
+    if (!skills.length && !external.length) extEmpty(skillList, t("暂无技能，可点右上「导入技能」或「新建技能」"));
   }
-  setExtCount("skills", skills.length);
+  setExtCount("skills", skills.length + external.length);
 
   const tools = Object.entries(state.skills.mcp || {});
   if (toolList) {
@@ -1155,7 +1159,7 @@ async function openSkillViewer(name) {
   skillModal.classList.remove("hidden");
 
   try {
-    const res = await post("/skills/execute", { skill: name, params: {} });
+    const res = await post("/skills/execute", { skill: name, params: {}, project: String(state.project?.project_id || "") });
     if (res.code === 0 && res.data?.content) {
       skillResult.textContent = res.data.content;
     } else {
@@ -1373,6 +1377,29 @@ async function handleGithubImport() {
   }
 }
 
+// ── 从 npm 安装技能 ─────────────────────────
+
+async function handleNpmImport() {
+  const pkg = await dlgPrompt(t("npm 包名："), {
+    title: t("从 npm 安装"),
+    placeholder: t("例如 @scope/skill-package"),
+  });
+  if (!pkg || !pkg.trim()) return;
+
+  showToast(t("正在从 npm 下载…"));
+  try {
+    const res = await post("/skills/import-npm", { package: pkg.trim() });
+    if (res.code === 0) {
+      showToast(t("技能 {name} 导入成功（{n} 个文件）", { name: res.data.name, n: res.data.files }));
+      refreshSkills();
+    } else {
+      showToast(t("导入失败: {msg}", { msg: res.message }));
+    }
+  } catch (e) {
+    showToast(t("导入失败: {msg}", { msg: e.message }));
+  }
+}
+
 // ── 刷新技能列表 ────────────────────────────
 
 /*
@@ -1422,6 +1449,7 @@ function initSkillPanel() {
   btnRunSkill = document.getElementById("btn-run-skill");
   btnDiscover = document.getElementById("btn-discover-plugins");
   btnGithubImport = document.getElementById("btn-github-import");
+  const btnNpmImport = document.getElementById("btn-npm-import");
 
   initActionModal();
 
@@ -1429,6 +1457,7 @@ function initSkillPanel() {
   btnImport.addEventListener("click", handleImportSkill);
   if (btnDiscover) btnDiscover.addEventListener("click", handleDiscoverPlugins);
   if (btnGithubImport) btnGithubImport.addEventListener("click", handleGithubImport);
+  if (btnNpmImport) btnNpmImport.addEventListener("click", handleNpmImport);
   btnRunSkill.addEventListener("click", executeSkill);
   // 「＋ 新建 Action」现在是扩展页栏头里的静态按钮（列表容器不再自己造按钮）
   document.getElementById("btn-ext-action-new")?.addEventListener("click", handleCreateAction);

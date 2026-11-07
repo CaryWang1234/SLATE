@@ -12,18 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor, MODE_TOOLS_NONE, MODE_READONLY_TOOLS, BUILTIN_MODES, addMode, updateMode, removeMode, modeById } from "../store.js?v=20261107-001";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261107-001";
-import { guardSkillCall } from "./riskguard.js?v=20261107-001";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20261107-001";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261107-001";
-import { t } from "./i18n.js?v=20261107-001";
-import { makeId } from "./utils.js?v=20261107-001";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261107-001";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261107-001";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20261107-001";
-import { isAiToolOff, isAiFeatureOn } from "./ai_features.js?v=20261107-001";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261107-001";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor, MODE_TOOLS_NONE, MODE_READONLY_TOOLS, BUILTIN_MODES, addMode, updateMode, removeMode, modeById } from "../store.js?v=20261107-003";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261107-003";
+import { guardSkillCall } from "./riskguard.js?v=20261107-003";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20261107-003";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261107-003";
+import { t } from "./i18n.js?v=20261107-003";
+import { makeId } from "./utils.js?v=20261107-003";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261107-003";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261107-003";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20261107-003";
+import { isAiToolOff, isAiFeatureOn } from "./ai_features.js?v=20261107-003";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261107-003";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -463,11 +463,12 @@ const TOOLS = {
     },
     async execute({ keyword }, callCtx = {}) {
       try {
-        let mcp = {}, evolved = {}, skills = {}, remoteTools = [];
+        let mcp = {}, evolved = {}, skills = {}, external = [], remoteTools = [];
         if (state.skills) {
           mcp = state.skills.mcp || {};
           evolved = state.skills.evolved || {};
           skills = state.skills.skills || {};
+          external = state.skills.externalSkills || [];
         }
         // 远程那份按「这一场的项目」取：全局清单里被项目掩码关掉的服务器，
         // 在这一场看来就是不存在——列给模型却调不动，比不列更容易引出幻觉。
@@ -479,6 +480,7 @@ const TOOLS = {
             mcp = res.data.mcp || {};
             evolved = res.data.evolved || {};
             skills = res.data.skills || {};
+            external = res.data.externalSkills || [];
             remoteTools = res.data.remoteTools || [];
           }
         }
@@ -488,6 +490,8 @@ const TOOLS = {
           // 自进化的那份单独列一类：模型要知道这名字不是程序自带的，出问题去看「扩展 → 新功能」
           ...Object.entries(evolved).map(([name, desc]) => ({ name, desc: String(desc), type: "自进化工具" })),
           ...Object.entries(skills).map(([name, desc]) => ({ name, desc: String(desc), type: "SKILL.md 技能" })),
+          // .agents 直读那份单列来源：模型与用户都要知道它不在 data/skills 里，删不掉也不必导入
+          ...external.filter(e => !(e.name in skills)).map(e => ({ name: e.name, desc: String(e.description || ""), type: e.source === "workspace" ? "SKILL.md 技能（项目 .agents）" : "SKILL.md 技能（~/.agents）" })),
           ...(remoteTools || []).map(t => ({ name: `mcp__${t.serverId}__${t.name}`, desc: `[MCP:${t.server}] ${t.description || ""}`, type: "远程 MCP" })),
         ];
         const hits = kw
@@ -553,8 +557,9 @@ const TOOLS = {
           signal: callCtx.signal,
           callId: callCtx.callId,
           onEvent: callCtx.onEvent,
-          // 远程 MCP 工具要按这一场的项目掩码复验；内置技能读不到这个字段，多传无害。
-          project: skill.startsWith("mcp__") ? scopeProjectParam(callCtx) : "",
+          // 远程 MCP 工具要按这一场的项目掩码复验；.agents 直读技能也要靠它找工作区。
+          // 内置技能读不到这个字段，多传无害。
+          project: scopeProjectParam(callCtx),
         });
         const res = streamed.fallback
           ? await post("/skills/execute", { skill, params: p, project: scopeProjectParam(callCtx) })

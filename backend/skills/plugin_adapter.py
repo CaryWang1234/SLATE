@@ -14,7 +14,9 @@ import os
 import re
 import shutil
 import subprocess
+import tarfile
 import tempfile
+import urllib.parse
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -284,3 +286,164 @@ def list_available_sources() -> dict[str, Any]:
         "codex_plugins": discover_codex_plugins(),
         "standard_dirs": [str(d) for d in STANDARD_SKILL_DIRS if d.is_dir()],
     }
+
+
+# ── .agents 直读（不复制） ─────────────────────────────
+#
+# 跨工具 Agent Skills 标准落在 .agents/skills/：工作区一份、家目录一份。
+# 与「发现插件」那条复制导入的路不同，这里是活读——别家工具装了/更新了，
+# 下一次请求就看得见；同名时工作区盖过家目录（标准规定的优先级）。
+
+def _agents_skill_dirs(workspace_dir: Path | None) -> list[tuple[Path, str]]:
+    dirs: list[tuple[Path, str]] = []
+    if workspace_dir:
+        dirs.append((workspace_dir / ".agents" / "skills", "workspace"))
+    dirs.append((Path.home() / ".agents" / "skills", "home"))
+    return dirs
+
+
+def _scan_agents_dir(base_dir: Path, source: str) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+    if not base_dir.is_dir():
+        return found
+    for skill_dir in sorted(base_dir.iterdir()):
+        if not skill_dir.is_dir():
+            continue
+        skill_md = _find_skill_md(skill_dir)
+        if not skill_md:
+            continue
+        try:
+            content = skill_md.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        meta = _parse_skill_md_frontmatter(content)
+        found.append({
+            "name": skill_dir.name,
+            "description": meta.get("description", skill_dir.name),
+            "source": source,
+            "path": str(skill_dir),
+        })
+    return found
+
+
+def list_external_skills(workspace_dir: Path | None = None) -> list[dict[str, Any]]:
+    """直读工作区与家目录的 .agents/skills；同名工作区优先，各来源内部按目录名去重。"""
+    result: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for base_dir, source in _agents_skill_dirs(workspace_dir):
+        for entry in _scan_agents_dir(base_dir, source):
+            if entry["name"] in seen:
+                continue
+            seen.add(entry["name"])
+            result.append(entry)
+    return result
+
+
+def resolve_external_skill(name: str, workspace_dir: Path | None = None) -> Path | None:
+    """按名字找回 .agents 里的技能目录（工作区优先）；名字先消毒防穿越。"""
+    clean = re.sub(r"[^\w\u4e00-\u9fff.-]", "-", str(name).strip()).strip(".")[:64]
+    if not clean or clean != str(name).strip():
+        return None
+    for base_dir, _source in _agents_skill_dirs(workspace_dir):
+        candidate = base_dir / clean
+        if candidate.is_dir() and _find_skill_md(candidate):
+            return candidate
+    return None
+
+
+# ── npm 包导入（tarball 直取，不跑 lifecycle 脚本） ─────
+
+NPM_REGISTRY = "https://registry.npmjs.org"
+_NPM_NAME_RE = re.compile(r"^(?:@[a-z0-9-~][a-z0-9-._~]*/)?[a-z0-9-~][a-z0-9-._~]*$")
+_NPM_MAX_BYTES = 20 * 1024 * 1024
+
+
+def _safe_extract_tar(archive: Path, dest: Path) -> None:
+    """解 tar.gz 时逐条验落点：绝对路径、.. 穿越、符号链接一律拒收。"""
+    dest_resolved = dest.resolve()
+    with tarfile.open(archive, "r:gz") as tf:
+        for member in tf.getmembers():
+            target = (dest / member.name).resolve()
+            if dest_resolved != target and dest_resolved not in target.parents:
+                raise ValueError(f"压缩包含越界路径: {member.name}")
+            if member.issym() or member.islnk():
+                raise ValueError(f"压缩包含链接条目: {member.name}")
+        tf.extractall(dest, filter="data")
+
+
+def import_from_npm(package: str, dest_dir: Path, name: str = "") -> dict[str, Any]:
+    """从 npm registry 取包的 tarball，找到 SKILL.md 后复制导入。
+
+    只下载与解包，绝不执行 npm install / lifecycle 脚本——postinstall 是
+    技能包供应链里最常见的投毒点，技能本体又只是 Markdown，没必要跑代码。
+    """
+    import urllib.request
+
+    pkg = str(package).strip()
+    if pkg.startswith("npm:"):
+        pkg = pkg[4:].strip()
+    if not _NPM_NAME_RE.match(pkg) or len(pkg) > 214:
+        return {"error": f"不是合法的 npm 包名: {package}"}
+
+    try:
+        meta_url = f"{NPM_REGISTRY}/{urllib.parse.quote(pkg, safe='@/')}"
+        with urllib.request.urlopen(meta_url, timeout=20) as resp:
+            meta = json.loads(resp.read().decode("utf-8"))
+        latest = (meta.get("dist-tags") or {}).get("latest", "")
+        version_meta = (meta.get("versions") or {}).get(latest) or {}
+        tarball = (version_meta.get("dist") or {}).get("tarball", "")
+        if not tarball.startswith("https://"):
+            return {"error": f"包 {pkg} 没有可下载的 tarball"}
+    except Exception as e:
+        return {"error": f"查询 npm registry 失败: {str(e)[:160]}"}
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        archive_path = tmp_path / "package.tgz"
+        try:
+            req = urllib.request.Request(tarball, headers={"User-Agent": "SLATE-skill-import"})
+            with urllib.request.urlopen(req, timeout=60) as resp, open(archive_path, "wb") as out:
+                total = 0
+                while chunk := resp.read(65536):
+                    total += len(chunk)
+                    if total > _NPM_MAX_BYTES:
+                        return {"error": "包体积超过 20MB，拒绝导入"}
+                    out.write(chunk)
+        except Exception as e:
+            return {"error": f"下载 tarball 失败: {str(e)[:160]}"}
+
+        extract_dir = tmp_path / "extracted"
+        extract_dir.mkdir()
+        try:
+            _safe_extract_tar(archive_path, extract_dir)
+        except (ValueError, tarfile.TarError, OSError) as e:
+            return {"error": f"解包被拒: {str(e)[:160]}"}
+
+        # npm tarball 惯例是 package/ 一层；SKILL.md 可能在根、skills/<name>/ 或更深
+        skill_md = None
+        for candidate in sorted(extract_dir.rglob("*")):
+            if candidate.is_file() and candidate.name in SKILL_MD_NAMES:
+                skill_md = candidate
+                break
+        if not skill_md:
+            return {"error": f"包 {pkg} 里没有找到 SKILL.md，它可能不是一个技能包"}
+        skill_dir = skill_md.parent
+        meta_fm = _parse_skill_md_frontmatter(skill_md.read_text(encoding="utf-8", errors="ignore"))
+        skill_name = name or meta_fm.get("name") or (skill_dir.name if skill_dir.name != "package" else pkg.split("/")[-1])
+        skill_name = re.sub(r"[^\w\u4e00-\u9fff.-]", "-", skill_name.strip()).strip(".")[:64]
+        if not skill_name:
+            return {"error": "无效的技能名称"}
+
+        dest = dest_dir / skill_name
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(skill_dir, dest)
+        file_count = sum(1 for _ in dest.rglob("*") if _.is_file())
+        return {
+            "name": skill_name,
+            "format": "skill.md",
+            "files": file_count,
+            "path": str(dest),
+            "source": f"npm:{pkg}@{latest}",
+        }

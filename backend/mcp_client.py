@@ -1,7 +1,7 @@
 """外部 MCP Server 客户端管理器。
 
-通过 SSE 传输协议连接外部 MCP Server，发现并调用其工具。
-支持多 Server 同时连接，连接状态持久化。
+支持两种传输：HTTP+SSE（url）与 stdio 子进程（command/args/env，npm 生态的
+MCP Server 大多走 npx 启动）。多 Server 同时连接，连接状态持久化。
 
 协议规范：https://modelcontextprotocol.io/docs/concepts/transports
 """
@@ -12,6 +12,9 @@ import asyncio
 import json
 import logging
 import os
+import shutil
+import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -20,6 +23,7 @@ import httpx
 
 from backend import scope_overlay
 from backend.data_io import atomic_write_json, backup_corrupt
+from backend.subprocess_utils import hidden_subprocess_kwargs
 
 logger = logging.getLogger("slate.mcp_client")
 
@@ -265,9 +269,243 @@ class McpServerConnection:
         self.status = "disconnected"
 
 
+# ── stdio 传输（本地子进程） ────────────────────────────
+
+# cmd.exe 会解释这些字符：走 .cmd/.bat 垫片时命令与参数里出现即拒，
+# 配置是用户手输的也不给注入留门
+_SHELL_META = set('&|<>^%\r\n"')
+
+
+def stdio_argv(command: str, args: list[str]) -> list[str]:
+    """把 command+args 变成可执行的 argv。
+
+    Windows 上 npx/npm 是 .cmd 垫片，CreateProcess 不认，要经 cmd.exe 转一道；
+    其余情况直接 exec，不过 shell。找不到命令原样回命令名，让 spawn 报错信息说话。
+    """
+    exe = shutil.which(command) or command
+    if sys.platform == "win32" and exe.lower().endswith((".cmd", ".bat")):
+        if any(c in _SHELL_META for c in [command, *args]):
+            raise ValueError("命令或参数含 shell 特殊字符，拒绝经 cmd.exe 启动")
+        comspec = os.environ.get("COMSPEC", "cmd.exe")
+        return [comspec, "/d", "/c", exe, *args]
+    return [exe, *args]
+
+
+class StdioConnection:
+    """单个 MCP Server 的 stdio 连接：JSON-RPC 走子进程 stdin/stdout，逐行一条消息。"""
+
+    def __init__(self, server_id: str, name: str, command: str, args: list[str] | None = None,
+                 env: dict[str, str] | None = None, enabled: bool = True):
+        self.server_id = server_id
+        self.name = name
+        self.url = ""  # stdio 没有 URL；品牌识别回落 MCP 官方 mark
+        self.command = command
+        self.args = list(args or [])
+        self.env = dict(env or {})
+        self.enabled = enabled
+        self.status: str = "disconnected"
+        self.error: str = ""
+        self.tools: list[dict[str, Any]] = []
+        self._request_id = 0
+        self._pending: dict[int, asyncio.Future] = {}
+        self._proc: asyncio.subprocess.Process | None = None
+        self._reader_task: asyncio.Task | None = None
+        self._stderr_task: asyncio.Task | None = None
+        self._stderr_tail = ""
+
+    def command_line(self) -> str:
+        return " ".join([self.command, *self.args])
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.server_id,
+            "name": self.name,
+            "url": "",
+            "transport": "stdio",
+            "command": self.command,
+            "args": self.args,
+            "enabled": self.enabled,
+            "status": self.status,
+            "error": self.error,
+            "tools": [{"name": t["name"], "description": t.get("description", "")} for t in self.tools],
+            "toolCount": len(self.tools),
+        }
+
+    async def _fail_connect(self, error: str) -> bool:
+        self.status = "error"
+        self.error = error[:300]
+        await self._teardown()
+        return False
+
+    async def _teardown(self):
+        """收掉读任务与整棵进程树：npx 会再生一层 node 子进程，只杀父进程会留孤儿。"""
+        for task in (self._reader_task, self._stderr_task):
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except BaseException:
+                    pass
+        self._reader_task = None
+        self._stderr_task = None
+        proc, self._proc = self._proc, None
+        if proc and proc.returncode is None:
+            try:
+                if sys.platform == "win32":
+                    await asyncio.get_running_loop().run_in_executor(
+                        None, lambda: subprocess.run(
+                            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                            timeout=5, **hidden_subprocess_kwargs()))
+                else:
+                    proc.terminate()
+                    try:
+                        await asyncio.wait_for(proc.wait(), timeout=2)
+                    except asyncio.TimeoutError:
+                        proc.kill()
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+        for fut in self._pending.values():
+            if not fut.done():
+                fut.set_result({"error": "stdio 连接已断开"})
+        self._pending.clear()
+
+    async def connect(self) -> bool:
+        self.status = "connecting"
+        self.error = ""
+        self.tools = []
+        self._stderr_tail = ""
+        try:
+            argv = stdio_argv(self.command, self.args)
+            env = {**os.environ, **self.env} if self.env else None
+            self._proc = await asyncio.create_subprocess_exec(
+                *argv,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+                **hidden_subprocess_kwargs(),
+            )
+        except ValueError as e:
+            return await self._fail_connect(str(e))
+        except FileNotFoundError:
+            return await self._fail_connect(f"找不到命令: {self.command}（确认已装 Node.js/npm 或该程序在 PATH 里）")
+        except Exception as e:
+            return await self._fail_connect(f"启动失败: {str(e)[:200]}")
+
+        self._reader_task = asyncio.create_task(self._read_stdout())
+        self._stderr_task = asyncio.create_task(self._read_stderr())
+
+        # npx 首次要现下载包，initialize 给足 60 秒；后续请求 15 秒
+        init_result = await self._send_request("initialize", {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "SLATE", "version": "1.0.0"},
+        }, timeout=60.0)
+        if not init_result or "error" in init_result:
+            err = (init_result or {}).get("error")
+            detail = err if isinstance(err, str) else (self._stderr_tail or "进程无响应")
+            return await self._fail_connect(f"initialize 失败: {str(detail)[:200]}")
+        await self._send_notification("notifications/initialized")
+        tools_result = await self._send_request("tools/list", {})
+        if not tools_result or "error" in tools_result:
+            err = (tools_result or {}).get("error")
+            return await self._fail_connect(f"tools/list 失败: {str(err or self._stderr_tail)[:200]}")
+        self.tools = tools_result.get("tools") or []
+        self.status = "connected"
+        logger.info(f"MCP Server '{self.name}' (stdio) 已连接，{len(self.tools)} 个工具")
+        return True
+
+    async def _read_stdout(self):
+        assert self._proc and self._proc.stdout
+        try:
+            async for line in self._proc.stdout:
+                text = line.decode("utf-8", errors="replace").strip()
+                if not text:
+                    continue
+                try:
+                    msg = json.loads(text)
+                except json.JSONDecodeError:
+                    continue  # 有些服务器往 stdout 混日志行，跳过
+                req_id = msg.get("id")
+                if req_id is not None and req_id in self._pending:
+                    fut = self._pending.pop(req_id)
+                    if not fut.done():
+                        fut.set_result({"error": msg["error"]} if "error" in msg else msg.get("result", {}))
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            pass
+        # stdout 走到头＝进程退了：挂起请求立即失败，状态改错
+        if self.status in ("connecting", "connected"):
+            self.status = "error"
+            self.error = (self._stderr_tail or "进程已退出")[:300]
+        for fut in list(self._pending.values()):
+            if not fut.done():
+                fut.set_result({"error": "stdio 进程已退出"})
+
+    async def _read_stderr(self):
+        assert self._proc and self._proc.stderr
+        try:
+            async for line in self._proc.stderr:
+                self._stderr_tail = (self._stderr_tail + line.decode("utf-8", errors="replace"))[-2000:]
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            pass
+
+    async def _send_request(self, method: str, params: dict, timeout: float = 15.0) -> dict | None:
+        if not self._proc or not self._proc.stdin or self._proc.returncode is not None:
+            return {"error": "stdio 进程未在运行"}
+        self._request_id += 1
+        req_id = self._request_id
+        payload = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
+        future = asyncio.get_running_loop().create_future()
+        self._pending[req_id] = future
+        try:
+            self._proc.stdin.write((json.dumps(payload) + "\n").encode("utf-8"))
+            await self._proc.stdin.drain()
+            return await asyncio.wait_for(future, timeout=timeout)
+        except asyncio.TimeoutError:
+            self._pending.pop(req_id, None)
+            return {"error": "响应超时"}
+        except Exception as e:
+            self._pending.pop(req_id, None)
+            return {"error": str(e)[:200]}
+
+    async def _send_notification(self, method: str, params: dict | None = None):
+        if not self._proc or not self._proc.stdin or self._proc.returncode is not None:
+            return
+        payload = {"jsonrpc": "2.0", "method": method}
+        if params:
+            payload["params"] = params
+        try:
+            self._proc.stdin.write((json.dumps(payload) + "\n").encode("utf-8"))
+            await self._proc.stdin.drain()
+        except Exception:
+            pass
+
+    async def call_tool(self, tool_name: str, arguments: dict) -> dict[str, Any]:
+        if self.status != "connected":
+            return {"error": f"服务器未连接: {self.status}"}
+        result = await self._send_request("tools/call", {"name": tool_name, "arguments": arguments}, timeout=60.0)
+        if result is None:
+            return {"error": "请求失败"}
+        if "error" in result:
+            return {"error": result["error"]}
+        return result
+
+    async def disconnect(self):
+        await self._teardown()
+        self.tools = []
+        self.status = "disconnected"
+
+
 # ── 管理器（全局单例） ──────────────────────────────────
 
-_connections: dict[str, McpServerConnection] = {}
+_connections: dict[str, Any] = {}
 _config_load_error = False  # 原文件损坏时置位，保存前备份防覆盖丢失
 
 
@@ -293,6 +531,16 @@ def _save_config(servers: list[dict[str, Any]]):
     atomic_write_json(CONFIG_PATH, servers)
 
 
+def _make_connection(cfg: dict[str, Any]):
+    """按配置里的 transport 造连接：缺省与旧配置都是 SSE，stdio 是新增那路。"""
+    sid = cfg["id"]
+    name = cfg.get("name", "")
+    if cfg.get("transport") == "stdio":
+        return StdioConnection(sid, name, cfg.get("command", ""), cfg.get("args") or [],
+                               cfg.get("env") or {}, cfg.get("enabled", True))
+    return McpServerConnection(sid, name, cfg.get("url", ""), cfg.get("enabled", True))
+
+
 def list_servers(project_id: str = "") -> list[dict[str, Any]]:
     """列出所有已配置的 MCP Server 及其状态。
 
@@ -309,6 +557,9 @@ def list_servers(project_id: str = "") -> list[dict[str, Any]]:
             "id": sid,
             "name": cfg.get("name", ""),
             "url": cfg.get("url", ""),
+            "transport": cfg.get("transport", "sse"),
+            "command": cfg.get("command", ""),
+            "args": cfg.get("args") or [],
             "enabled": cfg.get("enabled", True),
             "status": "disconnected",
             "error": "",
@@ -349,30 +600,42 @@ def get_all_remote_tools(project_id: str = "") -> list[dict[str, Any]]:
     return tools
 
 
-async def add_server(name: str, url: str, auto_connect: bool = True) -> dict[str, Any]:
-    """添加一个新的 MCP Server。"""
+async def add_server(name: str, url: str = "", auto_connect: bool = True, *,
+                     command: str = "", args: list[str] | None = None,
+                     env: dict[str, str] | None = None) -> dict[str, Any]:
+    """添加一个新的 MCP Server：给 url 走 SSE，给 command 走 stdio 子进程。"""
     configs = _load_config()
-    # 检查 URL 是否已存在
-    for cfg in configs:
-        if cfg.get("url") == url:
-            return {"error": f"该地址已配置: {cfg.get('name', '')}"}
-
     import hashlib
-    sid = hashlib.sha256(url.encode()).hexdigest()[:12]
 
-    cfg = {"id": sid, "name": name, "url": url, "enabled": True}
+    if command:
+        args = list(args or [])
+        key = json.dumps([command, args], ensure_ascii=False)
+        for cfg in configs:
+            if cfg.get("transport") == "stdio" and cfg.get("command") == command and (cfg.get("args") or []) == args:
+                return {"error": f"该命令已配置: {cfg.get('name', '')}"}
+        sid = hashlib.sha256(key.encode()).hexdigest()[:12]
+        cfg = {"id": sid, "name": name, "transport": "stdio", "command": command,
+               "args": args, "env": dict(env or {}), "enabled": True}
+    else:
+        # 检查 URL 是否已存在
+        for cfg in configs:
+            if cfg.get("url") == url:
+                return {"error": f"该地址已配置: {cfg.get('name', '')}"}
+        sid = hashlib.sha256(url.encode()).hexdigest()[:12]
+        cfg = {"id": sid, "name": name, "url": url, "enabled": True}
+
     configs.append(cfg)
     _save_config(configs)
 
     if auto_connect:
-        conn = McpServerConnection(sid, name, url)
+        conn = _make_connection(cfg)
         _connections[sid] = conn
         ok = await conn.connect()
         if not ok:
-            return {"id": sid, "name": name, "url": url, "status": "error", "error": conn.error, "tools": [], "toolCount": 0}
+            return {**conn.to_dict(), "status": "error", "error": conn.error}
         return conn.to_dict()
 
-    return {"id": sid, "name": name, "url": url, "status": "disconnected", "tools": [], "toolCount": 0}
+    return {**cfg, "status": "disconnected", "error": "", "tools": [], "toolCount": 0}
 
 
 async def remove_server(server_id: str) -> dict[str, Any]:
@@ -399,7 +662,7 @@ async def connect_server(server_id: str) -> dict[str, Any]:
     if old:
         await old.disconnect()
 
-    conn = McpServerConnection(server_id, cfg["name"], cfg["url"], cfg.get("enabled", True))
+    conn = _make_connection(cfg)
     _connections[server_id] = conn
     ok = await conn.connect()
     if not ok:
@@ -440,7 +703,7 @@ async def startup_connect_all():
         if not cfg.get("enabled", True):
             continue
         sid = cfg["id"]
-        conn = McpServerConnection(sid, cfg["name"], cfg["url"])
+        conn = _make_connection(cfg)
         _connections[sid] = conn
         try:
             ok = await conn.connect()
