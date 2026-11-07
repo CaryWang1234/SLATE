@@ -9,8 +9,8 @@
  * 关掉自定义主题时这里会把整段样式和两个 data 属性一起摘掉，一个像素都不留——
  * 明暗切换（setTheme）在生效期间被 store.js 挡住，两套色不会同时说话。
  */
-import { API_BASE, IMPORTED_FONT_ID_RE } from "../store.js?v=20261106-003";
-import { get, post, del } from "./api.js?v=20261106-003";
+import { API_BASE, IMPORTED_FONT_ID_RE } from "../store.js?v=20261107-001";
+import { get, post, del } from "./api.js?v=20261107-001";
 
 const STYLE_ID = "slate-custom-theme";
 
@@ -434,6 +434,72 @@ export async function removeFont(id) {
   return true;
 }
 
+// ── 质感：毛玻璃与阴影 ──────────────────────
+//
+// 阴影基准与 ui_modern.css 的 --sh-1/2/3 两套逐字同源（守卫 check_theme_effects 盯着这两份不许漂移）。
+// 强度只缩放 rgba 的 alpha，几何不动；100% 时像素与内置一致。
+const SHADOW_BASE_LIGHT = [
+  "0 1px 2px rgba(30, 25, 18, .06)",
+  "0 8px 24px rgba(30, 25, 18, .10), 0 1px 2px rgba(30, 25, 18, .06)",
+  "0 24px 64px rgba(20, 16, 10, .18)",
+];
+const SHADOW_BASE_DARK = [
+  "0 1px 2px rgba(0, 0, 0, .35)",
+  "0 8px 24px rgba(0, 0, 0, .45), 0 1px 2px rgba(0, 0, 0, .30)",
+  "0 24px 64px rgba(0, 0, 0, .55)",
+];
+
+/** 毛玻璃只磨结构层：侧栏/右栏/船坞/输入框。逐条消息不挂 backdrop-filter，流式渲染会掉帧 */
+const GLASS_SURFACES = [
+  ".project-sidebar",
+  ".todo-panel",
+  ".grind-panel",
+  ".team-history-sidebar",
+  ".codex-dock",
+  "#chat-input-area",
+];
+
+/** 投影落在卡片与输入框上；选中/聚焦/拖拽态自带更重要的影子，:not 让路给它们 */
+const SHADOW_SURFACES = [
+  "#chat-input-area:not(:focus-within)",
+  ".mcp-server-item",
+  ".board-card:not(.selected):not(.dragging)",
+];
+
+function scaledShadows(isDark, strength) {
+  const base = isDark ? SHADOW_BASE_DARK : SHADOW_BASE_LIGHT;
+  const k = strength / 100;
+  return base.map(css => css.replace(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/g, (_, r, g, b, a) => {
+    const alpha = Math.min(1, Math.round(Number(a) * k * 100) / 100);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }));
+}
+
+/**
+ * 质感那段 CSS。blur=0 时一条 backdrop-filter 都不发——blur(0) 也会创建 backdrop root，
+ * 白挂一层会改变固定定位子元素的包含块；shadow=0 时不发投影规则，但 --sh-* 仍发零 alpha
+ * 的覆盖值，把内置浮层的影子也一并关掉。
+ */
+function buildEffectsCss(theme, isDark, selector) {
+  const blur = theme.effects?.blur ?? 12;
+  const shadow = theme.effects?.shadow ?? 120;
+  const [sh1, sh2, sh3] = scaledShadows(isDark, shadow);
+  let css = `\n${selector} {\n  --sh-1: ${sh1};\n  --sh-2: ${sh2};\n  --sh-3: ${sh3};\n}`;
+  if (blur > 0) {
+    css += `\n${selector} {\n  --glass-blur: ${blur}px;\n}`;
+    const list = GLASS_SURFACES.map(s => `html[data-custom-theme="1"] ${s}`).join(",\n");
+    css += `\n${list} {\n`
+      + "  backdrop-filter: blur(var(--glass-blur));\n"
+      + "  -webkit-backdrop-filter: blur(var(--glass-blur));\n"
+      + "}";
+  }
+  if (shadow > 0) {
+    const list = SHADOW_SURFACES.map(s => `html[data-custom-theme="1"] ${s}`).join(",\n");
+    css += `\n${list} {\n  box-shadow: var(--sh-1);\n}`;
+  }
+  return css;
+}
+
 // ── 注入 ────────────────────────────────────
 
 /**
@@ -496,6 +562,7 @@ export function buildThemeCss(theme, options = {}) {
       + `  background: url("${backgroundUrl()}") center / cover no-repeat;\n`
       + "}\n";
   }
+  css += buildEffectsCss(theme, luminance(theme.colors.bg) < 0.45, selector);
   return css;
 }
 

@@ -228,7 +228,7 @@ Action Playbooks: Write the required flow for a recurring task into `data/action
 - 🔒 **Full Sandbox Protection**: Path traversal prevention (sensitive system dirs blacklisted), credential file access blocked, output truncation (50K chars), file size limits (5MB), request body size cap (20MB), upload filename sanitization, ReDoS timeout protection, env var cleanup — all transparent to users, zero friction
 - 🗜️ **Context Compression**: Auto-summarize over token threshold, manual compression supported; folded originals are never deleted — the model can query them back by keyword
 - 🏭 **Prompt Factory**: Constitution summary → context snippets → task description → constraints → delivery requirements
-- 🎨 **Themes & Custom Look**: Light / Dark one-click switch; under Settings → Custom theme four source colours (background / panel / body text / accent) derive the whole palette, with 10 presets, body and code font pickers, a panel-opacity slider, fonts imported from your own font files, and a local background image with an opacity slider. It can also pull the preview of whatever wallpaper Wallpaper Engine is currently using — read-only: it touches only the config and preview files Wallpaper Engine wrote for itself, never launches it and never changes its settings, and a new wallpaper on that side does not follow over until you click again. While a custom theme is on, the dark/light switch locks — clicking it explains why nothing changed and where to turn it off instead of failing silently. The file-type icons in the project bar follow the accent colour too (multi-colour icons are tinted by hue)
+- 🎨 **Themes & Custom Look**: Light / Dark one-click switch; under Settings → Custom theme four source colours (background / panel / body text / accent) derive the whole palette, with 10 presets, body and code font pickers, a panel-opacity slider, fonts imported from your own font files, a local background image with an opacity slider, and frosted-glass / shadow strength sliders (glass touches only structural surfaces, never per-message; shadow strength scales depth without moving geometry; both at 0 is the plain built-in look). It can also pull the preview of whatever wallpaper Wallpaper Engine is currently using — read-only: it touches only the config and preview files Wallpaper Engine wrote for itself, never launches it and never changes its settings, and a new wallpaper on that side does not follow over until you click again. While a custom theme is on, the dark/light switch locks — clicking it explains why nothing changed and where to turn it off instead of failing silently. The file-type icons in the project bar follow the accent colour too (multi-colour icons are tinted by hue)
 
 ---
 
@@ -352,7 +352,7 @@ SLATE/
 
 ## 🧭 Design Principles
 
-- **Pure black-white-gray base**: No blue-purple gradients, no excessive rounding, no shadow/frosted glass
+- **Pure black-white-gray base**: No blue-purple gradients, no excessive rounding; the built-in theme ships without shadow/frosted glass (opt-in under Custom theme)
 - **Native tech**: Zero npm / Node.js, zero build tools, frontend is files — edit and it takes effect
 - **Local-first**: All data stored locally, API Keys used only for LLM calls
 - **Token economy**: Smart compression, tiered calls, silent processing

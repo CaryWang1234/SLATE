@@ -5,16 +5,16 @@
  * app.js 那一份订阅调 applyCustomTheme 注入样式。这里不再自己调 apply——
  * 两处各注入一次会打架，还会让"改了什么"和"页面上看到什么"对不上。
  */
-import { state, setCustomTheme } from "../store.js?v=20261106-003";
+import { state, setCustomTheme } from "../store.js?v=20261107-001";
 import {
   THEME_FONTS_MAIN, THEME_FONTS_CODE, THEME_PRESETS, MAX_FONT_BYTES,
   uploadBackground, removeBackground, probeBackground,
   probeWallpaperEngine, pullWallpaperEngineBackground,
   uploadFont, removeFont, probeFonts,
-} from "../services/theme_custom.js?v=20261106-003";
-import { dlgToast } from "../services/dialog.js?v=20261106-003";
-import { t } from "../services/i18n.js?v=20261106-003";
-import { reportError } from "../services/error_sink.js?v=20261106-003";
+} from "../services/theme_custom.js?v=20261107-001";
+import { dlgToast } from "../services/dialog.js?v=20261107-001";
+import { t } from "../services/i18n.js?v=20261107-001";
+import { reportError } from "../services/error_sink.js?v=20261107-001";
 
 // 背景图上限与后端 theme.py 的 MAX_BACKGROUND_BYTES 同一个数
 const MAX_BG_BYTES = 4 * 1024 * 1024;
@@ -249,6 +249,14 @@ export function renderThemeSettings() {
   if (alpha && alpha.value !== String(theme.opacity.panel)) alpha.value = String(theme.opacity.panel);
   const alphaValue = el("theme-panel-alpha-value");
   if (alphaValue) alphaValue.textContent = `${theme.opacity.panel}%`;
+  const blur = el("theme-glass-blur");
+  if (blur && blur.value !== String(theme.effects.blur)) blur.value = String(theme.effects.blur);
+  const blurValue = el("theme-glass-blur-value");
+  if (blurValue) blurValue.textContent = `${theme.effects.blur}px`;
+  const shadow = el("theme-shadow-strength");
+  if (shadow && shadow.value !== String(theme.effects.shadow)) shadow.value = String(theme.effects.shadow);
+  const shadowValue = el("theme-shadow-strength-value");
+  if (shadowValue) shadowValue.textContent = `${theme.effects.shadow}%`;
   const bgOn = el("theme-bg-enabled");
   if (bgOn) bgOn.checked = theme.background.enabled === true;
   const veil = el("theme-bg-veil");
@@ -335,11 +343,19 @@ export function initThemeSettings() {
     // 100 = 实色：滑块拖到底时不留 rgba(…, 1) 那种"半透明的实色"，令牌与旧行为逐字节相同
     setCustomTheme({ opacity: { panel: Number.isFinite(value) ? value : 100 } });
   });
+  el("theme-glass-blur")?.addEventListener("input", (e) => {
+    const value = parseInt(e.target.value, 10);
+    setCustomTheme({ effects: { blur: Number.isFinite(value) ? value : 12 } });
+  });
+  el("theme-shadow-strength")?.addEventListener("input", (e) => {
+    const value = parseInt(e.target.value, 10);
+    setCustomTheme({ effects: { shadow: Number.isFinite(value) ? value : 120 } });
+  });
   el("theme-font-pick")?.addEventListener("click", () => el("theme-font-file")?.click());
   el("theme-font-file")?.addEventListener("change", (e) => handlePickFont(e.target.files?.[0]));
   el("theme-reset")?.addEventListener("click", () => {
     const paper = THEME_PRESETS[0];
-    setCustomTheme({ preset: "", colors: { ...paper.colors }, fonts: { main: "", code: "" }, background: { enabled: false } });
+    setCustomTheme({ preset: "", colors: { ...paper.colors }, fonts: { main: "", code: "" }, background: { enabled: false }, effects: { blur: 12, shadow: 120 } });
     dlgToast(t("已恢复默认色板"));
   });
 }

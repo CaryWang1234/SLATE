@@ -203,11 +203,58 @@ class TrayHandle:
         self.tray = None
         self.quitting = threading.Event()
         self.hinted = threading.Event()
+        self.restore_mode = None  # 进托盘前的形态：fullscreen / maximized / normal
+
+    @staticmethod
+    def _gui_attr(window, name, default=None):
+        # window.gui 是 pywebview 的平台模块，不是窗口对象；真正的窗体现在在
+        # winforms.BrowserView.instances 里（window.gui 上没有 WindowState/is_fullscreen）。
+        gui = getattr(window, 'gui', None)
+        if hasattr(gui, name):
+            try:
+                return getattr(gui, name)
+            except Exception:
+                return default
+        try:
+            from webview.platforms import winforms
+            view = winforms.BrowserView.instances.get(window.uid)
+            return getattr(view, name, default)
+        except Exception:
+            return default
+
+    def _window_mode(self):
+        if self._gui_attr(self.window, 'is_fullscreen', False):
+            return 'fullscreen'
+        state = self._gui_attr(self.window, 'WindowState')
+        try:
+            name = state.ToString() if state is not None else ''
+        except Exception:
+            name = ''
+        return 'maximized' if name == 'Maximized' else 'normal'
 
     def show(self):
         try:
             self.window.show()
-            self.window.restore()  # 最小化过的那条路：只 Show 会把窗口留在任务栏下面
+            mode = self.restore_mode
+            if mode is None and not self._gui_attr(self.window, 'is_fullscreen', False):
+                # 从任务栏最小化状态点托盘：窗口还在，只 Show 不会把它抬起来
+                state = self._gui_attr(self.window, 'WindowState')
+                try:
+                    if state is not None and state.ToString() == 'Minimized':
+                        mode = 'normal'
+                except Exception:
+                    pass
+            if mode == 'fullscreen':
+                # restore() 会把 WindowState 打回 Normal；全屏要自己接上最大化态
+                self.window.maximize()
+                if not self._gui_attr(self.window, 'is_fullscreen', True):
+                    self.window.toggle_fullscreen()
+            elif mode == 'maximized':
+                self.window.maximize()
+            elif mode == 'normal':
+                # 最小化过的那条路：只 Show 会把窗口留在任务栏下面
+                self.window.restore()
+            self.restore_mode = None
         except Exception as exc:
             self.log(f'tray show failed: {exc}')
 
@@ -223,9 +270,11 @@ class TrayHandle:
         # pywebview 只把字面 False 当"取消关闭"，所以走不走托盘必须交给 close_action 判
         if desktop_tray.close_action(self.quitting.is_set(), tray_ready) == 'exit':
             return True
+        self.restore_mode = self._window_mode()
         try:
             self.window.hide()
         except Exception as exc:
+            self.restore_mode = None
             self.log(f'hide to tray failed: {exc}')
             return True  # 藏不起来就别把窗口卡没：让这次关闭照常走完
         if self.tray and not self.hinted.is_set():

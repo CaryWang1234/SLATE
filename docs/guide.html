@@ -973,7 +973,7 @@ python desktop.py</pre>
               <tr><td>输出控制</td><td>最大 Token 数、流式输出开关</td></tr>
               <tr><td>审批模式</td><td>四档：手动审批（执行命令、访问网络逐条确认）/ 自动审批（只拦 24 类高危）/ 完全访问（命令与联网都不问，缺条件时仍弹选择题问你一句，胶囊标红）/ 夜间模式（全托管：命令、联网、连反问都不问，自己拍板继续，胶囊标夜紫）。这里定的是每个对话的默认档，单个对话在输入框的审批胶囊里随时改。夜间模式下面还有一颗「跑任务时不让电脑睡眠」：只挡系统睡眠，屏幕照常熄灭，合盖、手动睡眠、已经睡着的机器都叫不醒；租约靠页面心跳续，页面刷新或崩掉后最迟 60 秒交还电源策略；由桌面端界面持有，手机端那一页跑的任务、没有前端在跑的定时任务与后台终端任务都不钉，这一版只在 Windows 上生效</td></tr>
               <tr><td>主题</td><td>深色/浅色切换；自定义主题开着时这颗按钮锁定，点下去说明原因而不换色</td></tr>
-              <tr><td>自定义主题</td><td>四个源色（底色 / 面板 / 正文 / 强调）推导整套配色 + 正文与代码字体（也能导入自己的字体文件）+ 板块透明度 + 本机背景图与遮罩浓度，附 10 套预设；还能取 Wallpaper Engine 正在用的那张壁纸的预览图当背景——只读它写在自己目录里的配置与 preview，不启动它、不改它的设置，它换了壁纸这里不跟着换，要再点一次；项目栏的文件类型图标也跟着强调色现算（多色图标按色相染色）；改任一格就脱离预设高亮，开关跨设备同步、图与字体只留本机</td></tr>
+              <tr><td>自定义主题</td><td>四个源色（底色 / 面板 / 正文 / 强调）推导整套配色 + 正文与代码字体（也能导入自己的字体文件）+ 板块透明度 + 本机背景图与遮罩浓度 + 毛玻璃强度与阴影强度（质感：毛玻璃只磨侧栏、右栏与输入框这些结构层，逐条消息不磨，流式不掉帧；阴影强度只缩放深浅不动几何，两档都拉到 0 就是内置那副素面），附 10 套预设；还能取 Wallpaper Engine 正在用的那张壁纸的预览图当背景——只读它写在自己目录里的配置与 preview，不启动它、不改它的设置，它换了壁纸这里不跟着换，要再点一次；项目栏的文件类型图标也跟着强调色现算（多色图标按色相染色）；改任一格就脱离预设高亮，开关跨设备同步、图与字体只留本机</td></tr>
               <tr><td>会话归档</td><td>「任务」栏每一行悬停都有归档：归档只是让这一场从任务列表离场，不是删除；正在生成的那一场会被拦下并说明原因（任务中心与进度都指着那一行）。归档过的会话在这一栏逐条恢复（回到任务栏）或删除，删除前先确认，删下去连消息一起清掉</td></tr>
               <tr><td>语言</td><td>中文 / English</td></tr>
               <tr><td>上下文压缩</td><td>自动/手动压缩历史对话；摘要发给模型的是原文，界面上折成一条可展开的折叠条。系统的催办与工具结果投喂只进上下文，压缩之后也不会冒成气泡。压缩只折不删：摘要尾部写明原文还在本机这一场的记录里，模型能按关键词把被折掉的原文查回来，需要上下文再取那条前后</td></tr>
@@ -1069,7 +1069,7 @@ python desktop.py</pre>
 
             <p><strong>设计原则</strong>：</p>
             <ul>
-              <li><strong>纯粹黑白灰底色</strong> — 不做蓝紫渐变、不滥用圆角、不靠阴影和毛玻璃，金色只做点缀。</li>
+              <li><strong>纯粹黑白灰底色</strong> — 不做蓝紫渐变、不滥用圆角，内置主题不靠阴影和毛玻璃，金色只做点缀；想要质感可在自定义主题里自选开启。</li>
               <li><strong>本地优先</strong> — 数据全在本地；API Key 只用于调用大模型，聊天、记忆、文件不经过任何第三方服务器。</li>
               <li><strong>Token 经济</strong> — 智能压缩、分级调用、静默处理，历史对话折成摘要，省额度也不丢要点。</li>
               <li><strong>永不冻结</strong> — 四层超时防御覆盖流式与工具调用，慢可以等，卡死不行。</li>
@@ -1130,7 +1130,7 @@ python desktop.py</pre>
 
             <p><strong>Design principles</strong>:</p>
             <ul>
-              <li><strong>Pure black-white-gray base</strong> — no blue-purple gradients, no excess rounding, no shadow or frosted glass; gold is only an accent.</li>
+              <li><strong>Pure black-white-gray base</strong> — no blue-purple gradients, no excess rounding; the built-in theme ships without shadow or frosted glass (opt-in under Custom theme); gold is only an accent.</li>
               <li><strong>Local-first</strong> — data stays local; API keys are used only to call models, and chats, memories and files never pass through a third-party server.</li>
               <li><strong>Token economy</strong> — smart compression, tiered calls, silent processing: old conversation folds into summaries, saving budget without losing the point.</li>
               <li><strong>Never frozen</strong> — four layers of timeout defense covering streaming and tool calls. Slow is waitable; stuck is not.</li>

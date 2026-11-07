@@ -47,7 +47,7 @@
   --sh-3: 0 24px 64px rgba(20, 16, 10, .18);
 
   /* 壳层：48 顶栏、4px 基准圆角；codex 另抬一档 */
-  --topbar-h: 48px;
+  --topbar-h: 40px;
   --radius: 4px;
   --transition: var(--dur-2) var(--ease);
 }
@@ -101,8 +101,8 @@ html[data-ui="codex"] {
 }
 
 .tab-btn {
-  height: 32px;
-  padding: 0 14px;
+  height: 28px;
+  padding: 0 12px;
   border-bottom: 0;
   border-radius: var(--radius);
   font-size: var(--fs-ui);
@@ -238,6 +238,12 @@ html[data-ui="codex"] {
   border-color: var(--border-hover);
 }
 
+/* 面板头图标行：28 的框配 16 的笔画，与页签/顶栏的组件标同一观感 */
+.panel-actions .icon-btn .svg-icon {
+  width: 16px;
+  height: 16px;
+}
+
 select,
 .setting-input,
 .settings-search-input,
@@ -327,7 +333,7 @@ select:focus,
 
 .settings-main {
   gap: var(--sp-5);
-  max-width: 780px;
+  max-width: 640px;
   margin-inline: auto;
 }
 

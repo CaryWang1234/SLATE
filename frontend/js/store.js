@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20261106-003";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261106-003";
+import { makeId } from "./services/utils.js?v=20261107-001";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261107-001";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -33,6 +33,7 @@ function normalizeCustomTheme(value) {
   const f = src.fonts && typeof src.fonts === "object" ? src.fonts : {};
   const b = src.background && typeof src.background === "object" ? src.background : {};
   const o = src.opacity && typeof src.opacity === "object" ? src.opacity : {};
+  const fx = src.effects && typeof src.effects === "object" ? src.effects : {};
   return {
     enabled: src.enabled === true,
     preset: typeof src.preset === "string" ? src.preset : "",
@@ -59,6 +60,12 @@ function normalizeCustomTheme(value) {
       // 板块不透明度（%）：面板/卡片/输入框/助手气泡这一族底色。100 = 完全不透明（旧行为）。
       // 下限 55：再低就只剩一圈边框线在撑着层级，正文会读成"浮在纸上"。
       panel: normalizeCountInt(o.panel, 55, 100, 100),
+    },
+    effects: {
+      // 毛玻璃模糊半径（px）：0 = 关。只磨结构层（侧栏/右栏/输入框），不磨逐条消息。
+      blur: normalizeCountInt(fx.blur, 0, 24, 12),
+      // 阴影强度（%）：100 = 内置 --sh-* 原值，0 = 全关，上限 200 防糊成一团黑。
+      shadow: normalizeCountInt(fx.shadow, 0, 200, 120),
     },
   };
 }
@@ -1239,6 +1246,7 @@ function setCustomTheme(patch) {
     fonts: { ...cur.fonts, ...(p.fonts || {}) },
     background: { ...cur.background, ...(p.background || {}) },
     opacity: { ...cur.opacity, ...(p.opacity || {}) },
+    effects: { ...cur.effects, ...(p.effects || {}) },
   });
   savePersistent();
   notify("customTheme", state.customTheme);
