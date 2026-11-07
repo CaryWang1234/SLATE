@@ -14,8 +14,8 @@
  * 摘要消息也在这一份里构造（historySummaryMessage）：三个压缩落点各自拼一次字符串，
  * 前缀就会漂成三份，而渲染层与 isHistorySummary 认的正是这个前缀。
  */
-import { isAiToolOff } from "./ai_features.js?v=20261107-001";
-import { HISTORY_SUMMARY_PREFIX } from "./agent_common.js?v=20261107-001";
+import { isAiToolOff } from "./ai_features.js?v=20261107-003";
+import { HISTORY_SUMMARY_PREFIX } from "./agent_common.js?v=20261107-003";
 
 /**
  * 压缩写回的那条 system 消息：前缀 + 摘要正文 +（能查回时）一条面包屑。

@@ -45,6 +45,9 @@
   --sh-1: 0 1px 2px rgba(30, 25, 18, .06);
   --sh-2: 0 8px 24px rgba(30, 25, 18, .10), 0 1px 2px rgba(30, 25, 18, .06);
   --sh-3: 0 24px 64px rgba(20, 16, 10, .18);
+  /* 结构边缘与按钮的墨色软影（不参与质感滑块的 alpha 缩放） */
+  --shadow-ink: rgba(30, 25, 18, .18);
+  --shadow-edge: rgba(30, 25, 18, .10);
 
   /* 壳层：48 顶栏、4px 基准圆角；codex 另抬一档 */
   --topbar-h: 40px;
@@ -56,6 +59,8 @@
   --sh-1: 0 1px 2px rgba(0, 0, 0, .35);
   --sh-2: 0 8px 24px rgba(0, 0, 0, .45), 0 1px 2px rgba(0, 0, 0, .30);
   --sh-3: 0 24px 64px rgba(0, 0, 0, .55);
+  --shadow-ink: rgba(0, 0, 0, .55);
+  --shadow-edge: rgba(0, 0, 0, .45);
 }
 
 html[data-ui="codex"] {
@@ -290,7 +295,7 @@ select:focus,
 
 #chat-input-area:focus-within {
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px var(--gold-dim);
+  box-shadow: 0 0 0 3px var(--gold-dim), var(--sh-2);
 }
 
 #chat-input {
@@ -406,6 +411,100 @@ select:focus,
 .toast.out {
   animation-duration: var(--dur-2);
   animation-timing-function: var(--ease-in);
+}
+
+/* ── 纵深：画布 → 静置模块 → 浮起层 ───────────────────────
+   三层靠「底色一档 + 一道浅影」拉开：静置模块用 --sh-1，
+   浮起层（输入框 / 弹层）用 --sh-2，弹窗沿用 --sh-3。
+   影子只取令牌：自定义主题的阴影强度滑块会一并缩放。 */
+
+/* 结构边缘：顶栏与两翼各在画布上落一道浅影 */
+#topbar {
+  box-shadow: 0 8px 20px -14px var(--shadow-ink);
+}
+
+.project-sidebar {
+  box-shadow: 6px 0 20px -16px var(--shadow-ink);
+}
+
+.todo-panel,
+.grind-panel {
+  box-shadow: -6px 0 20px -16px var(--shadow-ink);
+}
+
+/* 静置模块：卡片底色 + 一道贴地影 */
+.settings-block,
+.memory-item,
+.knowledge-item,
+.schedule-item,
+.mcp-server-item,
+.team-member-card {
+  background: var(--bg-card);
+  box-shadow: var(--sh-1);
+}
+
+.msg-user,
+.msg-assistant {
+  box-shadow: var(--sh-1);
+}
+
+.board-card,
+.bw-card {
+  box-shadow: var(--sh-1);
+}
+
+/* 悬停：抬 1px、影子换浮起档；黑板卡只换影不位移（位置靠 left/top） */
+.conv-item,
+.skill-item,
+.schedule-item,
+.mcp-server-item,
+.memory-item,
+.knowledge-item,
+.team-member-card {
+  transition: border-color var(--dur-1) var(--ease),
+              background-color var(--dur-1) var(--ease),
+              box-shadow var(--dur-1) var(--ease),
+              transform var(--dur-1) var(--ease);
+}
+
+.conv-item:hover,
+.skill-item:hover,
+.schedule-item:hover,
+.mcp-server-item:hover,
+.memory-item:hover,
+.knowledge-item:hover,
+.team-member-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--sh-2);
+}
+
+.board-card:hover,
+.bw-card:hover {
+  box-shadow: var(--sh-2);
+}
+
+/* 浮起层：输入框与弹层 */
+#chat-input-area {
+  box-shadow: var(--sh-2);
+}
+
+.mode-menu-pop,
+.mode-pop,
+.approval-pop,
+.effort-pop,
+.mention-popup {
+  box-shadow: var(--sh-2);
+}
+
+/* 主按钮：贴地一档，按下收回 */
+.send-btn,
+.generate-btn {
+  box-shadow: 0 1px 2px var(--shadow-edge);
+}
+
+.send-btn:active,
+.generate-btn:active {
+  box-shadow: none;
 }
 
 /* ── 降低动效：全站统一兜底 ───────────────────────────── */

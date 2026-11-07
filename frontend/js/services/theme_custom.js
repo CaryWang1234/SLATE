@@ -9,8 +9,8 @@
  * 关掉自定义主题时这里会把整段样式和两个 data 属性一起摘掉，一个像素都不留——
  * 明暗切换（setTheme）在生效期间被 store.js 挡住，两套色不会同时说话。
  */
-import { API_BASE, IMPORTED_FONT_ID_RE } from "../store.js?v=20261107-001";
-import { get, post, del } from "./api.js?v=20261107-001";
+import { API_BASE, IMPORTED_FONT_ID_RE } from "../store.js?v=20261107-003";
+import { get, post, del } from "./api.js?v=20261107-003";
 
 const STYLE_ID = "slate-custom-theme";
 
@@ -459,9 +459,12 @@ const GLASS_SURFACES = [
   "#chat-input-area",
 ];
 
-/** 投影落在卡片与输入框上；选中/聚焦/拖拽态自带更重要的影子，:not 让路给它们 */
-const SHADOW_SURFACES = [
+/** 浮起层：输入框抬一档（--sh-2），静置卡片贴地一档（--sh-1），与 ui_modern.css 的纵深分层同口径。
+    选中/聚焦/拖拽态自带更重要的影子，:not 让路给它们 */
+const FLOATING_SURFACES = [
   "#chat-input-area:not(:focus-within)",
+];
+const SHADOW_SURFACES = [
   ".mcp-server-item",
   ".board-card:not(.selected):not(.dragging)",
 ];
@@ -494,6 +497,8 @@ function buildEffectsCss(theme, isDark, selector) {
       + "}";
   }
   if (shadow > 0) {
+    const floatList = FLOATING_SURFACES.map(s => `html[data-custom-theme="1"] ${s}`).join(",\n");
+    css += `\n${floatList} {\n  box-shadow: var(--sh-2);\n}`;
     const list = SHADOW_SURFACES.map(s => `html[data-custom-theme="1"] ${s}`).join(",\n");
     css += `\n${list} {\n  box-shadow: var(--sh-1);\n}`;
   }

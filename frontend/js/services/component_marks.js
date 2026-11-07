@@ -12,7 +12,7 @@
  * 它是填充图形，不能按上面的描边纪律重画。图形直接引用 mcp_icons.js 的生成结果，
  * 这里只发外壳；另抄一份 path 会分家。
  */
-import { MCP_ICONS } from "./mcp_icons.js?v=20261107-001";
+import { MCP_ICONS } from "./mcp_icons.js?v=20261107-003";
 
 export const COMPONENT_MARKS = Object.freeze({
   chat: '<path d="M6 3.5 H15 L19 7.5 V15.5 A2 2 0 0 1 17 17.5 H11.5 V21.5 L8 17.5 H6 A2 2 0 0 1 4 15.5 V5.5 A2 2 0 0 1 6 3.5 Z"/><path d="M8 10.4 H15.2"/>',
