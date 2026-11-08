@@ -2,15 +2,19 @@
  * SLATE 白板组件 v2：卡片编辑、颜色标签、AI 整理
  */
 
-import { state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey } from "../store.js?v=20261107-003";
-import { aiModelFor, aiFeatureBlocked } from "../services/ai_features.js?v=20261107-003";
-import { get, streamChat } from "../services/api.js?v=20261107-003";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20261107-003";
-import { t } from "../services/i18n.js?v=20261107-003";
-import { iconSvgEl } from "../services/icons.js?v=20261107-003";
-import { makeId } from "../services/utils.js?v=20261107-003";
-import { reportError } from "../services/error_sink.js?v=20261107-003";
-import { renderWorkflowView, startWorkflowTick, stopWorkflowTick, initBoardWorkflow } from "./board_workflow.js?v=20261107-003";
+import {
+  state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey,
+  boardsOf, boardById, activeBoard, createBoard, switchBoard, renameBoard, removeBoard, setBoardPrefs,
+} from "../store.js?v=20261108-002";
+import { boardToSlml, slmlToBoard } from "../services/slml.js?v=20261108-002";
+import { aiModelFor, aiFeatureBlocked } from "../services/ai_features.js?v=20261108-002";
+import { get, streamChat } from "../services/api.js?v=20261108-002";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20261108-002";
+import { t } from "../services/i18n.js?v=20261108-002";
+import { iconSvgEl } from "../services/icons.js?v=20261108-002";
+import { makeId } from "../services/utils.js?v=20261108-002";
+import { reportError } from "../services/error_sink.js?v=20261108-002";
+import { renderWorkflowView, startWorkflowTick, stopWorkflowTick, initBoardWorkflow } from "./board_workflow.js?v=20261108-002";
 
 // 逐元素求极值：把整个数组当实参展开时，笔迹点上万会让 V8 抛
 // RangeError: Maximum call stack size exceeded，所以这里一律不展开。
@@ -20,7 +24,7 @@ function maxOf(values, floor = -Infinity) {
   return m;
 }
 
-let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel, whiteboardPanel, boardModesBar, wfStopBtn;
+let boardCanvas, boardCards, boardEmpty, drawCanvas, drawCtx, notesLayer, mermaidPreview, mermaidCode, mermaidRenderArea, selectionInfo, boardViewPanel, whiteboardPanel, boardModesBar, wfStopBtn, boardTabsEl;
 let cardModal, cardModalTitle, cardInputTitle, cardInputBody, cardInputArrows, cardColorOptions;
 let btnCardDelete, btnCardSave, btnCardCancel;
 let editingCardId = null;
@@ -45,10 +49,8 @@ let gitGraphState = { loading: false, data: null, error: "", repo: "" };
 let gitNodePositions = {};
 let gitGraphPan = { x: 0, y: 0 };
 let boardOutlineCollapsed = new Set();
-// 看板列是否显示工具步骤卡（默认隐藏，与用户卡片分离）；localStorage 记忆开关
-let showToolSteps = (() => {
-  try { return localStorage.getItem("slate_board_show_steps") === "1"; } catch { return false; }
-})();
+// 每块板各自记住「是否显示工具步骤卡」，切换标签时从板上现读
+let showToolSteps = false;
 
 const CARD_LAYOUT = {
   width: 220,
@@ -523,7 +525,7 @@ function renderBoardView() {
   stepToggle.title = showToolSteps ? t("隐藏工具步骤") : t("显示工具步骤");
   stepToggle.addEventListener("click", () => {
     showToolSteps = !showToolSteps;
-    try { localStorage.setItem("slate_board_show_steps", showToolSteps ? "1" : "0"); } catch {}
+    setBoardPrefs({ showSteps: showToolSteps });
     renderBoardView();
   });
   const collapse = document.createElement("button");
@@ -1217,6 +1219,7 @@ function setBoardView(view, options = {}) {
   const nextView = BOARD_VIEW_LABELS[view] ? view : "";
   if (!options.preserveCollapse || !nextView) boardViewCollapsed = false;
   currentBoardView = nextView;
+  if (options.persist !== false && activeBoard()?.view !== nextView) setBoardPrefs({ view: nextView });
   if (!nextView || boardViewCollapsed) setBoardViewFullscreen(false, { skipRender: true });
   const mainBoardMode = !currentBoardView;
   const showCanvas = mainBoardMode || boardViewCollapsed;
@@ -1249,6 +1252,177 @@ function refreshWhiteboard() {
   updateBoardLayerSize();
   // 切标签页等触发场景不强制重置：保留当前视图与折叠状态
   setBoardView(currentBoardView, { preserveCollapse: true });
+}
+
+// ── 黑板标签：一块板一个文档，切换只换镜像与现场 ──────────────
+
+function nextBoardTitle() {
+  const boards = boardsOf();
+  const used = new Set(boards.map(b => b.title));
+  let n = boards.length + 1;
+  while (used.has(t("黑板 {n}", { n }))) n += 1;
+  return t("黑板 {n}", { n });
+}
+
+function renderBoardTabs() {
+  if (!boardTabsEl) return;
+  const boards = boardsOf();
+  boardTabsEl.innerHTML = "";
+  for (const board of boards) {
+    const tab = document.createElement("div");
+    tab.className = "board-tab" + (board.id === state.activeBoardId ? " active" : "");
+    tab.dataset.boardId = board.id;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", board.id === state.activeBoardId ? "true" : "false");
+
+    const name = document.createElement("span");
+    name.className = "board-tab-name";
+    name.textContent = board.title;
+    name.title = board.title;
+    name.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      beginBoardRename(tab, name, board);
+    });
+    tab.appendChild(name);
+
+    if (boards.length > 1) {
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "board-tab-close";
+      close.textContent = "×";
+      close.title = t("关闭黑板");
+      close.setAttribute("aria-label", t("关闭黑板"));
+      close.addEventListener("pointerdown", (e) => e.stopPropagation());
+      close.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeBoard(board);
+      });
+      tab.appendChild(close);
+    }
+
+    tab.addEventListener("click", () => switchBoard(board.id));
+    tab.addEventListener("auxclick", (e) => {
+      if (e.button === 1 && boards.length > 1) {
+        e.preventDefault();
+        closeBoard(board);
+      }
+    });
+    boardTabsEl.appendChild(tab);
+  }
+
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "board-tab-add";
+  add.textContent = "+";
+  add.title = t("新建黑板");
+  add.setAttribute("aria-label", t("新建黑板"));
+  add.addEventListener("click", () => {
+    createBoard({ title: nextBoardTitle(), view: DEFAULT_BOARD_VIEW });
+  });
+  boardTabsEl.appendChild(add);
+}
+
+function beginBoardRename(tab, nameEl, board) {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "board-tab-rename";
+  input.value = board.title;
+  input.maxLength = 40;
+  input.setAttribute("aria-label", t("重命名黑板"));
+  tab.replaceChild(input, nameEl);
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = (commit) => {
+    if (done) return;
+    done = true;
+    if (commit) renameBoard(board.id, input.value);
+    renderBoardTabs();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener("blur", () => finish(true));
+  input.addEventListener("click", (e) => e.stopPropagation());
+  input.addEventListener("pointerdown", (e) => e.stopPropagation());
+}
+
+async function closeBoard(board) {
+  if (boardsOf().length <= 1) return;
+  const hasContent = board.cards.length > 0 || board.notes.length > 0 || board.strokes.length > 0;
+  if (hasContent) {
+    const ok = await dlgConfirm(
+      t("关闭黑板「{title}」？这一块的卡片、文字与笔迹都会删除", { title: board.title }),
+      { danger: true, okText: t("关闭") },
+    );
+    if (!ok) return;
+  }
+  removeBoard(board.id);
+}
+
+function applyActiveBoardUi(board) {
+  if (!board) return;
+  showToolSteps = board.showSteps === true;
+  selectedCardIds.clear();
+  connectSourceId = null;
+  currentStroke = null;
+  activeCardDrag = null;
+  boardViewCollapsed = false;
+  setBoardViewFullscreen(false, { skipRender: true });
+  strokes = Array.isArray(state.boardStrokes) ? [...state.boardStrokes] : [];
+  resizeDrawCanvas();
+  setBoardView(board.view, { persist: false });
+  renderNotes();
+}
+
+function safeBoardFilename(title) {
+  return String(title || "board").replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 40) || "board";
+}
+
+function exportBoardSlml() {
+  const board = activeBoard();
+  if (!board) return;
+  try {
+    const text = boardToSlml(board);
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safeBoardFilename(board.title)}.slml`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    dlgToast(t("导出失败：{msg}", { msg: e.message }), 6000);
+  }
+}
+
+function importBoardSlml() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".slml,text/plain";
+  input.addEventListener("change", async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = slmlToBoard(text);
+      const board = createBoard({
+        title: parsed.title || t("导入的黑板"),
+        view: parsed.view,
+        showSteps: parsed.showSteps,
+        cards: parsed.cards,
+        notes: parsed.notes,
+        strokes: parsed.strokes,
+      });
+      dlgToast(t("已导入黑板「{title}」", { title: board.title }));
+    } catch (e) {
+      dlgToast(t("导入失败：{msg}", { msg: e.message }), 7000);
+    }
+  });
+  input.click();
 }
 
 function renderCard(card) {
@@ -2017,59 +2191,6 @@ function cardsToMermaid(cards) {
   return lines.join("\n");
 }
 
-function exportBoard() {
-  const cards = state.boardCards || [];
-  const date = new Date().toISOString().slice(0, 10);
-  const lines = [
-    "# " + t("SLATE 黑板导出"),
-    "",
-    `${t("导出时间")}: ${new Date().toLocaleString()}`,
-    `${t("卡片数量")}: ${cards.length}`,
-    "",
-    `## ${t("卡片")}`,
-    "",
-  ];
-
-  if (cards.length === 0) {
-    lines.push(t("暂无卡片。"), "");
-  } else {
-    for (const card of cards) {
-      lines.push(`### ${card.id} · ${card.title || t("未命名")}`);
-      if (card.body) lines.push("", card.body);
-      if (card.arrows?.length) lines.push("", `${t("关联")}: ${card.arrows.join(", ")}`);
-      if (card.color && card.color !== "default") lines.push("", `${t("颜色")}: ${card.color}`);
-      lines.push("");
-    }
-  }
-
-  const mermaid = cardsToMermaid(cards);
-  if (mermaid) {
-    lines.push("## Mermaid", "", "```mermaid", mermaid, "```", "");
-  }
-
-  lines.push("## JSON", "", "```json", JSON.stringify(cards, null, 2), "```", "");
-  if ((state.boardNotes || []).length) {
-    lines.push("## Notes", "");
-    for (const note of state.boardNotes) {
-      if (note.text?.trim()) lines.push(`- ${note.text.trim()}`);
-    }
-    lines.push("");
-  }
-  if ((state.boardStrokes || []).length) {
-    lines.push("## Drawing", "", `${t("笔画数量")}: ${state.boardStrokes.length}`, "");
-  }
-
-  const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `slate-board-${date}.md`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
 async function renderMermaid() {
   const code = cardsToMermaid(state.boardCards);
   if (!code) {
@@ -2254,6 +2375,10 @@ function initWhiteboard() {
   whiteboardPanel = document.getElementById("panel-whiteboard");
   boardModesBar = document.getElementById("board-view-modes");
   wfStopBtn = document.getElementById("btn-wf-stop");
+  boardTabsEl = document.getElementById("board-tabs");
+  const initialBoard = activeBoard();
+  showToolSteps = initialBoard?.showSteps === true;
+  if (initialBoard) currentBoardView = initialBoard.view;
   for (const el of [boardModesBar, wfStopBtn]) {
     if (el?.parentElement) boardControlHomes.set(el, { parent: el.parentElement, next: el.nextElementSibling });
   }
@@ -2279,7 +2404,8 @@ function initWhiteboard() {
 
   // Mermaid 切换按钮
   document.getElementById("btn-toggle-mermaid").addEventListener("click", toggleMermaid);
-  document.getElementById("btn-export-board")?.addEventListener("click", exportBoard);
+  document.getElementById("btn-export-board")?.addEventListener("click", exportBoardSlml);
+  document.getElementById("btn-import-board")?.addEventListener("click", importBoardSlml);
   document.getElementById("btn-close-mermaid").addEventListener("click", () => {
     mermaidVisible = false;
     mermaidPreview.classList.add("hidden");
@@ -2352,21 +2478,32 @@ function initWhiteboard() {
     if (state.boardCards.length > 0) renderMermaid();
   });
 
-  subscribe("boardCards", () => {
+  subscribe("boardCards", (cards, boardId) => {
+    if (boardId && boardId !== state.activeBoardId) return;
     renderAllCards();
     renderMermaid();
     renderBoardView();
   });
-  subscribe("boardNotes", renderNotes);
-  subscribe("boardStrokes", (next) => {
+  subscribe("boardNotes", (notes, boardId) => {
+    if (boardId && boardId !== state.activeBoardId) return;
+    renderNotes();
+  });
+  subscribe("boardStrokes", (next, boardId) => {
+    if (boardId && boardId !== state.activeBoardId) return;
     strokes = Array.isArray(next) ? [...next] : [];
     redrawStrokes();
+  });
+  subscribe("boards", renderBoardTabs);
+  subscribe("boardSwitch", (board) => applyActiveBoardUi(board));
+  subscribe("boardStorageError", (full) => {
+    if (full) dlgToast(t("黑板存储已满：先导出 .slml，再清理笔迹或关闭空板"), 8000);
   });
   subscribe("project", () => {
     gitGraphState = { loading: false, data: null, error: "", repo: state.project?.path || "" };
     if (currentBoardView === "git") renderBoardView();
   });
 
+  renderBoardTabs();
   renderAllCards();
   renderNotes();
   redrawStrokes();
@@ -2393,12 +2530,22 @@ function stepCardBody(step) {
  * 以 callId 为键复用：已存在的卡只回写状态与正文，位置与编号不动；新出现的按账序追加，
  * 并串到上一步的箭头上。runId 不同的旧步骤链整批淘汰（一次任务一条链）。
  */
-function syncToolStepCards(steps, runId = "") {
-  const kept = state.boardCards.filter(c => !c._isToolStep || c._stepRunId === runId);
+const warnedStepFallback = new Set();
+
+function syncToolStepCards(steps, runId = "", boardId = "") {
+  let board = boardId ? boardById(boardId) : activeBoard();
+  const missing = !board;
+  if (!board) board = activeBoard();
+  if (!board) return;
+  if (missing && !warnedStepFallback.has(runId)) {
+    warnedStepFallback.add(runId);
+    dlgToast(t("原黑板已关闭，步骤卡写入当前黑板"), 5000);
+  }
+  const kept = board.cards.filter(c => !c._isToolStep || c._stepRunId === runId);
   const byCallId = new Map(kept.filter(c => c._isToolStep).map(c => [c._stepCallId, c]));
   const next = [...kept];
   let prevStepId = null;
-  let dirty = kept.length !== state.boardCards.length;
+  let dirty = kept.length !== board.cards.length;
   for (const step of steps) {
     const existing = byCallId.get(step.callId);
     if (existing) {
@@ -2426,19 +2573,21 @@ function syncToolStepCards(steps, runId = "") {
       _stepNum: stepNum,
       _status: step.status,
       _timestamp: Date.now(),
-    });
+    }, next.length);
     next.push(card);
     byCallId.set(step.callId, card);
     prevStepId = card.id;
     dirty = true;
   }
-  if (dirty) setBoardCards(next);
+  if (dirty) setBoardCards(next, board.id);
 }
 
 /** 新任务开始：只淘汰别的 run 的步骤链，本次 run 的卡片由投影自己维护 */
-function clearToolStepCards(runId = "") {
-  const nonStepCards = state.boardCards.filter(c => !c._isToolStep || c._stepRunId === runId);
-  if (nonStepCards.length !== state.boardCards.length) setBoardCards(nonStepCards);
+function clearToolStepCards(runId = "", boardId = "") {
+  const board = boardId ? boardById(boardId) : activeBoard();
+  if (!board) return;
+  const nonStepCards = board.cards.filter(c => !c._isToolStep || c._stepRunId === runId);
+  if (nonStepCards.length !== board.cards.length) setBoardCards(nonStepCards, board.id);
 }
 
 export { initWhiteboard, refreshWhiteboard, parseCardsFromLLM, cardsToMermaid, syncToolStepCards, clearToolStepCards };

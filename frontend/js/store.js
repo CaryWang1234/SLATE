@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20261107-003";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261107-003";
+import { makeId } from "./services/utils.js?v=20261108-002";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261108-002";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -118,7 +118,7 @@ const MODE_TOOLS_NONE = "none";
 // 收口工具（exit_target_mode / exit_autopilot）由 tools.js 的白名单过滤无条件保留。
 const MODE_READONLY_TOOLS = [
   "project_info", "project_files", "project_read_file", "project_find_file",
-  "code_search", "skill_search", "board_read", "knowledge_search", "history_search",
+  "code_search", "skill_search", "board_read", "board_list", "knowledge_search", "history_search",
   "actions_list", "actions_read", "system_info", "chat_context",
   "todo_manage", "user_ask",
 ];
@@ -207,7 +207,10 @@ const state = {
   conversations: [],
   messages: [],
 
-  // 黑板
+  // 黑板：boards 是唯一真相，下面三个数组是「当前板」的镜像（旧读取方不用改）
+  boards: [],
+  activeBoardId: "",
+  boardStorageError: false,
   boardCards: [],
   boardNotes: [],
   boardStrokes: [],
@@ -383,14 +386,196 @@ function subscribe(key, fn) {
   listeners[key].push(fn);
 }
 
-function notify(key, data) {
-  (listeners[key] || []).forEach(fn => fn(data));
+function notify(key, data, ...rest) {
+  (listeners[key] || []).forEach(fn => fn(data, ...rest));
+}
+
+// ── 黑板文档：一块板一份内容，activeBoardId 决定镜像是谁 ──────────
+
+const BOARD_VIEW_KEYS = ["", "git", "flow", "kanban", "outline", "workflow"];
+
+function boardIdValid(id) {
+  return /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(String(id || ""));
+}
+
+function makeBoardId() {
+  return `brd_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`.slice(0, 32);
+}
+
+function normalizeBoardRecord(raw, fallbackIndex = 0) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const now = Date.now();
+  const title = typeof source.title === "string" && source.title.trim()
+    ? source.title.trim().slice(0, 40)
+    : "黑板";
+  return {
+    id: boardIdValid(source.id) ? String(source.id) : `brd_legacy_${fallbackIndex + 1}`,
+    title,
+    view: BOARD_VIEW_KEYS.includes(source.view) ? source.view : "kanban",
+    showSteps: source.showSteps === true,
+    cards: Array.isArray(source.cards) ? source.cards.filter(c => c && typeof c === "object") : [],
+    notes: Array.isArray(source.notes) ? source.notes.filter(n => n && typeof n === "object") : [],
+    strokes: Array.isArray(source.strokes) ? source.strokes.filter(s => s && typeof s === "object") : [],
+    createdAt: Number.isFinite(Number(source.createdAt)) ? Number(source.createdAt) : now,
+    updatedAt: Number.isFinite(Number(source.updatedAt)) ? Number(source.updatedAt) : now,
+  };
+}
+
+function normalizeBoards(data) {
+  const source = data && typeof data === "object" ? data : {};
+  let boards = (Array.isArray(source.boards) ? source.boards : []).map((raw, index) => normalizeBoardRecord(raw, index));
+  if (!boards.length) {
+    // 旧存档只有一块板：三份数组原样搬进 brd_main，卡片 ID 与坐标都不动
+    let showSteps = false;
+    try { showSteps = localStorage.getItem("slate_board_show_steps") === "1"; } catch (e) { /* 隐私模式 */ }
+    boards = [normalizeBoardRecord({
+      id: "brd_main",
+      title: "黑板",
+      view: "kanban",
+      showSteps,
+      cards: source.boardCards,
+      notes: source.boardNotes,
+      strokes: source.boardStrokes,
+    }, 0)];
+  }
+  const seen = new Set();
+  for (const board of boards) {
+    let id = board.id;
+    let n = 2;
+    while (seen.has(id)) {
+      id = `${board.id}_${n}`;
+      n += 1;
+    }
+    board.id = id;
+    seen.add(id);
+  }
+  return boards;
+}
+
+function syncActiveBoardMirror() {
+  const board = state.boards.find(b => b.id === state.activeBoardId) || state.boards[0] || null;
+  if (!board) return null;
+  state.activeBoardId = board.id;
+  state.boardCards = board.cards;
+  state.boardNotes = board.notes;
+  state.boardStrokes = board.strokes;
+  return board;
+}
+
+function ensureBoards() {
+  if (!Array.isArray(state.boards) || !state.boards.length) {
+    state.boards = normalizeBoards({
+      boardCards: state.boardCards,
+      boardNotes: state.boardNotes,
+      boardStrokes: state.boardStrokes,
+    });
+    state.activeBoardId = state.boards[0].id;
+    syncActiveBoardMirror();
+  } else if (!state.boards.some(b => b.id === state.activeBoardId)) {
+    syncActiveBoardMirror();
+  }
+  return state.boards;
+}
+
+function boardsOf() {
+  return ensureBoards();
+}
+
+function boardById(id) {
+  ensureBoards();
+  return state.boards.find(b => b.id === id) || null;
+}
+
+function activeBoard() {
+  ensureBoards();
+  return state.boards.find(b => b.id === state.activeBoardId) || state.boards[0] || null;
+}
+
+function createBoard(options = {}) {
+  ensureBoards();
+  const raw = { ...options };
+  const board = normalizeBoardRecord(raw, state.boards.length);
+  if (!boardIdValid(raw.id)) board.id = makeBoardId();
+  while (state.boards.some(b => b.id === board.id)) board.id = makeBoardId();
+  if (typeof raw.title === "string" && raw.title.trim()) board.title = raw.title.trim().slice(0, 40);
+  board.createdAt = Date.now();
+  board.updatedAt = board.createdAt;
+  state.boards.push(board);
+  state.activeBoardId = board.id;
+  syncActiveBoardMirror();
+  savePersistent();
+  notify("boards", state.boards);
+  notify("boardSwitch", board);
+  return board;
+}
+
+function switchBoard(id) {
+  ensureBoards();
+  const board = state.boards.find(b => b.id === id);
+  if (!board) return null;
+  if (state.activeBoardId !== board.id) {
+    state.activeBoardId = board.id;
+    syncActiveBoardMirror();
+    savePersistent();
+    notify("boards", state.boards);
+    notify("boardSwitch", board);
+  }
+  return board;
+}
+
+function renameBoard(id, title) {
+  const board = boardById(id);
+  if (!board) return false;
+  const next = String(title ?? "").trim();
+  if (!next) return false;
+  board.title = next.slice(0, 40);
+  board.updatedAt = Date.now();
+  savePersistent();
+  notify("boards", state.boards);
+  return true;
+}
+
+function removeBoard(id) {
+  ensureBoards();
+  if (state.boards.length <= 1) return false;
+  const index = state.boards.findIndex(b => b.id === id);
+  if (index < 0) return false;
+  const wasActive = state.activeBoardId === id;
+  state.boards.splice(index, 1);
+  let next = null;
+  if (wasActive) {
+    next = state.boards[Math.min(index, state.boards.length - 1)];
+    state.activeBoardId = next.id;
+    syncActiveBoardMirror();
+  }
+  savePersistent();
+  notify("boards", state.boards);
+  if (next) notify("boardSwitch", next);
+  return true;
+}
+
+function setBoardPrefs(patch = {}, id = "") {
+  const board = id ? boardById(id) : activeBoard();
+  if (!board) return null;
+  if (Object.prototype.hasOwnProperty.call(patch, "view") && BOARD_VIEW_KEYS.includes(patch.view)) {
+    board.view = patch.view;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "showSteps")) {
+    board.showSteps = patch.showSteps === true;
+  }
+  board.updatedAt = Date.now();
+  savePersistent();
+  notify("boards", state.boards);
+  return board;
 }
 
 // ── 持久化 ──────────────────────────────────
 
 function buildPersistentData() {
+  ensureBoards();
   return {
+    boards: state.boards,
+    activeBoardId: state.activeBoardId,
     theme: normalizeTheme(state.theme),
     customTheme: normalizeCustomTheme(state.customTheme),
     uiMode: state.uiMode === "codex" ? "codex" : "classic",
@@ -662,7 +847,20 @@ function normalizeCountMap(value) {
 }
 
 function saveLocalPersistent(data = buildPersistentData()) {
-  try { localStorage.setItem("slate_state", JSON.stringify(data)); } catch (e) {}
+  try {
+    localStorage.setItem("slate_state", JSON.stringify(data));
+    if (state.boardStorageError) {
+      state.boardStorageError = false;
+      notify("boardStorageError", false);
+    }
+  } catch (e) {
+    // 多块板的笔迹可能撞 5MB 上限：内存态留着，界面据此提示导出 .slml，不静默丢
+    const full = e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014);
+    if (full && !state.boardStorageError) {
+      state.boardStorageError = true;
+      notify("boardStorageError", true);
+    }
+  }
 }
 
 function savePersistent() {
@@ -769,7 +967,7 @@ function migrateModelIds() {
 function loadPersistent() {
   try {
     const raw = localStorage.getItem("slate_state");
-    if (!raw) return;
+    if (!raw) { ensureBoards(); return; }
     const data = JSON.parse(raw);
     const perm = migratePermissionModes(data);
     state.theme = normalizeTheme(data.theme);
@@ -777,9 +975,9 @@ function loadPersistent() {
     state.uiMode = data.uiMode === "codex" ? "codex" : "classic";
     state.modelKeys = data.modelKeys || {};
     state.customModels = data.customModels || [];
-    state.boardCards = data.boardCards || [];
-    state.boardNotes = Array.isArray(data.boardNotes) ? data.boardNotes : [];
-    state.boardStrokes = Array.isArray(data.boardStrokes) ? data.boardStrokes : [];
+    state.boards = normalizeBoards(data);
+    state.activeBoardId = state.boards.some(b => b.id === data.activeBoardId) ? data.activeBoardId : state.boards[0].id;
+    syncActiveBoardMirror();
     state.memories = data.memories || [];
     state.userProfile = data.userProfile || {};
     state.promptSnippets = data.promptSnippets || [];
@@ -1759,28 +1957,48 @@ function setConversations(list) {
   notify("conversations", list);
 }
 
-function setBoardCards(cards) {
-  state.boardCards = cards;
+function setBoardCards(cards, boardId = "") {
+  const board = boardId ? boardById(boardId) : activeBoard();
+  if (!board) return;
+  board.cards = Array.isArray(cards) ? cards : [];
+  board.updatedAt = Date.now();
+  if (board.id === state.activeBoardId) state.boardCards = board.cards;
   savePersistent();
-  notify("boardCards", cards);
+  notify("boardCards", board.cards, board.id);
+  notify("boards", state.boards);
 }
 
-function addBoardCard(card) {
-  state.boardCards.push(card);
+function addBoardCard(card, boardId = "") {
+  const board = boardId ? boardById(boardId) : activeBoard();
+  if (!board) return;
+  board.cards.push(card);
+  board.updatedAt = Date.now();
+  if (board.id === state.activeBoardId) state.boardCards = board.cards;
   savePersistent();
-  notify("boardCards", state.boardCards);
+  notify("boardCards", board.cards, board.id);
+  notify("boards", state.boards);
 }
 
-function setBoardNotes(notes) {
-  state.boardNotes = Array.isArray(notes) ? notes : [];
+function setBoardNotes(notes, boardId = "") {
+  const board = boardId ? boardById(boardId) : activeBoard();
+  if (!board) return;
+  board.notes = Array.isArray(notes) ? notes : [];
+  board.updatedAt = Date.now();
+  if (board.id === state.activeBoardId) state.boardNotes = board.notes;
   savePersistent();
-  notify("boardNotes", state.boardNotes);
+  notify("boardNotes", board.notes, board.id);
+  notify("boards", state.boards);
 }
 
-function setBoardStrokes(strokes) {
-  state.boardStrokes = Array.isArray(strokes) ? strokes : [];
+function setBoardStrokes(strokes, boardId = "") {
+  const board = boardId ? boardById(boardId) : activeBoard();
+  if (!board) return;
+  board.strokes = Array.isArray(strokes) ? strokes : [];
+  board.updatedAt = Date.now();
+  if (board.id === state.activeBoardId) state.boardStrokes = board.strokes;
   savePersistent();
-  notify("boardStrokes", state.boardStrokes);
+  notify("boardStrokes", board.strokes, board.id);
+  notify("boards", state.boards);
 }
 
 function setConstitution(data) {
@@ -1987,6 +2205,7 @@ export {
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage, messagesOf, hasThread, dropThread, bindVisibleThread,
   setConversations, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,
+  boardsOf, boardById, activeBoard, createBoard, switchBoard, renameBoard, removeBoard, setBoardPrefs,
   setConstitution, effectiveConstitution, constitutionScope, setSkills, setActions, setModelRegistry,
   setProject, setProjectFileTree, setProjects, projectEntryOf,
   setMemories, addMemory, updateMemory, removeMemory,

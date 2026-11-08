@@ -12,18 +12,18 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor, MODE_TOOLS_NONE, MODE_READONLY_TOOLS, BUILTIN_MODES, addMode, updateMode, removeMode, modeById } from "../store.js?v=20261107-003";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261107-003";
-import { guardSkillCall } from "./riskguard.js?v=20261107-003";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20261107-003";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261107-003";
-import { t } from "./i18n.js?v=20261107-003";
-import { makeId } from "./utils.js?v=20261107-003";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261107-003";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261107-003";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20261107-003";
-import { isAiToolOff, isAiFeatureOn } from "./ai_features.js?v=20261107-003";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261107-003";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor, MODE_TOOLS_NONE, MODE_READONLY_TOOLS, BUILTIN_MODES, addMode, updateMode, removeMode, modeById, activeBoard, boardById, boardsOf, createBoard, switchBoard } from "../store.js?v=20261108-002";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261108-002";
+import { guardSkillCall } from "./riskguard.js?v=20261108-002";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20261108-002";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261108-002";
+import { t } from "./i18n.js?v=20261108-002";
+import { makeId } from "./utils.js?v=20261108-002";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261108-002";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261108-002";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20261108-002";
+import { isAiToolOff, isAiFeatureOn } from "./ai_features.js?v=20261108-002";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261108-002";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -180,6 +180,26 @@ function describeModeTools(tools) {
   return "全部工具";
 }
 
+// 黑板工具的目标：默认当前板；传了 ID 就按 ID，传标题只允许唯一命中
+function resolveBoardTarget(ref) {
+  const boards = boardsOf();
+  if (!ref) {
+    const board = activeBoard();
+    return board ? { board, error: "" } : { board: null, error: "没有可用的黑板" };
+  }
+  const key = String(ref).trim();
+  const byId = boards.find(b => b.id === key);
+  if (byId) return { board: byId, error: "" };
+  const byTitle = boards.filter(b => b.title === key);
+  if (byTitle.length === 1) return { board: byTitle[0], error: "" };
+  if (byTitle.length > 1) return { board: null, error: `有多块黑板都叫「${key}」，请改用 ID（board_list 可查）` };
+  return { board: null, error: `黑板「${key}」不存在，先用 board_list 查看` };
+}
+
+function boardLabel(board) {
+  return boardsOf().length > 1 ? `黑板「${board.title}」` : "黑板";
+}
+
 const TOOLS = {
 
   project_info: {
@@ -274,14 +294,17 @@ const TOOLS = {
 
   board_add: {
     name: "添加黑板卡片",
-    description: "在白板上添加一张卡片，支持标题、详情、依赖关系和语义颜色。适合将想法、任务或概念可视化。",
+    description: "在白板上添加一张卡片，支持标题、详情、依赖关系和语义颜色。适合将想法、任务或概念可视化。默认加到当前黑板；用 board_list 可看有哪些黑板。",
     params: {
       title: { type: "string", description: "卡片标题", required: true },
       body: { type: "string", description: "卡片描述/详情" },
       arrows: { type: "array", description: "依赖目标卡片 ID 列表（指向已有卡片）" },
       color: { type: "string", description: "颜色: default/red/orange/yellow/green/blue/purple" },
+      board: { type: "string", description: "目标黑板 ID（默认当前黑板；同名时只认 ID）" },
     },
-    async execute({ title, body, arrows, color }) {
+    async execute({ title, body, arrows, color, board: boardRef }) {
+      const target = resolveBoardTarget(boardRef);
+      if (target.error) return target.error;
       const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
       const id = makeId("c");
       const card = {
@@ -291,25 +314,30 @@ const TOOLS = {
         arrows: arrows || [],
         color: VALID_COLORS.includes(color) ? color : "default",
       };
-      addBoardCard(card);
-      return `已添加卡片[${id}]: ${title}`;
+      addBoardCard(card, target.board.id);
+      return `${boardLabel(target.board)}：已添加卡片[${id}]: ${title}`;
     },
   },
 
   board_read: {
     name: "读取黑板",
-    description: "获取当前黑板上所有卡片内容（含 ID、标题、详情、依赖、颜色）",
-    params: {},
-    async execute() {
-      if (state.boardCards.length === 0) return "黑板为空";
-      const lines = state.boardCards.map(c => {
+    description: "读黑板卡片（ID/标题/详情/依赖/颜色）。默认当前板；board_list 查 ID。",
+    params: {
+      board: { type: "string", description: "黑板 ID（默认当前）" },
+    },
+    async execute({ board: boardRef } = {}) {
+      const target = resolveBoardTarget(boardRef);
+      if (target.error) return target.error;
+      const cards = target.board.cards;
+      if (cards.length === 0) return `${boardLabel(target.board)}为空`;
+      const lines = cards.map(c => {
         let s = `[${c.id}] ${c.title}`;
         if (c.color && c.color !== "default") s += ` (${c.color})`;
         if (c.body) s += ` ${c.body}`;
         if (c.arrows?.length) s += ` ${c.arrows.join(", ")}`;
         return s;
       });
-      return `黑板${state.boardCards.length} 张卡片：\n${lines.join("\n")}`;
+      return `${boardLabel(target.board)}${cards.length} 张卡片：\n${lines.join("\n")}`;
     },
   },
 
@@ -322,34 +350,40 @@ const TOOLS = {
       body: { type: "string", description: "新详细" },
       arrows: { type: "array", description: "新依赖列表（覆盖原值）" },
       color: { type: "string", description: "新颜色 default/red/orange/yellow/green/blue/purple" },
+      board: { type: "string", description: "目标黑板 ID（默认当前黑板）" },
     },
-    async execute({ id, title, body, arrows, color }) {
+    async execute({ id, title, body, arrows, color, board: boardRef }) {
+      const target = resolveBoardTarget(boardRef);
+      if (target.error) return target.error;
       const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
-      const idx = state.boardCards.findIndex(c => c.id === id);
-      if (idx === -1) return `卡片 ${id} 不存在`;
-      const card = { ...state.boardCards[idx] };
+      const idx = target.board.cards.findIndex(c => c.id === id);
+      if (idx === -1) return `${boardLabel(target.board)}上没有卡片 ${id}`;
+      const card = { ...target.board.cards[idx] };
       if (title !== undefined) card.title = title;
       if (body !== undefined) card.body = body;
       if (arrows !== undefined) card.arrows = arrows;
       if (color !== undefined) card.color = VALID_COLORS.includes(color) ? color : card.color;
-      const cards = [...state.boardCards];
+      const cards = [...target.board.cards];
       cards[idx] = card;
-      setBoardCards(cards);
-      return `已更新卡片[${id}]`;
+      setBoardCards(cards, target.board.id);
+      return `${boardLabel(target.board)}：已更新卡片[${id}]`;
     },
   },
 
   board_batch: {
     name: "批量操作黑板",
-    description: "一次性对黑板执行多个操作（添加、更新、删除、清空），适合整体重构黑板结构。操作按顺序执行。",
+    description: "批量增改删清空黑板，按顺序执行。",
     params: {
-      ops: { type: "array", description: '操作列表，每天 {action:"add",title,body,arrows,color} | {action:"update",id,title,body,arrows,color} | {action:"delete",id} | {action:"clear"}', required: true },
+      ops: { type: "array", description: '操作列表：{action:"add"|"update"|"delete"|"clear"}；add/update 带 title、body、arrows、color，update/delete 带 id', required: true },
+      board: { type: "string", description: "黑板 ID（默认当前）" },
     },
-    async execute({ ops }) {
+    async execute({ ops, board: boardRef }) {
       if (!Array.isArray(ops) || !ops.length) return "ops 必须是非空数组";
+      const target = resolveBoardTarget(boardRef);
+      if (target.error) return target.error;
       const VALID_COLORS = ["default", "red", "orange", "yellow", "green", "blue", "purple"];
       const results = [];
-      let cards = [...state.boardCards];
+      let cards = [...target.board.cards];
 
       for (const op of ops) {
         if (op.action === "add") {
@@ -382,19 +416,60 @@ const TOOLS = {
         }
       }
 
-      setBoardCards(cards);
-      return `执行 ${ops.length} 项操作：\n${results.join("\n")}`;
+      setBoardCards(cards, target.board.id);
+      return `${boardLabel(target.board)}：执行 ${ops.length} 项操作：\n${results.join("\n")}`;
     },
   },
 
   board_clear: {
     name: "清空黑板",
-    description: "清除黑板上所有卡片",
+    description: "清除一块黑板上的所有卡片（文字与笔迹不受影响）",
+    params: {
+      board: { type: "string", description: "目标黑板 ID（默认当前黑板）" },
+    },
+    async execute({ board: boardRef } = {}) {
+      const target = resolveBoardTarget(boardRef);
+      if (target.error) return target.error;
+      const count = target.board.cards.length;
+      setBoardCards([], target.board.id);
+      return `${boardLabel(target.board)}：已清空${count} 张卡片`;
+    },
+  },
+
+  board_list: {
+    name: "列出黑板",
+    description: "列出黑板（ID、标题、张数、当前）；操作别的板前先查 ID。",
     params: {},
     async execute() {
-      const count = state.boardCards.length;
-      setBoardCards([]);
-      return `已清空${count} 张卡片`;
+      const boards = boardsOf();
+      const lines = boards.map(board => {
+        const userCards = board.cards.filter(c => !c._isToolStep).length;
+        const stepCards = board.cards.length - userCards;
+        const mark = board.id === state.activeBoardId ? "*" : " ";
+        const steps = stepCards > 0 ? `，含 ${stepCards} 张步骤卡` : "";
+        return `${mark} ${board.title}（id: ${board.id}，${userCards} 张卡片${steps}）`;
+      });
+      return `黑板 ${boards.length} 块（* 为当前）：\n${lines.join("\n")}`;
+    },
+  },
+
+  board_open: {
+    name: "切换或新建黑板",
+    description: "切换到已有黑板（按 ID 或唯一标题），或新建一块空白黑板。新建后它成为当前黑板。",
+    params: {
+      board: { type: "string", description: "要切换到的黑板 ID 或唯一标题" },
+      create: { type: "string", description: "新建黑板的标题；传了就新建而不是切换" },
+    },
+    async execute({ board: boardRef, create } = {}) {
+      if (create) {
+        const board = createBoard({ title: create });
+        return `已新建黑板「${board.title}」（id: ${board.id}）`;
+      }
+      if (!boardRef) return "需要 board（要切换的黑板）或 create（新黑板标题）";
+      const target = resolveBoardTarget(boardRef);
+      if (target.error) return target.error;
+      switchBoard(target.board.id);
+      return `已切到黑板「${target.board.title}」（id: ${target.board.id}）`;
     },
   },
 
@@ -1609,7 +1684,7 @@ const CORE_AGENT_TOOLS = [
   "project_info", "project_files", "project_find_file", "project_read_file",
   "code_search", "skill_search", "skill_run", "actions_list", "actions_read", "actions_write",
   "file_edit", "file_create", "file_append",
-  "todo_manage", "board_read", "board_batch",
+  "todo_manage", "board_read", "board_batch", "board_list",
   // 收口工具必须在精简目录里可见：弱端点只看得到核心集，缺了它们就只能靠轮数耗尽退出
   "exit_target_mode", "exit_autopilot",
 ];
@@ -2256,9 +2331,9 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
 
   // 黑板策略（第四批压成三行：颜色与"批量优先"本来 board_batch 自己的描述里就有）
   s += "[黑板策略 / board_* 工具]\n";
-  s += "黑板是可视化工作区，卡片是结构化思维单元——用户讨论复杂问题、多步骤任务、系统设计，或说「整理一下」「梳理一下」「画个流程图」时，主动把拆解结果投上去。\n";
-  s += "- 一次成型用 board_batch（别逐个 board_add），改前先 board_read；卡片之间用 arrows 表达依赖/数据流；标题不超过 10 字、详情不超过 3 行\n";
-  s += "- 颜色按性质给：red 问题/阻塞、orange 进行中、yellow 待讨论、green 已完成、blue 信息/数据、purple 创意\n\n";
+  s += "复杂问题、多步骤任务或「梳理/画流程图」时，把拆解结果投到黑板。\n";
+  s += "- 批量用 board_batch（别逐个 board_add），改前先 board_read；多块板先 board_list 查 ID；arrows 表达依赖；标题≤10、详情≤3 行\n";
+  s += "- 颜色：red 问题、orange 进行中、yellow 讨论、green 完成、blue 信息、purple 创意\n\n";
 
   // 三个文件类工具共用一份规则：以前每个工具各写一段，同一条限制重复三遍（第四批合并）
   s += "[文件写入规则 / file_edit · file_create · file_append]\n";
