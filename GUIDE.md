@@ -241,6 +241,7 @@ Harness 是 SLATE 的「自动驾驶」模式——你只需说清目标，模�
 - AI 可自动创建卡片（分析结果、方案对比等）
 - 手动拖拽卡片、建立连线
 - 顶栏可切换 Git / 流程 / 看板 / 纲要等显示模式；主黑板就是默认自由画布
+- 标签页可同时打开多块黑板（双击改名、× 关闭、＋ 新建），每块保留自己的显示模式与步骤开关；整块黑板可导出为 `.slml`，也能从 `.slml` 导入成新板
 - Git 树会识别当前项目的 Git 要素：HEAD、branch、remote branch、commit、tag、remote、worktree、stash、暂存 / 修改 / 未跟踪、未推送提交；节点和视野都可拖动
 - 支持 4 种 AI 白板工具：
   - `card_create` 创建卡片
@@ -688,6 +689,7 @@ Visual cards + connections system for reasoning and planning.
 - AI auto-creates cards (analysis results, comparisons)
 - Drag cards, create connections manually
 - Switch display modes from the whiteboard header: Git, Flow, Kanban, Outline and Workflow. The main whiteboard is the default freeform canvas.
+- Tabs hold several boards at once (double-click to rename, × to close, + to create); each keeps its own display mode and step toggle, and any board exports to `.slml` or imports from one as a new board.
 - Git Tree recognizes the opened project's Git elements: HEAD, branches, remote branches, commits, tags, remotes, worktrees, stash, staged/changed/untracked counts, and unpushed commits. Nodes and the canvas viewport are draggable.
 - 4 AI whiteboard tools:
   - `card_create` — Create cards
