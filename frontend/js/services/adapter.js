@@ -3,9 +3,9 @@
  * 根据不同模型特点优化提示。
  */
 
-import { state } from "../store.js?v=20261108-002";
-import { getToolsSystemPrompt } from "./tools.js?v=20261108-002";
-import { catalogForScope } from "./project_scope.js?v=20261108-002";
+import { state } from "../store.js?v=20261108-003";
+import { getToolsSystemPrompt } from "./tools.js?v=20261108-003";
+import { catalogForScope } from "./project_scope.js?v=20261108-003";
 
 // ── System Prompt 模板 ──────────────────────
 
@@ -220,7 +220,11 @@ function buildSystemContent(modelId, constitution, opts = {}) {
     // 只给目录读不到正文，反而诱导模型声称"已按流程执行"。
     systemContent += getActionsSystemPrompt(opts.project);
     // 工具目录按这一场的模式裁剪：模式没开放的工具连目录都不出现（白名单见 tools.js modeAllowsTool）
-    systemContent += getToolsSystemPrompt({ compact: true, project: opts.project || null, mode: opts.mode || null });
+    systemContent += getToolsSystemPrompt({
+      compact: true, project: opts.project || null, mode: opts.mode || null,
+      // 中枢工具只在中枢会话的目录里出现；普通会话连名字都不给
+      hub: opts.hub === true,
+    });
   }
 
   // 模式追加放在最后：它是"这一场怎么跑"的语气与侧重，贴着最近处才不容易被长目录冲淡
@@ -251,6 +255,8 @@ function buildMessages(userMessages, constitution, toolMode = "text", opts = {})
       project: opts.project || userMessages._project || null,
       // 回复模式：只带"追加提示词"用；工具白名单与三条旋钮在各自的调用点生效
       mode: opts.mode || userMessages._mode || null,
+      // 中枢：这条线程是不是中枢会话，决定工具目录里出不出跨会话/全局管理那七项
+      hub: opts.hub === true || userMessages._hub === true,
     }),
   });
 

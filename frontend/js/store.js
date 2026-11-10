@@ -3,8 +3,8 @@
  * 管理主题、模型（per-model API key）、对话历史、用量统计、黑板卡片
  */
 
-import { makeId } from "./services/utils.js?v=20261108-002";
-import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261108-002";
+import { makeId } from "./services/utils.js?v=20261108-003";
+import { FLAG_KINDS, normalizeTaskFlags, normalizeTaskListSort } from "./services/task_list.js?v=20261108-003";
 
 const API_ORIGIN = typeof window !== "undefined" && window.location?.origin
   ? window.location.origin
@@ -206,6 +206,8 @@ const state = {
   currentConversationId: null,
   conversations: [],
   messages: [],
+  // 中枢会话的 id：只存本机（同 taskFlags）。它是一条普通会话记录，指针丢了大不了重建一条
+  hubConversationId: null,
 
   // 黑板：boards 是唯一真相，下面三个数组是「当前板」的镜像（旧读取方不用改）
   boards: [],
@@ -592,6 +594,8 @@ function buildPersistentData() {
     lastProjectPath: state.project?.workspace_dir || state.project?.path || null,
     conversationUsage: state.conversationUsage,
     conversationTodos: state.conversationTodos,
+    // 中枢指针只存本机：哪条会话是"这台设备上的中枢"是本地编排，后台一场不该读到别的机器的选择
+    hubConversationId: state.hubConversationId || null,
     taskFlags: state.taskFlags,
     taskListSort: normalizeTaskListSort(state.taskListSort),
     todoPanelOpen: state.todoPanelOpen !== false,
@@ -985,6 +989,8 @@ function loadPersistent() {
     state._lastProjectPath = data.lastProjectPath || null;
     state.conversationUsage = data.conversationUsage || {};
     state.conversationTodos = data.conversationTodos || {};
+    state.hubConversationId = typeof data.hubConversationId === "string" && data.hubConversationId
+      ? data.hubConversationId : null;
     state.taskFlags = normalizeTaskFlags(data.taskFlags);
     state.taskListSort = normalizeTaskListSort(data.taskListSort);
     state.todoPanelOpen = data.todoPanelOpen !== false;
@@ -1957,6 +1963,20 @@ function setConversations(list) {
   notify("conversations", list);
 }
 
+// 中枢：一条普通会话 + 一个本机指针。指针不是权限档——工具是否可见由 hub 标记决定，
+// 指针丢了最多重建一条会话，绝不能因此把普通会话当成中枢。
+function isHubConversation(convId = state.currentConversationId) {
+  return Boolean(state.hubConversationId) && String(convId || "") === String(state.hubConversationId);
+}
+
+function setHubConversationId(convId) {
+  const next = convId ? String(convId) : null;
+  if (state.hubConversationId === next) return;
+  state.hubConversationId = next;
+  savePersistent();
+  notify("hub", next);
+}
+
 function setBoardCards(cards, boardId = "") {
   const board = boardId ? boardById(boardId) : activeBoard();
   if (!board) return;
@@ -2204,7 +2224,7 @@ export {
   adoptConversationPermissionMode, forgetConversationPermissionMode,
   loadSharedPersistent,
   setMessages, addMessage, updateLastAssistantMessage, messagesOf, hasThread, dropThread, bindVisibleThread,
-  setConversations, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,
+  setConversations, isHubConversation, setHubConversationId, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes,
   boardsOf, boardById, activeBoard, createBoard, switchBoard, renameBoard, removeBoard, setBoardPrefs,
   setConstitution, effectiveConstitution, constitutionScope, setSkills, setActions, setModelRegistry,
   setProject, setProjectFileTree, setProjects, projectEntryOf,

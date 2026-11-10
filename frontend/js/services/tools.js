@@ -12,18 +12,22 @@
  *   ◈◆◆
  */
 
-import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor, MODE_TOOLS_NONE, MODE_READONLY_TOOLS, BUILTIN_MODES, addMode, updateMode, removeMode, modeById, activeBoard, boardById, boardsOf, createBoard, switchBoard } from "../store.js?v=20261108-002";
-import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261108-002";
-import { guardSkillCall } from "./riskguard.js?v=20261108-002";
-import { isTruncatedUnexecutable } from "./agent_common.js?v=20261108-002";
-import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261108-002";
-import { t } from "./i18n.js?v=20261108-002";
-import { makeId } from "./utils.js?v=20261108-002";
-import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261108-002";
-import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261108-002";
-import { noteBgTaskStarted } from "./bg_tasks.js?v=20261108-002";
-import { isAiToolOff, isAiFeatureOn } from "./ai_features.js?v=20261108-002";
-import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261108-002";
+import { state, addBoardCard, setBoardCards, getConversationTodos, setConversationTodos, setActions, setHarnessEnabled, requestLoopExit, effectiveConstitution, permissionModeFor, MODE_TOOLS_NONE, MODE_READONLY_TOOLS, BUILTIN_MODES, addMode, updateMode, removeMode, modeById, activeBoard, boardById, boardsOf, createBoard, switchBoard } from "../store.js?v=20261108-003";
+import { get, post, put, runSkillStream, REASONING_PREFIX, REASONING_INLINE_PREFIX } from "../services/api.js?v=20261108-003";
+import { guardSkillCall } from "./riskguard.js?v=20261108-003";
+import { isTruncatedUnexecutable } from "./agent_common.js?v=20261108-003";
+import { dlgUserAsk, dlgConfirm } from "./dialog.js?v=20261108-003";
+import { t } from "./i18n.js?v=20261108-003";
+import { makeId } from "./utils.js?v=20261108-003";
+import { runSubAgents, getSubAgentSignal, SUBAGENT_MAX_PARALLEL, SUBAGENT_OUTPUT_LIMIT } from "./subagent.js?v=20261108-003";
+import { startSubAgentJob, BG_SUBAGENT_MAX_JOBS } from "./subagent_jobs.js?v=20261108-003";
+import { noteBgTaskStarted } from "./bg_tasks.js?v=20261108-003";
+import { isAiToolOff, isAiFeatureOn } from "./ai_features.js?v=20261108-003";
+import { projectScopeOf, catalogForScope, forgetScopeCatalog } from "./project_scope.js?v=20261108-003";
+import {
+  HUB_TOOL_KEYS, runSessionList, runSessionRead, runSessionDispatch,
+  runExtensionsList, runExtensionManage, runWorkspaceList, runWorkspaceManage,
+} from "./hub.js?v=20261108-003";
 
 // 一次工具调用的"项目视野"：并行时后台那一场带着它自己的项目进来（ctx.project），
 // 没有 ctx 的旧调用点照旧读 state.project。这条是 P2 的串台防线——少了它，
@@ -1548,7 +1552,93 @@ const TOOLS = {
       return exitAgentLoop("autopilot", summary);
     },
   },
+
+  // ── 中枢专用：跨会话 / 扩展 / 工作区。普通会话里目录不出现、执行也会被拒 ──
+  session_list: {
+    name: "会话清单",
+    description: "中枢专用：列出本机会话（id、标题、项目、更新时间、条数）。读别的会话内容或派发前先用它拿 id；scope=project 只看当前项目。",
+    params: {
+      scope: { type: "string", description: "all 全部（默认）/ project 当前项目" },
+      archived: { type: "boolean", description: "是否包含已归档会话，默认 false" },
+      limit: { type: "number", description: "最多返回几条，默认 80" },
+    },
+    async execute(args) {
+      return runSessionList(args || {});
+    },
+  },
+  session_read: {
+    name: "读取其他会话",
+    description: "中枢专用：按 id 读取指定会话最近的用户/助手消息（过滤系统注入与隐藏消息）。内容可能很长，默认只取最近 30 条。",
+    params: {
+      id: { type: "string", description: "会话 id（来自 session_list）", required: true },
+      limit: { type: "number", description: "读取最近几条，默认 30，最多 80" },
+    },
+    async execute(args) {
+      return runSessionRead(args || {});
+    },
+  },
+  session_dispatch: {
+    name: "派发会话",
+    description: "中枢专用：把一条任务写进指定会话（id），不传 id 就新建一条会话再派发。目标会话按它自己的审批档与工具白名单执行；目标正在跑时拒绝，不排队也不抢占。",
+    params: {
+      id: { type: "string", description: "目标会话 id；省略则新建会话" },
+      title: { type: "string", description: "新建会话时的标题" },
+      project: { type: "string", description: "新会话归属的项目 id（可选）" },
+      text: { type: "string", description: "要派发的任务内容", required: true },
+    },
+    async execute(args, callCtx) {
+      return runSessionDispatch(args || {}, callCtx);
+    },
+  },
+  extensions_list: {
+    name: "扩展清单",
+    description: "中枢专用：列出扩展与状态。kind=skills 技能 / mcp 外部服务 / modes 回复模式 / experts 专家包 / actions 工作流动作。",
+    params: {
+      kind: { type: "string", description: "skills（默认）/ mcp / modes / experts / actions" },
+    },
+    async execute(args) {
+      return runExtensionsList(args || {});
+    },
+  },
+  extension_manage: {
+    name: "管理扩展",
+    description: "中枢专用：增删启停扩展。kind=mcp 支持 add/connect/disconnect/remove；skill 只支持 remove；mode 支持 save/remove；expert 支持 create/save/delete；action 支持 save/delete。data 是各操作自己的参数对象，先 extensions_list 查现状。",
+    params: {
+      kind: { type: "string", description: "mcp / skill / mode / expert / action", required: true },
+      action: { type: "string", description: "动作名（见工具说明）", required: true },
+      data: { type: "object", description: "动作参数：如 {id,name,url,transport,command}、{mode:{id,name}}、{id,content,scope}" },
+    },
+    async execute(args, callCtx) {
+      return runExtensionManage(args || {}, callCtx);
+    },
+  },
+  workspace_list: {
+    name: "工作区清单",
+    description: "中枢专用：列出当前项目/工作区、包含的文件夹，以及在册项目。管理工作区前先用它确认 id 与路径。",
+    params: {},
+    async execute() {
+      return runWorkspaceList();
+    },
+  },
+  workspace_manage: {
+    name: "管理工作区",
+    description: "中枢专用：打开/关闭/新建/切换工作区，增删文件夹，设活动项目、置顶或摘除注册表。动作：open/close/create/set_active/switch_root/add_folder/remove_folder/set_pinned/remove_registry。",
+    params: {
+      action: { type: "string", description: "动作名（见工具说明）", required: true },
+      path: { type: "string", description: "open/switch_root/add_folder/remove_folder 的绝对路径" },
+      name: { type: "string", description: "create 的工作区名" },
+      folders: { type: "array", description: "create 的文件夹绝对路径数组" },
+      project: { type: "string", description: "目标项目 id（set_active/switch_root/add_folder/remove_folder/set_pinned/remove_registry）" },
+      pinned: { type: "boolean", description: "set_pinned 用：true 置顶，false 取消" },
+      forget: { type: "boolean", description: "remove_registry 用：true 连带删 SLATE 私有数据" },
+    },
+    async execute(args, callCtx) {
+      return runWorkspaceManage(args || {}, callCtx);
+    },
+  },
 };
+
+const HUB_TOOL_SET = new Set(HUB_TOOL_KEYS);
 
 /**
  * 无限上下文的取回通道：压缩只折不删，被折掉的原文按关键词查得回来。
@@ -2128,6 +2218,10 @@ async function executeTool(name, params, callCtx = {}) {
   if (!modeAllowsTool(callCtx.mode, name)) {
     return { success: false, output: `[工具 ${name}] 未执行：当前回复模式没有开放这个工具（可换用模式内已开放的工具，或让用户切到更高的模式）。` };
   }
+  // 中枢工具只在中枢会话里执行：普通会话记住了工具名也调不到别人的聊天
+  if (HUB_TOOL_SET.has(name) && callCtx.hub !== true) {
+    return { success: false, output: `[工具 ${name}] 未执行：该工具只在中枢会话里可用（跨会话与全局管理仅限中枢）。` };
+  }
   const validationError = validateToolCall(name, params);
   if (validationError) {
     return { success: false, output: `[工具 ${name}] 未执行：${validationError}。请按该工具参数说明重发完整调用。` };
@@ -2210,6 +2304,9 @@ async function executeToolCalls(calls, ctx = {}) {
         project: ctx.project || null,
         // 回复模式的工具白名单：只有输入框那条链路显式带 mode 进来，后台路径不带＝不限制
         mode: ctx.mode || null,
+        // 中枢权限：由宿主按"发起这一轮的会话是不是中枢"判定后带进来；
+        // 这里不自己读 state，免得后台那场借用屏幕上的会话身份
+        hub: ctx.hub === true,
         onEvent: ctx.onEvent ? (env => ctx.onEvent(env, call, i)) : null,
       });
       // 本轮标识随结果走：预览没自动落盘时，「接受」按钮/移动 sheet 手里只有 structured，
@@ -2225,7 +2322,7 @@ async function executeToolCalls(calls, ctx = {}) {
 
 // ── 系统提示词工具段 ──────────────────────────
 
-function getToolsSystemPrompt({ minimal = false, compact = false, project = null, mode = null } = {}) {
+function getToolsSystemPrompt({ minimal = false, compact = false, project = null, mode = null, hub = false } = {}) {
   let s = "\n\n[可用工具]\n";
   s += "你拥有工具，可以直接操作用户的工作环境。有一条边界先说清楚：灾难级命令（清空根目录、格式化磁盘一类）由后端无条件硬拦，任何审批档位都不放行——撞到这类拒绝不要重试、不要换写法绕，直接告诉用户被拦与你的替代方案。\n\n";
   s += "**Agent 调用纪律**\n";
@@ -2271,14 +2368,24 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
     s += "\n";
   }
 
-  const toolEntries = (compact || minimal
+  const baseEntries = compact || minimal
     ? CORE_AGENT_TOOLS.filter(key => TOOLS[key]).map(key => [key, TOOLS[key]])
-    : Object.entries(TOOLS)
+    : Object.entries(TOOLS);
+  const toolEntries = baseEntries
   // 「AI 辅助功能」关掉的那几项（子代理 / 图片 / 视频）与当前模式没开放的工具，
   // 连目录里都不出现：模型看不到的工具才不会去调，比调完被拒少烧一轮。
-  ).filter(([key]) => !isAiToolOff(key) && modeAllowsTool(mode, key));
+  // 中枢工具只在中枢会话里出现；普通会话的目录里连名字都不给。
+  .filter(([key]) => !isAiToolOff(key) && modeAllowsTool(mode, key) && (hub || !HUB_TOOL_SET.has(key)))
+  .concat(hub ? HUB_TOOL_KEYS.filter(key => TOOLS[key] && !isAiToolOff(key) && modeAllowsTool(mode, key))
+    .map(key => [key, TOOLS[key]]) : []);
 
   s += compact || minimal ? "**核心 Agent 工具**\n" : "**工具目录**\n";
+  if (hub) {
+    s += "**中枢权限**：这条会话对整个 SLATE 有最高控制权——可以读取任意会话、向任意会话派发任务（必要时新建会话），"
+      + "并管理扩展（技能/模式/MCP/专家/工作流）与工作区。跨会话前先用 session_list 拿 id，读内容用 session_read。"
+      + "派发遵守目标会话自己的审批档与工具白名单；目标正在跑时会被拒绝，不要反复重试。"
+      + "扩展与工作区的写操作会动全局配置：先 extensions_list / workspace_list 核对现状，再执行并把改了什么说清楚。\n";
+  }
   // 自进化工具是用户自己长出来的能力，模型不看目录就不知道它们存在。
   // 停用的那份后端已经不进 catalog，所以这里列出来的都真能调。
   const evolvedNames = Object.keys(state.skills?.evolved || {}).slice(0, 8);
@@ -2309,7 +2416,7 @@ function getToolsSystemPrompt({ minimal = false, compact = false, project = null
   }
 
   if (compact || minimal) {
-    const extraNames = Object.keys(TOOLS).filter(key => !CORE_AGENT_TOOLS.includes(key) && !isAiToolOff(key) && modeAllowsTool(mode, key));
+    const extraNames = Object.keys(TOOLS).filter(key => !CORE_AGENT_TOOLS.includes(key) && !HUB_TOOL_SET.has(key) && !isAiToolOff(key) && modeAllowsTool(mode, key));
     if (extraNames.length) {
       s += `其他可用工具名：${extraNames.join(", ")}。不确定参数时优先使用 skill_run 调用内置技能或先读取相关上下文。\n\n`;
     }

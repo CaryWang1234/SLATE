@@ -5,16 +5,16 @@
 import {
   state, subscribe, setBoardCards, addBoardCard, setBoardNotes, setBoardStrokes, getModelKey,
   boardsOf, boardById, activeBoard, createBoard, switchBoard, renameBoard, removeBoard, setBoardPrefs,
-} from "../store.js?v=20261108-002";
-import { boardToSlml, slmlToBoard } from "../services/slml.js?v=20261108-002";
-import { aiModelFor, aiFeatureBlocked } from "../services/ai_features.js?v=20261108-002";
-import { get, streamChat } from "../services/api.js?v=20261108-002";
-import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20261108-002";
-import { t } from "../services/i18n.js?v=20261108-002";
-import { iconSvgEl } from "../services/icons.js?v=20261108-002";
-import { makeId } from "../services/utils.js?v=20261108-002";
-import { reportError } from "../services/error_sink.js?v=20261108-002";
-import { renderWorkflowView, startWorkflowTick, stopWorkflowTick, initBoardWorkflow } from "./board_workflow.js?v=20261108-002";
+} from "../store.js?v=20261108-003";
+import { boardToSlml, slmlToBoard } from "../services/slml.js?v=20261108-003";
+import { aiModelFor, aiFeatureBlocked } from "../services/ai_features.js?v=20261108-003";
+import { get, streamChat } from "../services/api.js?v=20261108-003";
+import { dlgConfirm, dlgToast } from "../services/dialog.js?v=20261108-003";
+import { t } from "../services/i18n.js?v=20261108-003";
+import { iconSvgEl } from "../services/icons.js?v=20261108-003";
+import { makeId } from "../services/utils.js?v=20261108-003";
+import { reportError } from "../services/error_sink.js?v=20261108-003";
+import { renderWorkflowView, startWorkflowTick, stopWorkflowTick, initBoardWorkflow } from "./board_workflow.js?v=20261108-003";
 
 // 逐元素求极值：把整个数组当实参展开时，笔迹点上万会让 V8 抛
 // RangeError: Maximum call stack size exceeded，所以这里一律不展开。

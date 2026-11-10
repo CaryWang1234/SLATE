@@ -2350,5 +2350,8 @@ export const EN_DICT = {
   "输入消息…": "Type a message…",
   "记忆": "Memory",
   "待办": "Tasks",
+  "中枢": "Hub",
+  "最高控制权 · 跨会话 / 扩展 / 工作区": "Highest control · sessions / extensions / workspaces",
+  "创建中枢会话失败": "Failed to create the hub session",
 
 };

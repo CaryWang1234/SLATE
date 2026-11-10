@@ -13325,3 +13325,16 @@ html[data-ui="codex"] .msg-assistant {
   .bw-live-step.is-running .bw-live-dot { animation: none; }
 }
 
+/* 中枢：置顶那一行。克制的单色工程风——只靠左侧墨标与底色区分，不做渐变与彩色 */
+.conv-hub { margin-bottom: 6px; border-left: 2px solid var(--text); background: var(--bg-soft, var(--bg)); }
+.conv-hub.active { background: var(--bg-active, var(--bg-soft, var(--bg))); }
+.conv-hub-mark { flex: 0 0 auto; color: var(--text); font-size: 13px; line-height: 1; padding-right: 2px; }
+.conv-hub .conv-item-title { font-weight: 600; }
+.codex-hist-hub {
+  display: block; width: 100%; margin: 0 0 6px; padding: 7px 10px;
+  border: 0; border-left: 2px solid var(--text); border-radius: 0;
+  background: var(--bg-soft, var(--bg)); color: var(--text);
+  font: inherit; font-weight: 600; text-align: left; cursor: pointer;
+}
+.codex-hist-hub.active { background: var(--bg-active, var(--bg-soft, var(--bg))); }
+
