@@ -110,6 +110,12 @@ SLATE 支持同时接入多个模型，在对话界面顶部下拉框随时切�
 - 等结果期间你又改了草稿（包括语音听写实时写进去的字），这次结果会被放弃，不会盖掉你新写的
 - 用哪个模型可在「设置 → AI 辅助功能 → 提示词优化」单独指定；关掉后一次请求都不发
 
+**中枢对话（侧栏置顶那条）：**
+- 对 SLATE 拥有最高控制权：可以列出并读取任意会话、向某一条派发任务（不给 id 就先新建一条），也能管理扩展与工作区
+- 这组能力只在中枢会话里出现：普通会话的工具目录里连名字都没有，硬调也会在执行口被拒并说明原因
+- 派发走的是同一条单场运行闸门，目标会话用自己那场的审批档、项目与工具白名单；目标正在跑时拒绝而不是抢占，槽位满时如实排进等待队列
+- 中枢是一条普通会话，聊天记录照常持久化；删掉它只会清掉「哪一条是中枢」这个指针，不会动别的会话
+
 **快捷键：**
 - `Enter` 发送消息
 - `Shift + Enter` 换行
@@ -566,6 +572,12 @@ SLATE supports multiple models simultaneously — switch anytime from the top dr
 - **Keep original**, `Esc` or clicking outside all decline it; the input box does not change by a single character
 - If the draft changes while you wait (voice dictation included), that rewrite is dropped instead of overwriting what you typed
 - Which model does it is pinned under Settings → AI Assistance → Prompt polish; switch it off and it never sends a request
+
+**Hub conversation (the pinned row at the top of the sidebar):**
+- It holds the highest authority over SLATE: list and read any conversation, dispatch a task into one (creating a new one first when no id is given), and manage extensions and workspaces
+- Those capabilities exist only in the hub: other conversations do not even list the names, and a call made from memory is refused at the execute gate with the reason stated
+- Dispatches reuse the same per-conversation run guard — the target keeps its own approval mode, project and tool whitelist; a running target is refused rather than pre-empted, and a full slot reports that it was queued
+- The hub is an ordinary conversation, so its transcript persists like any other; deleting it only clears the "which one is the hub" pointer and leaves the other conversations untouched
 
 **Shortcuts:**
 - `Enter` to send
