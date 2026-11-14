@@ -24,7 +24,7 @@
 ; 构建号（yyyyMMddHHmm）。发布构建由 CI 用 /DMyAppBuild= 注入，本地构建用下行默认值
 #ifdef MyAppBuild
 #else
-  #define MyAppBuild "202611062054"
+  #define MyAppBuild "202611142334"
 #endif
 #define MyAppPublisher "SLATE"
 #define MyAppURL "https://github.com/CaryWang1234/SLATE"
